@@ -1,0 +1,156 @@
+syntax = "proto3";
+
+package g1.protocol;
+
+// 每个回包都需要包含的返回值
+message Ret {
+    int32 ret = 1;
+    string msg = 2;
+    int32 argv = 3;
+}
+
+enum EKickOutReason {
+    UNKNOWN = 0;
+    HEARTBEAT_TIMEOUT = 1;
+    MULTI_PLACE_LOGIN = 2;
+}
+
+// 玩家数据段
+enum ERoleSectionFlag {
+    _ERoleSectionFlag_ZERO = 0;
+
+    ALL                 = -1;
+    REGISTER_INFO       = 0x00000001;
+    LOGIN_INFO          = 0x00000002;
+    DESC_INFO           = 0x00000004;
+    BASIC_INFO          = 0x00000008;
+    INVENTORY_INFO      = 0x00000010;
+    ICON_INFO           = 0x00000020;
+    MALL_INFO           = 0x00000040;
+    MAIN_TASK_INFO      = 0x00000080;
+    GUILD_INFO          = 0x00000100;
+    GUIDE_INFO          = 0x00000200;
+    OPEN_FUNC_INFO      = 0x00000400;
+    ACTVITY_TASK_INFO   = 0x00000800;
+}
+
+// 一些常用的道具ID
+enum EItemID {
+    _ITEM_ID_NONE = 0;
+    GOLD = 10101002;
+    DIAMOND = 10101003;
+    MONEY  = 10101004;
+    GUILDGOLD = 10101007;
+    GUILDEXP = 10101008;
+    LIVENESS = 10101009;
+    SINEW = 10101001;
+    EXP = 10201001;
+    CHANGE_NAME_CARD = 20101001;
+}
+
+enum EItemType {
+    _ITEM_TYPE_NONE = 0;
+    DROP = 9;
+}
+
+// 道具类型
+enum EItemMainType {
+    _ITEM_MAIN_TYPE_NONE = 0;
+    ICON = 701;
+    HERO_CARD = 401;
+	  EQUIP = 501;
+    ARTIFACT = 601;
+    PACKAGE = 901;
+}
+
+enum EItemSubType {
+    _ITEM_SUB_TYPE_NONE = 0;
+
+    ICON_ICON = 70101;
+    ICON_FRAME = 70102;
+
+}
+
+
+
+
+
+// 红点系统枚举
+enum ERedPointSystem {
+    _RED_POINT_SYSTEM_NONE = 0;
+    RED_POINT_ICON = 1;
+    RED_POINT_FRAME = 2;
+    RED_POINT_CARD = 3;
+    RED_POINT_ACHIEVEMENT = 4;
+
+}
+
+
+
+enum MailType {
+    _MAIL_TYPE_NONE = 0;
+    MAIL_TYPE_SYSTEM = 1;
+    MAIL_TYPE_SYSTEM_TEMPLATE = 2;
+    MAIL_TYPE_USER = 3;
+}
+
+
+
+// 聊天频道
+enum ChatChannel {
+    _CHAT_CHANNEL_NONE = 0;
+    CHAT_CHANNEL_HALL = 1;      // 综合
+    CHAT_CHANNEL_GUILD = 2;     // 公会
+    CHAT_CHANNEL_FRIEND = 3;    // 好友
+}
+
+// 任务更新方法
+enum TaskCountType {
+    _TASK_COUNT_TYPE_NONE = 0;
+    TASK_COUNT_TYPE_ADD = 1;    // 累加
+    TASK_COUNT_TYPE_MAX = 2;    // 更新最大值
+}
+
+enum TaskName {
+    _TASK_NAME_NONE = 0;
+    TASK_ROLE_LEVEL             = 1;           //指挥官等级
+    TASK_PASS_INSTANCE          = 2;         //通过制定关卡    1002;
+    TASK_USE_ITEM               = 3;           //消耗物品
+    TASK_GENREAL_INSTANCE       = 4;            //普通副本次数
+    TASK_ELITE_INSTANCE         = 5;            //精英副本次数
+    TASK_EVERYDAY_LOGIN         = 6;            // 登录汇总
+    TASK_TODAY_LOGIN            = 7;            // 当天登录标记
+    TASK_HERO_LEVEL             = 8;           //英雄解锁
+    TASK_HERO_STAR              = 9;           //英雄星级
+    TASK_HERO_QUALITY           = 10;           //英雄品质
+    TASK_HERO_SKILL_LEVEL       = 11;           //英雄品质
+}
+
+
+
+enum ActvityTaskUpdateType {
+    AT_NULL_TYPE           = 0;            // 默认
+    AT_UPDATE_TYPE         = 1;            // 更新
+    AT_DELETE_TYPE         = 2;            // 删除
+}
+
+enum ActvityTaskCompareType {
+    C_NULL_TYPE             = 0;            // 默认 null
+    EQUAL_TYPE              = 1;            // 等于
+    BIG_AND_EQUAL_TYPE      = 2;            // 大等于
+    SMALL_AND_EQUAL_TYPE    = 3;            // 小等于
+}
+
+enum ActvityTaskAwardType {
+    A_NULL_TYPE             = 0;            // 默认 未完成无奖励
+    UNCLAIMED_TYPE          = 1;            // 有奖励未领取
+    AUTO_TYPE               = 2;            // 直接已发放
+    ALREADY_TYPE            = 3;            // 玩家已领取
+
+}
+
+enum ActvityTaskReceiveType {
+    R_NULL_TYPE             = 0;            // 默认 NULL
+    MANUAL_RECEIVE_TYPE     = 1;            // 手动发放
+    AUTO_RECEIVE_TYPE       = 2;            // 自动发放
+}

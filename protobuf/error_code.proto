@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package g1.protocol;
+
+enum ErrorCode
+{
+    // 公共错误码，范围：[-99,0]
+    ERR_OK                          = 0;
+    ERR_FAIL                        = -1;
+    ERR_TIMEOUT                     = -2;
+    ERR_MARSHAL                     = -3;
+    ERR_NOT_EXIST                   = -4;
+    ERR_DB                          = -5;
+    ERR_CONF                        = -6;
+    ERR_ARGV                        = -7;
+    ERR_ZONE                        = -8;
+
+    ERR_INSTANCE_NOT_AVAILABLE      = -10001;   // 副本未开放
+    ERR_ITEM_NOT_ENOUGH             = -10002;   // 道具数量不足
+    ERR_ITEM_ADD_ERROR              = -10003;   // 添加道具失败
+    ERR_ITEM_CARD_NOT_EXIST         = -10004;   // 卡牌不存在
+    ERR_INSTANCE_NOT_PASS           = -10005;   // 章节未通关
+    ERR_REWARD_ALREADY_GET          = -10006;   // 奖励重复领取
+    ERR_SINEW_NOT_ENOUGH            = -10007;   // 体力不足
+    ERR_GOLD_NOT_ENOUGH             = -10008;   // 金币不足
+    ERR_DIAMOND_NOT_ENOUGH          = -10009;   // 砖石不足
+
+    ERR_RES_INSTANCE_MAX_TIMES      = -10010;   // 达到最大挑战次数
+    ERR_RES_INSTANCE_NOT_OPEN       = -10011;   // 资源副本未开放
+    ERR_RES_INSTANCE_MAX_BUY_TIMES  = -10012;
+
+    ERR_FURY_COIN_NOT_ENOUGH        = -10013;   // 狂暴币不足
+    ERR_SEMICONDUCTOR_NOT_ENOUGH    = -10014;   // 半导体不足
+
+    ERR_ICON_NOT_HAVE               = -10020;   // 头像未获得
+    ERR_FRAME_NOT_HAVE              = -10021;   // 相框未获得
+    ERR_IMAGE_NOT_HAVE              = -10022;   // 立绘未获得
+    ERR_INVALID_NAME                = -10023;   // 名字不合法
+    ERR_SENSITIVE_WORD              = -10024;   // 敏感词
+    ERR_DUPLICATE_NAME              = -10025;   // 名字已经存在
+
+    ERR_HERO_MAX_STAR               = -10030;   // 英雄星级满
+    ERR_HERO_MAX_LEVEL              = -10031;   // 英雄等级已满
+
+    ERR_FRIEND_ALREADY_FRIEND       = -10050;   // 对方已经是好友
+    ERR_FRIEND_NOT_EXIST            = -10051;   // 好友不存在
+    ERR_FRIEND_MAX_INVITATION_NUM   = -10052;
+    ERR_FRIEND_OTHER_MAX_INVITATION_NUM = -10053; // 对方好友申请已满
+    ERR_FRIEND_INVITATION_NOT_EXIST = -10054;
+    ERR_FRIEND_MAX_FRIEND_NUM       = -10055;   // 好友数量满
+    ERR_FRIEND_OTHER_MAX_FRIEND_NUM = -10056;   // 对方好友数量满
+    ERR_FRIEND_SHIELD               = -10057;   // 玩家被屏蔽
+    ERR_FRIEND_MAX_SHIELD           = -10058;   // 黑名单达到上限
+
+
+    ERR_MAIN_TASK_NOT_FINISH        = -10150;
+
+    ERR_GUIDE_IS_EXIST              = -10187;       // 该引导已经存在
+    ERR_FUNCTION_NOT_OPEN           = -10188;       // 功能未开放
+
+    // 排行榜
+    ERR_RANK_TYPE_ERROR             = -90000;       // 排行榜类型错误
+}

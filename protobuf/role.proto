@@ -1,0 +1,169 @@
+syntax = "proto3";
+
+package g1.protocol;
+
+message RoleRegisterInfo {
+    uint64 uid = 1;
+    int32 register_time = 2;
+    int32 zone = 3;
+    int32 time_offset_minute = 4;
+}
+
+message RoleLoginInfo {
+    int32 last_login_time = 1;
+    int32 last_logout_time = 2;
+    int32 last_hart_beat_time = 3;
+    int32 now_login_time = 4;
+}
+
+message RoleDescInfo {
+    string name = 1;
+    int32 icon_id = 2;  // 当前头像
+    int32 frame_id = 3; // 当前相框
+    uint32 free_cnt = 4; //免费改名次数
+}
+
+message RoleBasicInfo {
+    int32 level = 1;     // 等级
+    int32 exp = 2;       // 经验
+    int32 gold = 3;      // 金币
+    int32 diamond = 4;   // 钻石
+    int32 sinew = 5;     // 体力
+    int32 liveness = 6;     // 活跃度
+    int32 guild_coin = 7;  //公会币
+}
+
+// 道具信息
+message PbItem {
+    int32 id = 1;
+    int32 count = 2;
+}
+
+message RoleInventoryInfo {
+    repeated PbItem item_list = 1;
+}
+
+
+
+// 头像
+message PbIcon {
+    int32 id = 1;
+    bool red_point = 2;
+}
+
+// 头像框
+message PbFrame {
+    int32 id = 1;
+    bool red_point = 2;
+}
+
+// 头像
+message RoleIconInfo {
+    repeated PbIcon icon_list = 1;
+    repeated PbFrame frame_list = 2;
+}
+
+
+
+// 商城礼包
+message PbMallItem {
+    int32 conf_id = 1;
+    int32 daily_buy_count = 2;
+    int32 total_buy_count = 3;
+}
+
+// 商城礼包
+message RoleMallInfo {
+    repeated PbMallItem item_list = 1;
+}
+
+message PbTask {
+    int32 task_id = 1;
+    int32 argv1 = 2;
+    int32 argv2 = 3;
+    int32 argv3 = 4;
+    int32 progress = 5;
+    int32 task_type = 6;
+    int32 has_award = 7;  //完成奖励   0未领取 1可领取，2自动发放，3手动领取
+}
+
+message RoleTaskInfo {
+    repeated PbTask task_list = 1;
+}
+
+
+// 主线任务
+message RoleMainTaskInfo {
+    int32 cur_task_id = 1;
+    bool finished = 2;
+}
+
+
+
+// 个人公会信息 ,例如公会副本，商场购买记录等
+message RoleGuildInfo {
+    uint64 gid = 1;
+    string name = 2;
+    int32 title = 3;
+    uint32 donate_cnt = 4;
+}
+
+//玩家引导ID
+message RoleGuideInfo {
+    repeated int32 id_lis = 1;              // 已经完成
+    int32  cur_id         = 2;              // 正在进行的ID
+}
+
+// 功能开放列表
+message RoleOpenFunction {
+    repeated int32    data  = 1;            // 已经开放的功能ID
+    bool  is_all_open       = 2;            // 测试用,上线后删除该字段
+}
+
+// 礼包码
+message RoleGiftExchangeInfo {
+    repeated int32 type_list = 1;           // 已经领取过的礼包类型
+}
+
+//活动任务,日常，成就等
+message RoleActvityTaskInfo {
+    repeated PbTask task_list = 1;
+}
+
+
+// 角色的所有数据
+message RoleInfo {
+    RoleRegisterInfo        register_info       = 1;
+    RoleLoginInfo           login_info          = 2;
+    RoleDescInfo            desc_info           = 3;
+    RoleBasicInfo           basic_info          = 4; // role base
+    RoleInventoryInfo       inventory_info      = 5; // 背包数据
+    RoleIconInfo            icon_info           = 6; // 头像资源
+    RoleMallInfo            mall_info           = 7; // 商城
+    RoleMainTaskInfo        main_task_info      = 8; // 主线任务
+    RoleGuildInfo           guild_info          = 9; // 公会
+    RoleGuideInfo           guide_info          = 10; // 引导数据
+    RoleOpenFunction        open_fun_info       = 11; // 功能开放
+    RoleGiftExchangeInfo    gift_info           = 12; // 礼包兑换
+    RoleActvityTaskInfo     actvity_Info        = 13; //活动任务，日常等
+    ConnSvrInfo             conn_svr_info       = 100;   // 服务器用，客户端不用管
+}
+
+message ConnSvrInfo {
+    uint32 bus_id = 1;
+    string client_pos = 2;
+    //    optional uint32 client_ip = 3;
+}
+
+// 玩家头像框需要的信息
+message PbIconDesc {
+    uint64 uid = 1;
+    string name = 2;
+    int32 icon = 3;
+    int32 frame = 4;
+    int32 level = 5;
+    int32 vip_level = 6;
+
+    int32 last_online_time = 30;
+    bool is_online = 31;
+}

@@ -1,0 +1,7 @@
+{
+  "SelfBusId" : "1.1.1.{{ instance_id }}",
+  "ZKAddr" : "{{ zk_address }}",
+  "RabbitMQAddr" : "{{ rabbitmq_address }}",
+  "LoginSdkAddr" : "{{ LoginSdkAddr }}",
+  "ListenPort" : 13200
+}

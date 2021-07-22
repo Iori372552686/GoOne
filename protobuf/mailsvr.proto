@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package g1.protocol;
+
+import "common.proto";
+import "role.proto";
+
+message PbMail {
+    int32 id = 1;
+    int32 type = 2;     // in common.proto  MailType
+    int32 conf_id = 3;  // 邮件配置表中id
+    int32 create_time = 4;  // 创建时间
+    repeated PbItem attach_list = 5; // 邮件附件
+    uint64 sender = 6;   // 好友邮件需要设置uid
+
+    bool read = 10;     // 是否已读
+    bool attach_get = 11;   // 附件是否领取
+
+    string title = 20;
+    string content = 21;
+    repeated string content_argv = 22;
+
+    int32 remove_start_time = 50; // 邮件删除开始计时
+}
+
+message MailInfo {
+    uint64 uid = 1;
+    repeated PbMail mail_list = 2;
+    int32 cur_mail_id = 3;
+    repeated int32 add_mail_list = 4; // 记录配置表中已经发放的邮件，防止重复发放
+}
+
+
+//////////////////////////////////////////////////////////
+
+// MAIL_INNER_ADD_MAIL_REQ
+message MailInnerAddMailReq {
+    repeated PbMail mail_list = 1;
+}
+
+message MailInnerAddMailRsp {
+    Ret ret = 1;
+}

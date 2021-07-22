@@ -1,0 +1,40 @@
+syntax = "proto3";
+                        
+package g1.protocol;
+
+import "common.proto";
+
+message PbRoleBriefInfo {
+    uint64 uid = 1;
+    string name = 2;
+    int32 icon = 3;
+    int32 frame = 4;
+    int32 level = 5;
+    int32 vip_level = 6;
+    int32 exp = 7;
+    int32 image = 8;
+    int32 register_time = 9;
+
+    int32 total_star = 11;
+    int32 card_cnt = 12;
+    int32 fp = 13;
+
+    int32 opvp_level = 14;
+    int32 opvp_rank = 15;
+
+    int32 last_online_time = 16;
+
+    uint32 conn_bus_id = 100;
+}
+
+
+// INFO_SET_BRIEF_INFO_REQ
+message InfoSetBriefInfoReq {
+    uint64 uid = 1;
+    PbRoleBriefInfo info = 2;
+    bool ignore_rsp = 3;
+}
+
+message InfoSetBriefInfoRsp {
+    Ret ret = 1;
+}

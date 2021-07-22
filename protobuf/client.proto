@@ -1,0 +1,243 @@
+syntax = "proto3";
+
+package g1.protocol;
+
+import "common.proto";
+import "role.proto";
+import "infosvr.proto";
+import "mailsvr.proto";
+import "chatsvr.proto";
+import "friendsvr.proto";
+
+
+// SC_KICK_OUT
+message ScKickOut {
+    EKickOutReason reason = 1;
+}
+
+// SC_SYNC_USER_DATA
+message ScSyncUserData {
+    RoleInfo role_info = 1;
+}
+
+// SC_CHAT
+message ScChat {
+    PbChatMsg msg = 1;
+}
+
+//SC_DATA_CHANGE_NOTIFY
+message ScDataChangeNotify {
+    int32 cmd = 1;
+//    bool friend = 1;  // 好友系统更新
+//    bool mail = 2;  // 邮件系统更新
+}
+
+// MAIN_LOGIN_REQ
+message LoginReq {
+    string account      =1;
+    string password     =2;
+    string server_id    =3;
+}
+
+message LoginRsp {
+    Ret ret    = 1;
+    int64 time_now_ms = 2;
+    RoleInfo role_info = 3;
+}
+
+// MAIN_LOGOUT_REQ
+message LogoutReq {
+    bool by_server = 1;
+    string reason = 2;
+}
+
+message LogoutRsp {
+    Ret ret = 1;
+}
+
+// MAIN_HEARTBEAT_REQ
+message HeartBeatReq {
+    int64  client_now_ms = 2;
+}
+
+message HeartBeatRsp {
+    Ret ret = 1;
+    int64 client_now_ms_in_req = 2;
+    int64 server_now_ms = 3;
+}
+
+// MAIN_ITEM_USE_REQ
+message ItemUseReq {
+    repeated PbItem item_list = 1;
+}
+
+message ItemUseRsp {
+    Ret ret = 1;
+    repeated PbItem real_add_item_list = 2;  // 实际加到玩家身上的东西，比如说开宝箱后的东西
+}
+
+// MAIN_CHANGE_NAME_REQ
+message ChangeNameReq {
+    string name = 1;
+}
+
+message ChangeNameRsp {
+    Ret ret = 1;
+}
+
+
+// INFO_GET_BRIEF_INFO_REQ
+message InfoGetBriefInfoReq {
+    repeated uint64 uid_list = 1;
+}
+
+message InfoGetBriefInfoRsp {
+    Ret ret = 1;
+    repeated PbRoleBriefInfo info_list = 2;
+}
+
+// INFO_GET_ICON_DESC_REQ
+message InfoGetIconDescReq {
+    repeated uint64 uid_list = 1;
+}
+
+message InfoGetIconDescRsp {
+    Ret ret = 1;
+    repeated PbIconDesc icon_list = 2;
+}
+
+
+
+
+
+
+
+// MAIL_GET_MAIL_LIST_REQ
+message GetMailListReq {
+}
+
+message GetMailListRsp {
+    Ret ret = 1;
+    MailInfo mail_info = 2;
+}
+
+// MAIL_READ_MAIL_REQ
+message ReadMailReq {
+    repeated int32 id_list = 1;
+}
+
+message ReadMailRsp {
+    Ret ret = 1;
+    repeated int32 id_list = 2;
+}
+
+// MAIL_DEL_MAIL_REQ
+message DelMailReq {
+    repeated int32 id_list = 1;
+}
+
+message DelMailRsp {
+    Ret ret = 1;
+    repeated int32 id_list = 2;
+}
+
+// MAIL_GET_MAIL_ATTACH_REQ
+message GetMailAttachReq {
+    repeated int32 id_list = 1;
+}
+
+message GetMailAttachRsp {
+    Ret ret = 1;
+    repeated int32 id_list = 2;
+    repeated PbItem item_list = 3;
+}
+
+
+// CHAT_CHAT_REQ
+message ChatChatReq {
+    PbChatMsg msg = 1;
+}
+
+message ChatChatRsp {
+    Ret ret = 1;
+}
+
+// CHAT_GET_CHAT_INFO_REQ
+message ChatGetChatInfoReq {
+}
+
+message ChatGetChatInfoRsp {
+    Ret ret = 1;
+    PbChatInfo chat_info = 2;
+}
+
+// CHAT_DEL_CHAT_REQ
+message ChatDelChatReq {
+    uint64 friend_uid = 1;
+}
+
+message ChatDelChatRsp {
+    Ret ret = 1;
+}
+
+
+// FRIEND_GET_FRIEND_INFO_REQ
+message FriendGetFriendInfoReq {
+}
+
+message FriendGetFriendInfoRsp {
+    Ret ret = 1;
+    RoleFriendInfo friend_info = 2;
+}
+
+
+
+// FRIEND_ADD_FRIEND_REQ
+message FriendAddFriendReq {
+    uint64 friend_uid = 1;
+    bool   is_del_friend = 2;
+}
+
+message FriendAddFriendRsp {
+    Ret ret = 1;
+    uint64 friend_uid = 2;
+    bool   is_del_friend = 3;
+}
+
+// FRIEND_CONFIRM_FRIEND_REQ
+message FriendConfirmFriendReq {
+    uint64 friend_uid = 1;
+    bool   is_reject = 2;
+    bool   all_invitation = 3; // 是否针对所有请求
+}
+
+message FriendConfirmFriendRsp {
+    Ret ret = 1;
+    uint64 friend_uid = 2;
+    bool   is_reject = 3;
+    bool   all_invitation = 4; // 是否针对所有请求
+}
+
+// FRIEND_SHIELD_USER_REQ
+message FriendShieldUserReq {
+    uint64 shield_uid = 1;
+    bool   is_cancel_shield = 2;
+}
+
+message FriendShieldUserRsp {
+    Ret ret = 1;
+    uint64 shield_uid = 2;
+    bool   is_cancel_shield = 3;
+}
+
+// FRIEND_SEARCH_ROLE_REQ
+message FriendSearchRoleReq {
+    string search_string = 1;
+}
+
+message FriendSearchRoleRsp {
+    Ret ret = 1;
+    repeated PbIconDesc role_list = 2;
+}
+
+
