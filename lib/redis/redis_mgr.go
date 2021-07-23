@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"sync"
 	"time"
-	`bian/src/common/logger`
+
+	`GoOne/lib/logger`
+
 	`github.com/mediocregopher/radix/v3`
 )
 

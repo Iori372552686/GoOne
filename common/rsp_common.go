@@ -1,9 +1,3 @@
-/**
-* Created by GoLand.
-* User: link1st
-* Date: 2019-07-25
-* Time: 12:11
- */
 
 package common
 

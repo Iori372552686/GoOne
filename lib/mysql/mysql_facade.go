@@ -3,7 +3,8 @@ package mysql
 import (
 	"database/sql"
 	"fmt"
-	`bian/src/common/logger`
+
+	`GoOne/lib/logger`
 )
 
 type IFacde interface {

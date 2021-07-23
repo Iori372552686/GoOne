@@ -9,6 +9,7 @@ import (
 	`GoOne/lib/marshal`
 	`GoOne/lib/router`
 	`GoOne/lib/sharedstruct`
+	`GoOne/src/mysqlsvr/config`
 	`GoOne/src/mysqlsvr/globals`
 )
 

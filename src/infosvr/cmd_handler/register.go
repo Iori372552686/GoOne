@@ -1,8 +1,8 @@
 package cmd_handler
 
 import (
-	g1_protocol `bian/src/bian_newFrame/protobuf/protocol`
-	`bian/src/bian_newFrame/src/infosvr/globals`
+	g1_protocol `GoOne/protobuf/protocol`
+	`GoOne/src/infosvr/globals`
 
 	"github.com/golang/glog"
 

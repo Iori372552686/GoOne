@@ -9,6 +9,8 @@ import (
 	`GoOne/lib/marshal`
 	`GoOne/lib/router`
 	`GoOne/lib/sharedstruct`
+	`GoOne/src/infosvr/cmd_handler`
+	`GoOne/src/infosvr/config`
 	`GoOne/src/infosvr/globals`
 )
 

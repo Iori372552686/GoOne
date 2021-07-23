@@ -1,9 +1,9 @@
 package cmd_handler
 
 import (
-	g1_protocol `bian/src/bian_newFrame/protobuf/protocol`
-	`bian/src/bian_newFrame/src/mysqlsvr/globals`
-	`bian/src/common/logger`
+	`GoOne/lib/logger`
+	g1_protocol `GoOne/protobuf/protocol`
+	`GoOne/src/mysqlsvr/globals`
 )
 
 // 所有的命令字对应的go需要在这里先注册

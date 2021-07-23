@@ -13,9 +13,9 @@ import (
 	"log"
 	"net"
 
-	`bian/src/bian_newFrame/common`
-	`bian/src/bian_newFrame/lib/web/models`
-	protobuf `bian/src/bian_newFrame/protobuf/protocol`
+	`GoOne/common`
+	`GoOne/lib/web/models`
+	protobuf `GoOne/protobuf/protocol`
 	"github.com/golang/protobuf/proto"
 	"github.com/spf13/viper"
 )

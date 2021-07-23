@@ -8,7 +8,7 @@ import (
 )
 
 func Test_ErrorCapture(t *testing.T) {
-	str := "测"
+	str := "测试"
 	userId := "0526_90001"
 	userName := "Name_0526_90001"
 	id := 052601

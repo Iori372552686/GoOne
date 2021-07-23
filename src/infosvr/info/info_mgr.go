@@ -3,9 +3,10 @@ package info
 import (
 	"fmt"
 
-	`bian/src/bian_newFrame/lib/algorithm`
-	`bian/src/bian_newFrame/lib/redis`
-	g1_protocol `bian/src/bian_newFrame/protobuf/protocol`
+	`GoOne/lib/algorithm`
+	`GoOne/lib/redis`
+	g1_protocol `GoOne/protobuf/protocol`
+
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 )

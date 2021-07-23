@@ -1,10 +1,10 @@
 package cmd_handler
 
 import (
-	`bian/src/bian_newFrame/lib/cmd_handler`
-	g1_protocol `bian/src/bian_newFrame/protobuf/protocol`
-	`bian/src/bian_newFrame/src/mysqlsvr/globals`
-	`bian/src/common/logger`
+	`GoOne/lib/cmd_handler`
+	`GoOne/lib/logger`
+	g1_protocol `GoOne/protobuf/protocol`
+	`GoOne/src/mysqlsvr/globals`
 )
 
 type UpdateRoleInfo struct{}

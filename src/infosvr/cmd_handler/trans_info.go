@@ -1,10 +1,11 @@
 package cmd_handler
 
 import (
-	`bian/src/bian_newFrame/common/misc`
-	`bian/src/bian_newFrame/lib/cmd_handler`
-	g1_protocol `bian/src/bian_newFrame/protobuf/protocol`
-	`bian/src/bian_newFrame/src/infosvr/globals`
+	`GoOne/common`
+
+	`GoOne/lib/cmd_handler`
+	g1_protocol `GoOne/protobuf/protocol`
+	`GoOne/src/infosvr/globals`
 )
 
 type GetBriefInfo struct {}
@@ -55,7 +56,7 @@ func (h *GetIconDesc) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 
 		iconList := make([]*g1_protocol.PbIconDesc, 0, len(*res))
 		for _, v := range *res {
-			icon := misc.GetIconDescFromRoleBrief(v)
+			icon := common.GetIconDescFromRoleBrief(v)
 			iconList = append(iconList, icon)
 		}
 		rsp.IconList = iconList
