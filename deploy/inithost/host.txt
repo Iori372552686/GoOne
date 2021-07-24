@@ -1,0 +1,2 @@
+[82]
+192.168.0.82 ansible_ssh_user=root ansible_ssh_pass=Iori@123 ansible_sudo_pass=Iori@123

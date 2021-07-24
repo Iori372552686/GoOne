@@ -1,0 +1,59 @@
+---
+
+- name: '[connsvr] Create a directory if it does not exist'
+  file:
+    path: '{{ item }}'
+    state: directory
+    mode: '0755'
+  with_items:
+    - /home/user00/g1/
+    - /home/user00/g1/connsvr/
+    - /home/user00/g1/log/
+    - /home/user00/g1/log/connsvr
+  tags: 'connsvr_init'
+- name: '[connsvr] Copy scripts'
+  copy:
+    src: ../tools/scripts/server.sh
+    dest: /home/user00/g1/connsvr/server.sh
+    mode: '0755'
+  tags: "connsvr_init"
+
+
+- name: '[connsvr] Copy bin'
+  copy:
+    src: ../build/connsvr
+    dest: /home/user00/g1/connsvr/connsvr
+    mode: '0755'
+    backup: yes
+  tags: "connsvr_push"
+
+- name: '[connsvr] Copy config'
+  template:
+    src: connsvr_conf.json
+    dest: /home/user00/g1/connsvr/connsvr_conf.json
+  tags: 'connsvr_push'
+
+- name: '[connsvr] start connsvr'
+  shell: cd /home/user00/g1/connsvr; ./server.sh start; ./server.sh check
+  ignore_errors: yes
+  tags: 'connsvr_start'
+
+- name: '[connsvr] stop connsvr'
+  shell: cd /home/user00/g1/connsvr; ./server.sh stop
+  ignore_errors: yes
+  tags: 'connsvr_stop'
+
+- name: '[connsvr] restart connsvr'
+  shell: cd /home/user00/g1/connsvr; ./server.sh restart; ./server.sh check
+  ignore_errors: yes
+  tags: 'connsvr_restart'
+
+- name: '[connsvr] check connsvr'
+  shell: cd /home/user00/g1/connsvr; ./server.sh check
+  ignore_errors: yes
+  tags: 'connsvr_check'
+
+- name: '[connsvr] delLog connsvr'
+  shell: cd /home/user00/g1/log/connsvr; rm ./*
+  ignore_errors: yes
+  tags: 'connsvr_delLog'

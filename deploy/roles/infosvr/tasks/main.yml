@@ -1,0 +1,58 @@
+---
+
+- name: '[infosvr] Create a directory if it does not exist'
+  file:
+    path: '{{ item }}'
+    state: directory
+    mode: '0755'
+  with_items:
+    - /home/user00/g1/
+    - /home/user00/g1/infosvr/
+    - /home/user00/g1/log/
+    - /home/user00/g1/log/infosvr
+  tags: 'infosvr_init'
+- name: '[infosvr] Copy scripts'
+  copy:
+    src: ../tools/scripts/server.sh
+    dest: /home/user00/g1/infosvr/server.sh
+    mode: '0755'
+  tags: "infosvr_init"
+
+- name: '[infosvr] Copy bin'
+  copy:
+    src: ../build/infosvr
+    dest: /home/user00/g1/infosvr/infosvr
+    mode: '755'
+    backup: yes
+  tags: "infosvr_push"
+
+- name: '[infosvr] Copy config'
+  template:
+    src: infosvr_conf.json
+    dest: /home/user00/g1/infosvr/infosvr_conf.json
+  tags: 'infosvr_push'
+
+- name: '[infosvr] start infosvr'
+  shell: cd /home/user00/g1/infosvr; ./server.sh start; ./server.sh check
+  ignore_errors: yes
+  tags: 'infosvr_start'
+
+- name: '[infosvr] stop infosvr'
+  shell: cd /home/user00/g1/infosvr; ./server.sh stop
+  ignore_errors: yes
+  tags: 'infosvr_stop'
+
+- name: '[infosvr] restart infosvr'
+  shell: cd /home/user00/g1/infosvr; ./server.sh restart; ./server.sh check
+  ignore_errors: yes
+  tags: 'infosvr_restart'
+
+- name: '[infosvr] check infosvr'
+  shell: cd /home/user00/g1/infosvr; ./server.sh check
+  ignore_errors: yes
+  tags: 'infosvr_check'
+
+- name: '[infosvr] delLog infosvr'
+  shell: cd /home/user00/g1/log/infosvr; rm ./*
+  ignore_errors: yes
+  tags: 'infosvr_delLog'

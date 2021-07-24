@@ -1,0 +1,21 @@
+{
+  "SelfBusId": "1.1.2.{{ instance_id }}",
+  "ZKAddr": "{{ zk_address }}",
+  "RabbitMQAddr": "{{ rabbitmq_address }}",
+  "MongoDb_Ip": "{{ mongodb_ip }}",
+  "MongoDb_Port": "{{ mongodb_port }}",
+  "GameDataDir": "{{ root_path }}/gamedata",
+  "LogStashIp": "127.0.0.1",
+  "LogStashPort": 190001,
+  "SensitiveWordsFile": "{{ root_path }}/commconf/sensitive.txt",
+  "DbInstances" : [
+    {
+      "InstanceId" : 13,
+      "Ip" : "{{ redis_ip }}",
+      "Port" : {{ redis_port }},
+    "Password" : "",
+    "IsCluster" : {{ redis_use_cluster }},
+    "Description" : "brief info data"
+    }
+  ]
+}

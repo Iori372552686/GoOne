@@ -1,0 +1,28 @@
+{
+  "SelfBusId" : "1.1.11.{{ instance_id }}",
+  "ZKAddr" : "{{ zk_address }}",
+  "RabbitMQAddr" : "{{ rabbitmq_address }}",
+
+  "SensitiveWordsFile": "{{ root_path }}/commconf/sensitive.txt",
+  "GMOpen" : {{ gm_open }},
+
+  "DbInstances" : [
+    {
+      "InstanceId" : 3,
+      "Ip" : "{{ redis_ip }}",
+      "Port" : {{ redis_port }},
+      "Password" : "",
+      "IsCluster" : {{ redis_use_cluster }},
+      "Description" : "brief info data"
+    },
+    {
+      "InstanceId" : 11,
+      "Ip" : "{{ redis_ip }}",
+      "Port" : {{ redis_port }},
+      "Password" : "",
+      "IsCluster" : {{ redis_use_cluster }},
+      "Description" : "chat data"
+    }
+  ]
+}
+

@@ -1,9 +1,3 @@
-/**
-* Created by GoLand.
-* User: link1st
-* Date: 2019-08-03
-* Time: 16:43
- */
 
 package grpcserver
 

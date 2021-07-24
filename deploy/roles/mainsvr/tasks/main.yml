@@ -1,0 +1,58 @@
+---
+
+- name: '[mainsvr] Create a directory if it does not exist'
+  file:
+    path: '{{ item }}'
+    state: directory
+    mode: '0755'
+  with_items:
+    - /home/user00/g1/
+    - /home/user00/g1/mainsvr/
+    - /home/user00/g1/log/
+    - /home/user00/g1/log/mainsvr
+  tags: 'mainsvr_init'
+- name: '[mainsvr] Copy scripts'
+  copy:
+    src: ../tools/scripts/server.sh
+    dest: /home/user00/g1/mainsvr/server.sh
+    mode: '0755'
+  tags: "mainsvr_init"
+
+- name: '[mainsvr] Copy bin'
+  copy:
+    src: ../build/mainsvr
+    dest: /home/user00/g1/mainsvr/mainsvr
+    mode: '0755'
+    backup: yes
+  tags: "mainsvr_push"
+
+- name: '[mainsvr] Copy config'
+  template:
+    src: mainsvr_conf.json
+    dest: /home/user00/g1/mainsvr/mainsvr_conf.json
+  tags: 'mainsvr_push'    
+
+- name: '[mainsvr] start mainsvr'
+  shell: cd /home/user00/g1/mainsvr; ./server.sh start; ./server.sh check
+  ignore_errors: yes
+  tags: 'mainsvr_start'
+
+- name: '[mainsvr] stop mainsvr'
+  shell: cd /home/user00/g1/mainsvr; ./server.sh stop
+  ignore_errors: yes
+  tags: 'mainsvr_stop'
+
+- name: '[mainsvr] restart mainsvr'
+  shell: cd /home/user00/g1/mainsvr; ./server.sh restart; ./server.sh check
+  ignore_errors: yes
+  tags: 'mainsvr_restart'
+
+- name: '[mainsvr] check mainsvr'
+  shell: cd /home/user00/g1/mainsvr; ./server.sh check
+  ignore_errors: yes
+  tags: 'mainsvr_check'
+
+- name: '[mainsvr] delLog mainsvr'
+  shell: cd /home/user00/g1/log/mainsvr; rm ./*
+  ignore_errors: yes
+  tags: 'mainsvr_delLog'

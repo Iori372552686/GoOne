@@ -1,0 +1,50 @@
+---
+# 用法：
+# 由于ansible的文件夹层级关系，这个playbook实际运行时是被复制到上层文件夹来执行的
+# vars：变量，主要定义机器的instanceID, 用于生成实例的唯一busID，进程实例busID的规则是：[worldID].[zoneID].[instanceType].[instanceID]
+# vars_file: 变量文件，里面的变量用于替换进程实例配置文件中的变量，比如redis地址mysql地址等等
+# roles: 机器上安装的实例类型，除了commconf，gamedata是配置文件之外，其余的都是进程实例
+
+- hosts: dev1
+  vars:
+    - instance_id: 1
+  vars_files:
+    - playbook_dev/dev1_vars
+  roles:
+    - commconf
+    - gamedata
+    - connsvr
+    - mainsvr
+    - dbsvr
+    - infosvr
+    - mysqlsvr
+    - mailsvr
+    - friendsvr
+    - chatsvr
+
+#关于如何将svr部署到多台机器，可以参照如下方式
+#- hosts: test_host1
+#  vars:
+#    - instance_id: 1
+#  vars_files:
+#    - playbook_dev/test_vars
+#  roles:
+#    - commconf
+#    - gamedata
+#    - connsvr
+#    - mainsvr
+#    - dbsvr
+#
+#- hosts: test_host2
+#  vars:
+#    - instance_id: 2   #这里需要和test_host1的id不一样，不然就会生成相同的实例busID
+#  vars_files:
+#    - playbook_dev/test_vars
+#  roles:
+#    - commconf   #每台机器都需要
+#    - gamedata   #每台机器都需要
+#    - mainsvr    #在test_host1中也有mainsvr，也就是说mainsvr在test集群上部署了2个实例，busID分别为1.1.2.1和1.1.2.2
+#    - dbsvr
+#    - rcmdsvr
+#    - infosvr
+#    - mysqlsvr

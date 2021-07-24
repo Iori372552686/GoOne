@@ -1,0 +1,58 @@
+---
+
+- name: '[mailsvr] Create a directory if it does not exist'
+  file:
+    path: '{{ item }}'
+    state: directory
+    mode: '0755'
+  with_items:
+    - /home/user00/g1/
+    - /home/user00/g1/mailsvr/
+    - /home/user00/g1/log/
+    - /home/user00/g1/log/mailsvr
+  tags: 'mailsvr_init'
+- name: '[mailsvr] Copy scripts'
+  copy:
+    src: ../tools/scripts/server.sh
+    dest: /home/user00/g1/mailsvr/server.sh
+    mode: '0755'
+  tags: "mailsvr_init"
+
+- name: '[mailsvr] Copy bin'
+  copy:
+    src: ../build/mailsvr
+    dest: /home/user00/g1/mailsvr/mailsvr
+    mode: '755'
+    backup: yes
+  tags: "mailsvr_push"
+
+- name: '[mailsvr] Copy config'
+  template:
+    src: mailsvr_conf.json
+    dest: /home/user00/g1/mailsvr/mailsvr_conf.json
+  tags: 'mailsvr_push'
+
+- name: '[mailsvr] start mailsvr'
+  shell: cd /home/user00/g1/mailsvr; ./server.sh start; ./server.sh check
+  ignore_errors: yes
+  tags: 'mailsvr_start'
+
+- name: '[mailsvr] stop mailsvr'
+  shell: cd /home/user00/g1/mailsvr; ./server.sh stop
+  ignore_errors: yes
+  tags: 'mailsvr_stop'
+
+- name: '[mailsvr] restart mailsvr'
+  shell: cd /home/user00/g1/mailsvr; ./server.sh restart; ./server.sh check
+  ignore_errors: yes
+  tags: 'mailsvr_restart'
+
+- name: '[mailsvr] check mailsvr'
+  shell: cd /home/user00/g1/mailsvr; ./server.sh check
+  ignore_errors: yes
+  tags: 'mailsvr_check'
+
+- name: '[mailsvr] delLog mailsvr'
+  shell: cd /home/user00/g1/log/mailsvr; rm ./*
+  ignore_errors: yes
+  tags: 'mailsvr_delLog'

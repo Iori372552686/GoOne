@@ -1,0 +1,29 @@
+---
+
+- name: '[gamedata] Create a directory if it does not exist'
+  file:
+    path: /home/user00/g1/gamedata/
+    state: directory
+    mode: '0755'
+  tags: 'gamedata_init'
+
+- name: '[gamedata] Gen tar ball'
+  shell: cd ../excel/;  tar cvf gamedata.tar --transform s=data/== ./data/*
+  connection: local
+  tags: "gamedata_push"
+
+- name: '[gamedata] Copy gamedata tar ball'
+  copy:
+    src: ../excel/gamedata.tar
+    dest: /home/user00/g1/gamedata.tar
+  tags: "gamedata_push"
+
+- name: '[gamedata] unzip gamedata tar ball'
+  shell: cd /home/user00/g1/; tar xvf gamedata.tar -C ./gamedata; rm gamedata.tar
+  ignore_errors: yes
+  tags: 'gamedata_push'
+
+- name: '[gamedata] delLog gamedata'
+  shell: cd /home/user00/g1/log/gamedata; rm ./*
+  ignore_errors: yes
+  tags: 'gamedata_delLog'

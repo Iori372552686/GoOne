@@ -1,0 +1,20 @@
+---
+#deploy dev
+
+- hosts: dev_local
+  vars:
+    - instance_id: 1
+  vars_files:
+    - playbook_dev/dev_local_vars
+  roles:
+    - commconf
+    - gamedata
+    - connsvr
+    - mainsvr
+    - dbsvr
+    - infosvr
+    - mysqlsvr
+    - opvpsvr
+    - mailsvr
+    - friendsvr
+    - chatsvr

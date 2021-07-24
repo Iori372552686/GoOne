@@ -1,0 +1,58 @@
+---
+
+- name: '[dbsvr] Create a directory if it does not exist'
+  file:
+    path: '{{ item }}'
+    state: directory
+    mode: '0755'
+  with_items:
+    - /home/user00/g1/
+    - /home/user00/g1/dbsvr/
+    - /home/user00/g1/log/
+    - /home/user00/g1/log/dbsvr
+  tags: 'dbsvr_init'
+- name: '[dbsvr] Copy scripts'
+  copy:
+    src: ../tools/scripts/server.sh
+    dest: /home/user00/g1/dbsvr/server.sh
+    mode: '0755'
+  tags: "dbsvr_init"
+
+- name: '[dbsvr] Copy bin'
+  copy:
+    src: ../build/dbsvr
+    dest: /home/user00/g1/dbsvr/dbsvr
+    mode: '755'
+    backup: yes
+  tags: "dbsvr_push"
+
+- name: '[dbsvr] Copy config'
+  template:
+    src: dbsvr_conf.json
+    dest: /home/user00/g1/dbsvr/dbsvr_conf.json
+  tags: 'dbsvr_push'    
+
+- name: '[dbsvr] start dbsvr'
+  shell: cd /home/user00/g1/dbsvr; ./server.sh start; ./server.sh check
+  ignore_errors: yes
+  tags: 'dbsvr_start'
+
+- name: '[dbsvr] stop dbsvr'
+  shell: cd /home/user00/g1/dbsvr; ./server.sh stop
+  ignore_errors: yes
+  tags: 'dbsvr_stop'
+
+- name: '[dbsvr] restart dbsvr'
+  shell: cd /home/user00/g1/dbsvr; ./server.sh restart; ./server.sh check
+  ignore_errors: yes
+  tags: 'dbsvr_restart'
+
+- name: '[dbsvr] check dbsvr'
+  shell: cd /home/user00/g1/dbsvr; ./server.sh check
+  ignore_errors: yes
+  tags: 'dbsvr_check'
+
+- name: '[dbsvr] delLog dbsvr'
+  shell: cd /home/user00/g1/log/dbsvr; rm ./*
+  ignore_errors: yes
+  tags: 'dbsvr_delLog'
