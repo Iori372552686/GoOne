@@ -1,9 +1,9 @@
 module GoOne
 
-go 1.13
+go 1.15
 
 require (
-	github.com/360EntSecGroup-Skylar/excelize v1.4.1 // indirect
+	//github.com/360EntSecGroup-Skylar/excelize v1.4.1 // indirect
 	github.com/ExpansiveWorlds/instrumentedsql v0.0.0-20171218214018-45abb4b1947d // indirect
 	github.com/Microsoft/go-winio v0.4.14 // indirect
 	github.com/Re-volution/sizestruct v0.0.0-20190319075800-3818643ce02e // indirect
