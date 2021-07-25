@@ -1,6 +1,6 @@
 # Environment Setup
-* linux: *setup_linux.md*
-* windows: *setup_win.md*
+* [linux setup](setup_linux.md)
+* [windows setup](setup_win.md)
 
 # Install protoc
 * 当前项目中，已添加protoc与protoc-gen-go，<br />
