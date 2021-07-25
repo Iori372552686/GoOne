@@ -14,9 +14,14 @@ require (
 	github.com/golang/glog v0.0.0-20210429001901-424d2337a529
 	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/websocket v1.4.1
+	github.com/iancoleman/strcase v0.2.0
+	github.com/jhump/protoreflect v1.9.0
 	github.com/mediocregopher/radix/v3 v3.4.2
+	github.com/pkg/errors v0.9.1
 	github.com/samuel/go-zookeeper v0.0.0-20201211165307-7117e9ea2414
 	github.com/spf13/cast v1.3.0
 	github.com/streadway/amqp v1.0.0
+	github.com/stretchr/testify v1.5.1
+	github.com/tealeg/xlsx v1.0.5
 	google.golang.org/grpc v1.39.0
 )

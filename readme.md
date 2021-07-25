@@ -8,9 +8,6 @@
 
 
 # Debug Configuration
-* gopath <br/>
-  add $PROJECT_ROOT/gopath to project GOPATH
-  
 
 * goland run config
 ```
