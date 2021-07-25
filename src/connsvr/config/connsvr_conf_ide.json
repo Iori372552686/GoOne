@@ -1,0 +1,8 @@
+{
+  "SelfBusId" : "1.1.1.2",
+  "ZKAddr" : "192.168.0.80:2181",
+  "RabbitMQAddr" : "amqp://guest:guest@192.168.0.80:5672/",
+  "LoginSdkAddr" : "http://192.168.2.80:8090",
+  "ListenPort" : 13200
+}
+

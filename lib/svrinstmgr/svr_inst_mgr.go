@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	`GoOne/common`
 	`GoOne/lib/bus`
 	`GoOne/lib/logger`
 
@@ -177,7 +176,7 @@ func (s *ServerInstanceMgr) refreshNode(children []string) {
 	for k := range s.mapSvrTypeToIns {
 		// 排序去重
 		sort.Slice(s.mapSvrTypeToIns[k], func(i, j int) bool { return s.mapSvrTypeToIns[k][i] < s.mapSvrTypeToIns[k][j] })
-		s.mapSvrTypeToIns[k] = common.Uint32SliceDeduplicateSorted(s.mapSvrTypeToIns[k])
+		s.mapSvrTypeToIns[k] = Uint32SliceDeduplicateSorted(s.mapSvrTypeToIns[k])
 
 		// 输出日志
 		var b bytes.Buffer
@@ -246,4 +245,20 @@ func (s *ServerInstanceMgr) getSvrInsByMaster(svrType uint32) uint32 {
 	}
 
 	return svrs[0]
+}
+
+
+func Uint32SliceDeduplicateSorted(s []uint32) []uint32 {
+	if s == nil || len(s) <= 1 {
+		return s
+	}
+
+	out := []uint32{s[0]}
+	for i := 1; i < len(s); i++ {
+		if s[i] != out[len(out)-1] {
+			out = append(out, s[i])
+		}
+	}
+
+	return out
 }

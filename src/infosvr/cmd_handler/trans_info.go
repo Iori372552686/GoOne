@@ -1,7 +1,7 @@
 package cmd_handler
 
 import (
-	`GoOne/common`
+	"GoOne/common/misc"
 
 	`GoOne/lib/cmd_handler`
 	g1_protocol `GoOne/protobuf/protocol`
@@ -56,7 +56,7 @@ func (h *GetIconDesc) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 
 		iconList := make([]*g1_protocol.PbIconDesc, 0, len(*res))
 		for _, v := range *res {
-			icon := common.GetIconDescFromRoleBrief(v)
+			icon := misc.GetIconDescFromRoleBrief(v)
 			iconList = append(iconList, icon)
 		}
 		rsp.IconList = iconList

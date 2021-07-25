@@ -1,4 +1,4 @@
-package common
+package misc
 
 import (
 	`GoOne/common/module/datetime`
@@ -96,21 +96,4 @@ func GetRoleIconDesc(role *g1_protocol.RoleInfo) (iconDesc *g1_protocol.PbIconDe
 	//iconDesc.VipLevel = 0
 	iconDesc.Name = role.DescInfo.Name
 	return
-}
-
-
-
-func Uint32SliceDeduplicateSorted(s []uint32) []uint32 {
-	if s == nil || len(s) <= 1 {
-		return s
-	}
-
-	out := []uint32{s[0]}
-	for i := 1; i < len(s); i++ {
-		if s[i] != out[len(out)-1] {
-			out = append(out, s[i])
-		}
-	}
-
-	return out
 }

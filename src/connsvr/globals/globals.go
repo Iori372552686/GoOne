@@ -1,9 +1,9 @@
 package globals
 
 import (
-	`GoOne/lib/transaction`
-	web `GoOne/lib/web/client`
+	"GoOne/lib/transaction"
+	"GoOne/src/connsvr/tcp_server"
 )
 
 var TransMgr = transaction.NewTransactionMgr()
-var ClientMgr = web.NewClientMgr()
+var ConnTcpSvr = tcp_server.NewTcpSvr()

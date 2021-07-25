@@ -1,6 +1,7 @@
 package main
 
 import (
+	"GoOne/src/mysqlsvr/cmd_handler"
 	"flag"
 
 	`GoOne/common/misc`

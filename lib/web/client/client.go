@@ -8,10 +8,10 @@
 package web
 
 import (
+	"GoOne/common/misc"
 	"fmt"
 	"runtime/debug"
 
-	`GoOne/common`
 	`GoOne/lib/logger`
 	`GoOne/lib/router`
 	`GoOne/lib/sharedstruct`
@@ -108,13 +108,13 @@ func (c *Client) OnPacket(addr string, data []byte) {
 		}
 	}
 
-	if common.IsInnerCmd(packetHeader.Cmd) {
+	if misc.IsInnerCmd(packetHeader.Cmd) {
 		logger.Debugf("Received an inner command from client: %#v", packetHeader)
 		return
 	}
 
 
-	serverType := common.ServerTypeInCmd(packetHeader.Cmd)
+	serverType := misc.ServerTypeInCmd(packetHeader.Cmd)
 	// router.SendMsgBySvrType(serverType, uid, packetHeader.Cmd, 0, 0, packetBody)
 	router.SendMsgBySvrTypeConn(serverType, uid, packetHeader.Cmd, 0, 0, packetBody, addr)
 }

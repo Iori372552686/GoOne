@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/url"
 
-	"bian/src/common/util"
 )
 
 func SendNotifyToFeiShu(hookUrl, msg string) {

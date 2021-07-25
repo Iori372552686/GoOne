@@ -43,7 +43,7 @@ working directory: $svr_dir
   * 将$PROJECT_ROOT/gopath/bin加到PATH环境变量中
 
 # Appendix : All Golang modules
-* 此处列出所有依赖的模块，目前已经加入到工程中的，可以考虑不定期的更新一下。
+* 此处列出所有依赖的模块，目前已经加入到工程中
 
 ```sh
 # protobuf

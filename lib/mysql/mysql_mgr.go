@@ -1,10 +1,11 @@
 package mysql
 
 import (
+	"GoOne/lib/logger"
 	"database/sql"
 	"fmt"
 
-	`bian/src/common/logger`
+
 
 	_ "github.com/go-sql-driver/mysql"
 

@@ -5,11 +5,7 @@ import (
 	"runtime"
 	"time"
 
-	`GoOne/common/module/datetime`
-
 	"github.com/getsentry/sentry-go"
-
-
 )
 
 type sentryConfig struct {
@@ -48,7 +44,7 @@ func CaptureErrorToSentry(level sentry.Level, userId, userName, errTile string, 
 	event.Level = level
 	event.Message = errTile
 	event.Logger = errMsg
-	event.Timestamp = datetime.NowMs()
+	event.Timestamp = time.Now()
 	event.User.ID = userId
 	event.User.Username = userName
 	if event.User.ID == "" {
@@ -60,7 +56,7 @@ func CaptureErrorToSentry(level sentry.Level, userId, userName, errTile string, 
 		&sentry.Breadcrumb{
 			Level:     level,
 			Message:   fmt.Sprintf("\n%s\n%s", errMsg, stack),
-			Timestamp: datetime.NowMs(),
+			Timestamp: time.Now(),
 		},
 	}
 
