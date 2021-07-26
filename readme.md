@@ -1,3 +1,10 @@
+
+## GoOne Framework：
+![image](https://user-images.githubusercontent.com/27808711/126938946-797aa10a-d552-444b-ab66-1ea62d760b60.png)
+
+* [[GoOne架构---详细说明文档]](/doc/G1服务器技术架构文档.docx)
+
+
 # Environment Setup
 * [linux setup](setup_linux.md)
 * [windows setup](setup_win.md)
