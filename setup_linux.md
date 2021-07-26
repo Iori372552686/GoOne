@@ -73,51 +73,51 @@ yum install ansible.noarch
 
 ##host
 ```
-#gosvr/deploy/inithost host.txt
+#goOne/deploy/inithost host.txt
 [local]
-127.0.0.1 ansible_ssh_user=root ansible_ssh_pass=pwd ansible_sudo_pass=solgame
+127.0.0.1 ansible_ssh_user=root ansible_ssh_pass=pwd ansible_sudo_pass=Iori@123
 #pwd 你的root密码
 
-#gosvr/deploy/hosts/host_dev.txt
+#goOne/deploy/hosts/host_dev.txt
 add
 [dev_local]
 127.0.0.1 ansible_ssh_user=user00 ansible_ssh_pass=123456 ansible_sudo_pass=123456
 
-#gosvr/deploy/playbook_dev/dev_local.yml
-#gosvr/deploy/playbook_dev/dev_local.vars
+#goOne/deploy/playbook_dev/dev_local.yml
+#goOne/deploy/playbook_dev/dev_local.vars
 ```
 
 ##init
 ```
-#gosvr/deploy/inithost
+#goOne/deploy/inithost
 ansible-playbook -i host.txt inithost.yml 
 ```
 
 ##protoc
 ```
-#gosvr/deps/protoc/protoc-3.11.4-linux-x86_64/bin
+#goOne/deps/protoc/protoc-3.11.4-linux-x86_64/bin
 cp protoc protoc-gen-go /user/local/bin
-#gosvr/gopath/src/project.me/g1/gamesvr
+#goOne/gopath/src/project.me/g1/gamesvr
 cp libtolua.so /user/lib64
 ```
 
 
 ##导表工具
 ```
-#gosvr/gopath/src/project.me/xlstrans
+#goOne/gopath/src/project.me/xlstrans
 ./build.sh
 
 ```
 
 ##编译部署
 ```
-#gosvr/excel 导表 
+#goOne/excel 导表 
 ./run_me.sh
-#gosvr/protocol 导协议
+#goOne/protocol 导协议
 ./gen_code.sh
-#gosvr 编译
+#goOne 编译
 ./build.sh
-#gosvr/deploy 部署
+#goOne/deploy 部署
 d.sh dev_local init     #第一次部署 已经有新的部署任务的时候
 d.sh dev_local push
 d.sh dev_local start
