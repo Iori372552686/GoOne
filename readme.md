@@ -6,8 +6,8 @@
 * 项目还在持续优化中,欢迎加入一起创作
 
 # Environment Setup
-* [linux setup](setup_linux.md)
-* [windows setup](setup_win.md)
+* [linux setup](/doc/setup_linux.md)
+* [windows setup](/doc/setup_win.md)
 
 # Install protoc
 * 当前项目中，已添加protoc与protoc-gen-go，<br />
