@@ -11,7 +11,7 @@ require (
 	github.com/codeskyblue/dingrobot v0.0.0-20171214074958-18a295f1ddd8
 	github.com/getsentry/sentry-go v0.11.0
 	github.com/go-sql-driver/mysql v1.5.0
-	github.com/golang/glog v0.0.0-20210429001901-424d2337a529
+	github.com/golang/glog v1.0.0
 	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/websocket v1.4.1
 	github.com/iancoleman/strcase v0.2.0
@@ -21,7 +21,7 @@ require (
 	github.com/samuel/go-zookeeper v0.0.0-20201211165307-7117e9ea2414
 	github.com/spf13/cast v1.3.0
 	github.com/streadway/amqp v1.0.0
-	github.com/stretchr/testify v1.5.1
+	github.com/stretchr/testify v1.8.1
 	github.com/tealeg/xlsx v1.0.5
-	google.golang.org/grpc v1.39.0
+	google.golang.org/grpc v1.53.0
 )
