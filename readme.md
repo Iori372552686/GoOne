@@ -85,7 +85,7 @@ ansible-playbook -i host.txt inithost.yml
 
 ## protoc
 ```
-#GoMini/lib/deps/protoc/protoc-3.11.4-linux-x86_64/bin
+#GoMini/lib/contrib/protoc/protoc-3.11.4-linux-x86_64/bin
 cp protoc protoc-gen-go /usr/local/bin
 ```
 
