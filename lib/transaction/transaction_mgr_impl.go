@@ -1,9 +1,9 @@
 package transaction
 
 import (
-	`GoOne/lib/cmd_handler`
-	`GoOne/lib/logger`
-	`GoOne/lib/sharedstruct`
+	"GoOne/lib/cmd_handler"
+	"GoOne/lib/logger"
+	"GoOne/lib/sharedstruct"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
@@ -16,7 +16,6 @@ import (
 //   . RegisterCmd注册：指定的Cmd所对应的继承自TransBase的事务
 //   . 外部通过调用ProcessSSPacket，将收到的SSPacket传给transmgr，
 //     从而使transmgr会根据packet.DstTransId，进行开启协程处理新事务，或将消息转给已有协程。
-
 
 // 并发模型：
 //   . 主处理逻辑由一个单独的协程完成runTransMgr（接收chan：chanInPacket）
@@ -43,9 +42,9 @@ func (m *TransactionMgr) InitAndRun(maxTrans int32, useUidLock bool, maxUidPendi
 	m.chanTransRet = make(chan transRet, maxTrans)
 
 	m.useUidLock = useUidLock
-	m.uidInProcess = make(map[uint64] bool, 0)
+	m.uidInProcess = make(map[uint64]bool, 0)
 	m.maxUidPendingPacket = maxUidPendingPacket
-	m.uidPendingPackets = make(map[uint64] []*sharedstruct.SSPacket, 0)
+	m.uidPendingPackets = make(map[uint64][]*sharedstruct.SSPacket, 0)
 
 	go m.run()
 }
@@ -80,7 +79,7 @@ func (m *TransactionMgr) SendPbMsgToMyself(selfBusId uint32, uid uint64, cmd uin
 	}
 
 	packet := &sharedstruct.SSPacket{
-		Header : sharedstruct.SSPacketHeader {
+		Header: sharedstruct.SSPacketHeader{
 			SrcBusID:   selfBusId,
 			DstBusID:   selfBusId,
 			SrcTransID: 0,
@@ -107,28 +106,28 @@ type transRet struct {
 }
 
 type TransactionMgr struct {
-	started     	bool                               // TransMgr已启动
-	cmdHandlers 	map[uint32]cmd_handler.ICmdHandler // 这里注册的命令字
+	started     bool                               // TransMgr已启动
+	cmdHandlers map[uint32]cmd_handler.ICmdHandler // 这里注册的命令字
 
-	chanInPacket	chan *sharedstruct.SSPacket		// 外部通过此通道，把其他服务器发来的消息传给transmgr进行处理。
+	chanInPacket chan *sharedstruct.SSPacket // 外部通过此通道，把其他服务器发来的消息传给transmgr进行处理。
 
-	curTransID 		uint32
-	maxTransNum		int32
-	transMap   		map[uint32]*Transaction		// 保存所有的trans。（此处用独立的transInfo，而不是Transaction。是为了避免trans_mgr与Transaction的协程访问同一份Transaction数据）
-	chanTransRet	chan transRet    			// 这个channel用来接收trans执行完后返回的结果
+	curTransID   uint32
+	maxTransNum  int32
+	transMap     map[uint32]*Transaction // 保存所有的trans。（此处用独立的transInfo，而不是Transaction。是为了避免trans_mgr与Transaction的协程访问同一份Transaction数据）
+	chanTransRet chan transRet           // 这个channel用来接收trans执行完后返回的结果
 
-	useUidLock   bool							// 每个uid同时只能有一个协程在处理。（后面的消息进等待队列）
+	useUidLock bool // 每个uid同时只能有一个协程在处理。（后面的消息进等待队列）
 	// 状态服务器（内存中留有uid相关数据），这个应该是一定要为true的，不然两个协程同时处理一个uid会有问题。
-	maxUidPendingPacket int						// 当useUidLock=true时，此值为每个uid的消息等待队列的长度。
-	uidInProcess        map[uint64] bool		// uid有正在处理的事务
-	uidPendingPackets   map[uint64] []*sharedstruct.SSPacket	// 每个uid的待处理消息队列。
+	maxUidPendingPacket int                                 // 当useUidLock=true时，此值为每个uid的消息等待队列的长度。
+	uidInProcess        map[uint64]bool                     // uid有正在处理的事务
+	uidPendingPackets   map[uint64][]*sharedstruct.SSPacket // 每个uid的待处理消息队列。
 }
 
 func (m *TransactionMgr) run() {
 Loop:
 	for {
 		select {
-		case packet, ok := <- m.chanInPacket:
+		case packet, ok := <-m.chanInPacket:
 			if !ok {
 				glog.Error("m.chanInPacket is closed")
 				break Loop
@@ -136,7 +135,7 @@ Loop:
 			if packet != nil {
 				m.processSSPacket(packet)
 			}
-		case aTransRet, ok := <- m.chanTransRet:
+		case aTransRet, ok := <-m.chanTransRet:
 			if !ok {
 				glog.Error("m.chanTransRet is closed")
 				break Loop
@@ -180,7 +179,7 @@ func (m *TransactionMgr) processSSPacket(packet *sharedstruct.SSPacket) int32 {
 			return -2
 		}
 
-		myTransID := m.curTransID  //todo: id冲突。有可能很早以前的id还在运行中。
+		myTransID := m.curTransID //todo: id冲突。有可能很早以前的id还在运行中。
 		m.curTransID += 1
 
 		// 这里开启协程执行trans，每一个trans都会创建一个新的结构体来运行
@@ -192,7 +191,7 @@ func (m *TransactionMgr) processSSPacket(packet *sharedstruct.SSPacket) int32 {
 	} else {
 		// 恢复挂起的trans
 		if trans, in := m.transMap[dstTransID]; in {
-			if !packet.SendToChan(trans.chanIn, 3 * time.Second) {
+			if !packet.SendToChan(trans.chanIn, 3*time.Second) {
 				logger.Errorf("timeout to send message to transaction {header: %#v}", packet.Header)
 				return -4
 			}
@@ -233,4 +232,3 @@ func (m *TransactionMgr) processTransactionRet(aTransRet transRet) {
 	}
 	logger.Debugf("Transaction finished {transId:%v}", aTransRet.transID)
 }
-
