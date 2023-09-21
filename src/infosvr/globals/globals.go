@@ -1,8 +1,8 @@
 package globals
 
 import (
-	`GoOne/lib/transaction`
-	`GoOne/src/infosvr/info`
+	"GoOne/lib/service/transaction"
+	"GoOne/src/infosvr/info"
 )
 
 var TransMgr = transaction.NewTransactionMgr()

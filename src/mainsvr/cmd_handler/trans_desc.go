@@ -1,14 +1,15 @@
 package cmd_handler
 
 import (
-	`GoOne/common/misc`
-	`GoOne/lib/cmd_handler`
-	`GoOne/lib/sensitive_words`
-	g1_protocol `GoOne/protobuf/protocol`
-	`GoOne/src/mainsvr/role`
+	"GoOne/common/misc"
+	"GoOne/lib/api/cmd_handler"
+	"GoOne/lib/service/sensitive_words"
+	g1_protocol "GoOne/protobuf/protocol"
+	"GoOne/src/mainsvr/role"
 )
 
-type ChangeName struct {}
+type ChangeName struct{}
+
 func (h *ChangeName) ProcessCmd(c cmd_handler.IContext, data []byte, myRole *role.Role) int {
 	req := &g1_protocol.ChangeNameReq{}
 	rsp := &g1_protocol.ChangeNameRsp{}
@@ -24,7 +25,7 @@ func (h *ChangeName) ProcessCmd(c cmd_handler.IContext, data []byte, myRole *rol
 		free := myRole.PbRole.DescInfo.GetFreeCnt()
 		_, hasCard := myRole.ItemCheckReduce(int32(g1_protocol.EItemID_CHANGE_NAME_CARD), 1)
 		_, hasDiamond := myRole.ItemCheckReduce(int32(g1_protocol.EItemID_DIAMOND), 100)
-		if hasCard != 0 && hasDiamond !=0 && free <= 0{
+		if hasCard != 0 && hasDiamond != 0 && free <= 0 {
 			break
 		}
 
@@ -40,7 +41,7 @@ func (h *ChangeName) ProcessCmd(c cmd_handler.IContext, data []byte, myRole *rol
 		dupCheckReq.Name = req.Name
 		dupCheckRsp := &g1_protocol.MysqlInnerUpdateRoleInfoRsp{}
 		err = c.CallMsgBySvrType(misc.ServerType_MysqlSvr, uint32(g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ),
-									dupCheckReq, dupCheckRsp)
+			dupCheckReq, dupCheckRsp)
 		if err != nil {
 			myRole.Errorf("update mysql role error: %v", err)
 			ret = -1
@@ -53,7 +54,6 @@ func (h *ChangeName) ProcessCmd(c cmd_handler.IContext, data []byte, myRole *rol
 
 		myRole.PbRole.DescInfo.Name = req.Name
 
-
 		// 同步数据
 		_ = myRole.SyncDataToClient(g1_protocol.ERoleSectionFlag_DESC_INFO | g1_protocol.ERoleSectionFlag_INVENTORY_INFO)
 		break
@@ -64,4 +64,3 @@ func (h *ChangeName) ProcessCmd(c cmd_handler.IContext, data []byte, myRole *rol
 
 	return ret
 }
-

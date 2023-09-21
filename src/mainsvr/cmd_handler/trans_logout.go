@@ -1,12 +1,13 @@
 package cmd_handler
 
 import (
-	`GoOne/lib/cmd_handler`
-	g1_protocol `GoOne/protobuf/protocol`
-	`GoOne/src/mainsvr/globals`
+	"GoOne/lib/api/cmd_handler"
+	g1_protocol "GoOne/protobuf/protocol"
+	"GoOne/src/mainsvr/globals"
 )
 
-type Logout struct {}
+type Logout struct{}
+
 func (h *Logout) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 	req := &g1_protocol.LogoutReq{}
 	err := c.ParseMsg(data, req)

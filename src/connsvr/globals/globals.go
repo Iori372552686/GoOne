@@ -1,7 +1,7 @@
 package globals
 
 import (
-	"GoOne/lib/transaction"
+	"GoOne/lib/service/transaction"
 	"GoOne/src/connsvr/tcp_server"
 )
 

@@ -1,9 +1,9 @@
 package cmd_handler
 
 import (
-	`GoOne/lib/logger`
-	g1_protocol `GoOne/protobuf/protocol`
-	`GoOne/src/mysqlsvr/globals`
+	"GoOne/lib/api/logger"
+	g1_protocol "GoOne/protobuf/protocol"
+	"GoOne/src/mysqlsvr/globals"
 )
 
 // 所有的命令字对应的go需要在这里先注册

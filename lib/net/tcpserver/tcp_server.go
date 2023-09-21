@@ -1,7 +1,7 @@
 package tcpserver
 
 import (
-	"GoOne/lib/logger"
+	"GoOne/lib/api/logger"
 	"bytes"
 	"fmt"
 	"github.com/golang/glog"
@@ -18,18 +18,17 @@ const (
 )
 
 type ITcpSvrEventHandler interface {
-	OnConn(net.Conn)  // 被Listener协程调用，一个TcpSvr对应一个Listener协程
-	OnRead(net.Conn, []byte) int  // 被Read协程调用，每个Connection对应一个Read协调
-	OnClose(net.Conn)  // 被Read协程调用，每个Connection对应一个Read协调
+	OnConn(net.Conn)             // 被Listener协程调用，一个TcpSvr对应一个Listener协程
+	OnRead(net.Conn, []byte) int // 被Read协程调用，每个Connection对应一个Read协调
+	OnClose(net.Conn)            // 被Read协程调用，每个Connection对应一个Read协调
 }
 
 type TcpConnInfo struct {
-	chanWrite chan []byte  // passing 'nil' means close
+	chanWrite chan []byte // passing 'nil' means close
 }
 
-
 type TcpSvr struct {
-	TcpReadTimeout time.Duration
+	TcpReadTimeout  time.Duration
 	TcpWriteTimeout time.Duration
 
 	handler ITcpSvrEventHandler
@@ -73,15 +72,18 @@ func (s *TcpSvr) WriteData(conn net.Conn, data1 []byte, data2 []byte) error {
 		return fmt.Errorf("connection doesn't exist")
 	}
 
-	data := make([]byte, len(data1)+len(data2)); pos := 0
-	copy(data[pos:], data1); pos += len(data1)
-	copy(data[pos:], data2); pos += len(data2)
+	data := make([]byte, len(data1)+len(data2))
+	pos := 0
+	copy(data[pos:], data1)
+	pos += len(data1)
+	copy(data[pos:], data2)
+	pos += len(data2)
 
 	t := time.NewTimer(3 * time.Second)
 	defer t.Stop()
 	select {
 	case chanWrite <- data:
-	case <- t.C:
+	case <-t.C:
 		return fmt.Errorf("time out in 3 seconds")
 	}
 
@@ -106,13 +108,12 @@ func (s *TcpSvr) Close(conn net.Conn) error {
 	defer t.Stop()
 	select {
 	case chanWrite <- nil:
-	case <- t.C:
+	case <-t.C:
 		return fmt.Errorf("time out in 3 seconds")
 	}
 
 	return nil
 }
-
 
 func (s *TcpSvr) runListener(listener net.Listener) {
 	defer listener.Close()
@@ -120,7 +121,7 @@ func (s *TcpSvr) runListener(listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			logger.Errorf("Error accepting: %v", err)  //todo: fatal or error
+			logger.Errorf("Error accepting: %v", err) //todo: fatal or error
 			return
 		}
 
@@ -184,7 +185,7 @@ func (s *TcpSvr) runConnWrite(conn net.Conn, chanWrite <-chan []byte) {
 			break
 		}
 
-		if writeData == nil {  // nil means close
+		if writeData == nil { // nil means close
 			logger.Infof("A 'nil' is passed to chanWrite to close conn {local:%v, remote:%v}",
 				conn.LocalAddr(), conn.RemoteAddr())
 			_ = conn.Close()
@@ -193,7 +194,7 @@ func (s *TcpSvr) runConnWrite(conn net.Conn, chanWrite <-chan []byte) {
 
 		_ = conn.SetWriteDeadline(time.Now().Add(s.TcpWriteTimeout))
 		sentLen, err := conn.Write(writeData)
-		if sentLen < len(writeData) || err != nil {  //todo: retry?
+		if sentLen < len(writeData) || err != nil { //todo: retry?
 			logger.Errorf("Failed to write tcp data {err:%v, dataLen: %v, sentLen: %v}",
 				err, len(writeData), sentLen)
 			_ = conn.Close()

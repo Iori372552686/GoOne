@@ -1,19 +1,20 @@
 package cmd_handler
 
 import (
-	`GoOne/lib/bus`
-	`GoOne/lib/cmd_handler`
-	`GoOne/lib/router`
-	g1_protocol `GoOne/protobuf/protocol`
-	`GoOne/src/mainsvr/globals`
-	`GoOne/src/mainsvr/role`
+	"GoOne/lib/api/cmd_handler"
+	"GoOne/lib/service/bus"
+	"GoOne/lib/service/router"
+	g1_protocol "GoOne/protobuf/protocol"
+	"GoOne/src/mainsvr/globals"
+	"GoOne/src/mainsvr/role"
 
 	"github.com/golang/protobuf/proto"
 
 	"strconv"
 )
 
-type Login struct {}
+type Login struct{}
+
 func (h *Login) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 	req := &g1_protocol.LoginReq{}
 	err := c.ParseMsg(data, req)
@@ -42,7 +43,6 @@ func (h *Login) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 		myRole.PbRole.LoginInfo.LastLoginTime = myRole.PbRole.LoginInfo.NowLoginTime
 		myRole.PbRole.LoginInfo.NowLoginTime = now
 
-
 		myRole.OnClientHeartbeat(now)
 
 		myRole.AfterLogin(now)
@@ -61,11 +61,11 @@ func (h *Login) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 	return ret
 }
 
-func (h *Login) processConnSvrInfo(c cmd_handler.IContext, myRole *role.Role) {	
+func (h *Login) processConnSvrInfo(c cmd_handler.IContext, myRole *role.Role) {
 	connSvrInfo := myRole.PbRole.ConnSvrInfo
 
 	ipStr := bus.IpIntToString(c.Ip())
-	portStr := strconv.Itoa(int(c.Flag()))  // 端口是存在flag字段里面的
+	portStr := strconv.Itoa(int(c.Flag())) // 端口是存在flag字段里面的
 
 	remoteAddr := ipStr + ":" + portStr
 	if connSvrInfo.ClientPos != "" && connSvrInfo.ClientPos != remoteAddr {

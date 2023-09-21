@@ -1,22 +1,22 @@
 package main
 
 import (
+	"GoOne/lib/api/logger"
+	"GoOne/lib/api/sharedstruct"
+	"GoOne/lib/service/application"
+	"GoOne/lib/service/router"
+	"GoOne/lib/util/marshal"
 	"GoOne/src/mysqlsvr/cmd_handler"
 	"flag"
 
-	`GoOne/common/misc`
-	`GoOne/common/module/application`
-	`GoOne/lib/logger`
-	`GoOne/lib/marshal`
-	`GoOne/lib/router`
-	`GoOne/lib/sharedstruct`
-	`GoOne/src/mysqlsvr/config`
-	`GoOne/src/mysqlsvr/globals`
+	"GoOne/common/misc"
+	"GoOne/src/mysqlsvr/config"
+	"GoOne/src/mysqlsvr/globals"
 )
 
 func onRecvSSPacket(packet *sharedstruct.SSPacket) {
 	globals.TransMgr.ProcessSSPacket(packet)
-	packet = nil  // packet所有权转交给transmgr，后面不能再用packet（包括data）
+	packet = nil // packet所有权转交给transmgr，后面不能再用packet（包括data）
 }
 
 var svrConfFile = flag.String("svr_conf", "./msyqlsvr_conf.json", "app conf file")

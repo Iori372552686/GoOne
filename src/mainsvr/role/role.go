@@ -1,16 +1,16 @@
 package role
 
 import (
+	"GoOne/lib/api/cmd_handler"
+	"GoOne/lib/api/datetime"
+	"GoOne/lib/api/logger"
+	"GoOne/lib/service/router"
 	"fmt"
 	"strconv"
 	"sync"
 
-	`GoOne/common/misc`
-	`GoOne/common/module/datetime`
-	`GoOne/lib/cmd_handler`
-	`GoOne/lib/logger`
-	`GoOne/lib/router`
-	g1_protocol `GoOne/protobuf/protocol`
+	"GoOne/common/misc"
+	g1_protocol "GoOne/protobuf/protocol"
 
 	"github.com/golang/glog"
 )
@@ -33,7 +33,6 @@ func NewRole(uid uint64) *Role {
 	//role.ItemAdd(1201001, 5, &Reason{REASON_INIT, 0})
 	//role.ItemAdd(1201002, 5, &Reason{REASON_INIT, 0})
 	//role.ItemAdd(1201003, 5, &Reason{REASON_INIT, 0})
-
 
 	role.OnRoleCreate()
 	return role
@@ -119,31 +118,31 @@ func (r *Role) Zone() int32 {
 }
 
 func (r *Role) SaveToDB(trans cmd_handler.IContext) error {
-/*	if r.Uid() != trans.Uid() {
-		r.Errorf("inconsistent uid {roleUid:%v, transUid:%v}", r.Uid(), trans.Uid())
-		return errors.New("inconsistent uid")
-	}
+	/*	if r.Uid() != trans.Uid() {
+			r.Errorf("inconsistent uid {roleUid:%v, transUid:%v}", r.Uid(), trans.Uid())
+			return errors.New("inconsistent uid")
+		}
 
-	data, err := proto.Marshal(r.PbRole)
-	if err != nil {
-		r.Errorf("marshaling error {role:%v} | %v", r.PbRole, err)
-		return err
-	}
+		data, err := proto.Marshal(r.PbRole)
+		if err != nil {
+			r.Errorf("marshaling error {role:%v} | %v", r.PbRole, err)
+			return err
+		}
 
-	req := g1_protocol.DBUidSetReq{}
-	rsp := g1_protocol.DBUidSetRsp{}
-	req.Uid = r.Uid()
-	req.DbType = uint32(g1_protocol.DBType_DB_TYPE_ROLE)
-	req.Data = data
-	err = trans.CallMsgBySvrType(misc.ServerType_DBSvr, uint32(g1_protocol.CMD_DB_INNER_UID_SET_REQ), &req, &rsp)
-	if err != nil {
-		return err
-	}
+		req := g1_protocol.DBUidSetReq{}
+		rsp := g1_protocol.DBUidSetRsp{}
+		req.Uid = r.Uid()
+		req.DbType = uint32(g1_protocol.DBType_DB_TYPE_ROLE)
+		req.Data = data
+		err = trans.CallMsgBySvrType(misc.ServerType_DBSvr, uint32(g1_protocol.CMD_DB_INNER_UID_SET_REQ), &req, &rsp)
+		if err != nil {
+			return err
+		}
 
-	if rsp.Ret.Ret != 0 {
-		return fmt.Errorf("save role response error {ret:%v}", rsp.Ret.Ret)
-	}
-*/
+		if rsp.Ret.Ret != 0 {
+			return fmt.Errorf("save role response error {ret:%v}", rsp.Ret.Ret)
+		}
+	*/
 	return nil
 }
 
@@ -167,22 +166,22 @@ func (r *Role) SaveToMysql(trans cmd_handler.IContext) error {
 
 // 保存玩家数据，不等待返回结果。只在特殊情况下使用。比如：RoleMgr::removeExpiredRoles中
 func (r *Role) SaveToDBIgnoreRsp() {
-/*	data, err := proto.Marshal(r.PbRole)
-	if err != nil {
-		r.Errorf("Failed to marshal role when removing expired role {role:%v} | %v", r.PbRole, err)
-		return
-	}
+	/*	data, err := proto.Marshal(r.PbRole)
+		if err != nil {
+			r.Errorf("Failed to marshal role when removing expired role {role:%v} | %v", r.PbRole, err)
+			return
+		}
 
-	req := g1_protocol.DBUidSetReq{}
-	req.Uid = r.Uid()
-	req.DbType = uint32(g1_protocol.DBType_DB_TYPE_ROLE)
-	req.IgnoreRsp = true
-	req.Data = data
-	err = router.SendPbMsgBySvrTypeSimple(misc.ServerType_DBSvr, r.Uid(), uint32(g1_protocol.CMD_DB_INNER_UID_SET_REQ), &req)
-	if err != nil {
-		r.Errorf("Failed to saveToDBIgnoreRsp {role:%v} | %v", r.PbRole, err)
-		return
-	}*/
+		req := g1_protocol.DBUidSetReq{}
+		req.Uid = r.Uid()
+		req.DbType = uint32(g1_protocol.DBType_DB_TYPE_ROLE)
+		req.IgnoreRsp = true
+		req.Data = data
+		err = router.SendPbMsgBySvrTypeSimple(misc.ServerType_DBSvr, r.Uid(), uint32(g1_protocol.CMD_DB_INNER_UID_SET_REQ), &req)
+		if err != nil {
+			r.Errorf("Failed to saveToDBIgnoreRsp {role:%v} | %v", r.PbRole, err)
+			return
+		}*/
 }
 
 func (r *Role) OnRoleCreate() {
@@ -261,21 +260,21 @@ func (r *Role) OnClientHeartbeat(now int32) {
 	lastClientHeartBeatTime := r.PbRole.LoginInfo.LastHartBeatTime
 
 	syncFlag := g1_protocol.ERoleSectionFlag(0)
-	if !datetime.IsSameMinute(lastClientHeartBeatTime, now) {
+	if !datetime.IsSameMinute(int64(lastClientHeartBeatTime), int64(now)) {
 		syncFlag |= r.everyMinuteCheck(now)
 	}
-	if !datetime.IsSameHour(lastClientHeartBeatTime, now) {
-		syncFlag |= r.everyHourCheck(lastClientHeartBeatTime,now)
+	if !datetime.IsSameHour(int64(lastClientHeartBeatTime), int64(now)) {
+		syncFlag |= r.everyHourCheck(lastClientHeartBeatTime, now)
 	}
 	// 早上0点的刷新
-	if !datetime.IsSameDay(lastClientHeartBeatTime, now) {
+	if !datetime.IsSameDay(int64(lastClientHeartBeatTime), int64(now)) {
 		syncFlag |= r.everyDayCheck(now)
 	}
 	// 晚上9点的刷新
-	if datetime.IsSameDayByDayBeginHour(lastClientHeartBeatTime, now, 21) {
+	if datetime.IsSameDayByDayBeginHour(int64(lastClientHeartBeatTime), int64(now), 21) {
 		syncFlag |= r.everyDayCheck21(now)
 	}
-	if !datetime.IsSameWeek(lastClientHeartBeatTime, now) {
+	if !datetime.IsSameWeek(int64(lastClientHeartBeatTime), int64(now)) {
 		syncFlag |= r.everyWeakCheck(now)
 	}
 
@@ -298,7 +297,7 @@ func (r *Role) everyMinuteCheck(now int32) g1_protocol.ERoleSectionFlag {
 	return 0
 }
 
-func (r *Role) everyHourCheck(last,now int32) g1_protocol.ERoleSectionFlag {
+func (r *Role) everyHourCheck(last, now int32) g1_protocol.ERoleSectionFlag {
 	//weekday:= datetime.GetDayOfWeek(now)
 	//,_:= datetime.GetHourMinuteForTime(now)
 
@@ -317,15 +316,13 @@ func (r *Role) everyDayCheck(now int32) g1_protocol.ERoleSectionFlag {
 
 	r.MallDailyRefresh()
 
-	return	g1_protocol.ERoleSectionFlag_MALL_INFO |
+	return g1_protocol.ERoleSectionFlag_MALL_INFO |
 		g1_protocol.ERoleSectionFlag_ACTVITY_TASK_INFO
 }
 
 func (r *Role) everyWeakCheck(now int32) g1_protocol.ERoleSectionFlag {
 	return 0
 }
-
-
 
 // 玩家的简要信息，一般用于展示给其它玩家查看
 func (r *Role) GetBriefInfo() *g1_protocol.PbRoleBriefInfo {
@@ -360,4 +357,3 @@ func (r *Role) ExpAdd(exp int32) {
 func (r *Role) IsOnline() bool {
 	return r.PbRole.LoginInfo.LastHartBeatTime+2*30 > datetime.Now()
 }
-

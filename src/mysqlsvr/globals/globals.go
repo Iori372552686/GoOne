@@ -1,10 +1,9 @@
 package globals
 
 import (
-	`GoOne/lib/mysql`
-	`GoOne/lib/transaction`
+	"GoOne/lib/db/mysql"
+	"GoOne/lib/service/transaction"
 )
 
 var TransMgr = transaction.NewTransactionMgr()
 var MysqlMgr = mysql.NewMysqlMgr()
-

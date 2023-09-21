@@ -1,11 +1,11 @@
 package cmd_handler
 
 import (
-	`GoOne/lib/cmd_handler`
-	`GoOne/lib/logger`
-	g1_protocol `GoOne/protobuf/protocol`
-	`GoOne/src/mainsvr/globals`
-	`GoOne/src/mainsvr/role`
+	"GoOne/lib/api/cmd_handler"
+	"GoOne/lib/api/logger"
+	g1_protocol "GoOne/protobuf/protocol"
+	"GoOne/src/mainsvr/globals"
+	"GoOne/src/mainsvr/role"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"

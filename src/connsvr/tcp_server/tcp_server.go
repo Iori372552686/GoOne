@@ -2,10 +2,10 @@ package tcp_server
 
 import (
 	"GoOne/common/misc"
-	"GoOne/lib/logger"
+	"GoOne/lib/api/logger"
+	"GoOne/lib/api/sharedstruct"
 	"GoOne/lib/net/tcpserver"
-	"GoOne/lib/router"
-	"GoOne/lib/sharedstruct"
+	"GoOne/lib/service/router"
 	g1_protocol "GoOne/protobuf/protocol"
 	"GoOne/src/connsvr/config"
 	"encoding/json"
@@ -16,7 +16,6 @@ import (
 	"net"
 	"net/http"
 
-
 	"strconv"
 	"sync"
 )
@@ -25,11 +24,11 @@ import (
 type ConnTcpSvr struct {
 	tcpserver.TcpPacketSvr
 
-	uidConnMap map[uint64]net.Conn
-	connUidMap map[net.Conn]uint64
+	uidConnMap        map[uint64]net.Conn
+	connUidMap        map[net.Conn]uint64
 	remoteAddrConnMap map[string]net.Conn
 	remoteAddrKickMap map[string]bool
-	lock       sync.RWMutex
+	lock              sync.RWMutex
 }
 
 func NewTcpSvr() *ConnTcpSvr {
@@ -42,9 +41,9 @@ func (t *ConnTcpSvr) InitAndRun(ip string, port int) error {
 	t.remoteAddrConnMap = make(map[string]net.Conn)
 	t.remoteAddrKickMap = make(map[string]bool)
 
-	packetInfo := tcpserver.TcpPacketInfo {
+	packetInfo := tcpserver.TcpPacketInfo{
 		HeaderLen: sharedstruct.ByteLenOfCSPacketHeader(),
-		BodyLen: sharedstruct.ByteLenOfCSPacketBody,
+		BodyLen:   sharedstruct.ByteLenOfCSPacketBody,
 	}
 
 	return t.TcpPacketSvr.InitAndRun(ip, port, packetInfo, t)
@@ -54,7 +53,6 @@ func (t *ConnTcpSvr) InitAndRun(ip string, port int) error {
 func (t *ConnTcpSvr) OnConn(conn net.Conn) {
 	logger.Infof("new conn: %s", conn.RemoteAddr().String())
 }
-
 
 // 被Read协程调用，每个Connection对应一个Read协调
 func (t *ConnTcpSvr) OnPacket(conn net.Conn, data []byte) {
@@ -85,7 +83,7 @@ func (t *ConnTcpSvr) OnPacket(conn net.Conn, data []byte) {
 		// 	}
 		// }
 
-	}else {
+	} else {
 
 		if packetHeader.Cmd == uint32(g1_protocol.CMD_MAIN_LOGIN_REQ) {
 			req := &g1_protocol.LoginReq{}
@@ -101,11 +99,13 @@ func (t *ConnTcpSvr) OnPacket(conn net.Conn, data []byte) {
 			}
 
 			//http连接loginsvr 去做校验
-			ret,aid :=connLoginHttpCheck(req.Account,req.Password,req.ServerId)
-			if !ret { return }
+			ret, aid := connLoginHttpCheck(req.Account, req.Password, req.ServerId)
+			if !ret {
+				return
+			}
 
 			//uid =  sid + aid
-			int_id,_:= strconv.Atoi(req.GetServerId() + strconv.Itoa(aid))
+			int_id, _ := strconv.Atoi(req.GetServerId() + strconv.Itoa(aid))
 			uid = uint64(int_id)
 
 		}
@@ -127,39 +127,39 @@ func (t *ConnTcpSvr) OnPacket(conn net.Conn, data []byte) {
 	router.SendMsgBySvrTypeConn(serverType, uid, packetHeader.Cmd, 0, 0, packetBody, conn.RemoteAddr().String())
 }
 
-func  connLoginHttpCheck(account string,password string,serverid string) (bool,int){
+func connLoginHttpCheck(account string, password string, serverid string) (bool, int) {
 	// 创建请求
 	client := &http.Client{}
 	req, err := http.NewRequest(
 		"GET",
-		config.SvrCfg.LoginSdkAddr +"/userlogin_verify?account="+account+"&password="+password+"&curserid="+ serverid,
+		config.SvrCfg.LoginSdkAddr+"/userlogin_verify?account="+account+"&password="+password+"&curserid="+serverid,
 		nil)
 	if err != nil {
-		return false,0
+		return false, 0
 	}
 
 	req.Header.Add("token", "a")
 	resp, err1 := client.Do(req)
 	if err1 != nil {
-		return false,0
+		return false, 0
 	}
 
 	// 获取消息体
 	body, err2 := ioutil.ReadAll(resp.Body)
 	if err2 != nil {
-		return false,0
+		return false, 0
 	}
 
 	fmt.Println(string(body))
 	if resp.StatusCode == 200 {
 		var result map[string]interface{}
 		json.Unmarshal(body, &result)
-		if  result["ret"] == "true" {
-			return true,int(result["accountid"].(float64))
+		if result["ret"] == "true" {
+			return true, int(result["accountid"].(float64))
 		}
 	}
 
-	return false,0
+	return false, 0
 }
 
 // 被Read协程调用，每个Connection对应一个Read协调
@@ -178,7 +178,7 @@ func (t *ConnTcpSvr) OnClose(conn net.Conn) {
 	req.ByServer = true
 	req.Reason = "disconnect"
 	err := router.SendPbMsgBySvrTypeSimple(uint32(misc.ServerType_MainSvr), uid,
-											uint32(g1_protocol.CMD_MAIN_LOGOUT_REQ), &req)
+		uint32(g1_protocol.CMD_MAIN_LOGOUT_REQ), &req)
 	if err != nil {
 		glog.Error(err)
 	}
@@ -202,7 +202,7 @@ func (t *ConnTcpSvr) SendByUid(uid uint64, data1 []byte, data2 []byte) error {
 		return err
 	}
 
-	logger.Debugf("Send to client {uid: %v, len: %v}", uid, len(data1) + len(data2))
+	logger.Debugf("Send to client {uid: %v, len: %v}", uid, len(data1)+len(data2))
 	return nil
 }
 
@@ -234,7 +234,7 @@ func (t *ConnTcpSvr) Kick(uid uint64, reason g1_protocol.EKickOutReason) {
 	t.kick(conn, uid, reason)
 }
 
-func (t *ConnTcpSvr) KickByRemoteAddr(uid uint64, reason g1_protocol.EKickOutReason, remoteAddr string) {	
+func (t *ConnTcpSvr) KickByRemoteAddr(uid uint64, reason g1_protocol.EKickOutReason, remoteAddr string) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -267,7 +267,7 @@ func (t *ConnTcpSvr) removeConn(conn net.Conn) uint64 {
 			delete(t.remoteAddrKickMap, conn.RemoteAddr().String())
 			return 0
 		}
-	} else {  // uid并不属于这个conn。在多地登录时，会出现。
+	} else { // uid并不属于这个conn。在多地登录时，会出现。
 		return 0
 	}
 
@@ -279,7 +279,7 @@ func (t *ConnTcpSvr) kick(conn net.Conn, uid uint64, reason g1_protocol.EKickOut
 
 	logger.Infof("Kick out client {uid:%v, reason:%v, ip:%v}", uid, reason, conn.RemoteAddr())
 
-	msg := g1_protocol.ScKickOut{Reason:reason}
+	msg := g1_protocol.ScKickOut{Reason: reason}
 	msgData, err := proto.Marshal(&msg)
 	if err != nil {
 		logger.Errorf("Marshal error in ScKickOut | %v", err)
@@ -287,8 +287,8 @@ func (t *ConnTcpSvr) kick(conn net.Conn, uid uint64, reason g1_protocol.EKickOut
 	}
 
 	header := sharedstruct.CSPacketHeader{
-		Uid: uid,
-		Cmd: uint32(g1_protocol.CMD_SC_KICK_OUT),
+		Uid:     uid,
+		Cmd:     uint32(g1_protocol.CMD_SC_KICK_OUT),
 		BodyLen: uint32(len(msgData)),
 	}
 	err = t.WriteData(conn, header.ToBytes(), msgData)

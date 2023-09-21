@@ -1,29 +1,27 @@
 /// 角色管理器
 
-
 package role
 
 import (
-	`sync`
+	"GoOne/lib/api/cmd_handler"
+	"GoOne/lib/api/datetime"
+	"GoOne/lib/api/logger"
+	"GoOne/lib/service/router"
+	"sync"
 
-	`GoOne/common/module/datetime`
-	`GoOne/lib/cmd_handler`
-	`GoOne/lib/logger`
-	`GoOne/lib/router`
-	g1_protocol `GoOne/protobuf/protocol`
+	g1_protocol "GoOne/protobuf/protocol"
 
-	`github.com/golang/glog`
+	"github.com/golang/glog"
 )
 
 type RoleMgr struct {
-	mapUidToRole sync.Map	// map[uint64]*Role
+	mapUidToRole sync.Map // map[uint64]*Role
 }
 
 // -------------------------------- public --------------------------------
 
 func NewRoleMgr() *RoleMgr {
-	return &RoleMgr{
-	}
+	return &RoleMgr{}
 }
 
 func (m *RoleMgr) GetOrLoadOrCreateRole(uid uint64, trans cmd_handler.IContext) *Role {
@@ -31,7 +29,7 @@ func (m *RoleMgr) GetOrLoadOrCreateRole(uid uint64, trans cmd_handler.IContext) 
 }
 
 func (m *RoleMgr) GetOrLoadRole(uid uint64, trans cmd_handler.IContext) *Role {
-	return m.obtainRole(uid, trans,false)
+	return m.obtainRole(uid, trans, false)
 }
 
 func (m *RoleMgr) GetRole(uid uint64) *Role {
@@ -48,53 +46,51 @@ func (m *RoleMgr) DeleteRole(uid uint64) {
 	m.mapUidToRole.Delete(uid)
 }
 
-
 func (m *RoleMgr) Tick() {
 	m.removeExpiredRoles()
 }
 
 // -------------------------------- private --------------------------------
 
-
 func (m *RoleMgr) setRole(uid uint64, role *Role) {
 	m.mapUidToRole.Store(uid, role)
 }
 
 func loadRole(uid uint64, trans cmd_handler.IContext) (error, *Role) {
-/*	if uid != trans.Uid() {
-		glog.Errorf("inconsistent uid {uid:%v, transUid:%v}", uid, trans.Uid())
-		return errors.New("inconsistent uid"), nil
-	}
+	/*	if uid != trans.Uid() {
+			glog.Errorf("inconsistent uid {uid:%v, transUid:%v}", uid, trans.Uid())
+			return errors.New("inconsistent uid"), nil
+		}
 
-	req := g1_protocol.DBUidGetReq{}
-	rsp := g1_protocol.DBUidGetRsp{}
-	req.DbType = uint32(g1_protocol.DBType_DB_TYPE_ROLE)
-	req.Uid = uid
-	err := trans.CallMsgBySvrType(misc.ServerType_DBSvr, uint32(g1_protocol.CMD_DB_INNER_UID_GET_REQ), &req, &rsp)
-	if err != nil {
-		return err, nil
-	}
+		req := g1_protocol.DBUidGetReq{}
+		rsp := g1_protocol.DBUidGetRsp{}
+		req.DbType = uint32(g1_protocol.DBType_DB_TYPE_ROLE)
+		req.Uid = uid
+		err := trans.CallMsgBySvrType(misc.ServerType_DBSvr, uint32(g1_protocol.CMD_DB_INNER_UID_GET_REQ), &req, &rsp)
+		if err != nil {
+			return err, nil
+		}
 
-	ret := rsp.Ret.Ret
-	switch ret {
-	case int32(g1_protocol.ErrorCode_ERR_NOT_EXIST):
-		return nil, nil
-	default:
-		return fmt.Errorf("rsp error {ret:%v}", ret), nil
-	case 0:
-	}
+		ret := rsp.Ret.Ret
+		switch ret {
+		case int32(g1_protocol.ErrorCode_ERR_NOT_EXIST):
+			return nil, nil
+		default:
+			return fmt.Errorf("rsp error {ret:%v}", ret), nil
+		case 0:
+		}
 
-	role := Role{}
-	role.PbRole = new(g1_protocol.RoleInfo)
-	err = proto.Unmarshal(rsp.Data, role.PbRole)
-	if err != nil {
-		glog.Error(err)
-		return err, nil
-	}
-	// 这里主要是老的数据添加新增的数据段，不然新数据段就是nil
-	role.RoleInitField(role.PbRole.RegisterInfo.Uid)
-	return nil, &role*/
-	return  nil,nil
+		role := Role{}
+		role.PbRole = new(g1_protocol.RoleInfo)
+		err = proto.Unmarshal(rsp.Data, role.PbRole)
+		if err != nil {
+			glog.Error(err)
+			return err, nil
+		}
+		// 这里主要是老的数据添加新增的数据段，不然新数据段就是nil
+		role.RoleInitField(role.PbRole.RegisterInfo.Uid)
+		return nil, &role*/
+	return nil, nil
 }
 
 func (m *RoleMgr) obtainRole(uid uint64, trans cmd_handler.IContext, createIfNotExist bool) *Role {
@@ -110,7 +106,7 @@ func (m *RoleMgr) obtainRole(uid uint64, trans cmd_handler.IContext, createIfNot
 		glog.Errorf("failed to load role {uid:%v} | %v", uid, err)
 		return nil
 	}
-	if role == nil && createIfNotExist {  // err==nil && role==nil : 数据库中不存在
+	if role == nil && createIfNotExist { // err==nil && role==nil : 数据库中不存在
 		createHere = true
 		role = NewRole(uid)
 		role.Lock()
@@ -143,8 +139,8 @@ func (m *RoleMgr) removeExpiredRoles() {
 	expiryThreshold := 60 * 2
 	m.mapUidToRole.Range(func(key, value interface{}) bool {
 		role, ok := value.(*Role)
-		if ok && role != nil && now - role.PbRole.LoginInfo.LastHartBeatTime > int32(expiryThreshold) &&
-			now > role.HeartBeatExpiryTime + 1 {
+		if ok && role != nil && now-role.PbRole.LoginInfo.LastHartBeatTime > int32(expiryThreshold) &&
+			now > role.HeartBeatExpiryTime+1 {
 			expiredUidList = append(expiredUidList, role.Uid())
 			busIdList = append(busIdList, role.PbRole.ConnSvrInfo.BusId)
 			role.HeartBeatExpiryTime = now

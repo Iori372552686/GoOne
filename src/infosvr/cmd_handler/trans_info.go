@@ -2,13 +2,14 @@ package cmd_handler
 
 import (
 	"GoOne/common/misc"
+	"GoOne/lib/api/cmd_handler"
 
-	`GoOne/lib/cmd_handler`
-	g1_protocol `GoOne/protobuf/protocol`
-	`GoOne/src/infosvr/globals`
+	g1_protocol "GoOne/protobuf/protocol"
+	"GoOne/src/infosvr/globals"
 )
 
-type GetBriefInfo struct {}
+type GetBriefInfo struct{}
+
 func (h *GetBriefInfo) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 	req := &g1_protocol.InfoGetBriefInfoReq{}
 	rsp := &g1_protocol.InfoGetBriefInfoRsp{}
@@ -37,7 +38,8 @@ func (h *GetBriefInfo) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 	return ret
 }
 
-type GetIconDesc struct {}
+type GetIconDesc struct{}
+
 func (h *GetIconDesc) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 	req := &g1_protocol.InfoGetIconDescReq{}
 	rsp := &g1_protocol.InfoGetIconDescRsp{}
@@ -69,9 +71,8 @@ func (h *GetIconDesc) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 	return ret
 }
 
+type SetBriefInfo struct{}
 
-
-type SetBriefInfo struct {}
 func (h *SetBriefInfo) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 	req := &g1_protocol.InfoSetBriefInfoReq{}
 	rsp := &g1_protocol.InfoSetBriefInfoRsp{}

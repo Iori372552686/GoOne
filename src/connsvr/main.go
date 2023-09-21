@@ -2,11 +2,11 @@ package main
 
 import (
 	"GoOne/common/misc"
-	"GoOne/common/module/application"
-	"GoOne/lib/logger"
-	"GoOne/lib/marshal"
-	"GoOne/lib/router"
-	"GoOne/lib/sharedstruct"
+	"GoOne/lib/api/logger"
+	"GoOne/lib/api/sharedstruct"
+	"GoOne/lib/service/application"
+	"GoOne/lib/service/router"
+	"GoOne/lib/util/marshal"
 	g1_protocol "GoOne/protobuf/protocol"
 	"GoOne/src/connsvr/cmd_handler"
 	"GoOne/src/connsvr/config"
@@ -14,7 +14,6 @@ import (
 	"flag"
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
-
 )
 
 var svrConfFile = flag.String("svr_conf", "./connsvr_conf.json", "app conf file")
@@ -22,16 +21,16 @@ var svrConfFile = flag.String("svr_conf", "./connsvr_conf.json", "app conf file"
 func onRecvSSPacket(packet *sharedstruct.SSPacket) {
 	if misc.IsClientCmd(packet.Header.Cmd) {
 		csPacketHeader := sharedstruct.CSPacketHeader{
-			Uid: packet.Header.Uid,
-			Cmd: packet.Header.Cmd,
+			Uid:     packet.Header.Uid,
+			Cmd:     packet.Header.Cmd,
 			BodyLen: packet.Header.BodyLen,
 		}
 		globals.ConnTcpSvr.SendByUid(packet.Header.Uid, csPacketHeader.ToBytes(), packet.Body)
 	} else if packet.Header.Cmd == uint32(g1_protocol.CMD_CONN_KICK_OUT_REQ) {
-			onSSPacketConnKickout(packet)
+		onSSPacketConnKickout(packet)
 	} else {
 		globals.TransMgr.ProcessSSPacket(packet)
-		packet = nil  // packet所有权转交给transmgr，后面不能再用packet（包括data）
+		packet = nil // packet所有权转交给transmgr，后面不能再用packet（包括data）
 	}
 }
 
@@ -48,7 +47,6 @@ func onSSPacketConnKickout(packet *sharedstruct.SSPacket) {
 	// globals.ConnTcpSvr.Kick(packet.Header.Uid, req.Reason)
 	globals.ConnTcpSvr.KickByRemoteAddr(packet.Header.Uid, req.Reason, req.RemoteAddr)
 }
-
 
 type ConnSvrImpl struct {
 }
@@ -112,4 +110,3 @@ func main() {
 	application.Init(&ConnSvrImpl{})
 	application.Run()
 }
-

@@ -1,32 +1,33 @@
 package main
 
 import (
+	"GoOne/lib/api/datetime"
+	"GoOne/lib/api/logger"
+	"GoOne/lib/api/sharedstruct"
+	"GoOne/lib/service/application"
+	"GoOne/lib/service/router"
+	"GoOne/lib/service/sensitive_words"
+	"GoOne/lib/util/marshal"
 	"flag"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
 
-	`GoOne/common/misc`
-	`GoOne/common/module/application`
-	`GoOne/common/module/datetime`
-	`GoOne/lib/logger`
-	`GoOne/lib/marshal`
-	`GoOne/lib/router`
-	`GoOne/lib/sensitive_words`
-	`GoOne/lib/sharedstruct`
-	`GoOne/src/mainsvr/cmd_handler`
-	config `GoOne/src/mainsvr/conf`
-	`GoOne/src/mainsvr/globals`
+	"GoOne/common/misc"
+	"GoOne/src/mainsvr/cmd_handler"
+	config "GoOne/src/mainsvr/conf"
+	"GoOne/src/mainsvr/globals"
 )
 
 var svrConfFile = flag.String("svr_conf", "./mainsvr_conf.json", "app conf file")
-type MainSvrImpl struct {}
+
+type MainSvrImpl struct{}
 
 //---------------------------------- func
 
 func onRecvSSPacket(packet *sharedstruct.SSPacket) {
 	globals.TransMgr.ProcessSSPacket(packet)
-	packet = nil  // packet所有权转交给transmgr，后面不能再用packet（包括data）
+	packet = nil // packet所有权转交给transmgr，后面不能再用packet（包括data）
 }
 
 func (a *MainSvrImpl) OnInit() error {
@@ -44,11 +45,11 @@ func (a *MainSvrImpl) OnInit() error {
 
 	sensitive_words.Init(config.SvrCfg.SensitiveWordsFile)
 	err = router.InitAndRun(config.SvrCfg.SelfBusId,
-							onRecvSSPacket,
-							config.SvrCfg.RabbitMQAddr,
-							misc.ServerRouteRules,
-							config.SvrCfg.ZKAddr,
-							)
+		onRecvSSPacket,
+		config.SvrCfg.RabbitMQAddr,
+		misc.ServerRouteRules,
+		config.SvrCfg.ZKAddr,
+	)
 	if err != nil {
 		logger.Fatalf("Failed to initialize router | %v", err)
 		return err
@@ -76,7 +77,7 @@ func (a *MainSvrImpl) OnProc() bool { // return: isIdle
 }
 
 func (a *MainSvrImpl) OnTick(lastMs, nowMs int64) {
-	if lastMs / datetime.MS_PER_MINUTE != nowMs / datetime.MS_PER_MINUTE {   // 一分钟调用
+	if lastMs/datetime.MS_PER_MINUTE != nowMs/datetime.MS_PER_MINUTE { // 一分钟调用
 		globals.RoleMgr.Tick()
 	}
 }

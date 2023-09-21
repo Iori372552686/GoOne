@@ -1,22 +1,20 @@
 package tcpserver
 
 import (
-	"GoOne/lib/logger"
+	"GoOne/lib/api/logger"
 	"net"
-
 )
 
 type TcpPacketInfo struct {
 	HeaderLen int
-	BodyLen func([]byte) int
+	BodyLen   func([]byte) int
 }
 
 type ITcpPacketSvrEventHandler interface {
-	OnConn(net.Conn)  // 被Listener协程调用，一个TcpPacketSvr对应一个Listener协程
-	OnPacket(net.Conn, []byte)  // 被Read协程调用，每个Connection对应一个Read协调
-	OnClose(net.Conn)  // 被Read协程调用，每个Connection对应一个Read协调
+	OnConn(net.Conn)           // 被Listener协程调用，一个TcpPacketSvr对应一个Listener协程
+	OnPacket(net.Conn, []byte) // 被Read协程调用，每个Connection对应一个Read协调
+	OnClose(net.Conn)          // 被Read协程调用，每个Connection对应一个Read协调
 }
-
 
 type TcpPacketSvr struct {
 	TcpSvr
@@ -40,11 +38,11 @@ func (s *TcpPacketSvr) OnRead(conn net.Conn, data []byte) int {
 	headerLen := s.packetInfo.HeaderLen
 	logger.Infof("on read, len=%d, headlen=%d", dataLen, headerLen)
 	consumed := 0
-	for {  // There likely be more than one packet
-		if dataLen >= consumed + headerLen {  // header is ready
-			bodyLen := s.packetInfo.BodyLen(data[consumed : consumed + headerLen])
-			if dataLen >= consumed + headerLen + bodyLen {  // header and body is ready
-				s.handler.OnPacket(conn, data[consumed : consumed + headerLen + bodyLen])
+	for { // There likely be more than one packet
+		if dataLen >= consumed+headerLen { // header is ready
+			bodyLen := s.packetInfo.BodyLen(data[consumed : consumed+headerLen])
+			if dataLen >= consumed+headerLen+bodyLen { // header and body is ready
+				s.handler.OnPacket(conn, data[consumed:consumed+headerLen+bodyLen])
 				consumed += headerLen + bodyLen
 			} else {
 				return consumed
@@ -54,7 +52,6 @@ func (s *TcpPacketSvr) OnRead(conn net.Conn, data []byte) int {
 		}
 	}
 }
-
 
 func (s *TcpPacketSvr) OnClose(conn net.Conn) {
 	s.handler.OnClose(conn)

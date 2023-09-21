@@ -1,11 +1,11 @@
 package info
 
 import (
+	"GoOne/lib/db/redis"
+	"GoOne/lib/service/algorithm"
 	"fmt"
 
-	`GoOne/lib/algorithm`
-	`GoOne/lib/redis`
-	g1_protocol `GoOne/protobuf/protocol`
+	g1_protocol "GoOne/protobuf/protocol"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
@@ -14,7 +14,6 @@ import (
 const (
 	CACHE_SIZE = 10000
 )
-
 
 type InfoMgr struct {
 	data *algorithm.LRUCache
@@ -63,7 +62,6 @@ func (m *InfoMgr) SetInfo(uid uint64, brief *g1_protocol.PbRoleBriefInfo) int {
 	return m.saveBriefToDB(uid, brief)
 }
 
-
 func (m *InfoMgr) loadBriefFromDB(uidList []uint64) (*[]*g1_protocol.PbRoleBriefInfo, int) {
 	dbType := uint32(g1_protocol.DBType_DB_TYPE_BRIEF_INFO)
 	keys := make([]string, 0, len(uidList))
@@ -96,4 +94,3 @@ func (m *InfoMgr) saveBriefToDB(uid uint64, brief *g1_protocol.PbRoleBriefInfo) 
 	}
 	return 0
 }
-

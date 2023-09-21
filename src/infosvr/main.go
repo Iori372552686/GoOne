@@ -1,28 +1,28 @@
 package main
 
 import (
+	"GoOne/lib/api/logger"
+	"GoOne/lib/api/sharedstruct"
+	"GoOne/lib/service/application"
+	"GoOne/lib/util/marshal"
+
+	"GoOne/lib/service/router"
 	"flag"
 
-	`GoOne/common/misc`
-	`GoOne/common/module/application`
-	`GoOne/lib/logger`
-	`GoOne/lib/marshal`
-	`GoOne/lib/router`
-	`GoOne/lib/sharedstruct`
-	`GoOne/src/infosvr/cmd_handler`
-	`GoOne/src/infosvr/config`
-	`GoOne/src/infosvr/globals`
+	"GoOne/common/misc"
+	"GoOne/src/infosvr/cmd_handler"
+	"GoOne/src/infosvr/config"
+	"GoOne/src/infosvr/globals"
 )
-
 
 var svrConfFile = flag.String("svr_conf", "./infosvr_conf.json", "app conf file")
 
 func onRecvSSPacket(packet *sharedstruct.SSPacket) {
 	globals.TransMgr.ProcessSSPacket(packet)
-	packet = nil  // packet所有权转交给transmgr，后面不能再用packet（包括data）
+	packet = nil // packet所有权转交给transmgr，后面不能再用packet（包括data）
 }
 
-type InfoSvrImpl struct{
+type InfoSvrImpl struct {
 }
 
 func (a *InfoSvrImpl) OnInit() error {
@@ -33,7 +33,7 @@ func (a *InfoSvrImpl) OnInit() error {
 	}
 
 	for _, ins := range config.SvrCfg.DbInstances {
-		_ = globals.InfoMgr.RedisMgr.AddInstance(ins.InstanceId, ins.Ip, ins.Port, ins.Password, 0, ins.IsCluster)
+		_ = globals.InfoMgr.RedisMgr.AddInstance(ins.InstanceId, ins.Ip, int(ins.Port), ins.Password, 0, ins.IsCluster)
 	}
 
 	err = router.InitAndRun(config.SvrCfg.SelfBusId,

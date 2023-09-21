@@ -1,10 +1,10 @@
 package cmd_handler
 
 import (
-	`GoOne/lib/cmd_handler`
-	`GoOne/lib/logger`
-	g1_protocol `GoOne/protobuf/protocol`
-	`GoOne/src/mysqlsvr/globals`
+	"GoOne/lib/api/cmd_handler"
+	"GoOne/lib/api/logger"
+	g1_protocol "GoOne/protobuf/protocol"
+	"GoOne/src/mysqlsvr/globals"
 )
 
 type UpdateRoleInfo struct{}
@@ -83,7 +83,6 @@ func (h *SearchRole) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 	c.SendMsgBack(rsp)
 	return ret
 }
-
 
 func checkRoleExist(c cmd_handler.IContext) bool {
 	instance := uint32(g1_protocol.EMysqlType_MYSQL_TYPE_ROLE_INFO)

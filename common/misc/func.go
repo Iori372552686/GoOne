@@ -1,8 +1,8 @@
 package misc
 
 import (
-	`GoOne/common/module/datetime`
-	g1_protocol `GoOne/protobuf/protocol`
+	"GoOne/lib/api/datetime"
+	g1_protocol "GoOne/protobuf/protocol"
 )
 
 // 从命令字中获取目标svr
@@ -17,7 +17,7 @@ func MsgTypeInCmd(cmd uint32) uint32 {
 
 // 判断命令字时候是客户端发来
 func IsClientCmd(cmd uint32) bool {
-	t :=  MsgTypeInCmd(cmd)
+	t := MsgTypeInCmd(cmd)
 	return t == 0 || t == 3
 }
 
@@ -41,8 +41,6 @@ func IsRobot(uid uint64) bool {
 	return uid < 100
 }
 
-
-
 //func SplitItemFromString(s string) *[]*g1_protocol.PbItem {
 //	items := make([]*g1_protocol.PbItem, 0)
 //	s1 := strings.Split(s, "|")
@@ -61,8 +59,10 @@ func IsRobot(uid uint64) bool {
 // 这里一般是一个id，接一个数量
 func SplitItemFromArray(a []int32) *[]*g1_protocol.PbItem {
 	items := make([]*g1_protocol.PbItem, 0)
-	if len(a)%2 == 1 { return &items }  //容错处理
-	
+	if len(a)%2 == 1 {
+		return &items
+	} //容错处理
+
 	for i := 0; i < len(a); i += 2 {
 		item := &g1_protocol.PbItem{}
 		item.Id = a[i]
@@ -74,19 +74,17 @@ func SplitItemFromArray(a []int32) *[]*g1_protocol.PbItem {
 
 func GetIconDescFromRoleBrief(brief *g1_protocol.PbRoleBriefInfo) *g1_protocol.PbIconDesc {
 	icon := &g1_protocol.PbIconDesc{
-		Uid: brief.Uid,
-		Name: brief.Name,
-		Icon: brief.Icon,
-		Frame: brief.Frame,
-		Level: brief.Level,
-		VipLevel: brief.VipLevel,
+		Uid:            brief.Uid,
+		Name:           brief.Name,
+		Icon:           brief.Icon,
+		Frame:          brief.Frame,
+		Level:          brief.Level,
+		VipLevel:       brief.VipLevel,
 		LastOnlineTime: brief.LastOnlineTime,
-		IsOnline: brief.LastOnlineTime + 30 > datetime.Now(),
+		IsOnline:       brief.LastOnlineTime+30 > datetime.Now(),
 	}
 	return icon
 }
-
-
 
 func GetRoleIconDesc(role *g1_protocol.RoleInfo) (iconDesc *g1_protocol.PbIconDesc) {
 	iconDesc = &g1_protocol.PbIconDesc{}
