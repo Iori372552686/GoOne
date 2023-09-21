@@ -1,4 +1,3 @@
-// add by Iori
 package common
 
 import (
@@ -17,7 +16,6 @@ import (
 
 /**
 * @Description: 检测 recover并打印错误 stack
-* @Author: Iori <yuanzhuang@mini1.cn>
 * @Date: 2022-02-19 10:33:49
 **/
 func CheckRecover() {
@@ -31,7 +29,6 @@ func CheckRecover() {
 
 /**
 * @Description: 检测 recover并跟踪代码
-* @Author: Iori <yuanzhuang@mini1.cn>
 * @Date: 2022-02-26 18:00:12
 **/
 func RecoverTraceCode() {
@@ -44,7 +41,7 @@ func RecoverTraceCode() {
 /**
 * @Description: 输出错误，跟踪代码
 * @param: code
-* @Author: Iori <yuanzhuang@mini1.cn>
+* @Author: Iori
 * @Date: 2022-02-26 18:00:28
 **/
 func TraceCode(code ...interface{}) {
@@ -63,7 +60,7 @@ func TraceCode(code ...interface{}) {
 /**
 * @Description: 获取当前协程id
 * @return: uint64
-* @Author: Iori <yuanzhuang@mini1.cn>
+* @Author: Iori
 * @Date: 2022-02-19 10:32:39
 **/
 func GetGID() uint64 {
@@ -79,7 +76,7 @@ func GetGID() uint64 {
 * @Description: 结构体数据复制
 * @param: binding  要修改的结构体
 * @param: value  有数据的结构体
-* @Author: Iori <yuanzhuang@mini1.cn>
+* @Author: Iori
 * @Date: 2022-02-19 10:32:57
 **/
 func StructAssign(binding interface{}, value interface{}) {
@@ -98,7 +95,7 @@ func StructAssign(binding interface{}, value interface{}) {
 * @Description: 随机指定长度字符串
 * @param: n
 * @return: string
-* @Author: Iori <yuanzhuang@mini1.cn>
+* @Author: Iori
 * @Date: 2022-06-01 15:19:58
 **/
 func GetRandomStr(n int) string {
@@ -115,7 +112,7 @@ func GetRandomStr(n int) string {
 * @Description:
 * @param: n
 * @return: string
-* @Author: Iori <yuanzhuang@mini1.cn>
+* @Author: Iori
 * @Date: 2022-06-01 16:41:37
 **/
 func GetRandomByte(n int) []byte {
