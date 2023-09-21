@@ -1,27 +1,23 @@
-package tcpserver
+package tcp_server
 
 import (
+	"GoOne/common/misc"
 	"GoOne/lib/api/logger"
 	"bytes"
 	"fmt"
-	"github.com/golang/glog"
 	"io"
 	"net"
+	"sync"
+
+	"github.com/golang/glog"
 
 	"strconv"
-	"sync"
 	"time"
 )
 
 const (
 	kReadBufSize = 1024 * 10
 )
-
-type ITcpSvrEventHandler interface {
-	OnConn(net.Conn)             // 被Listener协程调用，一个TcpSvr对应一个Listener协程
-	OnRead(net.Conn, []byte) int // 被Read协程调用，每个Connection对应一个Read协调
-	OnClose(net.Conn)            // 被Read协程调用，每个Connection对应一个Read协调
-}
 
 type TcpConnInfo struct {
 	chanWrite chan []byte // passing 'nil' means close
@@ -38,7 +34,7 @@ type TcpSvr struct {
 }
 
 func (s *TcpSvr) InitAndRun(ip string, port int, handler ITcpSvrEventHandler) error {
-	s.TcpReadTimeout = 10 * time.Second
+	s.TcpReadTimeout = 2 * misc.ClientExpiryThreshold
 	s.TcpWriteTimeout = 10 * time.Second
 
 	s.handler = handler
@@ -151,7 +147,8 @@ func (s *TcpSvr) runConnRead(conn net.Conn) {
 
 		if err == nil {
 			buff.Write(readBuf[0:readLen])
-			consumedLen := s.handler.OnRead(conn, buff.Bytes())
+			//consumedLen := s.handler.OnRead(conn, buff.Bytes())
+			consumedLen := s.handler.OnRead2(conn, buff.Bytes())
 			if consumedLen > 0 {
 				buff.Next(consumedLen)
 			}

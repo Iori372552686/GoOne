@@ -1,4 +1,4 @@
-package tcp_server
+package net_mgr
 
 import (
 	"GoOne/common/misc"
@@ -7,39 +7,20 @@ import (
 	"GoOne/lib/net/tcp_server"
 	"GoOne/lib/service/router"
 	g1_protocol "GoOne/protobuf/protocol"
-	"GoOne/src/connsvr/config"
-	"encoding/json"
 	"fmt"
-	"github.com/golang/glog"
-	"github.com/golang/protobuf/proto"
-	"io/ioutil"
 	"net"
-	"net/http"
 
-	"strconv"
-	"sync"
+	"github.com/golang/protobuf/proto"
+
+	"github.com/golang/glog"
 )
 
-// 必须实现 tcpserver.ITcpPacketSvrEventHandler
-type ConnTcpSvr struct {
-	tcp_server.TcpPacketSvr
-
-	uidConnMap        map[uint64]net.Conn
-	connUidMap        map[net.Conn]uint64
-	remoteAddrConnMap map[string]net.Conn
-	remoteAddrKickMap map[string]bool
-	lock              sync.RWMutex
-}
-
-func NewTcpSvr() *ConnTcpSvr {
-	return &ConnTcpSvr{}
-}
-
-func (t *ConnTcpSvr) InitAndRun(ip string, port int) error {
+func (t *ConnTcpSvr) InitAndRun(ip string, port int, cb func(conn net.Conn, data []byte)) error {
 	t.uidConnMap = make(map[uint64]net.Conn)
 	t.connUidMap = make(map[net.Conn]uint64)
 	t.remoteAddrConnMap = make(map[string]net.Conn)
 	t.remoteAddrKickMap = make(map[string]bool)
+	t.handler = cb
 
 	packetInfo := tcp_server.TcpPacketInfo{
 		HeaderLen: sharedstruct.ByteLenOfCSPacketHeader(),
@@ -56,110 +37,10 @@ func (t *ConnTcpSvr) OnConn(conn net.Conn) {
 
 // 被Read协程调用，每个Connection对应一个Read协调
 func (t *ConnTcpSvr) OnPacket(conn net.Conn, data []byte) {
-	headerLen := sharedstruct.ByteLenOfCSPacketHeader()
-	logger.Debugf("on packet: {dataLen: %v, headerLen: %v, remoteAddr: %v}\n",
-		len(data), headerLen, conn.RemoteAddr())
+	// todo 处理业务 -- dispatch
+	go t.handler(conn, data)
 
-	packetHeader := sharedstruct.CSPacketHeader{}
-	packetHeader.From(data)
-	packetBody := data[headerLen:]
-	logger.Debugf("[uid: %d] Received client packet: %#v", packetHeader.Uid, packetHeader)
-
-	// 实现帐号认证系统之前，由client决定uid
-	uid := packetHeader.Uid
-	if uid > 0 {
-		// t.lock.RLock()
-		// oldConn := t.uidConnMap[uid]
-		// t.lock.RUnlock()
-
-		// if oldConn != conn {
-		// 	t.lock.Lock()
-		// 	oldConn = t.uidConnMap[uid]
-		// 	t.uidConnMap[uid] = conn
-		// 	t.connUidMap[conn] = uid
-		// 	t.lock.Unlock()
-		// 	if oldConn != nil {
-		// 		t.kick(oldConn, uid, g1_protocol.EKickOutReason_MULTI_PLACE_LOGIN)
-		// 	}
-		// }
-
-	} else {
-
-		if packetHeader.Cmd == uint32(g1_protocol.CMD_MAIN_LOGIN_REQ) {
-			req := &g1_protocol.LoginReq{}
-			err := proto.Unmarshal(packetBody, req)
-			if err != nil {
-				logger.Errorf(" Fail to unmarshal LoginReq | %v ", err)
-				return
-			}
-
-			if req.GetAccount() == "" || req.GetServerId() == "" {
-				logger.Errorf(" LoginReq  -- > account or ServerId   error !!! ")
-				return
-			}
-
-			//http连接loginsvr 去做校验
-			ret, aid := connLoginHttpCheck(req.Account, req.Password, req.ServerId)
-			if !ret {
-				return
-			}
-
-			//uid =  sid + aid
-			int_id, _ := strconv.Atoi(req.GetServerId() + strconv.Itoa(aid))
-			uid = uint64(int_id)
-
-		}
-	}
-
-	if misc.IsInnerCmd(packetHeader.Cmd) {
-		logger.Debugf("Received an inner command from client: %#v", packetHeader)
-		return
-	}
-
-	t.lock.Lock()
-	t.uidConnMap[uid] = conn
-	t.connUidMap[conn] = uid
-	t.remoteAddrConnMap[conn.RemoteAddr().String()] = conn
-	t.lock.Unlock()
-
-	serverType := misc.ServerTypeInCmd(packetHeader.Cmd)
-	// router.SendMsgBySvrType(serverType, uid, packetHeader.Cmd, 0, 0, packetBody)
-	router.SendMsgBySvrTypeConn(serverType, uid, packetHeader.Cmd, 0, 0, packetBody, conn.RemoteAddr().String())
-}
-
-func connLoginHttpCheck(account string, password string, serverid string) (bool, int) {
-	// 创建请求
-	client := &http.Client{}
-	req, err := http.NewRequest(
-		"GET",
-		config.SvrCfg.LoginSdkAddr+"/userlogin_verify?account="+account+"&password="+password+"&curserid="+serverid,
-		nil)
-	if err != nil {
-		return false, 0
-	}
-
-	req.Header.Add("token", "a")
-	resp, err1 := client.Do(req)
-	if err1 != nil {
-		return false, 0
-	}
-
-	// 获取消息体
-	body, err2 := ioutil.ReadAll(resp.Body)
-	if err2 != nil {
-		return false, 0
-	}
-
-	fmt.Println(string(body))
-	if resp.StatusCode == 200 {
-		var result map[string]interface{}
-		json.Unmarshal(body, &result)
-		if result["ret"] == "true" {
-			return true, int(result["accountid"].(float64))
-		}
-	}
-
-	return false, 0
+	return
 }
 
 // 被Read协程调用，每个Connection对应一个Read协调
