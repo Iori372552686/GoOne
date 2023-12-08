@@ -1,11 +1,10 @@
 package info
 
 import (
-	"GoOne/lib/db/redis"
-	"GoOne/lib/service/algorithm"
 	"fmt"
-
-	g1_protocol "GoOne/protobuf/protocol"
+	"github.com/Iori372552686/GoOne/lib/db/redis"
+	"github.com/Iori372552686/GoOne/lib/service/algorithm"
+	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"

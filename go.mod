@@ -1,6 +1,6 @@
-module GoOne
+module github.com/Iori372552686/GoOne
 
-go 1.20
+go 1.21
 
 require (
 	github.com/apolloconfig/agollo/v4 v4.3.1

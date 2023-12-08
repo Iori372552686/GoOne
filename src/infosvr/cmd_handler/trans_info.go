@@ -1,11 +1,10 @@
 package cmd_handler
 
 import (
-	"GoOne/common/misc"
-	"GoOne/lib/api/cmd_handler"
-
-	g1_protocol "GoOne/protobuf/protocol"
-	"GoOne/src/infosvr/globals"
+	"github.com/Iori372552686/GoOne/common/misc"
+	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
+	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
+	"github.com/Iori372552686/GoOne/src/infosvr/globals"
 )
 
 type GetBriefInfo struct{}

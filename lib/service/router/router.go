@@ -1,12 +1,12 @@
 package router
 
 import (
-	"GoOne/lib/api/logger"
-	"GoOne/lib/api/sharedstruct"
-	bus2 "GoOne/lib/service/bus"
-	"GoOne/lib/service/svrinstmgr"
 	"errors"
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
+	"github.com/Iori372552686/GoOne/lib/service/bus"
+	"github.com/Iori372552686/GoOne/lib/service/svrinstmgr"
 
 	"github.com/golang/protobuf/proto"
 
@@ -41,7 +41,7 @@ func InitAndRun(selfBusId string, cb CbOnRecvSSPacket, rabbitmqAddr string,
 	}
 
 	router.cbOnRecvSSPacket = cb
-	router.busImpl = bus2.CreateBus("rabbitmq", bus2.IpStringToInt(selfBusId), onRecvBusMsg, rabbitmqAddr)
+	router.busImpl = bus.CreateBus("rabbitmq", bus.IpStringToInt(selfBusId), onRecvBusMsg, rabbitmqAddr)
 	if router.busImpl == nil {
 		return errors.New("failed to create bus implement")
 	}
@@ -121,7 +121,7 @@ func SendMsgBySvrTypeConn(svrType uint32, uid uint64, cmd uint32, sendSeq uint16
 	ip := strings.Split(remoteAddr, ":")[0]
 	port := strings.Split(remoteAddr, ":")[1]
 
-	ipInt := bus2.IpStringToInt(ip)
+	ipInt := bus.IpStringToInt(ip)
 	portInt, _ := strconv.Atoi(port)
 
 	packetHeader := sharedstruct.SSPacketHeader{
@@ -189,7 +189,7 @@ func SendMsgBack(originalHeader sharedstruct.SSPacketHeader, srcTransId uint32, 
 var severInstanceMgr svrinstmgr.ServerInstanceMgr
 
 var router struct {
-	busImpl          bus2.IBus
+	busImpl          bus.IBus
 	cbOnRecvSSPacket CbOnRecvSSPacket
 }
 

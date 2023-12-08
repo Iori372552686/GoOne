@@ -1,9 +1,9 @@
 package cmd_handler
 
 import (
-	"GoOne/lib/api/logger"
-	g1_protocol "GoOne/protobuf/protocol"
-	"GoOne/src/mainsvr/globals"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
+	"github.com/Iori372552686/GoOne/src/mainsvr/globals"
 )
 
 // 所有的命令字对应的go需要在这里先注册

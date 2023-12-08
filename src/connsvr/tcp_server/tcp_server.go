@@ -1,15 +1,15 @@
 package tcp_server
 
 import (
-	"GoOne/common/misc"
-	"GoOne/lib/api/logger"
-	"GoOne/lib/api/sharedstruct"
-	"GoOne/lib/net/tcp_server"
-	"GoOne/lib/service/router"
-	g1_protocol "GoOne/protobuf/protocol"
-	"GoOne/src/connsvr/config"
 	"encoding/json"
 	"fmt"
+	"github.com/Iori372552686/GoOne/common/misc"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
+	"github.com/Iori372552686/GoOne/lib/net/tcp_server"
+	"github.com/Iori372552686/GoOne/lib/service/router"
+	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
+	"github.com/Iori372552686/GoOne/src/connsvr/config"
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	"io/ioutil"

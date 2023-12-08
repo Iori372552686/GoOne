@@ -1,17 +1,16 @@
 package main
 
 import (
-	"GoOne/lib/api/logger"
-	"GoOne/lib/api/sharedstruct"
-	"GoOne/lib/service/application"
-	"GoOne/lib/service/router"
-	"GoOne/lib/util/marshal"
-	"GoOne/src/mysqlsvr/cmd_handler"
 	"flag"
-
-	"GoOne/common/misc"
-	"GoOne/src/mysqlsvr/config"
-	"GoOne/src/mysqlsvr/globals"
+	"github.com/Iori372552686/GoOne/common/misc"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
+	"github.com/Iori372552686/GoOne/lib/service/application"
+	"github.com/Iori372552686/GoOne/lib/service/router"
+	"github.com/Iori372552686/GoOne/lib/util/marshal"
+	"github.com/Iori372552686/GoOne/src/mysqlsvr/cmd_handler"
+	"github.com/Iori372552686/GoOne/src/mysqlsvr/config"
+	"github.com/Iori372552686/GoOne/src/mysqlsvr/globals"
 )
 
 func onRecvSSPacket(packet *sharedstruct.SSPacket) {

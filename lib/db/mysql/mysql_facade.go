@@ -1,9 +1,9 @@
 package mysql
 
 import (
-	"GoOne/lib/api/logger"
 	"database/sql"
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 )
 
 type IFacde interface {

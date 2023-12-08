@@ -1,10 +1,10 @@
 package cmd_handler
 
 import (
-	"GoOne/lib/api/cmd_handler"
-	"GoOne/lib/api/sharedstruct"
-	g1_protocol "GoOne/protobuf/protocol"
-	"GoOne/src/connsvr/globals"
+	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
+	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
+	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
+	"github.com/Iori372552686/GoOne/src/connsvr/globals"
 )
 
 type Broadcast struct{}

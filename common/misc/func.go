@@ -1,8 +1,8 @@
 package misc
 
 import (
-	"GoOne/lib/api/datetime"
-	g1_protocol "GoOne/protobuf/protocol"
+	"github.com/Iori372552686/GoOne/lib/api/datetime"
+	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
 )
 
 // 从命令字中获取目标svr

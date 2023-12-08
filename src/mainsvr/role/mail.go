@@ -1,9 +1,9 @@
 package role
 
 import (
-	"GoOne/common/misc"
-	"GoOne/lib/api/cmd_handler"
-	g1_protocol "GoOne/protobuf/protocol"
+	"github.com/Iori372552686/GoOne/common/misc"
+	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
+	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
 )
 
 // 添加邮件，这里一般是在trans中执行的，所以要加上cmd_handle参数

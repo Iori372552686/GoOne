@@ -1,12 +1,12 @@
 package transaction
 
 import (
-	"GoOne/lib/api/cmd_handler"
-	"GoOne/lib/api/logger"
-	"GoOne/lib/api/sharedstruct"
-	"GoOne/lib/service/router"
 	"errors"
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
+	"github.com/Iori372552686/GoOne/lib/service/router"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"

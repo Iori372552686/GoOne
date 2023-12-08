@@ -1,7 +1,7 @@
 package misc
 
 import (
-	"GoOne/lib/service/svrinstmgr"
+	"github.com/Iori372552686/GoOne/lib/service/svrinstmgr"
 	"time"
 )
 

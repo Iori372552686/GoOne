@@ -1,17 +1,17 @@
 package main
 
 import (
-	"GoOne/common/misc"
-	"GoOne/lib/api/logger"
-	"GoOne/lib/api/sharedstruct"
-	"GoOne/lib/service/application"
-	"GoOne/lib/service/router"
-	"GoOne/lib/util/marshal"
-	g1_protocol "GoOne/protobuf/protocol"
-	"GoOne/src/connsvr/cmd_handler"
-	"GoOne/src/connsvr/config"
-	"GoOne/src/connsvr/globals"
 	"flag"
+	"github.com/Iori372552686/GoOne/common/misc"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
+	"github.com/Iori372552686/GoOne/lib/service/application"
+	"github.com/Iori372552686/GoOne/lib/service/router"
+	"github.com/Iori372552686/GoOne/lib/util/marshal"
+	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
+	"github.com/Iori372552686/GoOne/src/connsvr/cmd_handler"
+	"github.com/Iori372552686/GoOne/src/connsvr/config"
+	"github.com/Iori372552686/GoOne/src/connsvr/globals"
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 )

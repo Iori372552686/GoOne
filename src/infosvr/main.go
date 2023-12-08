@@ -1,18 +1,16 @@
 package main
 
 import (
-	"GoOne/lib/api/logger"
-	"GoOne/lib/api/sharedstruct"
-	"GoOne/lib/service/application"
-	"GoOne/lib/util/marshal"
-
-	"GoOne/lib/service/router"
 	"flag"
-
-	"GoOne/common/misc"
-	"GoOne/src/infosvr/cmd_handler"
-	"GoOne/src/infosvr/config"
-	"GoOne/src/infosvr/globals"
+	"github.com/Iori372552686/GoOne/common/misc"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
+	"github.com/Iori372552686/GoOne/lib/service/application"
+	"github.com/Iori372552686/GoOne/lib/service/router"
+	"github.com/Iori372552686/GoOne/lib/util/marshal"
+	"github.com/Iori372552686/GoOne/src/infosvr/cmd_handler"
+	"github.com/Iori372552686/GoOne/src/infosvr/config"
+	"github.com/Iori372552686/GoOne/src/infosvr/globals"
 )
 
 var svrConfFile = flag.String("svr_conf", "./infosvr_conf.json", "app conf file")

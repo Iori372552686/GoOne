@@ -1,7 +1,7 @@
 package application
 
 import (
-	"GoOne/lib/api/datetime"
+	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"os"
 	"time"
 

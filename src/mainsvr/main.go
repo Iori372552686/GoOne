@@ -1,22 +1,21 @@
 package main
 
 import (
-	"GoOne/lib/api/datetime"
-	"GoOne/lib/api/logger"
-	"GoOne/lib/api/sharedstruct"
-	"GoOne/lib/service/application"
-	"GoOne/lib/service/router"
-	"GoOne/lib/service/sensitive_words"
-	"GoOne/lib/util/marshal"
 	"flag"
+	"github.com/Iori372552686/GoOne/common/misc"
+	"github.com/Iori372552686/GoOne/lib/api/datetime"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
+	"github.com/Iori372552686/GoOne/lib/service/application"
+	"github.com/Iori372552686/GoOne/lib/service/router"
+	"github.com/Iori372552686/GoOne/lib/service/sensitive_words"
+	"github.com/Iori372552686/GoOne/lib/util/marshal"
+	"github.com/Iori372552686/GoOne/src/mainsvr/cmd_handler"
+	config "github.com/Iori372552686/GoOne/src/mainsvr/conf"
+	"github.com/Iori372552686/GoOne/src/mainsvr/globals"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
-
-	"GoOne/common/misc"
-	"GoOne/src/mainsvr/cmd_handler"
-	config "GoOne/src/mainsvr/conf"
-	"GoOne/src/mainsvr/globals"
 )
 
 var svrConfFile = flag.String("svr_conf", "./mainsvr_conf.json", "app conf file")

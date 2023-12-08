@@ -1,8 +1,8 @@
 package sensitive_words
 
 import (
-	"GoOne/lib/api/logger"
 	"bufio"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"os"
 	"strings"
 )

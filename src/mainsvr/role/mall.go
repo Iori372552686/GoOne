@@ -1,9 +1,6 @@
 package role
 
-import (
-	g1_protocol `GoOne/protobuf/protocol`
-)
-
+import g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
 
 func (r *Role) MallGetItem(confId int32) *g1_protocol.PbMallItem {
 	info := r.PbRole.MallInfo

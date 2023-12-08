@@ -1,16 +1,15 @@
 package role
 
 import (
-	"GoOne/lib/api/cmd_handler"
-	"GoOne/lib/api/datetime"
-	"GoOne/lib/api/logger"
-	"GoOne/lib/service/router"
 	"fmt"
+	"github.com/Iori372552686/GoOne/common/misc"
+	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
+	"github.com/Iori372552686/GoOne/lib/api/datetime"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/service/router"
+	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
 	"strconv"
 	"sync"
-
-	"GoOne/common/misc"
-	g1_protocol "GoOne/protobuf/protocol"
 
 	"github.com/golang/glog"
 )

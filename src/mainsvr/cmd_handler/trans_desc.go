@@ -1,11 +1,11 @@
 package cmd_handler
 
 import (
-	"GoOne/common/misc"
-	"GoOne/lib/api/cmd_handler"
-	"GoOne/lib/service/sensitive_words"
-	g1_protocol "GoOne/protobuf/protocol"
-	"GoOne/src/mainsvr/role"
+	"github.com/Iori372552686/GoOne/common/misc"
+	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
+	"github.com/Iori372552686/GoOne/lib/service/sensitive_words"
+	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
+	"github.com/Iori372552686/GoOne/src/mainsvr/role"
 )
 
 type ChangeName struct{}

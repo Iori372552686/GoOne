@@ -1,11 +1,11 @@
 package svrinstmgr
 
 import (
-	"GoOne/lib/api/logger"
-	"GoOne/lib/service/bus"
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"math/rand"
 	"sort"
 	"sync"

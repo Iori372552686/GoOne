@@ -1,11 +1,8 @@
 /// 玩家邮箱，相框，立绘相关
 
-
 package role
 
-import (
-	g1_protocol `GoOne/protobuf/protocol`
-)
+import g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
 
 func (r *Role) IconGetIconDesc() *g1_protocol.PbIconDesc {
 	desc := &g1_protocol.PbIconDesc{}
@@ -16,7 +13,6 @@ func (r *Role) IconGetIconDesc() *g1_protocol.PbIconDesc {
 	//desc.VipLevel = 0
 	return desc
 }
-
 
 func (r *Role) IconGet(id int32, addIfExist bool) *g1_protocol.PbIcon {
 	if r.PbRole.IconInfo.IconList == nil {
@@ -101,7 +97,6 @@ func (r *Role) ImageChange(imageId int32) int {
 	return 0
 }
 
-
 func (r *Role) IconTouchRedPoint(id int32) int {
 	icon := r.IconGet(id, false)
 	if icon != nil {
@@ -117,6 +112,3 @@ func (r *Role) FrameTouchRedPoint(id int32) int {
 	}
 	return 0
 }
-
-
-

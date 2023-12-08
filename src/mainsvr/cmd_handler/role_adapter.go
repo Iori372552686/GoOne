@@ -1,9 +1,9 @@
 package cmd_handler
 
 import (
-	"GoOne/lib/api/cmd_handler"
-	"GoOne/src/mainsvr/globals"
-	"GoOne/src/mainsvr/role"
+	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
+	"github.com/Iori372552686/GoOne/src/mainsvr/globals"
+	"github.com/Iori372552686/GoOne/src/mainsvr/role"
 )
 
 type IRoleCmd interface {

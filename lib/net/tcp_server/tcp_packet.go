@@ -1,8 +1,8 @@
 package tcp_server
 
 import (
-	"GoOne/lib/api/logger"
 	"encoding/binary"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"net"
 )
 

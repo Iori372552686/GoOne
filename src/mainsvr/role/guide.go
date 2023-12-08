@@ -1,7 +1,7 @@
 package role
 
 import (
-	g1_protocol `GoOne/protobuf/protocol`
+	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
 )
 
 func (r *Role) GuideCompleted(id int32) int {

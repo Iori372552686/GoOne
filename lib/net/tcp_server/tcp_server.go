@@ -1,10 +1,10 @@
 package tcp_server
 
 import (
-	"GoOne/common/misc"
-	"GoOne/lib/api/logger"
 	"bytes"
 	"fmt"
+	"github.com/Iori372552686/GoOne/common/misc"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"io"
 	"net"
 	"sync"

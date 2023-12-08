@@ -1,9 +1,9 @@
 package bus
 
 import (
-	"GoOne/lib/api/logger"
 	"encoding/binary"
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 
 	"github.com/streadway/amqp"
 

@@ -1,13 +1,12 @@
 package cmd_handler
 
 import (
-	"GoOne/lib/api/cmd_handler"
-	"GoOne/lib/service/bus"
-	"GoOne/lib/service/router"
-	g1_protocol "GoOne/protobuf/protocol"
-	"GoOne/src/mainsvr/globals"
-	"GoOne/src/mainsvr/role"
-
+	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
+	"github.com/Iori372552686/GoOne/lib/service/bus"
+	"github.com/Iori372552686/GoOne/lib/service/router"
+	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
+	"github.com/Iori372552686/GoOne/src/mainsvr/globals"
+	"github.com/Iori372552686/GoOne/src/mainsvr/role"
 	"github.com/golang/protobuf/proto"
 
 	"strconv"

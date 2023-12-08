@@ -1,8 +1,8 @@
 package redis
 
 import (
-	"GoOne/lib/api/logger"
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"sync"
 	"time"
 

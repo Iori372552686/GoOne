@@ -2,9 +2,7 @@
 
 package role
 
-import (
-	g1_protocol `GoOne/protobuf/protocol`
-)
+import g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
 
 /// 玩家道具相关操作放在这里
 
@@ -29,7 +27,7 @@ func (r *Role) ItemGetCountRef(itemId int32) *int32 {
 		return &(r.PbRole.BasicInfo.Liveness)
 	} else if itemId == int32(g1_protocol.EItemID_GUILDGOLD) {
 		return &(r.PbRole.BasicInfo.GuildCoin)
-	}else {
+	} else {
 		for i := range r.PbRole.InventoryInfo.ItemList {
 			if r.PbRole.InventoryInfo.ItemList[i].Id == itemId {
 				return &(r.PbRole.InventoryInfo.ItemList[i].Count)
