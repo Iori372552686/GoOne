@@ -44,6 +44,12 @@ func Init(handler AppInterface) int {
 	return 0
 }
 
+func SetTickInterval(interval int64) {
+	if interval > 0 && interval < 1000 {
+		app.tickInterval = interval
+	}
+}
+
 func (a *Application) exit() {
 	a.appHandler.OnExit()
 }
