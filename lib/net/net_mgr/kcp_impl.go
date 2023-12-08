@@ -1,7 +1,7 @@
 package net_mgr
 
 import (
-	"GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 	Kcp "github.com/xtaci/kcp-go/v5"
 )
 

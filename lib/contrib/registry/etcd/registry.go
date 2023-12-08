@@ -1,9 +1,9 @@
 package etcd
 
 import (
-	"GoOne/lib/contrib/registry"
 	"context"
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/contrib/registry"
 	"math/rand"
 	"time"
 

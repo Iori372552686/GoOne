@@ -1,9 +1,9 @@
 package ws_gin
 
 import (
-	"GoOne/lib/api/logger"
-	"GoOne/lib/net/ws_server"
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/net/ws_server"
 	"strconv"
 
 	"github.com/gin-gonic/gin"

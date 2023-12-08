@@ -1,10 +1,10 @@
 package consul
 
 import (
-	"GoOne/lib/api/logger"
-	"GoOne/lib/contrib/registry"
 	"context"
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/contrib/registry"
 	"net"
 	"net/url"
 	"strconv"

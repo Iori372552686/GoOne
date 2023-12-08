@@ -1,8 +1,8 @@
 package crypto
 
 import (
-	"GoOne/lib/util/convert"
 	"encoding/base64"
+	"github.com/Iori372552686/GoOne/lib/util/convert"
 )
 
 var coder = base64.StdEncoding

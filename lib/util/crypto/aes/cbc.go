@@ -1,10 +1,10 @@
 package aes
 
 import (
-	"GoOne/lib/util/convert"
-	"GoOne/lib/util/crypto"
 	"crypto/aes"
 	"crypto/cipher"
+	"github.com/Iori372552686/GoOne/lib/util/convert"
+	"github.com/Iori372552686/GoOne/lib/util/crypto"
 )
 
 /*

@@ -1,7 +1,7 @@
 package orm
 
 import (
-	"GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/go-xorm/xorm"
 )
 

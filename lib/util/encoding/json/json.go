@@ -1,8 +1,8 @@
 package json
 
 import (
-	"GoOne/lib/util/encoding"
 	"encoding/json"
+	"github.com/Iori372552686/GoOne/lib/util/encoding"
 	"reflect"
 
 	"google.golang.org/protobuf/encoding/protojson"

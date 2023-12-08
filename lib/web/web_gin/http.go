@@ -1,9 +1,9 @@
 package web_gin
 
 import (
-	"GoOne/lib/api/logger"
-	"GoOne/lib/web/rest"
 	"errors"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/web/rest"
 	"time"
 
 	ginglog "github.com/szuecs/gin-glog"

@@ -1,12 +1,12 @@
 package net
 
 import (
-	"GoOne/lib/api/logger"
-	gnet_svr "GoOne/lib/net/gnet_server"
-	"GoOne/lib/net/net_mgr"
-	"GoOne/lib/net/ws_server"
-	ws_gin "GoOne/lib/net/ws_server/gin"
 	"errors"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	gnet_svr "github.com/Iori372552686/GoOne/lib/net/gnet_server"
+	"github.com/Iori372552686/GoOne/lib/net/net_mgr"
+	"github.com/Iori372552686/GoOne/lib/net/ws_server"
+	ws_gin "github.com/Iori372552686/GoOne/lib/net/ws_server/gin"
 	"net"
 
 	"github.com/panjf2000/gnet"

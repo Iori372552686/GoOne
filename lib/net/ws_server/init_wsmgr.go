@@ -1,8 +1,8 @@
 package ws_server
 
 import (
-	"GoOne/lib/api/datetime"
-	"GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/datetime"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

@@ -2,8 +2,8 @@
 package orm
 
 import (
-	"GoOne/lib/api/logger"
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/go-xorm/xorm"

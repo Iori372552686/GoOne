@@ -3,7 +3,7 @@ package xml
 import (
 	"encoding/xml"
 
-	"GoOne/lib/util/encoding"
+	"github.com/Iori372552686/GoOne/lib/util/encoding"
 )
 
 // Name is the name registered for the xml codec.

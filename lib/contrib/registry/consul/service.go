@@ -1,7 +1,7 @@
 package consul
 
 import (
-	"GoOne/lib/contrib/registry"
+	"github.com/Iori372552686/GoOne/lib/contrib/registry"
 	"sync"
 	"sync/atomic"
 )

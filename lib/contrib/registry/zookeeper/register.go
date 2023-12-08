@@ -1,9 +1,9 @@
 package zookeeper
 
 import (
-	"GoOne/lib/contrib/registry"
 	"context"
 	"encoding/json"
+	"github.com/Iori372552686/GoOne/lib/contrib/registry"
 	"path"
 	"sync"
 	"sync/atomic"

@@ -1,8 +1,8 @@
 package etcd
 
 import (
-	"GoOne/lib/contrib/registry"
 	"encoding/json"
+	"github.com/Iori372552686/GoOne/lib/contrib/registry"
 )
 
 func marshal(si *registry.ServiceInstance) (string, error) {

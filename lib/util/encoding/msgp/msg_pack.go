@@ -3,7 +3,7 @@
 package msgp
 
 import (
-	"GoOne/lib/util/encoding"
+	"github.com/Iori372552686/GoOne/lib/util/encoding"
 	"github.com/vmihailenco/msgpack"
 )
 

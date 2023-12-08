@@ -8,11 +8,11 @@
 package ws_server
 
 import (
-	"GoOne/lib/api/datetime"
-	"GoOne/lib/api/logger"
-	"GoOne/lib/api/sharedstruct"
-	g1_protocol "GoOne/protobuf/protocol"
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/api/datetime"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
+	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
 	"sync"
 
 	"github.com/golang/protobuf/proto"

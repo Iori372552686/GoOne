@@ -1,8 +1,8 @@
 package nacos
 
 import (
-	"GoOne/lib/contrib/registry"
 	"context"
+	"github.com/Iori372552686/GoOne/lib/contrib/registry"
 	"log"
 	"net"
 	"testing"

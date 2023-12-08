@@ -1,10 +1,10 @@
 package http_client
 
 import (
-	"GoOne/lib/api/logger"
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"io/ioutil"
 	"net"
 	"net/http"

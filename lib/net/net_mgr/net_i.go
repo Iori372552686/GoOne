@@ -1,8 +1,8 @@
 package net_mgr
 
 import (
-	"GoOne/lib/net/kcp_server"
-	"GoOne/lib/net/tcp_server"
+	"github.com/Iori372552686/GoOne/lib/net/kcp_server"
+	"github.com/Iori372552686/GoOne/lib/net/tcp_server"
 	"net"
 	"sync"
 

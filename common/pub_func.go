@@ -1,11 +1,11 @@
 package common
 
 import (
-	"GoOne/lib/api/logger"
-	"GoOne/lib/util/convert"
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/util/convert"
 	"math/rand"
 	"net"
 	"reflect"

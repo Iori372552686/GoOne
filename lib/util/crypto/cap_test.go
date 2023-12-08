@@ -1,9 +1,9 @@
 package crypto
 
 import (
-	"GoOne/lib/util/crypto/aes"
-	"GoOne/lib/util/crypto/xxtea"
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/util/crypto/aes"
+	"github.com/Iori372552686/GoOne/lib/util/crypto/xxtea"
 	"log"
 	"testing"
 )

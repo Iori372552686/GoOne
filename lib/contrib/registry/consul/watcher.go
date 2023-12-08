@@ -1,8 +1,8 @@
 package consul
 
 import (
-	"GoOne/lib/contrib/registry"
 	"context"
+	"github.com/Iori372552686/GoOne/lib/contrib/registry"
 )
 
 type watcher struct {
