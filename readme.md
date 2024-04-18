@@ -19,7 +19,7 @@ GoOne 是一款基于Go语言实现的Reactor模型的微服务式分布式游�
 ├─example			使用示例
 ├─src			  具体的业务项目示例源码
    ├─connsvr	          网关服务项目源码
-   ├─infosvr		  日志服务项目源码  
+   ├─infosvr		  role-info服务项目源码  
    ├─mainsvr	          游戏主逻辑服务源码  
    ├─mysqlsvr	          mysql服务源码  
       
