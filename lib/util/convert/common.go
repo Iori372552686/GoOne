@@ -3,7 +3,6 @@ package convert
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/bytedance/sonic/decoder"
 	"reflect"
@@ -168,73 +167,4 @@ func JsonToMapUseInt64(body []byte, dst *map[string]interface{}) error {
 	dec.UseInt64()
 
 	return dec.Decode(dst)
-}
-
-/**
-* @Description:  json 转 map interface , 数值为int64版本
-* @param: jsStr
-* @return: map[string]interface{}
-* @return: error
-* @Author: Iori
-**/
-func JsonToMapByInt(body []byte, dst *map[string]interface{}) error {
-	err := json.Unmarshal(body, dst)
-	if err != nil {
-		logger.Errorf("convert (%s) to map error:%v", body, err)
-		return err
-	}
-
-	// proc json float64 problem
-	return mapFloatToInt(dst)
-}
-
-/**
-* @Description: 将map里面的float转为int64,忽略精度问题
-* @Author: Iori
-**/
-func mapFloatToInt(srcMap *map[string]interface{}) error {
-	for key, value := range *srcMap {
-		switch value.(type) {
-		case float64:
-			(*srcMap)[key] = int64(value.(float64))
-			continue
-
-		case map[string]interface{}:
-			data := value.(map[string]interface{})
-			mapFloatToInt(&data)
-			continue
-
-		case []interface{}:
-			data := value.([]interface{})
-			sliceFloatToInt(&data)
-			continue
-		}
-	}
-
-	return nil
-}
-
-/**
-* @Description:  将slice里面的float转为int64,忽略精度问题
-* @param: src
-* @Author: Iori
-**/
-func sliceFloatToInt(src *[]interface{}) {
-	for key, value := range *src {
-		switch value.(type) {
-		case float64:
-			(*src)[key] = int64(value.(float64))
-			continue
-
-		case map[string]interface{}:
-			data := value.(map[string]interface{})
-			mapFloatToInt(&data)
-			continue
-
-		case []interface{}:
-			data := value.([]interface{})
-			sliceFloatToInt(&data)
-			continue
-		}
-	}
 }
