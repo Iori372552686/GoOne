@@ -4,7 +4,8 @@ GoOne 是一款基于Go语言实现的Reactor模型的微服务式分布式游�
 
 
 ## GoOne Framework：
-![image](https://user-images.githubusercontent.com/27808711/126938946-797aa10a-d552-444b-ab66-1ea62d760b60.png)
+![image](https://github.com/user-attachments/assets/991e2091-dbd9-4f8f-9e0b-5c24ed98bf3b)
+
 
 ### 目录结构
 
