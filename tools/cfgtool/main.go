@@ -26,7 +26,7 @@ func main() {
 	flag.StringVar(&domain.BytesPath, "bytes", "", "数据文件目录")
 	flag.StringVar(&domain.CodePath, "code", "", "go代码文件目录")
 	flag.StringVar(&domain.Module, "module", "github.com/Iori372552686/GoOne", "项目目录")
-	flag.StringVar(&domain.PbPath, "pb", "github.com/gdsgog/poker_protocol/protocol", "proto生成路径")
+	flag.StringVar(&domain.PbPath, "pb", "github.com/Iori372552686/game_protocol/protocol", "proto生成路径")
 	flag.Parse()
 
 	if len(domain.XlsxPath) <= 0 {

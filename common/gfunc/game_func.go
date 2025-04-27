@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"github.com/Iori372552686/GoOne/common/define"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/cespare/xxhash/v2"
-	pb "github.com/gdsgog/poker_protocol/protocol"
+	pb "github.com/Iori372552686/game_protocol/protocol"
 	"strconv"
 )
 

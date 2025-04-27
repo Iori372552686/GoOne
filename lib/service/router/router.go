@@ -9,7 +9,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/lib/service/svrinstmgr"
 	"github.com/Iori372552686/GoOne/module/misc"
-	g1_protocol "github.com/gdsgog/poker_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/game_protocol"
 
 	"github.com/golang/protobuf/proto"
 )

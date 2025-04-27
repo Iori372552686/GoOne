@@ -2,57 +2,60 @@
 
 package role
 
-import g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
+import (
+	"fmt"
+	g1_protocol "github.com/Iori372552686/game_protocol"
+)
 
-func (r *Role) IconGetIconDesc() *g1_protocol.PbIconDesc {
+func (r *Role) GetIconDesc() *g1_protocol.PbIconDesc {
 	desc := &g1_protocol.PbIconDesc{}
-	desc.Name = r.PbRole.DescInfo.Name
-	desc.Icon = r.PbRole.DescInfo.IconId
-	desc.Frame = r.PbRole.DescInfo.FrameId
+	desc.Name = r.PbRole.BasicInfo.Name
+	desc.IconUrl = r.PbRole.IconInfo.IconUrl
+	desc.Frame = r.PbRole.IconInfo.FrameId
 	desc.Level = r.PbRole.BasicInfo.Level
+	desc.IsOnline = r.IsOnline()
+	desc.Uid = r.PbRole.RegisterInfo.Uid
 	//desc.VipLevel = 0
 	return desc
 }
 
 func (r *Role) IconGet(id int32, addIfExist bool) *g1_protocol.PbIcon {
-	if r.PbRole.IconInfo.IconList == nil {
-		r.PbRole.IconInfo.IconList = make([]*g1_protocol.PbIcon, 0)
+	if r.PbRole.IconInfo.IconMap == nil {
+		r.PbRole.IconInfo.IconMap = make(map[int32]*g1_protocol.PbIcon)
 	}
-	for _, v := range r.PbRole.IconInfo.IconList {
-		if v.Id == id {
-			return v
-		}
+
+	if r.PbRole.IconInfo.IconMap[id] != nil {
+		return r.PbRole.IconInfo.IconMap[id]
 	}
 
 	if addIfExist {
-		v := &g1_protocol.PbIcon{Id: id}
-		r.PbRole.IconInfo.IconList = append(r.PbRole.IconInfo.IconList, v)
-		return v
+		ins := &g1_protocol.PbIcon{Id: id}
+		r.PbRole.IconInfo.IconMap[id] = ins
+		return ins
 	}
 	return nil
 }
 
 func (r *Role) FrameGet(id int32, addIfExist bool) *g1_protocol.PbFrame {
-	if r.PbRole.IconInfo.FrameList == nil {
-		r.PbRole.IconInfo.FrameList = make([]*g1_protocol.PbFrame, 0)
+	if r.PbRole.IconInfo.FrameMap == nil {
+		r.PbRole.IconInfo.FrameMap = make(map[int32]*g1_protocol.PbFrame)
 	}
-	for _, v := range r.PbRole.IconInfo.FrameList {
-		if v.Id == id {
-			return v
-		}
+
+	if r.PbRole.IconInfo.FrameMap[id] != nil {
+		return r.PbRole.IconInfo.FrameMap[id]
 	}
 
 	if addIfExist {
-		v := &g1_protocol.PbFrame{Id: id}
-		r.PbRole.IconInfo.FrameList = append(r.PbRole.IconInfo.FrameList, v)
-		return v
+		ins := &g1_protocol.PbFrame{Id: id}
+		r.PbRole.IconInfo.FrameMap[id] = ins
+		return ins
 	}
 	return nil
 }
 
 func (r *Role) IconAdd(id int32, reason *Reason) int {
 	icon := r.IconGet(id, true)
-	if reason.Reason != int32(REASON_INIT) {
+	if reason.Reason != g1_protocol.Reason_REASON_INIT {
 		icon.RedPoint = true
 	}
 	return 0
@@ -65,7 +68,7 @@ func (r *Role) IconHas(id int32) bool {
 
 func (r *Role) FrameAdd(id int32, reason *Reason) int {
 	frame := r.FrameGet(id, true)
-	if reason.Reason != int32(REASON_INIT) {
+	if reason.Reason != g1_protocol.Reason_REASON_INIT {
 		frame.RedPoint = true
 	}
 	return 0
@@ -76,25 +79,25 @@ func (r *Role) FrameHas(id int32) bool {
 	return v != nil
 }
 
-func (r *Role) IconChange(iconId int32) int {
-	if iconId > 0 && !r.IconHas(iconId) {
-		return int(g1_protocol.ErrorCode_ERR_ICON_NOT_HAVE)
+func (r *Role) IconChange(iconId int32) g1_protocol.ErrorCode {
+	if iconId <= 0 { //&& !r.IconHas(iconId)
+		return g1_protocol.ErrorCode_ERR_ICON_NOT_HAVE
 	}
-	r.PbRole.DescInfo.IconId = iconId
-	return 0
+	r.PbRole.IconInfo.IconUrl = fmt.Sprintf("headicon_%d", iconId)
+	return g1_protocol.ErrorCode_ERR_OK
 }
 
-func (r *Role) FrameChange(frameId int32) int {
+func (r *Role) FrameChange(frameId int32) g1_protocol.ErrorCode {
 	if frameId > 0 && !r.FrameHas(frameId) {
-		return int(g1_protocol.ErrorCode_ERR_FRAME_NOT_HAVE)
+		return g1_protocol.ErrorCode_ERR_FRAME_NOT_HAVE
 	}
-	r.PbRole.DescInfo.FrameId = frameId
-	return 0
+	r.PbRole.IconInfo.FrameId = frameId
+	return g1_protocol.ErrorCode_ERR_OK
 }
 
-func (r *Role) ImageChange(imageId int32) int {
+func (r *Role) ImageChange(imageId int32) g1_protocol.ErrorCode {
 
-	return 0
+	return g1_protocol.ErrorCode_ERR_OK
 }
 
 func (r *Role) IconTouchRedPoint(id int32) int {

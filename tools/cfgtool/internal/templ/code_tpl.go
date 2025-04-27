@@ -17,7 +17,7 @@ import (
 	"sync/atomic"
 	
 	"github.com/Iori372552686/GoOne/common/gamedata"
-	{{.PbPkg}} "github.com/gdsgog/poker_protocol/protocol"
+	{{.PbPkg}} "github.com/Iori372552686/game_protocol/protocol"
 	"github.com/golang/protobuf/proto"
 )
 

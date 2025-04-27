@@ -4,7 +4,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/infosvr/globals"
-	g1_protocol "github.com/gdsgog/poker_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/game_protocol"
 )
 
 func GetBriefInfo(c cmd_handler.IContext, data []byte) g1_protocol.ErrorCode {

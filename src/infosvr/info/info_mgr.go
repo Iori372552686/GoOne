@@ -5,7 +5,7 @@ import (
 
 	"github.com/Iori372552686/GoOne/lib/db/redis"
 	"github.com/Iori372552686/GoOne/lib/service/algorithm"
-	g1_protocol "github.com/gdsgog/poker_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/game_protocol"
 	"github.com/nacos-group/nacos-sdk-go/common/logger"
 
 	"github.com/golang/protobuf/proto"

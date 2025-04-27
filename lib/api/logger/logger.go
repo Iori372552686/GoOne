@@ -8,7 +8,7 @@ import (
 
 	"github.com/Iori372552686/GoOne/lib/api/logger/plug"
 	"github.com/Iori372552686/GoOne/lib/api/logger/zap"
-	pb "github.com/gdsgog/poker_protocol/protocol"
+	pb "github.com/Iori372552686/game_protocol/protocol"
 )
 
 var logPlug *plug.CmdBlacklist

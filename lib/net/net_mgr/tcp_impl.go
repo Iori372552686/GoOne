@@ -12,7 +12,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/util/convert"
 	"github.com/Iori372552686/GoOne/module/misc"
-	g1_protocol "github.com/gdsgog/poker_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/game_protocol"
 
 	"github.com/golang/protobuf/proto"
 )

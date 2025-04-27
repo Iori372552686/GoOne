@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
-	g1_protocol "github.com/gdsgog/poker_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/game_protocol"
 	"github.com/golang/protobuf/proto"
 )
 

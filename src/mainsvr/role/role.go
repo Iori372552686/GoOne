@@ -1,17 +1,21 @@
 package role
 
 import (
+	"errors"
 	"fmt"
-	"github.com/Iori372552686/GoOne/common/misc"
+	"github.com/Iori372552686/GoOne/lib/util/safego"
+	"github.com/Iori372552686/GoOne/module/misc"
+	"github.com/Iori372552686/GoOne/src/mainsvr/globals/rds"
+
+	"google.golang.org/protobuf/proto"
+	"sync"
+
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/service/router"
-	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
-	"strconv"
-	"sync"
-
-	"github.com/golang/glog"
+	"github.com/Iori372552686/GoOne/lib/util/convert"
+	g1_protocol "github.com/Iori372552686/game_protocol"
 )
 
 type Role struct {
@@ -28,11 +32,6 @@ func NewRole(uid uint64) *Role {
 
 	role.PbRole = new(g1_protocol.RoleInfo)
 	role.RoleInitField(uid)
-	// TODO add test item
-	//role.ItemAdd(1201001, 5, &Reason{REASON_INIT, 0})
-	//role.ItemAdd(1201002, 5, &Reason{REASON_INIT, 0})
-	//role.ItemAdd(1201003, 5, &Reason{REASON_INIT, 0})
-
 	role.OnRoleCreate()
 	return role
 }
@@ -51,17 +50,27 @@ func (r *Role) RoleInitField(uid uint64) {
 	if r.PbRole.LoginInfo == nil {
 		r.PbRole.LoginInfo = &g1_protocol.RoleLoginInfo{}
 	}
-	if r.PbRole.DescInfo == nil {
-		r.PbRole.DescInfo = &g1_protocol.RoleDescInfo{}
-		r.PbRole.DescInfo.Name = "游客" + strconv.FormatInt(int64(uid), 10)
-		//r.PbRole.DescInfo.FrameId = gamedata.Const.DefaultFrame()
-		//r.PbRole.DescInfo.IconId = gamedata.Const.DefaultIcon()
-		//r.PbRole.DescInfo.ImageId = gamedata.Const.DefaultImage()
-		r.PbRole.DescInfo.FreeCnt = 1
+	if r.PbRole.GameInfo == nil {
+		r.PbRole.GameInfo = &g1_protocol.RoleGameInfo{}
+		r.PbRole.GameInfo.PlayRoomIds = make([]uint64, 0)
 	}
 	if r.PbRole.BasicInfo == nil {
 		r.PbRole.BasicInfo = &g1_protocol.RoleBasicInfo{}
 		r.PbRole.BasicInfo.Level = 1
+		r.PbRole.BasicInfo.Name = "Player" + convert.Int64ToString(int64(uid))
+		//r.PbRole.DescInfo.FrameId = gamedata.Const.DefaultFrame()
+		//r.PbRole.DescInfo.ImageId = gamedata.Const.DefaultImage()
+		r.PbRole.BasicInfo.Gold = 1000000
+		r.PbRole.BasicInfo.Diamond = 10000
+		r.PbRole.BasicInfo.AceCoin = 100000
+		r.PbRole.BasicInfo.WinAceCoin = 20000
+		r.PbRole.BasicInfo.Credit = 10000
+		r.PbRole.BasicInfo.FreeCnt = 1
+	}
+	if r.PbRole.IconInfo == nil {
+		r.PbRole.IconInfo = &g1_protocol.RoleIconInfo{}
+		//r.PbRole.IconInfo.FrameId = ConstConfig.MGetByName("DefaultFrame").Value //gamedata.Const.DefaultFrame()
+		r.PbRole.IconInfo.IconUrl = "headicon_" + convert.Int64ToString(int64(uid)%31)
 	}
 	if r.PbRole.MallInfo == nil {
 		r.PbRole.MallInfo = &g1_protocol.RoleMallInfo{}
@@ -72,6 +81,10 @@ func (r *Role) RoleInitField(uid uint64) {
 	if r.PbRole.OpenFunInfo == nil {
 		r.PbRole.OpenFunInfo = &g1_protocol.RoleOpenFunction{}
 		r.PbRole.OpenFunInfo.IsAllOpen = true
+	}
+	if r.PbRole.InventoryInfo == nil {
+		r.PbRole.InventoryInfo = &g1_protocol.RoleInventoryInfo{}
+		r.PbRole.InventoryInfo.ItemMap = make(map[int32]*g1_protocol.PbItem)
 	}
 
 }
@@ -87,24 +100,24 @@ func (r *Role) NowMs() int64 {
 // 日志
 func (r *Role) Errorf(format string, args ...interface{}) {
 	f := fmt.Sprintf("[%v|%v] %v", r.Uid(), 0, format)
-	glog.ErrorDepth(1, fmt.Sprintf(f, args...))
+	logger.ErrorDepthf(1, fmt.Sprintf(f, args...))
 }
 
 func (r *Role) Warningf(format string, args ...interface{}) {
 	f := fmt.Sprintf("[%v|%v] %v", r.Uid(), 0, format)
-	glog.WarningDepth(1, fmt.Sprintf(f, args...))
+	logger.WarningDepthf(1, fmt.Sprintf(f, args...))
 }
 
 func (r *Role) Infof(format string, args ...interface{}) {
 	f := fmt.Sprintf("[%v|%v] %v", r.Uid(), 0, format)
-	glog.InfoDepth(1, fmt.Sprintf(f, args...))
+	logger.InfoDepthf(1, fmt.Sprintf(f, args...))
 }
 
 func (r *Role) Debugf(format string, args ...interface{}) {
 	r.DebugDepthf(1, format, args...)
 }
 func (r *Role) DebugDepthf(depth int, format string, args ...interface{}) {
-	f := fmt.Sprintf("[%v|%v] %v", r.Uid(), 0, format)
+	f := fmt.Sprintf("[%v|%v] %v", r.Uid(), r.Zone(), format)
 	logger.DebugDepthf(1+depth, f, args...)
 }
 
@@ -112,52 +125,45 @@ func (r *Role) Uid() uint64 {
 	return r.PbRole.RegisterInfo.Uid
 }
 
-func (r *Role) Zone() int32 {
-	return r.PbRole.RegisterInfo.Zone
+func (r *Role) Zone() uint32 {
+	return uint32(r.PbRole.RegisterInfo.Zone)
 }
 
 func (r *Role) SaveToDB(trans cmd_handler.IContext) error {
-	/*	if r.Uid() != trans.Uid() {
-			r.Errorf("inconsistent uid {roleUid:%v, transUid:%v}", r.Uid(), trans.Uid())
-			return errors.New("inconsistent uid")
-		}
+	if r.Uid() != trans.Uid() {
+		r.Errorf("inconsistent uid {roleUid:%v, transUid:%v}", r.Uid(), trans.Uid())
+		return errors.New("inconsistent uid")
+	}
 
-		data, err := proto.Marshal(r.PbRole)
-		if err != nil {
-			r.Errorf("marshaling error {role:%v} | %v", r.PbRole, err)
-			return err
-		}
+	data, err := proto.Marshal(r.PbRole)
+	if err != nil {
+		r.Errorf("marshaling error {role:%v} | %v", r.PbRole, err)
+		return err
+	}
 
-		req := g1_protocol.DBUidSetReq{}
-		rsp := g1_protocol.DBUidSetRsp{}
-		req.Uid = r.Uid()
-		req.DbType = uint32(g1_protocol.DBType_DB_TYPE_ROLE)
-		req.Data = data
-		err = trans.CallMsgBySvrType(misc.ServerType_DBSvr, uint32(g1_protocol.CMD_DB_INNER_UID_SET_REQ), &req, &rsp)
-		if err != nil {
-			return err
-		}
+	err = rds.RedisMgr.SetBytes(uint32(g1_protocol.DBType_DB_TYPE_ROLE), fmt.Sprintf("%s:%d", g1_protocol.DBType_DB_TYPE_ROLE.String(), r.Uid()), data)
+	if err != nil {
+		logger.Errorf("role SaveToDB set redis error", err)
+		return errors.New("role SaveToDB set redis error")
+	}
 
-		if rsp.Ret.Ret != 0 {
-			return fmt.Errorf("save role response error {ret:%v}", rsp.Ret.Ret)
-		}
-	*/
+	r.Debugf("role SaveToDB set redis success | uid:%v", r.Uid())
 	return nil
 }
 
 func (r *Role) SaveToMysql(trans cmd_handler.IContext) error {
 	req := g1_protocol.MysqlInnerUpdateRoleInfoReq{}
-	rsp := g1_protocol.MysqlInnerUpdateRoleInfoRsp{}
-	req.Name = r.PbRole.DescInfo.Name
+	rsp := g1_protocol.MysqlInnerUpdateRoleInfoRsp{Ret: &g1_protocol.Ret{}}
+	req.Name = r.PbRole.BasicInfo.Name
 	r.Infof("update mysql")
-	err := trans.CallMsgBySvrType(misc.ServerType_MysqlSvr, uint32(g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ), &req, &rsp)
+	err := trans.CallMsgBySvrType(misc.ServerType_MysqlSvr, g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ, &req, &rsp)
 	if err != nil {
 		return err
 	}
 	r.Infof("update mysql")
 
-	if rsp.Ret.Ret != 0 {
-		r.Errorf("save role to mysql error {ret:%v}", rsp.Ret.Ret)
+	if rsp.Ret.Code != 0 {
+		r.Errorf("save role to mysql error {ret:%v}", rsp.Ret.Code)
 	}
 	r.Infof("update mysql")
 	return nil
@@ -165,26 +171,28 @@ func (r *Role) SaveToMysql(trans cmd_handler.IContext) error {
 
 // 保存玩家数据，不等待返回结果。只在特殊情况下使用。比如：RoleMgr::removeExpiredRoles中
 func (r *Role) SaveToDBIgnoreRsp() {
-	/*	data, err := proto.Marshal(r.PbRole)
+	data, err := proto.Marshal(r.PbRole)
+	if err != nil {
+		r.Errorf("marshaling error {role:%v} | %v", r.PbRole, err)
+		return
+	}
+
+	uid := r.Uid()
+	safego.Go(func() {
+		err = rds.RedisMgr.SetBytes(uint32(g1_protocol.DBType_DB_TYPE_ROLE), fmt.Sprintf("%s:%d", g1_protocol.DBType_DB_TYPE_ROLE.String(), uid), data)
 		if err != nil {
-			r.Errorf("Failed to marshal role when removing expired role {role:%v} | %v", r.PbRole, err)
+			logger.Errorf("role SaveToDBIgnoreRsp set redis error", err)
 			return
 		}
-
-		req := g1_protocol.DBUidSetReq{}
-		req.Uid = r.Uid()
-		req.DbType = uint32(g1_protocol.DBType_DB_TYPE_ROLE)
-		req.IgnoreRsp = true
-		req.Data = data
-		err = router.SendPbMsgBySvrTypeSimple(misc.ServerType_DBSvr, r.Uid(), uint32(g1_protocol.CMD_DB_INNER_UID_SET_REQ), &req)
-		if err != nil {
-			r.Errorf("Failed to saveToDBIgnoreRsp {role:%v} | %v", r.PbRole, err)
-			return
-		}*/
+	})
 }
 
 func (r *Role) OnRoleCreate() {
 
+	// add test item
+	r.ItemAdd(int32(g1_protocol.EItemID_GOLD), 500000, &Reason{g1_protocol.Reason_REASON_INIT, 0})
+	r.ItemAdd(int32(g1_protocol.EItemID_DIAMOND), 500000, &Reason{g1_protocol.Reason_REASON_INIT, 0})
+	r.ItemAdd(int32(g1_protocol.EItemID_CREDIT), 500000, &Reason{g1_protocol.Reason_REASON_INIT, 0})
 }
 
 // 这里服务端主动同步数据到客户端
@@ -206,8 +214,8 @@ func (r *Role) SyncDataToClient(dataFlag g1_protocol.ERoleSectionFlag) error {
 	if dataFlag&g1_protocol.ERoleSectionFlag_LOGIN_INFO != 0 {
 		data.RoleInfo.LoginInfo = r.PbRole.LoginInfo
 	}
-	if dataFlag&g1_protocol.ERoleSectionFlag_DESC_INFO != 0 {
-		data.RoleInfo.DescInfo = r.PbRole.DescInfo
+	if dataFlag&g1_protocol.ERoleSectionFlag_GAME_INFO != 0 {
+		data.RoleInfo.GameInfo = r.PbRole.GameInfo
 	}
 	if dataFlag&g1_protocol.ERoleSectionFlag_BASIC_INFO != 0 {
 		data.RoleInfo.BasicInfo = r.PbRole.BasicInfo
@@ -238,7 +246,7 @@ func (r *Role) SyncDataToClient(dataFlag g1_protocol.ERoleSectionFlag) error {
 	}
 
 	r.Infof("sync: %v", data.String())
-	return router.SendPbMsgByBusIdSimple(connsvrBusId, r.Uid(), uint32(g1_protocol.CMD_SC_SYNC_USER_DATA), &data)
+	return router.SendPbMsgByBusIdSimple(connsvrBusId, r.Uid(), g1_protocol.CMD_SC_SYNC_USER_DATA, &data)
 }
 
 func (r *Role) OnLogin(now int32) {
@@ -259,9 +267,9 @@ func (r *Role) OnClientHeartbeat(now int32) {
 	lastClientHeartBeatTime := r.PbRole.LoginInfo.LastHartBeatTime
 
 	syncFlag := g1_protocol.ERoleSectionFlag(0)
-	if !datetime.IsSameMinute(int64(lastClientHeartBeatTime), int64(now)) {
-		syncFlag |= r.everyMinuteCheck(now)
-	}
+	//if !datetime.IsSameMinute(int64(lastClientHeartBeatTime), int64(now)) {
+	//	syncFlag |= r.everyMinuteCheck(now)
+	//}
 	if !datetime.IsSameHour(int64(lastClientHeartBeatTime), int64(now)) {
 		syncFlag |= r.everyHourCheck(lastClientHeartBeatTime, now)
 	}
@@ -270,16 +278,16 @@ func (r *Role) OnClientHeartbeat(now int32) {
 		syncFlag |= r.everyDayCheck(now)
 	}
 	// 晚上9点的刷新
-	if datetime.IsSameDayByDayBeginHour(int64(lastClientHeartBeatTime), int64(now), 21) {
-		syncFlag |= r.everyDayCheck21(now)
-	}
+	//if datetime.IsSameDayByDayBeginHour(int64(lastClientHeartBeatTime), int64(now), 21) {
+	//	syncFlag |= r.everyDayCheck21(now)
+	//}
 	if !datetime.IsSameWeek(int64(lastClientHeartBeatTime), int64(now)) {
 		syncFlag |= r.everyWeakCheck(now)
 	}
 
 	// 10秒一次心跳
-	if r.HeartBeatCount%1 == 0 {
-		//r.Debugf("update brief info, %d", r.Now())
+	if r.HeartBeatCount%2 == 0 {
+		r.Debugf("update %v brief info, now: %d", r.Uid(), r.Now())
 		_ = r.UpdateBriefInfo()
 	}
 
@@ -328,11 +336,11 @@ func (r *Role) GetBriefInfo() *g1_protocol.PbRoleBriefInfo {
 	info := &g1_protocol.PbRoleBriefInfo{}
 
 	info.Uid = r.Uid()
-	info.Name = r.PbRole.DescInfo.Name
+	info.Name = r.PbRole.BasicInfo.Name
 	info.Level = r.PbRole.BasicInfo.Level
-	info.Exp = r.PbRole.BasicInfo.Exp
-	info.Icon = r.PbRole.DescInfo.IconId
-	info.Frame = r.PbRole.DescInfo.FrameId
+	info.Exp = int32(r.PbRole.BasicInfo.Exp)
+	info.IconUrl = r.PbRole.IconInfo.IconUrl
+	info.Frame = r.PbRole.IconInfo.FrameId
 	info.RegisterTime = r.PbRole.RegisterInfo.RegisterTime
 
 	info.LastOnlineTime = r.Now()
@@ -347,12 +355,12 @@ func (r *Role) UpdateBriefInfo() error {
 	req.Info = r.GetBriefInfo()
 	req.IgnoreRsp = true
 
-	return router.SendPbMsgBySvrTypeSimple(misc.ServerType_InfoSvr, r.Uid(), uint32(g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ), &req)
+	return router.SendPbMsgBySvrTypeSimple(misc.ServerType_InfoSvr, r.Uid(), r.Zone(), g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ, &req)
 }
 
-func (r *Role) ExpAdd(exp int32) {
+func (r *Role) ExpAdd(exp int64) {
 }
 
 func (r *Role) IsOnline() bool {
-	return r.PbRole.LoginInfo.LastHartBeatTime+2*30 > datetime.Now()
+	return r.PbRole.LoginInfo.LastHartBeatTime+30 > datetime.Now()
 }

@@ -19,7 +19,7 @@ func TestConfig(t *testing.T) {
 	domain.ProtoPath = "../gen/proto"
 	domain.CodePath = "../gen/code"
 	domain.Module = "github.com/Iori372552686/GoOne"
-	domain.PbPath = "github.com/gdsgog/poker_protocol/protocol"
+	domain.PbPath = "github.com/Iori372552686/game_protocol/protocol"
 	domain.PkgName = filepath.Base(domain.PbPath)
 
 	// 加载所有配置

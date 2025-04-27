@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/Iori372552686/GoOne/common/gamedata"
-	protocol "github.com/gdsgog/poker_protocol/protocol"
+	protocol "github.com/Iori372552686/game_protocol/protocol"
 	"github.com/golang/protobuf/proto"
 )
 

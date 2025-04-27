@@ -1,23 +1,26 @@
 package role
 
-import g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
+import (
+	"github.com/Iori372552686/GoOne/common/gamedata/repository/mall_config"
+	g1_protocol "github.com/Iori372552686/game_protocol"
+)
 
 func (r *Role) MallGetItem(confId int32) *g1_protocol.PbMallItem {
 	info := r.PbRole.MallInfo
-	for _, v := range info.ItemList {
-		if v.ConfId == confId {
-			return v
+
+	if info.ItemMap == nil {
+		info.ItemMap = make(map[int32]*g1_protocol.PbMallItem)
+		if info.ItemMap[confId] == nil {
+			info.ItemMap[confId] = &g1_protocol.PbMallItem{ConfId: confId}
 		}
 	}
 
-	item := &g1_protocol.PbMallItem{ConfId: confId}
-	info.ItemList = append(info.ItemList, item)
-	return item
+	return info.ItemMap[confId]
 }
 
 func (r *Role) MallDailyRefresh() {
 	info := r.PbRole.MallInfo
-	for _, v := range info.ItemList {
+	for _, v := range info.ItemMap {
 		v.DailyBuyCount = 0
 	}
 }
@@ -28,7 +31,26 @@ func (r *Role) MallAddBuyCount(confId int32) {
 	item.TotalBuyCount++
 }
 
-func (r *Role) MallCheckBuyCondition(confId int32) int {
+func (r *Role) MallCheckBuyCondition(confId int32) g1_protocol.ErrorCode {
+	conf := mall_config.GetById(confId)
+	if conf == nil {
+		return g1_protocol.ErrorCode_ERR_CONF
+	}
+
+	/*	now := int64(r.Now())
+		if (conf.BeginTime > 0 && now < conf.BeginTime) ||
+			(conf.EndTime > 0 && now > conf.EndTime) {
+			return g1_protocol.ErrorCode_ERR_MALL_OUT_OF_TIME
+		}*/
+
+	item := r.MallGetItem(confId)
+	if item.DailyBuyCount >= conf.DailyBuyLimit && conf.DailyBuyLimit > 0 {
+		return g1_protocol.ErrorCode_ERR_MALL_DAILY_LIMIT
+	}
+
+	if item.TotalBuyCount >= conf.BuyLimit && conf.BuyLimit > 0 {
+		return g1_protocol.ErrorCode_ERR_MALL_BUY_LIMIT
+	}
 
 	return 0
 }

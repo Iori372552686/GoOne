@@ -7,7 +7,7 @@ import (
 	orm "github.com/Iori372552686/GoOne/lib/db/xorm"
 	"github.com/Iori372552686/GoOne/lib/util/marshal"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/manager"
-	g1_protocol "github.com/gdsgog/poker_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/game_protocol"
 )
 
 func TestMain(m *testing.M) {

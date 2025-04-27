@@ -2,7 +2,7 @@ package misc
 
 import (
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
-	g1protocol "github.com/gdsgog/poker_protocol/protocol"
+	g1protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
 // 从命令字中获取目标svr
