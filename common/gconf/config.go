@@ -46,8 +46,8 @@ type MainSvr struct {
 
 type MySqlSvr struct {
 	SelfBusId string `yaml:"SelfBusId"`
-	LogDir    string `yaml:"LogDir"`
-	LogLevel  string `yaml:"LogLevel"`
+	LogDir    string `yaml:"log_dir"`
+	LogLevel  string `yaml:"log_level"`
 }
 
 type RoomCenterSvr struct {
