@@ -1,12 +1,10 @@
-package common
+package gfunc
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/lib/util/convert"
-	"math/rand"
 	"net"
 	"reflect"
 	"runtime"
@@ -89,40 +87,6 @@ func StructAssign(binding interface{}, value interface{}) {
 			bVal.FieldByName(name).Set(reflect.ValueOf(vVal.Field(i).Interface()))
 		}
 	}
-}
-
-/**
-* @Description: 随机指定长度字符串
-* @param: n
-* @return: string
-* @Author: Iori
-* @Date: 2022-06-01 15:19:58
-**/
-func GetRandomStr(n int) string {
-	bytes := []byte("0123456789abcdefghijklmnopqrstuvwxyz")
-	var result []byte
-
-	for i := 0; i < n; i++ {
-		result = append(result, bytes[rand.Intn(len(bytes))])
-	}
-	return convert.Bytes2str(result)
-}
-
-/**
-* @Description:
-* @param: n
-* @return: string
-* @Author: Iori
-* @Date: 2022-06-01 16:41:37
-**/
-func GetRandomByte(n int) []byte {
-	str := "0123456789abcdefghijklmnopqrstuvwxyz"
-	bytes := []byte(str)
-	var result []byte
-	for i := 0; i < n; i++ {
-		result = append(result, bytes[rand.Intn(len(bytes))])
-	}
-	return result
 }
 
 func isInclude(list *[]string, val string) bool {
@@ -313,15 +277,4 @@ func IfOr[R any](flag bool, a, b R) R {
 		return a
 	}
 	return b
-}
-
-/**
-* @Description:
-* @param: hashmap
-* @return: string
-* @Author: Iori
-**/
-func MapToJson(hashmap interface{}) string {
-	data, _ := json.Marshal(hashmap)
-	return convert.Bytes2str(data)
 }

@@ -1,0 +1,87 @@
+basecfg:
+  Pprof: true
+  ZKAddr: '{{ zk_address }}'
+  RabbitMQAddr: '{{ rabbitmq_address }}'
+  GameDataDir: '{{ root_path }}/gamedata'
+  SensitiveWordsFile: '{{ root_path }}/commconf/sensitive.txt'
+
+  HttpSign:
+    - IndexName: default
+      PrivateKey: d1233f2b7e9885ffb8a8268d06f44c6e2
+      SignName: sign
+      ExpiredTime: 1800
+      TimestampName: timestamp
+      SignType: md5
+      RequestIDName: ''
+
+  DbInstances:
+    - InstanceId: 3
+      Ip: {{ redis_ip }}
+      Port: {{ redis_port }}
+      Password: {{redis_passwd}}
+      IsCluster: {{ redis_use_cluster }}
+      Description: brief info data
+
+  OrmInstances:
+    - index_name: default
+      master:
+        ip: "192.168.50.250"
+        port: 3306
+        user: root
+        password: "sxy123456"
+        db_name: poker
+      slaves: []
+      description: "test db1"
+      max_idle: 10
+      max_open: 200
+      show_sql: true
+      init_flag: true
+      drive_name: mysql
+
+  RestApiConfig:
+    - service_name: default
+      urls:
+        - 'http://192.168.50.250:8000/mg/api/sdk/getGameRole?'
+      sign_name: default
+
+  CenterConfAddr:
+    ip_addr: 192.168.50.250
+    port: 8848
+    namespace_id: df4ad231-f231-49a1-b309-44493e949dd0
+    group_name: poker_gameconf
+    user_name: poker
+    password: poker123
+    log_dir: \tmp\nacos\log
+    cache_dir: \tmp\nacos\cache
+    rotate_time: 1h
+    max_age: 3
+    log_level: debug
+
+
+connsvr:
+  SelfBusId: '1.1.1.{{ instance_id }}'
+  ListenPort: 11000
+  log_dir: ./logs/
+  log_level: debug
+
+infosvr:
+  SelfBusId: '1.1.3.{{ instance_id }}'
+  log_dir: ./logs/
+  log_level: debug
+
+mainsvr:
+  SelfBusId: '1.1.2.{{ instance_id }}'
+  log_dir: ./logs/
+  log_level: debug
+
+mysqlsvr:
+  SelfBusId: '1.1.4.{{ instance_id }}'
+  log_dir: ./logs/
+  log_level: debug
+
+roomcentersvr:
+  SelfBusId: '1.1.11.{{ instance_id }}'
+
+texassvr:
+  SelfBusId: '1.1.50.{{ instance_id }}'
+
