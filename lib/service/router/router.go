@@ -3,13 +3,13 @@ package router
 import (
 	"errors"
 	"fmt"
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/lib/service/svrinstmgr"
 	"github.com/Iori372552686/GoOne/module/misc"
-	g1_protocol "github.com/Iori372552686/game_protocol"
 
 	"github.com/golang/protobuf/proto"
 )

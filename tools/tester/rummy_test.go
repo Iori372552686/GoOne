@@ -3,7 +3,7 @@ package tester
 import (
 	"fmt"
 	"github.com/Iori372552686/GoOne/lib/util/random"
-	g1_protocol "github.com/Iori372552686/game_protocol"
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 	pb "github.com/Iori372552686/game_protocol/protocol"
 	"math"
 	"sort"

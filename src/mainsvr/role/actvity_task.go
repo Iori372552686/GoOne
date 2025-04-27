@@ -1,7 +1,7 @@
 package role
 
 import (
-	g1_protocol "github.com/Iori372552686/game_protocol"
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
 func (r *Role) ActTaskGet(taskId, argv1, argv2, argv3 int32) *g1_protocol.PbTask {

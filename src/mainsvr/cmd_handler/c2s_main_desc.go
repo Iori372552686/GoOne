@@ -4,7 +4,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/lib/service/sensitive_words"
 	"github.com/Iori372552686/GoOne/src/mainsvr/role"
-	g1_protocol "github.com/Iori372552686/game_protocol"
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
 func ChangeName(c cmd_handler.IContext, data []byte, myRole *role.Role) g1_protocol.ErrorCode {

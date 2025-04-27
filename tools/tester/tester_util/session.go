@@ -1,7 +1,7 @@
 package tester_util
 
 import (
-	g1_protocol "github.com/Iori372552686/game_protocol"
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 	"github.com/golang/protobuf/proto"
 	"net"
 	"testing"

@@ -3,7 +3,7 @@ package gfunc
 import (
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/service/router"
-	g1_protocol "github.com/Iori372552686/game_protocol"
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 	"github.com/golang/protobuf/proto"
 )
 

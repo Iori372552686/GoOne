@@ -2,7 +2,7 @@ package manager
 
 import (
 	"github.com/Iori372552686/GoOne/lib/service/async"
-	g1_protocol "github.com/Iori372552686/game_protocol"
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
 const (

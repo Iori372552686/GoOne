@@ -12,7 +12,7 @@ import (
 	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/connsvr/globals"
 	"github.com/Iori372552686/GoOne/src/connsvr/login"
-	g1_protocol "github.com/Iori372552686/game_protocol"
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 	"github.com/golang/protobuf/proto"
 )
 

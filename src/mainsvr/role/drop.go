@@ -7,7 +7,7 @@ import (
 
 	"github.com/Iori372552686/GoOne/common/gamedata/repository/drop_item_confing"
 	"github.com/Iori372552686/GoOne/module/math"
-	g1_protocol "github.com/Iori372552686/game_protocol"
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
 const (

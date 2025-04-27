@@ -3,7 +3,7 @@ package cmd_handler
 import (
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/globals"
-	g1_protocol "github.com/Iori372552686/game_protocol"
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
 // 所有的命令字对应的go需要在这里先注册
