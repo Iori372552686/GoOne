@@ -3,11 +3,10 @@ module github.com/Iori372552686/GoOne
 go 1.23.4
 
 require (
+	github.com/Iori372552686/game_protocol v0.0.0-20250427031738-c3072b032cc4
 	github.com/apolloconfig/agollo/v4 v4.4.0
 	github.com/bugsnag/bugsnag-go/v2 v2.5.1
 	github.com/bytedance/sonic v1.12.10
-	github.com/cespare/xxhash/v2 v2.3.0
-	github.com/Iori372552686/game_protocol v0.0.0-20250318092417-f91b8f49132a
 	github.com/getsentry/sentry-go v0.31.1
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-kratos/kratos/v2 v2.8.3
@@ -15,8 +14,6 @@ require (
 	github.com/go-xorm/xorm v0.7.9
 	github.com/go-zookeeper/zk v1.0.4
 	github.com/gofrs/uuid v4.4.0+incompatible
-	github.com/gogo/protobuf v1.3.2
-	github.com/golang/glog v1.2.3
 	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/consul/api v1.31.2
@@ -33,6 +30,7 @@ require (
 	github.com/samuel/go-zookeeper v0.0.0-20201211165307-7117e9ea2414
 	github.com/seefan/gossdb/v2 v2.0.1
 	github.com/sony/sonyflake v1.2.0
+	github.com/spf13/cast v1.7.1
 	github.com/streadway/amqp v1.1.0
 	github.com/stretchr/testify v1.10.0
 	github.com/szuecs/gin-glog v1.1.1
@@ -40,6 +38,7 @@ require (
 	github.com/tommy351/gin-sessions v0.0.0-20150617141853-353060947eb6
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xtaci/kcp-go/v5 v5.6.18
+	github.com/xuri/excelize/v2 v2.9.0
 	go.etcd.io/etcd/client/v3 v3.5.18
 	go.uber.org/zap v1.21.0
 	google.golang.org/grpc v1.70.0
@@ -81,6 +80,7 @@ require (
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/bugsnag/panicwrap v1.3.4 // indirect
 	github.com/bytedance/sonic/loader v0.2.2 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/clbanning/mxj/v2 v2.5.5 // indirect
 	github.com/cloudwego/base64x v0.1.5 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
@@ -102,6 +102,8 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.20.0 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang/glog v1.2.3 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
@@ -149,7 +151,6 @@ require (
 	github.com/richardlehane/msoleps v1.0.4 // indirect
 	github.com/seefan/goerr v1.1.2 // indirect
 	github.com/spf13/afero v1.6.0 // indirect
-	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.8.1 // indirect
@@ -162,7 +163,6 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xuri/efp v0.0.0-20240408161823-9ad904a10d6d // indirect
-	github.com/xuri/excelize/v2 v2.9.0 // indirect
 	github.com/xuri/nfp v0.0.0-20240318013403-ab9948c2c4a7 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.18 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.18 // indirect
