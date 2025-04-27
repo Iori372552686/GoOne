@@ -61,7 +61,7 @@ func (s *ServerInstanceMgr) GetSvrInsBySvrType(serverType, zone uint32, uid uint
 	if rule, in := s.routeRules[serverType]; in {
 		switch rule {
 		case SvrRouterRule_Random:
-			return s.getSvrInsByRandom(serverType), 0
+			return s.getSvrInsByRandom(serverType), uid
 		case SvrRouterRule_Hash_UID:
 			return s.getSvrInsByHash(serverType, uid), uid
 		case SvrRouterRule_Hash_ZoneID:
@@ -69,7 +69,7 @@ func (s *ServerInstanceMgr) GetSvrInsBySvrType(serverType, zone uint32, uid uint
 		case SvrRouterRule_Hash_RouterID:
 			return s.getSvrInsByHash(serverType, routerId), routerId
 		case SvrRouterRule_Master:
-			return s.getSvrInsByMaster(serverType), 0
+			return s.getSvrInsByMaster(serverType), uid
 		default:
 			logger.Error("wrong svr router config ", serverType)
 		}
