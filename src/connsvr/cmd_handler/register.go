@@ -1,13 +1,13 @@
 package cmd_handler
 
 import (
-	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/src/connsvr/globals"
-	"github.com/golang/glog"
+	g1_protocol "github.com/gdsgog/poker_protocol/protocol"
 )
 
 // 所有的命令字对应的go需要在这里先注册
 func RegCmd() {
-	glog.Infof("register transaction commands")
-	globals.TransMgr.RegisterCmd(uint32(g1_protocol.CMD_CONN_BROADCAST_REQ), new(Broadcast))
+	logger.Infof("register transaction commands")
+	globals.TransMgr.RegisterCmd(g1_protocol.CMD_CONN_BROADCAST_REQ, Broadcast)
 }

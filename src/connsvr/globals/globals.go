@@ -1,9 +1,16 @@
 package globals
 
 import (
+	"github.com/Iori372552686/GoOne/lib/api/http_sign"
+	"github.com/Iori372552686/GoOne/lib/api/rest_api"
+	"github.com/Iori372552686/GoOne/lib/net/net_mgr"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
-	"github.com/Iori372552686/GoOne/src/connsvr/tcp_server"
 )
 
-var TransMgr = transaction.NewTransactionMgr()
-var ConnTcpSvr = tcp_server.NewTcpSvr()
+var (
+	TransMgr   = transaction.NewTransactionMgr()
+	ConnTcpSvr = net_mgr.NewTcpSvr()
+	ConnWsSvr  = net_mgr.NewWsTcpSvr()
+	SignMgr    = http_sign.NewSignMgr()
+	RestMgr    = rest_api.NewRestApiMgr()
+)
