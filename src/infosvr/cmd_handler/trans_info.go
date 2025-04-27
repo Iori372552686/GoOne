@@ -1,20 +1,18 @@
 package cmd_handler
 
 import (
-	"github.com/Iori372552686/GoOne/common/misc"
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
-	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
+	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/infosvr/globals"
+	g1_protocol "github.com/gdsgog/poker_protocol/protocol"
 )
 
-type GetBriefInfo struct{}
-
-func (h *GetBriefInfo) ProcessCmd(c cmd_handler.IContext, data []byte) int {
+func GetBriefInfo(c cmd_handler.IContext, data []byte) g1_protocol.ErrorCode {
 	req := &g1_protocol.InfoGetBriefInfoReq{}
 	rsp := &g1_protocol.InfoGetBriefInfoRsp{}
 	err := c.ParseMsg(data, req)
 	if err != nil {
-		return int(g1_protocol.ErrorCode_ERR_MARSHAL)
+		return g1_protocol.ErrorCode_ERR_MARSHAL
 	}
 
 	ret := 0
@@ -31,27 +29,25 @@ func (h *GetBriefInfo) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 
 		break
 	}
-	rsp.Ret = &g1_protocol.Ret{Ret: int32(ret)}
+	rsp.Ret = &g1_protocol.Ret{Code: g1_protocol.ErrorCode(ret)}
 
 	c.SendMsgBack(rsp)
-	return ret
+	return g1_protocol.ErrorCode(ret)
 }
 
-type GetIconDesc struct{}
-
-func (h *GetIconDesc) ProcessCmd(c cmd_handler.IContext, data []byte) int {
+func GetIconDesc(c cmd_handler.IContext, data []byte) g1_protocol.ErrorCode {
 	req := &g1_protocol.InfoGetIconDescReq{}
 	rsp := &g1_protocol.InfoGetIconDescRsp{}
 	err := c.ParseMsg(data, req)
 	if err != nil {
-		return int(g1_protocol.ErrorCode_ERR_MARSHAL)
+		return g1_protocol.ErrorCode_ERR_MARSHAL
 	}
 
-	ret := 0
+	ret := g1_protocol.ErrorCode_ERR_OK
 	for {
 		res, r := globals.InfoMgr.GetInfo(&req.UidList)
 		if r != 0 {
-			ret = r
+			ret = g1_protocol.ErrorCode(r)
 			break
 		}
 
@@ -64,20 +60,18 @@ func (h *GetIconDesc) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 
 		break
 	}
-	rsp.Ret = &g1_protocol.Ret{Ret: int32(ret)}
+	rsp.Ret = &g1_protocol.Ret{Code: ret}
 
 	c.SendMsgBack(rsp)
 	return ret
 }
 
-type SetBriefInfo struct{}
-
-func (h *SetBriefInfo) ProcessCmd(c cmd_handler.IContext, data []byte) int {
+func SetBriefInfo(c cmd_handler.IContext, data []byte) g1_protocol.ErrorCode {
 	req := &g1_protocol.InfoSetBriefInfoReq{}
 	rsp := &g1_protocol.InfoSetBriefInfoRsp{}
 	err := c.ParseMsg(data, req)
 	if err != nil {
-		return int(g1_protocol.ErrorCode_ERR_MARSHAL)
+		return g1_protocol.ErrorCode_ERR_MARSHAL
 	}
 
 	ret := 0
@@ -89,9 +83,9 @@ func (h *SetBriefInfo) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 
 		break
 	}
-	rsp.Ret = &g1_protocol.Ret{Ret: int32(ret)}
+	rsp.Ret = &g1_protocol.Ret{Code: g1_protocol.ErrorCode(ret)}
 	if !req.IgnoreRsp {
 		c.SendMsgBack(rsp)
 	}
-	return ret
+	return g1_protocol.ErrorCode(ret)
 }

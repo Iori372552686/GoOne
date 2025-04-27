@@ -2,11 +2,12 @@ package info
 
 import (
 	"fmt"
+
 	"github.com/Iori372552686/GoOne/lib/db/redis"
 	"github.com/Iori372552686/GoOne/lib/service/algorithm"
-	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
+	g1_protocol "github.com/gdsgog/poker_protocol/protocol"
+	"github.com/nacos-group/nacos-sdk-go/common/logger"
 
-	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -65,12 +66,12 @@ func (m *InfoMgr) loadBriefFromDB(uidList []uint64) (*[]*g1_protocol.PbRoleBrief
 	dbType := uint32(g1_protocol.DBType_DB_TYPE_BRIEF_INFO)
 	keys := make([]string, 0, len(uidList))
 	for _, v := range uidList {
-		key := fmt.Sprintf("%d:%d", dbType, v)
+		key := fmt.Sprintf("%v:%d", g1_protocol.DBType_DB_TYPE_BRIEF_INFO.String(), v)
 		keys = append(keys, key)
 	}
 	rsp, err := m.RedisMgr.MGetBytes(dbType, keys)
 	if err != nil {
-		glog.Error("get redis brief error: ", err)
+		logger.Error("get db brief error: ", err)
 		return nil, int(g1_protocol.ErrorCode_ERR_DB)
 	}
 	ret := make([]*g1_protocol.PbRoleBriefInfo, 0, len(uidList))
@@ -84,12 +85,12 @@ func (m *InfoMgr) loadBriefFromDB(uidList []uint64) (*[]*g1_protocol.PbRoleBrief
 
 func (m *InfoMgr) saveBriefToDB(uid uint64, brief *g1_protocol.PbRoleBriefInfo) int {
 	dbType := uint32(g1_protocol.DBType_DB_TYPE_BRIEF_INFO)
-	key := fmt.Sprintf("%d:%d", dbType, uid)
+	key := fmt.Sprintf("%v:%d", g1_protocol.DBType_DB_TYPE_BRIEF_INFO.String(), uid)
 	data, _ := proto.Marshal(brief)
 	err := m.RedisMgr.SetBytes(dbType, key, data)
 	if err != nil {
-		glog.Errorf("set redis brief err: ", err)
+		logger.Errorf("set db brief err: ", err)
 		return int(g1_protocol.ErrorCode_ERR_DB)
 	}
-	return 0
+	return int(g1_protocol.ErrorCode_ERR_OK)
 }

@@ -3,18 +3,16 @@ package cmd_handler
 import (
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/globals"
+	g1_protocol "github.com/gdsgog/poker_protocol/protocol"
 )
 
-type UpdateRoleInfo struct{}
-
-func (h *UpdateRoleInfo) ProcessCmd(c cmd_handler.IContext, data []byte) int {
+func UpdateRoleInfo(c cmd_handler.IContext, data []byte) g1_protocol.ErrorCode {
 	req := &g1_protocol.MysqlInnerUpdateRoleInfoReq{}
 	rsp := &g1_protocol.MysqlInnerUpdateRoleInfoRsp{}
 	err := c.ParseMsg(data, req)
 	if err != nil {
-		return int(g1_protocol.ErrorCode_ERR_MARSHAL)
+		return g1_protocol.ErrorCode_ERR_MARSHAL
 	}
 
 	ret := 0
@@ -41,19 +39,17 @@ func (h *UpdateRoleInfo) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 		break
 	}
 
-	rsp.Ret = &g1_protocol.Ret{Ret: int32(ret)}
+	rsp.Ret = &g1_protocol.Ret{Code: g1_protocol.ErrorCode(ret)}
 	c.SendMsgBack(rsp)
-	return ret
+	return g1_protocol.ErrorCode(ret)
 }
 
-type SearchRole struct{}
-
-func (h *SearchRole) ProcessCmd(c cmd_handler.IContext, data []byte) int {
+func SearchRole(c cmd_handler.IContext, data []byte) g1_protocol.ErrorCode {
 	req := &g1_protocol.MysqlInnerSearchRoleReq{}
 	rsp := &g1_protocol.MysqlInnerSearchRoleRsp{}
 	err := c.ParseMsg(data, req)
 	if err != nil {
-		return int(g1_protocol.ErrorCode_ERR_MARSHAL)
+		return g1_protocol.ErrorCode_ERR_MARSHAL
 	}
 
 	ret := 0
@@ -79,9 +75,9 @@ func (h *SearchRole) ProcessCmd(c cmd_handler.IContext, data []byte) int {
 		break
 	}
 
-	rsp.Ret = &g1_protocol.Ret{Ret: int32(ret)}
+	rsp.Ret = &g1_protocol.Ret{Code: g1_protocol.ErrorCode(ret)}
 	c.SendMsgBack(rsp)
-	return ret
+	return g1_protocol.ErrorCode(ret)
 }
 
 func checkRoleExist(c cmd_handler.IContext) bool {
