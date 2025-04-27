@@ -53,18 +53,20 @@ func (self *OrmSql) AddInstance(conf Config, tables ...interface{}) (*xorm.Engin
 	self.driveName = conf.DriveName
 
 	self.dsn = append(self.dsn,
-		fmt.Sprintf("%s:%s@tcp(%s)/%s?timeout=3s&parseTime=true&loc=Local&charset=utf8",
+		fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=3s&parseTime=true&loc=Local&charset=utf8",
 			conf.Master.User,
 			conf.Master.Password,
 			conf.Master.IP,
+			conf.Master.Port,
 			conf.Master.DBName),
 	)
 	for _, slaveCfg := range conf.Slaves {
 		self.dsn = append(self.dsn,
-			fmt.Sprintf("%s:%s@tcp(%s)/%s?timeout=3s&parseTime=true&loc=Local&charset=utf8",
+			fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=3s&parseTime=true&loc=Local&charset=utf8",
 				slaveCfg.User,
 				slaveCfg.Password,
 				slaveCfg.IP,
+				conf.Master.Port,
 				slaveCfg.DBName),
 		)
 	}

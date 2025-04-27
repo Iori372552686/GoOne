@@ -20,13 +20,13 @@ basecfg:
     - InstanceId: 1
       Ip: 113.45.34.170
       Port: 16379
-      Password: 123456
+      Password: go123456
       IsCluster: false
       Description: role info data
     - InstanceId: 3
       Ip: 113.45.34.170
       Port: 16379
-      Password: 123456
+      Password: go123456
       IsCluster: false
       Description: brief info data
 
