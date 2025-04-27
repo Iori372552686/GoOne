@@ -104,6 +104,5 @@ cp protoc protoc-gen-go /usr/local/bin
 
 ### K8s&Docker部署
 
-```
-[doker yaml](env/common.yaml)
-```
+* [[doker env]](env/docker.yaml)
+
