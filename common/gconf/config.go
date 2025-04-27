@@ -28,20 +28,20 @@ type BaseCfg struct {
 type ConnSvr struct {
 	SelfBusId  string `yaml:"SelfBusId"`
 	ListenPort int    `yaml:"ListenPort"`
-	LogDir     string `yaml:"LogDir"`
-	LogLevel   string `yaml:"LogLevel"`
+	LogDir     string `yaml:"log_dir"`
+	LogLevel   string `yaml:"log_level"`
 }
 
 type InfoSvr struct {
 	SelfBusId string `yaml:"SelfBusId"`
-	LogDir    string `yaml:"LogDir"`
-	LogLevel  string `yaml:"LogLevel"`
+	LogDir    string `yaml:"log_dir"`
+	LogLevel  string `yaml:"log_level"`
 }
 
 type MainSvr struct {
 	SelfBusId string `yaml:"SelfBusId"`
-	LogDir    string `yaml:"LogDir"`
-	LogLevel  string `yaml:"LogLevel"`
+	LogDir    string `yaml:"log_dir"`
+	LogLevel  string `yaml:"log_level"`
 }
 
 type MySqlSvr struct {
@@ -52,14 +52,14 @@ type MySqlSvr struct {
 
 type RoomCenterSvr struct {
 	SelfBusId string `yaml:"SelfBusId"`
-	LogDir    string `yaml:"LogDir"`
-	LogLevel  string `yaml:"LogLevel"`
+	LogDir    string `yaml:"log_dir"`
+	LogLevel  string `yaml:"log_level"`
 }
 
 type TexasSvr struct {
 	SelfBusId string `yaml:"SelfBusId"`
-	LogDir    string `yaml:"LogDir"`
-	LogLevel  string `yaml:"LogLevel"`
+	LogDir    string `yaml:"log_dir"`
+	LogLevel  string `yaml:"log_level"`
 }
 
 // connsvr配置
