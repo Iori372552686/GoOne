@@ -9,7 +9,7 @@ This module implements the `config.Source` interface in kratos based apollo conf
 ```go
 import (
 	"fmt"
-	"log"
+	"zap"
 
 	"github.com/go-kratos/kratos/contrib/config/apollo/v2"
 	"github.com/go-kratos/kratos/v2/config"

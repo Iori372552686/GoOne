@@ -1,8 +1,8 @@
 package bus
 
 import (
-	"encoding/binary"
 	"fmt"
+
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 
 	"github.com/streadway/amqp"
@@ -17,13 +17,13 @@ type BusImplRabbitMQ struct {
 	onRecv    MsgHandler
 }
 
-func NewBusImplRabbitMQ(selfBusId uint32, onRecvMsg MsgHandler, rabbitmqAddr string) *BusImplRabbitMQ {
+func NewBusImplRabbitMQ(selfBusId uint32, onRecvMsg MsgHandler, addr string) *BusImplRabbitMQ {
 	impl := new(BusImplRabbitMQ)
 	impl.selfBusId = selfBusId
 	impl.timeout = 3 * time.Second
 	impl.chanOut = make(chan outMsg, 10000)
 	impl.onRecv = onRecvMsg
-	go impl.run(rabbitmqAddr)
+	go impl.run(addr)
 	return impl
 }
 
@@ -55,70 +55,12 @@ func (b *BusImplRabbitMQ) Send(dstBusId uint32, data1 []byte, data2 []byte) erro
 		pos += len(data2)
 	}
 
-	logger.Debugf("Send bus message: %v, %#v\n", len(data1)+len(data2), header)
-
+	//logger.Debugf("Send bus message: %v, %#v\n", len(data1)+len(data2), header)
 	if !sendToMsgChan(b.chanOut, msg, b.timeout) {
 		return fmt.Errorf("bus.chanOut<-msg time out")
 	} // msg所有权已转移，后面不能再使用msg
 
 	return nil
-}
-
-// -------------------------------- private --------------------------------
-
-const (
-	passCode = 0xFEED
-)
-
-type busPacket struct {
-	Header busPacketHeader
-	Body   []byte
-}
-
-type busPacketHeader struct {
-	version  uint16
-	passCode uint16
-	srcBusId uint32
-	dstBusId uint32
-}
-
-func byteLenOfBusPacketHeader() int {
-	return 12
-}
-
-func (h *busPacketHeader) From(b []byte) {
-	h.version = binary.BigEndian.Uint16(b[0:])
-	h.passCode = binary.BigEndian.Uint16(b[2:])
-	h.srcBusId = binary.BigEndian.Uint32(b[4:])
-	h.dstBusId = binary.BigEndian.Uint32(b[8:])
-}
-
-func (h *busPacketHeader) To(b []byte) {
-	binary.BigEndian.PutUint16(b[0:], h.version)
-	binary.BigEndian.PutUint16(b[2:], h.passCode)
-	binary.BigEndian.PutUint32(b[4:], h.srcBusId)
-	binary.BigEndian.PutUint32(b[8:], h.dstBusId)
-}
-
-type outMsg struct {
-	busId uint32
-	data  []byte
-}
-
-func calcQueueName(busId uint32) string {
-	return "bus_" + fmt.Sprintf("%x", busId)
-}
-
-func sendToMsgChan(ch chan outMsg, msg outMsg, timeout time.Duration) bool {
-	t := time.NewTimer(timeout)
-	defer t.Stop()
-	select {
-	case ch <- msg:
-	case <-t.C:
-		return false
-	}
-
-	return true
 }
 
 func (b *BusImplRabbitMQ) process(rabbitmqAddr string, myQueueName string) error {
@@ -157,7 +99,6 @@ func (b *BusImplRabbitMQ) process(rabbitmqAddr string, myQueueName string) error
 				return fmt.Errorf("chanOut of bus is closed")
 			}
 
-			logger.Debugf("Send message to MQ: {dstBusId:0x%x, dataLen:%v}\n", msgOut.busId, len(msgOut.data))
 			// send by routering
 			err = ch.Publish(
 				"",                          // exchange
@@ -169,8 +110,7 @@ func (b *BusImplRabbitMQ) process(rabbitmqAddr string, myQueueName string) error
 					Body: msgOut.data,
 				})
 			if err != nil {
-				logger.Errorf("Failed to publish a message {busId:%v, dataLen:%v}| %w",
-					msgOut.busId, len(msgOut.data), err)
+				logger.Errorf("Failed to publish a message {busId:%v, dataLen:%v}| %v", msgOut.busId, len(msgOut.data), err)
 				// todo: is it necessary to return the err?
 			}
 		case delivery, ok := <-chanRecv:
@@ -180,9 +120,9 @@ func (b *BusImplRabbitMQ) process(rabbitmqAddr string, myQueueName string) error
 
 			header := busPacketHeader{}
 			header.From(delivery.Body)
-			logger.Debugf("Received message from MQ: %#v\n", header)
+			//logger.Debugf("Received message from MQ: %+v", header)
 			if header.passCode != passCode {
-				logger.Warningf("Received a bus message with wrong pass code: %#v\n", header)
+				logger.Warningf("Received a bus message with wrong pass code: %#v", header)
 				break
 			}
 
@@ -200,6 +140,7 @@ func (b *BusImplRabbitMQ) process(rabbitmqAddr string, myQueueName string) error
 
 func (b *BusImplRabbitMQ) run(rabbitmqAddr string) {
 	myQueueName := calcQueueName(b.selfBusId)
+	logger.Errorf("Start bus service {myQueueName:%s}", myQueueName)
 
 	retryCount := 0
 	for {
@@ -215,8 +156,7 @@ func (b *BusImplRabbitMQ) run(rabbitmqAddr string) {
 		if retryAfterSeconds > 30 {
 			retryAfterSeconds = 30
 		}
-		logger.Errorf("Error occur in processing bus. Retry later {retryTimes: %v, afterSeconds:%v} | %w",
-			retryCount, retryAfterSeconds, err)
+		logger.Errorf("Error occur in processing bus. Retry later {retryTimes: %v, afterSeconds:%v} | %v", retryCount, retryAfterSeconds, err)
 		time.Sleep(time.Duration(retryAfterSeconds) * time.Second)
 	}
 }

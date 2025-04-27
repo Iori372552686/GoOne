@@ -22,7 +22,7 @@ func GenGoMgrFile(templateFilePath string, structName string) {
 		panic(err)
 	}
 
-	dataFileName := "dataconfig_" + structName + ".conf"
+	dataFileName := "dataconfig_" + structName + ".config"
 
 	str := string(content)
 	str = strings.Replace(str, "{STRUCT_NAME}", strcase.ToCamel(structName), -1)

@@ -1,6 +1,6 @@
 package datetime
 
-//const
+// const
 const (
 	SECONDS_PER_MINUTE = 60
 	MINUTES_PER_HOUR   = 60

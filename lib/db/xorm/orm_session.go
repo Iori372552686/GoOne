@@ -15,7 +15,10 @@ type ORMOperation func(session *xorm.Session) error
 * @Date: 2022-11-29 18:33:00
 **/
 func (self *OrmSql) Transaction(f ORMOperation) (err error) {
-	err = self.Session.Begin()
+	//session := self.Session.Begin()
+	session := self.Engine.NewSession()
+
+	err = session.Begin()
 	if err != nil {
 		return
 	}
@@ -23,16 +26,16 @@ func (self *OrmSql) Transaction(f ORMOperation) (err error) {
 	defer func() {
 		if p := recover(); p != nil {
 			logger.Errorf("Transaction recover rollback:%s", p)
-			self.Session.Rollback()
+			session.Rollback()
 			panic(p) // re-throw panic after Rollback
 		} else if err != nil {
 			logger.Errorf("Transaction error rollback:%s", err.Error())
-			self.Session.Rollback() // err is non-nil; don't change it
+			session.Rollback() // err is non-nil; don't change it
 		} else {
-			err = self.Session.Commit() // err is nil; if Commit returns error update err
+			err = session.Commit() // err is nil; if Commit returns error update err
 		}
 	}()
 
-	err = f(self.Session) //用于defer闭包检查。
+	err = f(session) //用于defer闭包检查。
 	return err
 }

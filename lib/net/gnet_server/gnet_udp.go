@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	kReadBufSize = 128 * 1024 * 1024
+	kReadBufSize = 64 * 1024
 )
 
 type udpServer struct {

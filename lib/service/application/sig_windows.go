@@ -7,8 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-
-	"github.com/golang/glog"
 )
 
 func SignalNotify() {
@@ -20,9 +18,8 @@ func (a *Application) checkSysSignal() {
 	case s := <-sig:
 		switch s {
 		default:
-			glog.Infoln("onexit")
+			//logger.Infoln("onexit")
 			a.exit()
-			glog.Flush()
 			os.Exit(0)
 		}
 	default:

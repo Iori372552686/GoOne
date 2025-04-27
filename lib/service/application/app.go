@@ -1,11 +1,12 @@
 package application
 
+// mainloop boot,  如有问题飞书联系 to: Iori
 import (
-	"github.com/Iori372552686/GoOne/lib/api/datetime"
+	"fmt"
 	"os"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/Iori372552686/GoOne/lib/api/datetime"
 )
 
 type AppInterface interface {
@@ -28,25 +29,25 @@ type Application struct {
 var sig = make(chan os.Signal, 1)
 var app Application
 
-func Init(handler AppInterface) int {
+func Init(handler AppInterface) *Application {
 	app.appHandler = handler
 	err := app.appHandler.OnInit()
 	if err != nil {
-		glog.Error("Initialized fail | ", err)
-		glog.Flush()
+		fmt.Errorf("Initialized fail | ", err)
 		os.Exit(1)
-		return -1
+		return nil
 	}
 
 	app.tickInterval = 10
 
 	SignalNotify()
-	return 0
+	return &app
 }
 
-func SetTickInterval(interval int64) {
+// 每秒执行多少帧
+func (a *Application) SetTickInterval(interval int64) {
 	if interval > 0 && interval < 1000 {
-		app.tickInterval = interval
+		a.tickInterval = interval
 	}
 }
 
@@ -67,7 +68,7 @@ func (a *Application) tick(lastMs, nowMs int64) {
 }
 
 func Run() {
-	glog.Info("-----------  SvrImpl  is  Runing ------------ ")
+	fmt.Println("-----------  SvrImpl  is  Runing ------------ ")
 
 	for {
 		app.checkSysSignal()

@@ -1,7 +1,7 @@
 package ssdb
 
 import (
-	"github.com/Iori372552686/GoOne/common"
+	"github.com/Iori372552686/GoOne/common/gfunc"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/seefan/gossdb/v2/pool"
 )
@@ -59,6 +59,6 @@ func (self *SsdbMgr) InitAndRun(cfgs []Config) error {
 
 // tick
 func (self *SsdbMgr) Tick(nowMs int64) {
-	defer common.CheckRecover()
+	defer gfunc.CheckRecover()
 	return
 }

@@ -4,21 +4,24 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"math/rand"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/service/bus"
+
 	"github.com/samuel/go-zookeeper/zk"
 )
 
 // 路由方法
 const (
-	SvrRouterRule_Random = 1 + iota // 随机路由
-	SvrRouterRule_UID               // 根据UID取模
+	SvrRouterRule_Random           = 1 + iota // 随机路由
+	SvrRouterRule_Hash_UID                    // 根据UID取模
+	SvrRouterRule_Hash_ZoneID                 // 根据ZoneID取模
+	SvrRouterRule_Hash_RouterID               // 根据自定义RouterID取模
+	SvrRouterRule_IoCache_RouterID            // 根据自定义RouterID io cache
 	SvrRouterRule_Master
 )
 
@@ -54,22 +57,30 @@ func (s *ServerInstanceMgr) Close() {
 }
 
 // 根据ServerType和预先设定的RouterRule，获取一个ServerInstance
-func (s *ServerInstanceMgr) GetSvrInsBySvrType(serverType uint32, uid uint64) uint32 {
+func (s *ServerInstanceMgr) GetSvrInsBySvrType(serverType, zone uint32, uid uint64, routerId uint64) (uint32, uint64) {
 	if rule, in := s.routeRules[serverType]; in {
 		switch rule {
 		case SvrRouterRule_Random:
-			return s.getSvrInsByRandom(serverType)
-		case SvrRouterRule_UID:
-			return s.getSvrInsByUID(serverType, uid)
+			return s.getSvrInsByRandom(serverType), 0
+		case SvrRouterRule_Hash_UID:
+			return s.getSvrInsByHash(serverType, uid), uid
+		case SvrRouterRule_Hash_ZoneID:
+			return s.getSvrInsByHash(serverType, uint64(zone)), uint64(zone)
+		case SvrRouterRule_Hash_RouterID:
+			return s.getSvrInsByHash(serverType, routerId), routerId
 		case SvrRouterRule_Master:
-			return s.getSvrInsByMaster(serverType)
+			return s.getSvrInsByMaster(serverType), 0
 		default:
-			glog.Error("wrong svr router config ", serverType)
+			logger.Error("wrong svr router config ", serverType)
 		}
-	} else {
-		return 0
 	}
-	return 0
+
+	return 0, 0
+}
+
+// 根据RouterID，获取一个ServerInstance
+func (s *ServerInstanceMgr) GetSvrInsByRouterID(serverType uint32, rid uint64) uint32 {
+	return s.getSvrInsByHash(serverType, rid)
 }
 
 // 根据svrtype获取所有的svrinstance
@@ -222,7 +233,7 @@ func (s *ServerInstanceMgr) getSvrInsByRandom(svrType uint32) uint32 {
 }
 
 // 通过UID获取一个svr，这里对uid取模
-func (s *ServerInstanceMgr) getSvrInsByUID(svrType uint32, uid uint64) uint32 {
+func (s *ServerInstanceMgr) getSvrInsByHash(svrType uint32, id uint64) uint32 {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -231,7 +242,7 @@ func (s *ServerInstanceMgr) getSvrInsByUID(svrType uint32, uid uint64) uint32 {
 		return 0
 	}
 
-	return svrs[uid%uint64(len(svrs))]
+	return svrs[id%uint64(len(svrs))]
 }
 
 // 主备模式，永远取第一个svr

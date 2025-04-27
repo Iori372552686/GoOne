@@ -2,21 +2,23 @@ package net_mgr
 
 import (
 	"fmt"
-	"github.com/Iori372552686/GoOne/common/misc"
+	"net"
+	"strings"
+
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/net/tcp_server"
+	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/lib/service/router"
-	g1_protocol "github.com/Iori372552686/GoOne/protobuf/protocol"
-	"net"
+	"github.com/Iori372552686/GoOne/lib/util/convert"
+	"github.com/Iori372552686/GoOne/module/misc"
+	g1_protocol "github.com/gdsgog/poker_protocol/protocol"
 
 	"github.com/golang/protobuf/proto"
-
-	"github.com/golang/glog"
 )
 
-func (t *ConnTcpSvr) InitAndRun(ip string, port int, cb func(conn net.Conn, data []byte)) error {
-	t.uidConnMap = make(map[uint64]net.Conn)
+func (t *ConnTcpSvr) initAndRun(ip string, port int, cb func(conn net.Conn, data []byte)) error {
+	t.uidConnMap = make(map[uint64]*Client)
 	t.connUidMap = make(map[net.Conn]uint64)
 	t.remoteAddrConnMap = make(map[string]net.Conn)
 	t.remoteAddrKickMap = make(map[string]bool)
@@ -37,16 +39,11 @@ func (t *ConnTcpSvr) OnConn(conn net.Conn) {
 
 // 被Read协程调用，每个Connection对应一个Read协调
 func (t *ConnTcpSvr) OnPacket(conn net.Conn, data []byte) {
-	// todo 处理业务 -- dispatch
 	go t.handler(conn, data)
-
-	return
 }
 
 // 被Read协程调用，每个Connection对应一个Read协调
 func (t *ConnTcpSvr) OnClose(conn net.Conn) {
-	logger.Infof("client close {RemoteIp: %v}", conn.RemoteAddr())
-
 	uid := t.removeConn(conn)
 	if uid == 0 {
 		return
@@ -58,10 +55,9 @@ func (t *ConnTcpSvr) OnClose(conn net.Conn) {
 	req := g1_protocol.LogoutReq{}
 	req.ByServer = true
 	req.Reason = "disconnect"
-	err := router.SendPbMsgBySvrTypeSimple(uint32(misc.ServerType_MainSvr), uid,
-		uint32(g1_protocol.CMD_MAIN_LOGOUT_REQ), &req)
+	err := router.SendPbMsgBySvrTypeSimple(uint32(misc.ServerType_MainSvr), uid, 0, g1_protocol.CMD_MAIN_LOGOUT_REQ, &req)
 	if err != nil {
-		glog.Error(err)
+		logger.Error(err)
 	}
 	// todo: 如果client已经下线了，可能会再被拉起来处理一次这个消息。
 }
@@ -76,9 +72,9 @@ func (t *ConnTcpSvr) SendByUid(uid uint64, data1 []byte, data2 []byte) error {
 		return fmt.Errorf("uid doesn't exist {uid: %v}", uid)
 	}
 
-	err := t.WriteData(conn, data1, data2)
+	err := t.WriteData(conn.Conn, data1, data2)
 	if err != nil {
-		conn.Close()
+		conn.Conn.Close()
 		logger.Errorf("Closed connection for failing to write data {uid: %v}| %v", uid, err)
 		return err
 	}
@@ -93,9 +89,9 @@ func (t *ConnTcpSvr) BroadcastByZone(zone int32, data1 []byte, data2 []byte) {
 
 	for _, conn := range t.uidConnMap {
 		// TODO check zone
-		err := t.WriteData(conn, data1, data2)
+		err := t.WriteData(conn.Conn, data1, data2)
 		if err != nil {
-			conn.Close()
+			conn.Conn.Close()
 			logger.Errorf("Closed connection for failing to write data {uid: %v}| %v\", uid, err")
 			continue
 		}
@@ -112,7 +108,7 @@ func (t *ConnTcpSvr) Kick(uid uint64, reason g1_protocol.EKickOutReason) {
 		return
 	}
 
-	t.kick(conn, uid, reason)
+	t.kick(conn.Conn, uid, reason)
 }
 
 func (t *ConnTcpSvr) KickByRemoteAddr(uid uint64, reason g1_protocol.EKickOutReason, remoteAddr string) {
@@ -142,7 +138,7 @@ func (t *ConnTcpSvr) removeConn(conn net.Conn) uint64 {
 	// 把连接与UID的对应关系删了
 	delete(t.remoteAddrConnMap, conn.RemoteAddr().String())
 	delete(t.connUidMap, conn)
-	if connInMap, exists := t.uidConnMap[uid]; exists && connInMap == conn {
+	if connInMap, exists := t.uidConnMap[uid]; exists && connInMap.Conn == conn {
 		delete(t.uidConnMap, uid)
 		if t.remoteAddrKickMap[conn.RemoteAddr().String()] {
 			delete(t.remoteAddrKickMap, conn.RemoteAddr().String())
@@ -177,4 +173,39 @@ func (t *ConnTcpSvr) kick(conn net.Conn, uid uint64, reason g1_protocol.EKickOut
 		logger.Errorf("Failed to write data in kick | %v", err)
 		return
 	}
+}
+
+func (t *ConnTcpSvr) UpdateClientByUid(conn net.Conn, uid uint64, zone uint32) *Client {
+	oldCli := t.GetClientByUid(uid)
+	ipAddr := strings.Split(conn.RemoteAddr().String(), ":")
+	ip, port := ipAddr[0], ipAddr[1]
+
+	newIns := &Client{
+		Uid:        uid,
+		Zone:       zone,
+		Conn:       conn,
+		RemoteAddr: conn.RemoteAddr().String(),
+		Ip:         bus.IpStringToInt(ip),
+		Port:       uint32(convert.StrToInt(port)),
+	}
+
+	t.lock.Lock()
+	t.connUidMap[conn] = uid
+	t.uidConnMap[uid] = newIns
+	t.remoteAddrConnMap[conn.RemoteAddr().String()] = conn
+	t.lock.Unlock()
+
+	if oldCli != nil {
+		t.kick(oldCli.Conn, uid, g1_protocol.EKickOutReason_MULTI_PLACE_LOGIN)
+	}
+
+	return newIns
+}
+
+func (t *ConnTcpSvr) GetClientByUid(uid uint64) *Client {
+	t.lock.RLock()
+	conn := t.uidConnMap[uid]
+	t.lock.RUnlock()
+
+	return conn
 }

@@ -110,9 +110,9 @@ func JsonToStruct(jsStr string, st interface{}) error {
 	err := deCoder.Decode(st)
 	if err != nil {
 		logger.Errorf("convert (%v) to json string error:%v", st, err)
-		return err
 	}
-	return nil
+
+	return err
 }
 
 /**
@@ -164,7 +164,7 @@ func JsonToMapUseNumber(body []byte, dst *map[string]interface{}) error {
 **/
 func JsonToMapUseInt64(body []byte, dst *map[string]interface{}) error {
 	dec := decoder.NewStreamDecoder(bytes.NewBuffer(body))
-	dec.UseInt64()
+	//dec.UseInt64()
 
 	return dec.Decode(dst)
 }

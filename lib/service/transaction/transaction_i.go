@@ -3,6 +3,7 @@ package transaction
 import (
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
+	g1_protocol "github.com/gdsgog/poker_protocol/protocol"
 )
 
 type ITransactionMgr interface {
@@ -14,6 +15,6 @@ type ITransactionMgr interface {
 	//     当useUidLock=true时，此值为每个uid的消息等待队列的长度。
 	InitAndRun(maxTrans int32, useUidLock bool, maxUidPendingPacket int)
 
-	RegisterCmd(cmd uint32, cmdHandler cmd_handler.ICmdHandler)
+	RegisterCmd(cmd g1_protocol.CMD, cmdHandler cmd_handler.CmdHandlerFunc)
 	ProcessSSPacket(packet *sharedstruct.SSPacket)
 }

@@ -4,13 +4,14 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 )
 
 // http args
@@ -38,6 +39,52 @@ var HttpConnectPool http.RoundTripper = &http.Transport{
 func GetRequest(url string) ([]byte, error) {
 	logger.Infof(" GetRequest -- url:%v", url)
 	return HttpRequest("GET", url, "")
+}
+
+/**
+* @Description:  http请求 ，支持传入方式, 带header
+* @param: method
+* @param: url
+* @param: requestBody
+* @return: []byte
+* @return: error
+* @Author: ken
+* @Date: 2025-03-12 17:16:03
+**/
+func HttpRequestByHeader(method string, url, requestBody string, header map[string]string) ([]byte, error) {
+	client := &http.Client{
+		Transport: HttpConnectPool,
+	}
+
+	req, err := http.NewRequest(method, url, strings.NewReader(requestBody))
+	if err != nil {
+		logger.Errorf("http Request err: %v", err)
+		return nil, err
+	}
+
+	for k, v := range header {
+		req.Header.Set(k, v)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	client.Timeout = 8 * time.Second
+	resp, err := client.Do(req)
+	if err != nil {
+		logger.Errorf("client do err: %v", err)
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != 200 {
+		logger.Errorf("Error response.StatusCode=%v urlstr=%s body=%s", resp.StatusCode, url, string(body))
+		return nil, errors.New("resp.Code != 200")
+	}
+
+	return body, err
 }
 
 /**
@@ -70,14 +117,15 @@ func HttpRequest(method string, url, requestBody string) ([]byte, error) {
 	}
 
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		logger.Errorf("Error response.StatusCode=%v urlstr=%s", resp.StatusCode, url)
-		return nil, errors.New("resp.Code != 200")
-	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
+	}
+	if resp.StatusCode != 200 {
+		logger.Errorf("Error response.StatusCode=%v urlstr=%s", resp.StatusCode, url)
+		logger.Errorf("Error response.body=", string(body))
+		return nil, errors.New("resp.Code != 200")
 	}
 
 	return body, err
@@ -109,6 +157,7 @@ func TokenHttpRequest(method string, value url.Values, url, token string) ([]byt
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", token)
 
+	logger.Infof("http post request url:%v", req.URL)
 	resp, err := client.Do(req)
 	if err != nil {
 		logger.Errorf("client do err: %v", err)
@@ -121,7 +170,7 @@ func TokenHttpRequest(method string, value url.Values, url, token string) ([]byt
 		return nil, errors.New("resp.Code != 200")
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +207,7 @@ func HttpGetRequest(urlstr string, reqBody string) ([]byte, error) {
 		return nil, fmt.Errorf("Error response.StatusCode=%v urlstr=%s", response.StatusCode, urlstr)
 	}
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +245,7 @@ func HttpPostRequest(urlstr string, msgbody string) ([]byte, error) {
 		return nil, fmt.Errorf("Error response.StatusCode=%v urlstr=%s", response.StatusCode, urlstr)
 	}
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +268,6 @@ func HeaderHttpPostRequest(urlstr string, msgbody string, headers *map[string]st
 		Transport: HttpConnectPool,
 	}
 	request, e := http.NewRequest("POST", urlstr, strings.NewReader(msgbody))
-	request.Header.Set("Content-type", "application/json")
 	for k, v := range *headers {
 		request.Header.Set(k, v)
 	}
@@ -227,13 +275,14 @@ func HeaderHttpPostRequest(urlstr string, msgbody string, headers *map[string]st
 		return nil, e
 	}
 
+	logger.Infof("HttpPostRequest request |  url:%v", urlstr)
 	response, err := client.Do(request)
 	if err != nil {
 		return nil, err
 	}
 
 	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}

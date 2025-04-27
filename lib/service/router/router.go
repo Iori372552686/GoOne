@@ -3,15 +3,15 @@ package router
 import (
 	"errors"
 	"fmt"
+
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/lib/service/svrinstmgr"
+	"github.com/Iori372552686/GoOne/module/misc"
+	g1_protocol "github.com/gdsgog/poker_protocol/protocol"
 
 	"github.com/golang/protobuf/proto"
-
-	"strconv"
-	"strings"
 )
 
 // router
@@ -29,7 +29,6 @@ func SelfSvrType() uint32 {
 	return (SelfBusId() >> 8) & 0xff
 }
 
-// type CbOnRecvSSPacket func(*sharedstruct.SSPacketHeader, []byte)
 type CbOnRecvSSPacket func(*sharedstruct.SSPacket) // frameMsg的所有权，归回调函数
 
 // cb CbOnRecvSSPacket将由底层(bus)协程调用
@@ -50,7 +49,7 @@ func InitAndRun(selfBusId string, cb CbOnRecvSSPacket, rabbitmqAddr string,
 
 // 最终通过bus发消息的地方（其他都是易用性封装）
 func SendMsg(packetHeader *sharedstruct.SSPacketHeader, packetBody []byte) error {
-	logger.Debugf("Send bus message: %#v", packetHeader)
+	//logger.Infof("Send bus cmd: %v | %v", g1_protocol.CMD(packetHeader.Cmd), packetHeader)
 	err := router.busImpl.Send(packetHeader.DstBusID, packetHeader.ToBytes(), packetBody)
 	if err != nil {
 		e := fmt.Sprintf("failed to send bus message {header:%#v, bodyLen:%v} | %v",
@@ -62,7 +61,7 @@ func SendMsg(packetHeader *sharedstruct.SSPacketHeader, packetBody []byte) error
 }
 
 func SendPbMsg(packetHeader *sharedstruct.SSPacketHeader, pbMsg proto.Message) error {
-	logger.Debugf("SendPbMsg: %#v", pbMsg.String())
+	logger.CmdDebugf(packetHeader.Cmd, "SendPbMsg: %#v", pbMsg.String())
 	packetBody, err := proto.Marshal(pbMsg)
 	if err != nil {
 		return err
@@ -71,9 +70,10 @@ func SendPbMsg(packetHeader *sharedstruct.SSPacketHeader, pbMsg proto.Message) e
 	return SendMsg(packetHeader, packetBody)
 }
 
-func SendMsgByBusId(busId uint32, uid uint64, cmd uint32, sendSeq uint16, srcTransId uint32, data []byte) error {
+func SendMsgByBusId(busId uint32, routerKey, uid uint64, zone uint32, cmd g1_protocol.CMD, sendSeq uint16, srcTransId uint32, data []byte) error {
 	if busId == 0 {
-		return fmt.Errorf("server instance is 0, fail to send {busId: %v, uid: %v, cmd: %X}", busId, uid, cmd)
+		logger.Errorf("server instance is 0, fail to send {busId: %v, uid: %v, cmd: %X}", busId, uid, cmd)
+		return errors.New("server instance is 0, fail to send")
 	}
 
 	packetHeader := sharedstruct.SSPacketHeader{
@@ -82,47 +82,46 @@ func SendMsgByBusId(busId uint32, uid uint64, cmd uint32, sendSeq uint16, srcTra
 		SrcTransID: srcTransId,
 		DstTransID: 0,
 		Uid:        uid,
-		Cmd:        cmd,
+		Cmd:        uint32(cmd),
+		RouterID:   routerKey,
 		BodyLen:    uint32(len(data)),
 		CmdSeq:     sendSeq,
+		Zone:       zone,
 	}
 
 	return SendMsg(&packetHeader, data)
 }
 
-func SendPbMsgByBusId(busId uint32, uid uint64, cmd uint32, sendSeq uint16, srcTransId uint32, pbMsg proto.Message) error {
+func SendPbMsgByBusId(busId uint32, uid uint64, zone uint32, cmd g1_protocol.CMD, sendSeq uint16, srcTransId uint32, pbMsg proto.Message) error {
 	logger.Debugf("SendPbMsgByBusId: %#v", pbMsg.String())
 	data, err := proto.Marshal(pbMsg)
 	if err != nil {
 		return err
 	}
-	return SendMsgByBusId(busId, uid, cmd, sendSeq, srcTransId, data)
+	return SendMsgByBusId(busId, 0, uid, zone, cmd, sendSeq, srcTransId, data)
 }
 
-func SendPbMsgByBusIdSimple(busId uint32, uid uint64, cmd uint32, pbMsg proto.Message) error {
-	return SendPbMsgByBusId(busId, uid, cmd, 0, 0, pbMsg)
+func SendPbMsgByBusIdSimple(busId uint32, uid uint64, cmd g1_protocol.CMD, pbMsg proto.Message) error {
+	return SendPbMsgByBusId(busId, uid, 1, cmd, 0, 0, pbMsg)
 }
 
-func SendMsgBySvrType(svrType uint32, uid uint64, cmd uint32, sendSeq uint16, srcTransId uint32, data []byte) error {
-	dstBusId := severInstanceMgr.GetSvrInsBySvrType(svrType, uid)
+func SendMsgBySvrType(svrType uint32, routerId, uid uint64, zone uint32, cmd g1_protocol.CMD, sendSeq uint16, srcTransId uint32, data []byte) error {
+	dstBusId, routerKey := severInstanceMgr.GetSvrInsBySvrType(svrType, zone, uid, routerId)
 	if dstBusId == 0 {
-		return fmt.Errorf("cannot get a server instance to send {svrType: %v, uid: %v, cmd: %X}", svrType, uid, cmd)
+		logger.Errorf("cannot get a server instance to send {svrType: %v, uid: %v, cmd: %v}", svrType, uid, cmd)
+		return errors.New("cannot get a server instance to send")
 	}
 
-	return SendMsgByBusId(dstBusId, uid, cmd, sendSeq, srcTransId, data)
+	return SendMsgByBusId(dstBusId, routerKey, uid, zone, cmd, sendSeq, srcTransId, data)
 }
 
-func SendMsgBySvrTypeConn(svrType uint32, uid uint64, cmd uint32, sendSeq uint16, srcTransId uint32, data []byte, remoteAddr string) error {
-	dstBusId := severInstanceMgr.GetSvrInsBySvrType(svrType, uid)
+func SendMsgByConn(uid, routerId uint64, zone, cmd uint32, srcTransId uint32, data []byte, ip, port uint32) error {
+	svrType := misc.ServerTypeInCmd(cmd)
+	dstBusId, routerKey := severInstanceMgr.GetSvrInsBySvrType(svrType, zone, uid, routerId)
 	if dstBusId == 0 {
-		return fmt.Errorf("cannot get a server instance to send {svrType: %v, uid: %v, cmd: %X}", svrType, uid, cmd)
+		logger.Errorf("cannot get a server instance to send {svrType: %v, uid: %v, cmd: %v}", svrType, uid, cmd)
+		return errors.New("cannot get a server instance to send")
 	}
-
-	ip := strings.Split(remoteAddr, ":")[0]
-	port := strings.Split(remoteAddr, ":")[1]
-
-	ipInt := bus.IpStringToInt(ip)
-	portInt, _ := strconv.Atoi(port)
 
 	packetHeader := sharedstruct.SSPacketHeader{
 		SrcBusID:   SelfBusId(),
@@ -131,42 +130,47 @@ func SendMsgBySvrTypeConn(svrType uint32, uid uint64, cmd uint32, sendSeq uint16
 		DstTransID: 0,
 		Uid:        uid,
 		Cmd:        cmd,
+		RouterID:   routerKey,
 		BodyLen:    uint32(len(data)),
-		CmdSeq:     sendSeq,
-		Ip:         ipInt,
-		Flag:       uint32(portInt),
+		Ip:         ip,
+		Flag:       port,
+		Zone:       zone,
 	}
 
 	return SendMsg(&packetHeader, data)
 }
 
-func SendPbMsgBySvrType(svrType uint32, uid uint64, cmd uint32, sendSeq uint16, srcTransId uint32, pbMsg proto.Message) error {
-	logger.Debugf("SendPbMsgBySvrType: %#v", pbMsg.String())
+func SendPbMsgBySvrType(svrType uint32, routerId, uid uint64, zone uint32, cmd g1_protocol.CMD, sendSeq uint16, srcTransId uint32, pbMsg proto.Message) error {
+	//logger.Debugf("SendPbMsgBySvrType: %#v", pbMsg.String())
 	data, err := proto.Marshal(pbMsg)
 	if err != nil {
 		return err
 	}
-	return SendMsgBySvrType(svrType, uid, cmd, sendSeq, srcTransId, data)
+	return SendMsgBySvrType(svrType, routerId, uid, zone, cmd, sendSeq, srcTransId, data)
 }
 
-func SendPbMsgBySvrTypeSimple(svrType uint32, uid uint64, cmd uint32, pbMsg proto.Message) error {
-	return SendPbMsgBySvrType(svrType, uid, cmd, 0, 0, pbMsg)
+func SendPbMsgBySvrTypeSimple(svrType uint32, uid uint64, zone uint32, cmd g1_protocol.CMD, pbMsg proto.Message) error {
+	return SendPbMsgBySvrType(svrType, uid, uid, zone, cmd, 0, 0, pbMsg)
 }
 
-func BroadcastMsgByServerType(svrType uint32, uid uint64, cmd uint32, sendSeq uint16, data []byte) error {
+func SendPbMsgByRouter(svrType uint32, routerId, uid uint64, zone uint32, cmd g1_protocol.CMD, pbMsg proto.Message) error {
+	return SendPbMsgBySvrType(svrType, routerId, uid, zone, cmd, 0, 0, pbMsg)
+}
+
+func BroadcastMsgByServerType(svrType uint32, uid uint64, cmd g1_protocol.CMD, sendSeq uint16, data []byte) error {
 	instances := severInstanceMgr.GetAllSvrInsBySvrType(svrType)
 	if len(instances) == 0 {
 		return fmt.Errorf("cannot get a server instance to send {svrType: %v, uid: %v, cmd: %X}", svrType, uid, cmd)
 	}
 
 	for _, inst := range instances {
-		SendMsgByBusId(inst, uid, cmd, sendSeq, 0, data)
+		SendMsgByBusId(inst, 0, uid, 1, cmd, sendSeq, 0, data)
 	}
 
 	return nil
 }
 
-func BroadcastPbMsgByServerType(svrType uint32, uid uint64, cmd uint32, sendSeq uint16, pbMsg proto.Message) error {
+func BroadcastPbMsgByServerType(svrType uint32, uid uint64, cmd g1_protocol.CMD, sendSeq uint16, pbMsg proto.Message) error {
 	logger.Debugf("BroadcastPbMsgByServerType: %#v", pbMsg.String())
 	data, err := proto.Marshal(pbMsg)
 	if err != nil {
@@ -193,17 +197,19 @@ var router struct {
 	cbOnRecvSSPacket CbOnRecvSSPacket
 }
 
-func onRecvBusMsg(srcBusId uint32, data []byte) {
-	logger.Debugf("Received bus message, len: %v\n", len(data))
+func onRecvBusMsg(srcBusId uint32, data []byte) error {
+	//logger.Debugf("Received message bus:%v, len: %v\n", bus.IpIntToString(srcBusId), len(data))
 	if len(data) < sharedstruct.ByteLenOfSSPacketHeader() {
-		return
+		return fmt.Errorf("bus message is too short {len:%v, expect:%v}", len(data), sharedstruct.ByteLenOfSSPacketHeader())
 	}
 
 	packet := new(sharedstruct.SSPacket)
 	packet.Header.From(data)
 	packet.Body = data[sharedstruct.ByteLenOfSSPacketHeader():]
-	logger.Debugf("[uid: %d] Received bus message: %#v\n", packet.Header.Uid, packet.Header)
+	logger.CmdDebugf(packet.Header.Cmd, "[uid: %d] Received bus message: %+v", packet.Header.Uid, packet.Header)
 	if router.cbOnRecvSSPacket != nil {
 		router.cbOnRecvSSPacket(packet)
 	}
+
+	return nil
 }

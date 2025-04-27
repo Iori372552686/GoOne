@@ -3,13 +3,13 @@ package tcp_server
 import (
 	"bytes"
 	"fmt"
-	"github.com/Iori372552686/GoOne/common/misc"
-	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"io"
 	"net"
 	"sync"
 
-	"github.com/golang/glog"
+	"github.com/Iori372552686/GoOne/lib/api/datetime"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/module/misc"
 
 	"strconv"
 	"time"
@@ -117,7 +117,7 @@ func (s *TcpSvr) runListener(listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			logger.Errorf("Error accepting: %v", err) //todo: fatal or error
+			logger.Errorf("Error accepting: %v", err)
 			return
 		}
 
@@ -141,21 +141,21 @@ func (s *TcpSvr) runConnRead(conn net.Conn) {
 	readBuf := make([]byte, kReadBufSize)
 
 	for {
-		_ = conn.SetReadDeadline(time.Now().Add(s.TcpReadTimeout))
+		_ = conn.SetReadDeadline(datetime.NowT().Add(s.TcpReadTimeout))
 		readLen, err := conn.Read(readBuf)
-		glog.Infof("read len: %d", readLen)
+		logger.Infof("read len: %d", readLen)
 
 		if err == nil {
 			buff.Write(readBuf[0:readLen])
-			//consumedLen := s.handler.OnRead(conn, buff.Bytes())
-			consumedLen := s.handler.OnRead2(conn, buff.Bytes())
+			consumedLen := s.handler.OnRead(conn, buff.Bytes())
+			//consumedLen := s.handler.OnRead2(conn, buff.Bytes())
 			if consumedLen > 0 {
 				buff.Next(consumedLen)
 			}
 		} else if err == io.EOF {
 			break
 		} else {
-			glog.Errorf("error occurs when read from tcp {errorType:%T, error:%v}", err, err)
+			logger.Errorf("error occurs when read from tcp {errorType:%T, error:%v}", err, err)
 			break
 		}
 	}
@@ -166,12 +166,11 @@ func (s *TcpSvr) runConnRead(conn net.Conn) {
 
 func (s *TcpSvr) destroyConn(conn net.Conn) {
 	s.lockOfConnInfo.Lock()
-	defer s.lockOfConnInfo.Unlock()
-
 	if info, exists := s.mapOfConnInfo[conn]; exists {
 		close(info.chanWrite)
 		delete(s.mapOfConnInfo, conn)
 	}
+	s.lockOfConnInfo.Unlock()
 }
 
 func (s *TcpSvr) runConnWrite(conn net.Conn, chanWrite <-chan []byte) {
@@ -189,11 +188,10 @@ func (s *TcpSvr) runConnWrite(conn net.Conn, chanWrite <-chan []byte) {
 			break
 		}
 
-		_ = conn.SetWriteDeadline(time.Now().Add(s.TcpWriteTimeout))
+		_ = conn.SetWriteDeadline(datetime.NowT().Add(s.TcpWriteTimeout))
 		sentLen, err := conn.Write(writeData)
 		if sentLen < len(writeData) || err != nil { //todo: retry?
-			logger.Errorf("Failed to write tcp data {err:%v, dataLen: %v, sentLen: %v}",
-				err, len(writeData), sentLen)
+			logger.Errorf("Failed to write tcp data {err:%v, dataLen: %v, sentLen: %v}", err, len(writeData), sentLen)
 			_ = conn.Close()
 			break
 		}

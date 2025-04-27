@@ -21,3 +21,5 @@ func TestCap(t *testing.T) {
 	text = "no sensitive"
 	fmt.Println(ChangeSensitiveWords(text))
 }
+
+

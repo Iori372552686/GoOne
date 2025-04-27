@@ -1,10 +1,16 @@
 package bus
 
 // implType : args
-// "rabbitmq": (rabbitmqAddr string)
-func CreateBus(implType string, selfBusId uint32, onRecvMsg MsgHandler, args...interface{}) IBus {
+func CreateBus(implType string, selfBusId uint32, onRecvMsg MsgHandler, args ...interface{}) IBus {
 	switch implType {
-	case "rabbitmq": return NewBusImplRabbitMQ(selfBusId, onRecvMsg, args[0].(string))
-	default: return nil
+	case "nsq":
+		return NewBusImplNsqMQ(selfBusId, onRecvMsg, args[0].(Config))
+
+	case "rocketmq":
+		//todo   -- need you!
+		return nil
+
+	default: //rbmq
+		return NewBusImplRabbitMQ(selfBusId, onRecvMsg, args[0].(string))
 	}
 }

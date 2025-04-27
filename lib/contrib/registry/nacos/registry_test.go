@@ -43,7 +43,7 @@ func TestRegistry(t *testing.T) {
 		NamespaceId:         "public", // namespace id
 		TimeoutMs:           5000,
 		NotLoadCacheAtStart: true,
-		LogDir:              "/tmp/nacos/log",
+		LogDir:              "/tmp/nacos/zap",
 		CacheDir:            "/tmp/nacos/cache",
 		RotateTime:          "1h",
 		MaxAge:              3,
@@ -136,7 +136,7 @@ func TestRegistryMany(t *testing.T) {
 		NamespaceId:         "public", // namespace id
 		TimeoutMs:           5000,
 		NotLoadCacheAtStart: true,
-		LogDir:              "/tmp/nacos/log",
+		LogDir:              "/tmp/nacos/zap",
 		CacheDir:            "/tmp/nacos/cache",
 		RotateTime:          "1h",
 		MaxAge:              3,

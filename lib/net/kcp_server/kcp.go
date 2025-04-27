@@ -1,8 +1,8 @@
 package kcp_server
 
 import (
-	"GoMini/common/misc"
-	"GoMini/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/module/misc"
 	"io"
 	"strconv"
 	"sync"
@@ -13,7 +13,6 @@ import (
 
 const (
 	kReadBufSize = 65536
-	kcpSockBuf   = 128 * 1024 * 1024
 )
 
 /*

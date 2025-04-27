@@ -22,12 +22,12 @@ type NacosConf struct {
 }
 
 func NewNacosConfigClient(conf NacosConf) *config_client.IConfigClient {
-	//server conf
+	//server config
 	sc := []constant.ServerConfig{
 		*constant.NewServerConfig(conf.IPAddr, uint64(conf.Port)),
 	}
 
-	//client conf
+	//client config
 	cc := constant.ClientConfig{
 		TimeoutMs:           5000,
 		NotLoadCacheAtStart: true,

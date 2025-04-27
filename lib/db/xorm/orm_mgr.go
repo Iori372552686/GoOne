@@ -2,7 +2,7 @@
 package orm
 
 import (
-	"github.com/Iori372552686/GoOne/common"
+	"github.com/Iori372552686/GoOne/common/gfunc"
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/go-xorm/xorm"
@@ -85,7 +85,7 @@ func (self *OrmMgr) InitAndRun(dbIns []Config, tables ...interface{}) error {
 * @Date: 2022-10-13 11:29:17
 **/
 func (self *OrmMgr) Tick(nowMs int64) {
-	defer common.CheckRecover()
+	defer gfunc.CheckRecover()
 
 	if (nowMs - self.lastTick) > 30*datetime.MS_PER_SECOND {
 		//logger.Infof("OrmMgr   Tick.. ")

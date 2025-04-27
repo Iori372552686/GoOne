@@ -14,7 +14,7 @@ func Test_msgpack(t *testing.T) {
 	countryCapitalMap["device_id"] = "345"
 	countryCapitalMap["session_id"] = "123"
 
-	test, err := os.ReadFile("d:/test.log")
+	test, err := os.ReadFile("d:/test.zap")
 
 	in := countryCapitalMap
 	res, err := msgpack.Marshal(in)

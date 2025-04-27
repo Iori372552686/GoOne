@@ -25,7 +25,7 @@ func Init(fileName string) int {
 
 	file, err := os.Open(fileName)
 	if err != nil {
-		logger.Fatalf("load sensitive word file error: %v", err)
+		logger.Errorf("load sensitive word file error: %v", err)
 		return -1
 	}
 	defer file.Close()

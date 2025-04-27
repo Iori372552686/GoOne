@@ -46,7 +46,7 @@ func WithCluster(cluster string) Option {
 	}
 }
 
-// WithEndpoint with apollo config conf server ip
+// WithEndpoint with apollo config config server ip
 func WithEndpoint(endpoint string) Option {
 	return func(o *options) {
 		o.endpoint = endpoint

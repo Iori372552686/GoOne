@@ -3,26 +3,16 @@ package transaction
 import (
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/service/router"
-
-	"github.com/golang/glog"
+	"github.com/Iori372552686/GoOne/lib/util/safego"
+	g1_protocol "github.com/gdsgog/poker_protocol/protocol"
 	"github.com/golang/protobuf/proto"
-
-	"time"
 )
-
-// 使用：
-//   . 所有逻辑事务都继承自TransBase，实现Init、ProcessCmd。
-//	 . 通过调用transmgr.RegisterCmd注册Cmd和实现类
-//   . 在收到指定的Cmd时，Init、ProcessCmd会被相继调用，来实现逻辑功能。
-//     其间，可通过TransBase::CallMsgByBusId、Transaction::SendMsgBack等方法，进行通信与回包
-// 机制：
-//   . TransBase实现transmgr.innerTransaction，由transmgr在收到新cmd时，创建协程，调用run函数，启动此事务。
-//   . 其间，transmgr收到指定发给此事务（以事务ID标识）的消息，会通过chanIn转送给此事务。
-//   . 事务结束后，通过chanOut将返回值返回给transmgr
 
 type iTransaction interface {
 	cmd_handler.IContext
@@ -50,35 +40,49 @@ func newTransaction(transID uint32, oriPacketHeader sharedstruct.SSPacketHeader,
 }
 
 func (t *Transaction) Errorf(format string, args ...interface{}) {
-	f := fmt.Sprintf("[%v|%v] %v", t.Uid(), t.TransID(), format)
-	glog.ErrorDepth(1, fmt.Sprintf(f, args...))
+	f := fmt.Sprintf("[%v|%v|%v] %v", t.Uid(), t.Rid(), t.TransID(), format)
+	logger.ErrorDepth(1, fmt.Sprintf(f, args...))
 }
 
 func (t *Transaction) Warningf(format string, args ...interface{}) {
-	f := fmt.Sprintf("[%v|%v] %v", t.Uid(), t.TransID(), format)
-	glog.WarningDepth(1, fmt.Sprintf(f, args...))
+	f := fmt.Sprintf("[%v|%v|%v] %v", t.Uid(), t.Rid(), t.TransID(), format)
+	logger.WarningDepth(1, fmt.Sprintf(f, args...))
 }
 
 func (t *Transaction) Infof(format string, args ...interface{}) {
-	f := fmt.Sprintf("[%v|%v] %v", t.Uid(), t.TransID(), format)
-	glog.InfoDepth(1, fmt.Sprintf(f, args...))
+	f := fmt.Sprintf("[%v|%v|%v] %v", t.Uid(), t.Rid(), t.TransID(), format)
+	logger.InfoDepth(1, fmt.Sprintf(f, args...))
 }
 
 func (t *Transaction) Debugf(format string, args ...interface{}) {
 	t.DebugDepthf(1, format, args...)
 }
 func (t *Transaction) DebugDepthf(depth int, format string, args ...interface{}) {
-	f := fmt.Sprintf("[%v|%v] %v", t.Uid(), t.TransID(), format)
-	logger.DebugDepthf(1+depth, f, args...)
+	f := fmt.Sprintf("[%v|%v|%v] %v", t.Uid(), t.Rid(), t.TransID(), format)
+	logger.CmdDebugDepthf(t.Cmd(), 1+depth, f, args...)
 }
 
-func (t *Transaction) run(cmdHandler cmd_handler.ICmdHandler, packet *sharedstruct.SSPacket, chanRet chan<- transRet) {
-	ret := cmdHandler.ProcessCmd(t, packet.Body)
-	chanRet <- transRet{transID: t.transID, ret: int32(ret)}
+func (t *Transaction) run(cmdHandler cmd_handler.CmdHandlerFunc, packet *sharedstruct.SSPacket, chanRet chan<- uint32) {
+	safego.SafeFunc(func() {
+		ret := cmdHandler(t, packet.Body)
+		if ret != g1_protocol.ErrorCode_ERR_OK {
+			logger.Errorf("cmdHandler failed: %v", ret)
+		}
+	})
+
+	chanRet <- t.transID
 }
 
 func (t *Transaction) Uid() uint64 {
 	return t.OriPacketHeader.Uid
+}
+
+func (t *Transaction) Zone() uint32 {
+	return t.OriPacketHeader.Zone
+}
+
+func (t *Transaction) Rid() uint64 {
+	return t.OriPacketHeader.RouterID
 }
 
 func (t *Transaction) Cmd() uint32 {
@@ -115,75 +119,89 @@ func (t *Transaction) SendMsgBack(pbMsg proto.Message) {
 	router.SendMsgBack(t.OriPacketHeader, t.transID, pbMsg)
 }
 
-func (t *Transaction) CallMsgBySvrType(svrType uint32, cmd uint32, req proto.Message, rsp proto.Message) error {
-	return t.CallOtherMsgBySvrType(svrType, cmd, t.Uid(), req, rsp)
+func (t *Transaction) CallMsgBySvrType(svrType uint32, cmd g1_protocol.CMD, req proto.Message, rsp proto.Message) error {
+	return t.CallOtherMsgBySvrType(svrType, t.Uid(), t.Uid(), t.Zone(), cmd, req, rsp)
 }
 
-func (t *Transaction) CallOtherMsgBySvrType(svrType uint32, cmd uint32, uid uint64, req proto.Message, rsp proto.Message) error {
+func (t *Transaction) CallMsgByRouter(svrType uint32, routerId uint64, cmd g1_protocol.CMD, req proto.Message, rsp proto.Message) error {
+	return t.CallOtherMsgBySvrType(svrType, routerId, t.Uid(), t.Zone(), cmd, req, rsp)
+}
+
+func (t *Transaction) CallOtherMsgBySvrType(svrType uint32, routerId, uid uint64, zone uint32, cmd g1_protocol.CMD, req proto.Message, rsp proto.Message) error {
 	t.Debugf("CallMsgBySvrType: %#v", req.String())
 	t.sendSeq += 1
-	err := router.SendPbMsgBySvrType(svrType, uid, cmd, t.sendSeq, t.TransID(), req)
+	err := router.SendPbMsgBySvrType(svrType, routerId, uid, zone, cmd, t.sendSeq, t.TransID(), req)
 	if err != nil {
-		glog.Error(err)
+		logger.Error(err)
 		return err
 	}
 
 	return t.waitRsp(svrType, 0, cmd, time.Second*3, req, rsp)
 }
 
-func (t *Transaction) SendMsgByServerType(svrType uint32, cmd uint32, req proto.Message) error {
+func (t *Transaction) SendMsgByServerType(svrType uint32, cmd g1_protocol.CMD, req proto.Message) error {
 	t.Debugf("SendMsgByServerType: %#v", req.String())
 	t.sendSeq += 1
-	err := router.SendPbMsgBySvrTypeSimple(svrType, t.Uid(), cmd, req)
+	err := router.SendPbMsgBySvrTypeSimple(svrType, t.Uid(), t.Zone(), cmd, req)
 	if err != nil {
-		glog.Error(err)
+		logger.Error(err)
 	}
 	return err
 }
 
-func (t *Transaction) BroadcastByServerType(svrType uint32, cmd uint32, req proto.Message) error {
+func (t *Transaction) SendMsgByRouter(svrType uint32, rid uint64, cmd g1_protocol.CMD, req proto.Message) error {
+	t.Debugf("SendMsgByRouter: %#v", req.String())
+	t.sendSeq += 1
+	err := router.SendPbMsgByRouter(svrType, rid, t.Uid(), t.Zone(), cmd, req)
+	if err != nil {
+		logger.Error(err)
+	}
+	return err
+}
+
+func (t *Transaction) BroadcastByServerType(svrType uint32, cmd g1_protocol.CMD, req proto.Message) error {
 	t.Debugf("BroadcastByServerType: %#v", req.String())
 	t.sendSeq += 1
 	err := router.BroadcastPbMsgByServerType(svrType, t.Uid(), cmd, t.sendSeq, req)
 	if err != nil {
-		glog.Error(err)
+		logger.Error(err)
 	}
 	return err
 }
 
-func (t *Transaction) CallMsgByBusId(busId uint32, cmd uint32, req proto.Message, rsp proto.Message) error {
+func (t *Transaction) CallMsgByBusId(busId uint32, cmd g1_protocol.CMD, req proto.Message, rsp proto.Message) error {
 	t.Debugf("CallMsgByBusId: %#v", req.String())
 	t.sendSeq += 1
-	err := router.SendPbMsgByBusId(busId, t.Uid(), cmd, t.sendSeq, t.TransID(), req)
+	err := router.SendPbMsgByBusId(busId, t.Uid(), t.Zone(), cmd, t.sendSeq, t.TransID(), req)
 	if err != nil {
-		glog.Error(err)
+		logger.Error(err)
 		return err
 	}
 
 	return t.waitRsp(0, busId, cmd, time.Second*3, req, rsp)
 }
 
-func (t *Transaction) waitRsp(dstSvrType uint32, dstSvrIns uint32, cmd uint32,
+func (t *Transaction) waitRsp(dstSvrType uint32, dstSvrIns uint32, cmd g1_protocol.CMD,
 	d time.Duration, req proto.Message, rsp proto.Message) error {
 	ti := time.NewTimer(d)
 	defer ti.Stop()
 	for {
 		select {
 		case <-ti.C:
-			glog.Errorf("timeout to CallMsgBySvrType {svrType:%v, svrIns:%v, uid:%v, cmd:%x, req:%#v}",
+			logger.Errorf("timeout to CallMsgBySvrType {svrType:%v, svrIns:%v, uid:%v, cmd:%v, req:%#v}",
 				dstSvrType, dstSvrIns, t.Uid(), cmd, req.String())
 			return errors.New("timeout")
 		case packet, ok := <-t.chanIn:
 			if !ok {
-				glog.Errorf("Failed to CallMsgBySvrType as chanInPacket is closed "+
-					"{svrType:%v, svrIns:%v, uid:%v, cmd:%v, req:%#v}",
-					dstSvrType, dstSvrIns, t.Uid(), cmd, req.String())
+				logger.Errorf("Failed to CallMsgBySvrType as chanInPacket is closed "+
+					"{svrType:%v, svrIns:%v, uid:%v, cmd:%v, rid:%v req:%#v}",
+					dstSvrType, dstSvrIns, t.Uid(), cmd, t.Rid(), req.String())
 				return errors.New("channel is closed")
 			}
-			if packet.Header.CmdSeq != t.sendSeq || packet.Header.Cmd != cmd+1 {
-				glog.Warningf("Received a packet which is not what I'm waiting for "+
-					"{dstSvrType:%v, dstSvrIns:%v, uid:%v, cmd:%v, req:%#v, recvPacket:%#v}",
-					dstSvrType, dstSvrIns, t.Uid(), cmd, req.String(), packet.Header)
+			if packet.Header.CmdSeq != t.sendSeq || packet.Header.Cmd != uint32(cmd)+1 {
+				logger.Warningf("Received a packet which is not what I'm waiting for "+
+					"{dstSvrType:%v, dstSvrIns:%v, uid:%v, cmd:%v, rid:%v,req:%#v, recvPacket:%#v}",
+					dstSvrType, dstSvrIns, t.Uid(), cmd, t.Rid(), req.String(), packet.Header)
 			} else {
 				err := proto.Unmarshal(packet.Body, rsp)
 				t.Debugf("Received a rsp: %#v", rsp.String())

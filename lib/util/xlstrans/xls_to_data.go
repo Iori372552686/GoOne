@@ -14,16 +14,15 @@ import (
 )
 
 type XlsToData struct {
-	FileDesc 	*FileDesc
-	Sheet      	*xlsx.Sheet
+	FileDesc *FileDesc
+	Sheet    *xlsx.Sheet
 
-	RootMsgDesc 	*desc.MessageDescriptor
-	ItemMsgDesc		*desc.MessageDescriptor
-	RootMsg			*dynamic.Message
+	RootMsgDesc *desc.MessageDescriptor
+	ItemMsgDesc *desc.MessageDescriptor
+	RootMsg     *dynamic.Message
 
-	keys 		map[int64]bool
+	keys map[int64]bool
 }
-
 
 func (p *XlsToData) Parse(fileDesc *FileDesc, sheet *xlsx.Sheet) {
 	p.FileDesc = fileDesc
@@ -72,7 +71,7 @@ func (p *XlsToData) parse() {
 		if id == "" {
 			//fmt.Println("id none| ", p.structName, " |row: ", i)
 			continue
- 		}
+		}
 		p.parseLine(i)
 	}
 }
@@ -165,13 +164,13 @@ func (p *XlsToData) parseField(row, col int, item *dynamic.Message) {
 		} else if fieldDesc.FieldType == TYPE_DATE {
 			timeZone, _ := time.LoadLocation("Asia/Chongqing")
 			tmUnix := int64(0)
-			if len(v) == 8 {  // 有可能只配不配置日期: 13:21:02
+			if len(v) == 8 { // 有可能只配不配置日期: 13:21:02
 				vect := strings.Split(v, ":")
 				if len(vect) == 3 {
 					hour, _ := strconv.Atoi(vect[0])
 					minute, _ := strconv.Atoi(vect[1])
 					second, _ := strconv.Atoi(vect[2])
-					tmUnix = int64(hour * 3600 + minute * 60 + second)
+					tmUnix = int64(hour*3600 + minute*60 + second)
 					//fmt.Println(hour, minute, second, tmUnix)
 				}
 			} else {
@@ -209,7 +208,7 @@ func (p *XlsToData) writeDataToFile() {
 }
 
 func (p *XlsToData) writeReadableDataToFile() {
-	fileName := targetDataPath + "/dataconfig_" + p.FileDesc.StructName + ".conf"
+	fileName := targetDataPath + "/dataconfig_" + p.FileDesc.StructName + ".config"
 	data, e := p.RootMsg.MarshalTextIndent()
 
 	if e != nil {
@@ -218,6 +217,6 @@ func (p *XlsToData) writeReadableDataToFile() {
 
 	err := ioutil.WriteFile(fileName, data, 0644)
 	if err != nil {
-		fmt.Println("write conf file err", err)
+		fmt.Println("write config file err", err)
 	}
 }

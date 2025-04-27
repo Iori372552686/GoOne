@@ -40,7 +40,7 @@ func NewOrmSql() *OrmSql {
 
 /**
 * @Description:  添加链接实例
-* @param: conf
+* @param: config
 * @param: tables
 * @return: *xorm.EngineGroup
 * @return: error
