@@ -6,53 +6,47 @@
     state: directory
     mode: '0755'
   with_items:
-    - /home/user00/g1/
-    - /home/user00/g1/friendsvr/
-    - /home/user00/g1/log/
-    - /home/user00/g1/log/friendsvr
+    - /data/PokerGo/
+    - /data/PokerGo/friendsvr/
+    - /data/PokerGo/logs/
+    - /data/PokerGo/logs/friendsvr
   tags: 'friendsvr_init'
 - name: '[friendsvr] Copy scripts'
   copy:
-    src: ../tools/scripts/server.sh
-    dest: /home/user00/g1/friendsvr/server.sh
+    src: ./scripts/server.sh
+    dest: /data/PokerGo/friendsvr/server.sh
     mode: '0755'
   tags: "friendsvr_init"
 
 - name: '[friendsvr] Copy bin'
   copy:
     src: ../build/friendsvr
-    dest: /home/user00/g1/friendsvr/friendsvr
+    dest: /data/PokerGo/friendsvr/friendsvr
     mode: '755'
     backup: yes
   tags: "friendsvr_push"
 
-- name: '[friendsvr] Copy config'
-  template:
-    src: friendsvr_conf.json
-    dest: /home/user00/g1/friendsvr/friendsvr_conf.json
-  tags: 'friendsvr_push'
-
 - name: '[friendsvr] start friendsvr'
-  shell: cd /home/user00/g1/friendsvr; ./server.sh start; ./server.sh check
+  shell: cd /data/PokerGo/friendsvr; ./server.sh start; ./server.sh check
   ignore_errors: yes
   tags: 'friendsvr_start'
 
 - name: '[friendsvr] stop friendsvr'
-  shell: cd /home/user00/g1/friendsvr; ./server.sh stop
+  shell: cd /data/PokerGo/friendsvr; ./server.sh stop
   ignore_errors: yes
   tags: 'friendsvr_stop'
 
 - name: '[friendsvr] restart friendsvr'
-  shell: cd /home/user00/g1/friendsvr; ./server.sh restart; ./server.sh check
+  shell: cd /data/PokerGo/friendsvr; ./server.sh restart; ./server.sh check
   ignore_errors: yes
   tags: 'friendsvr_restart'
 
 - name: '[friendsvr] check friendsvr'
-  shell: cd /home/user00/g1/friendsvr; ./server.sh check
+  shell: cd /data/PokerGo/friendsvr; ./server.sh check
   ignore_errors: yes
   tags: 'friendsvr_check'
 
 - name: '[friendsvr] delLog friendsvr'
-  shell: cd /home/user00/g1/log/friendsvr; rm ./*
+  shell: cd /data/PokerGo/logs/friendsvr; rm ./*
   ignore_errors: yes
   tags: 'friendsvr_delLog'

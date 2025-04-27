@@ -5,11 +5,11 @@
 # vars_file: 变量文件，里面的变量用于替换进程实例配置文件中的变量，比如redis地址mysql地址等等
 # roles: 机器上安装的实例类型，除了commconf，gamedata是配置文件之外，其余的都是进程实例
 
-- hosts: dev1
+- hosts: dev2
   vars:
     - instance_id: 1
   vars_files:
-    - playbook_dev/dev1_vars
+    - playbook_dev/dev2_vars
   roles:
     - commconf
     - gamedata

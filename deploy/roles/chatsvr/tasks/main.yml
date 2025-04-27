@@ -6,53 +6,47 @@
     state: directory
     mode: '0755'
   with_items:
-    - /home/user00/g1/
-    - /home/user00/g1/chatsvr/
-    - /home/user00/g1/log/
-    - /home/user00/g1/log/chatsvr
+    - /data/PokerGo/
+    - /data/PokerGo/chatsvr/
+    - /data/PokerGo/logs/
+    - /data/PokerGo/logs/chatsvr
   tags: 'chatsvr_init'
 - name: '[chatsvr] Copy scripts'
   copy:
-    src: ../tools/scripts/server.sh
-    dest: /home/user00/g1/chatsvr/server.sh
+    src: ./scripts/server.sh
+    dest: /data/PokerGo/chatsvr/server.sh
     mode: '0755'
   tags: "chatsvr_init"
 
 - name: '[chatsvr] Copy bin'
   copy:
     src: ../build/chatsvr
-    dest: /home/user00/g1/chatsvr/chatsvr
+    dest: /data/PokerGo/chatsvr/chatsvr
     mode: '755'
     backup: yes
   tags: "chatsvr_push"
 
-- name: '[chatsvr] Copy config'
-  template:
-    src: chatsvr_conf.json
-    dest: /home/user00/g1/chatsvr/chatsvr_conf.json
-  tags: 'chatsvr_push'
-
 - name: '[chatsvr] start chatsvr'
-  shell: cd /home/user00/g1/chatsvr; ./server.sh start; ./server.sh check
+  shell: cd /data/PokerGo/chatsvr; ./server.sh start; ./server.sh check
   ignore_errors: yes
   tags: 'chatsvr_start'
 
 - name: '[chatsvr] stop chatsvr'
-  shell: cd /home/user00/g1/chatsvr; ./server.sh stop
+  shell: cd /data/PokerGo/chatsvr; ./server.sh stop
   ignore_errors: yes
   tags: 'chatsvr_stop'
 
 - name: '[chatsvr] restart chatsvr'
-  shell: cd /home/user00/g1/chatsvr; ./server.sh restart; ./server.sh check
+  shell: cd /data/PokerGo/chatsvr; ./server.sh restart; ./server.sh check
   ignore_errors: yes
   tags: 'chatsvr_restart'
 
 - name: '[chatsvr] check chatsvr'
-  shell: cd /home/user00/g1/chatsvr; ./server.sh check
+  shell: cd /data/PokerGo/chatsvr; ./server.sh check
   ignore_errors: yes
   tags: 'chatsvr_check'
 
 - name: '[chatsvr] delLog chatsvr'
-  shell: cd /home/user00/g1/log/chatsvr; rm ./*
+  shell: cd /data/PokerGo/logs/chatsvr; rm ./*
   ignore_errors: yes
   tags: 'chatsvr_delLog'

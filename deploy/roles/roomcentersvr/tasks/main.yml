@@ -1,0 +1,52 @@
+---
+
+- name: '[roomcentersvr] Create a directory if it does not exist'
+  file:
+    path: '{{ item }}'
+    state: directory
+    mode: '0755'
+  with_items:
+    - /data/PokerGo/
+    - /data/PokerGo/roomcentersvr/
+    - /data/PokerGo/logs/
+    - /data/PokerGo/logs/roomcentersvr
+  tags: 'roomcentersvr_init'
+- name: '[roomcentersvr] Copy scripts'
+  copy:
+    src: ./scripts/server.sh
+    dest: /data/PokerGo/roomcentersvr/server.sh
+    mode: '0755'
+  tags: "roomcentersvr_init"
+
+- name: '[roomcentersvr] Copy bin'
+  copy:
+    src: ../build/roomcentersvr
+    dest: /data/PokerGo/roomcentersvr/roomcentersvr
+    mode: '755'
+    backup: yes
+  tags: "roomcentersvr_push"
+
+- name: '[roomcentersvr] start roomcentersvr'
+  shell: cd /data/PokerGo/roomcentersvr; ./server.sh start; ./server.sh check
+  ignore_errors: yes
+  tags: 'roomcentersvr_start'
+
+- name: '[roomcentersvr] stop roomcentersvr'
+  shell: cd /data/PokerGo/roomcentersvr; ./server.sh stop
+  ignore_errors: yes
+  tags: 'roomcentersvr_stop'
+
+- name: '[roomcentersvr] restart roomcentersvr'
+  shell: cd /data/PokerGo/roomcentersvr; ./server.sh restart; ./server.sh check
+  ignore_errors: yes
+  tags: 'roomcentersvr_restart'
+
+- name: '[roomcentersvr] check roomcentersvr'
+  shell: cd /data/PokerGo/roomcentersvr; ./server.sh check
+  ignore_errors: yes
+  tags: 'roomcentersvr_check'
+
+- name: '[roomcentersvr] delLog roomcentersvr'
+  shell: cd /data/PokerGo/logs/roomcentersvr; rm ./*
+  ignore_errors: yes
+  tags: 'roomcentersvr_delLog'

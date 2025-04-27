@@ -6,53 +6,47 @@
     state: directory
     mode: '0755'
   with_items:
-    - /home/user00/g1/
-    - /home/user00/g1/mysqlsvr/
-    - /home/user00/g1/log/
-    - /home/user00/g1/log/mysqlsvr
+    - /data/PokerGo/
+    - /data/PokerGo/mysqlsvr/
+    - /data/PokerGo/logs/
+    - /data/PokerGo/logs/mysqlsvr
   tags: 'mysqlsvr_init'
 - name: '[mysqlsvr] Copy scripts'
   copy:
-    src: ../tools/scripts/server.sh
-    dest: /home/user00/g1/mysqlsvr/server.sh
+    src: ./scripts/server.sh
+    dest: /data/PokerGo/mysqlsvr/server.sh
     mode: '0755'
   tags: "mysqlsvr_init"
 
 - name: '[mysqlsvr] Copy bin'
   copy:
     src: ../build/mysqlsvr
-    dest: /home/user00/g1/mysqlsvr/mysqlsvr
+    dest: /data/PokerGo/mysqlsvr/mysqlsvr
     mode: '0755'
     backup: yes
   tags: "mysqlsvr_push"
 
-- name: '[mysqlsvr] Copy config'
-  template:
-    src: mysqlsvr_conf.json
-    dest: /home/user00/g1/mysqlsvr/mysqlsvr_conf.json
-  tags: 'mysqlsvr_push'    
-
 - name: '[mysqlsvr] start mysqlsvr'
-  shell: cd /home/user00/g1/mysqlsvr; ./server.sh start; ./server.sh check
+  shell: cd /data/PokerGo/mysqlsvr; ./server.sh start; ./server.sh check
   ignore_errors: yes
   tags: 'mysqlsvr_start'
 
 - name: '[mysqlsvr] stop mysqlsvr'
-  shell: cd /home/user00/g1/mysqlsvr; ./server.sh stop
+  shell: cd /data/PokerGo/mysqlsvr; ./server.sh stop
   ignore_errors: yes
   tags: 'mysqlsvr_stop'
 
 - name: '[mysqlsvr] restart mysqlsvr'
-  shell: cd /home/user00/g1/mysqlsvr; ./server.sh restart; ./server.sh check
+  shell: cd /data/PokerGo/mysqlsvr; ./server.sh restart; ./server.sh check
   ignore_errors: yes
   tags: 'mysqlsvr_restart'
 
 - name: '[mysqlsvr] check mysqlsvr'
-  shell: cd /home/user00/g1/mysqlsvr; ./server.sh check
+  shell: cd /data/PokerGo/mysqlsvr; ./server.sh check
   ignore_errors: yes
   tags: 'mysqlsvr_check'
 
 - name: '[mysqlsvr] delLog mysqlsvr'
-  shell: cd /home/user00/g1/log/mysqlsvr; rm ./*
+  shell: cd /data/PokerGo/logs/mysqlsvr; rm ./*
   ignore_errors: yes
   tags: 'mysqlsvr_delLog'

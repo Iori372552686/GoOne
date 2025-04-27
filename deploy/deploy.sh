@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #set -x
 
 ENV=$1
@@ -17,9 +17,7 @@ if [[ $# < 2 ]]; then
 fi
 
 #所有的role
-ALL_TARGET_ROLES=("commconf" "gamedata" "connsvr" "mainsvr" "dbsvr" "gmconnsvr" "rcmdsvr"
-"infosvr" "mysqlsvr" "gamesvr" "gamesvrlua" "opvpsvr" "mailsvr" "friendsvr" "chatsvr"
-"wbsvr" "ranksvr" "guildsvr")
+ALL_TARGET_ROLES=("commconf" "gamedata" "connsvr" "mainsvr" "infosvr" "mysqlsvr" "gamesvr" "mailsvr" "friendsvr" "chatsvr" "ranksvr" "guildsvr" "roomcentersvr" "texassvr")
 
 #如果命令行没有指明role，则默认为所有role
 target_role=()
@@ -54,6 +52,6 @@ rand=$RANDOM
 TMP=.tmp${rand}.myl
 cp playbook_dev/${ENV}.yml ${TMP}
 #执行playbook
-ansible-playbook -i hosts/host_dev.txt ${TMP} $tags
+ansible-playbook -i hosts/host_dev.txt ${TMP}  $tags
 rm ${TMP}
 

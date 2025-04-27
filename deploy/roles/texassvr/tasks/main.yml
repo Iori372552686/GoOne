@@ -1,0 +1,52 @@
+---
+
+- name: '[texassvr] Create a directory if it does not exist'
+  file:
+    path: '{{ item }}'
+    state: directory
+    mode: '0755'
+  with_items:
+    - /data/PokerGo/
+    - /data/PokerGo/texassvr/
+    - /data/PokerGo/logs/
+    - /data/PokerGo/logs/texassvr
+  tags: 'texassvr_init'
+- name: '[texassvr] Copy scripts'
+  copy:
+    src: ./scripts/server.sh
+    dest: /data/PokerGo/texassvr/server.sh
+    mode: '0755'
+  tags: "texassvr_init"
+
+- name: '[texassvr] Copy bin'
+  copy:
+    src: ../build/texassvr
+    dest: /data/PokerGo/texassvr/texassvr
+    mode: '755'
+    backup: yes
+  tags: "texassvr_push"
+
+- name: '[texassvr] start texassvr'
+  shell: cd /data/PokerGo/texassvr; ./server.sh start; ./server.sh check
+  ignore_errors: yes
+  tags: 'texassvr_start'
+
+- name: '[texassvr] stop texassvr'
+  shell: cd /data/PokerGo/texassvr; ./server.sh stop
+  ignore_errors: yes
+  tags: 'texassvr_stop'
+
+- name: '[texassvr] restart texassvr'
+  shell: cd /data/PokerGo/texassvr; ./server.sh restart; ./server.sh check
+  ignore_errors: yes
+  tags: 'texassvr_restart'
+
+- name: '[texassvr] check texassvr'
+  shell: cd /data/PokerGo/texassvr; ./server.sh check
+  ignore_errors: yes
+  tags: 'texassvr_check'
+
+- name: '[texassvr] delLog texassvr'
+  shell: cd /data/PokerGo/logs/texassvr; rm ./*
+  ignore_errors: yes
+  tags: 'texassvr_delLog'

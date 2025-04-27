@@ -2,13 +2,19 @@
 
 - name: '[commconf] Create a directory if it does not exist'
   file:
-    path: /home/user00/g1/commconf/
+    path: /data/PokerGo/commconf/
     state: directory
     mode: '0755'
   tags: 'commconf_init'
 
 - name: '[commconf] Copy files'
   copy:
-    src: ../comm_conf/
-    dest: /home/user00/g1/commconf/
+    src: ../common/conf/
+    dest: /data/PokerGo/commconf/
   tags: "commconf_push"
+
+- name: '[commconf] Copy game config'
+  template:
+    src: server_conf.yaml
+    dest: /data/PokerGo/commconf/server_conf.yaml
+  tags: 'commconf_push'

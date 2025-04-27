@@ -1,29 +1,31 @@
 ---
-
 - name: '[gamedata] Create a directory if it does not exist'
   file:
-    path: /home/user00/g1/gamedata/
+    path: '{{ item }}'
     state: directory
     mode: '0755'
+  with_items:
+    - /data/PokerGo/
+    - /data/PokerGo/gamedata/
   tags: 'gamedata_init'
 
 - name: '[gamedata] Gen tar ball'
-  shell: cd ../excel/;  tar cvf gamedata.tar --transform s=data/== ./data/*
+  shell: cd ../common/gamedata/data; tar cvf gamedata.tar --transform s=data/== ./*
   connection: local
   tags: "gamedata_push"
 
 - name: '[gamedata] Copy gamedata tar ball'
   copy:
-    src: ../excel/gamedata.tar
-    dest: /home/user00/g1/gamedata.tar
+    src: ../common/gamedata/data/gamedata.tar
+    dest: /data/PokerGo/gamedata.tar
   tags: "gamedata_push"
 
 - name: '[gamedata] unzip gamedata tar ball'
-  shell: cd /home/user00/g1/; tar xvf gamedata.tar -C ./gamedata; rm gamedata.tar
+  shell: cd /data/PokerGo/; tar xvf gamedata.tar -C ./gamedata; rm gamedata.tar
   ignore_errors: yes
   tags: 'gamedata_push'
 
 - name: '[gamedata] delLog gamedata'
-  shell: cd /home/user00/g1/log/gamedata; rm ./*
+  shell: cd /data/PokerGo/logs/gamedata; rm ./*
   ignore_errors: yes
   tags: 'gamedata_delLog'

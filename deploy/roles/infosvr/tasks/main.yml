@@ -6,53 +6,47 @@
     state: directory
     mode: '0755'
   with_items:
-    - /home/user00/g1/
-    - /home/user00/g1/infosvr/
-    - /home/user00/g1/log/
-    - /home/user00/g1/log/infosvr
+    - /data/PokerGo/
+    - /data/PokerGo/infosvr/
+    - /data/PokerGo/logs/
+    - /data/PokerGo/logs/infosvr
   tags: 'infosvr_init'
 - name: '[infosvr] Copy scripts'
   copy:
-    src: ../tools/scripts/server.sh
-    dest: /home/user00/g1/infosvr/server.sh
+    src: ./scripts/server.sh
+    dest: /data/PokerGo/infosvr/server.sh
     mode: '0755'
   tags: "infosvr_init"
 
 - name: '[infosvr] Copy bin'
   copy:
     src: ../build/infosvr
-    dest: /home/user00/g1/infosvr/infosvr
+    dest: /data/PokerGo/infosvr/infosvr
     mode: '755'
     backup: yes
   tags: "infosvr_push"
 
-- name: '[infosvr] Copy config'
-  template:
-    src: infosvr_conf.json
-    dest: /home/user00/g1/infosvr/infosvr_conf.json
-  tags: 'infosvr_push'
-
 - name: '[infosvr] start infosvr'
-  shell: cd /home/user00/g1/infosvr; ./server.sh start; ./server.sh check
+  shell: cd /data/PokerGo/infosvr; ./server.sh start; ./server.sh check
   ignore_errors: yes
   tags: 'infosvr_start'
 
 - name: '[infosvr] stop infosvr'
-  shell: cd /home/user00/g1/infosvr; ./server.sh stop
+  shell: cd /data/PokerGo/infosvr; ./server.sh stop
   ignore_errors: yes
   tags: 'infosvr_stop'
 
 - name: '[infosvr] restart infosvr'
-  shell: cd /home/user00/g1/infosvr; ./server.sh restart; ./server.sh check
+  shell: cd /data/PokerGo/infosvr; ./server.sh restart; ./server.sh check
   ignore_errors: yes
   tags: 'infosvr_restart'
 
 - name: '[infosvr] check infosvr'
-  shell: cd /home/user00/g1/infosvr; ./server.sh check
+  shell: cd /data/PokerGo/infosvr; ./server.sh check
   ignore_errors: yes
   tags: 'infosvr_check'
 
 - name: '[infosvr] delLog infosvr'
-  shell: cd /home/user00/g1/log/infosvr; rm ./*
+  shell: cd /data/PokerGo/logs/infosvr; rm ./*
   ignore_errors: yes
   tags: 'infosvr_delLog'

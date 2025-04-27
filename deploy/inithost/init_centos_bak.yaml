@@ -1,0 +1,36 @@
+---
+- hosts: dst
+  vars:
+    password: 'Iori@123'
+  tasks:
+    # 1.用户
+    - name: PokerGo
+      user:
+        name: PokerGo
+        group: wheel
+        password: "{{ password | password_hash('sha512') }}"
+        shell: /bin/bash
+        generate_ssh_key: yes
+        ssh_key_bits: 4096
+        ssh_key_file: .ssh/id_rsa
+    # 2.依赖库
+    - yum: { state: present, name: [libunwind-devel, epel-release, vim, net-tools, crontabs, psmisc, at, rsync, iproute, daemonize] }
+    # 3.系统设置
+    # 修改相关限制
+    - pam_limits: { domain: PokerGo, limit_type: soft, limit_item: core, value: 1000000000}
+    - pam_limits: { domain: PokerGo, limit_type: hard, limit_item: core, value: 1000000000}
+    - pam_limits: { domain: PokerGo, limit_type: soft, limit_item: nofile, value: 100000}
+    - pam_limits: { domain: PokerGo, limit_type: hard, limit_item: nofile, value: 100000}
+    # 创建core文件存放目录
+    - file:
+        path: /data/PokerGo/cores/
+        owner: PokerGo
+        group: wheel
+        state: directory
+    # 修改core文件位置
+    - sysctl:
+        name: kernel.core_pattern
+        value: /data/PokerGo/cores/core_%e_%p
+        sysctl_set: yes
+        state: present
+        reload: yes

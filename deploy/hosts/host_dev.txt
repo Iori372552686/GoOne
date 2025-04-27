@@ -1,9 +1,8 @@
 [dev1]
-192.168.0.80 ansible_ssh_user=user00 ansible_ssh_pass=Iori@123 ansible_sudo_pass=Iori@123
+192.168.50.250 ansible_ssh_user=root ansible_ssh_pass=poker123 ansible_sudo_pass=syx123456 ansible_python_interpreter=/usr/bin/python3 ansible_python_path=/usr/lib/python3/dist-packages
 
 [dev2]
-192.168.0.81 ansible_ssh_user=user00 ansible_ssh_pass=Iori@123 ansible_sudo_pass=Iori@123
-
+13.203.103.190 ansible_connection=ssh ansible_ssh_user=ec2-user ansible_ssh_private_key_file=~/.ssh/id_ed25519 ansible_python_interpreter=/usr/bin/python3 ansible_python_path=/usr/lib/python3/dist-packages
 
 [dev_local]
 127.0.0.1 ansible_ssh_user=user00 ansible_ssh_pass=Iori@123 ansible_sudo_pass=Iori@123
