@@ -1,8 +1,8 @@
 # 根层级直接对应 BaseCfg 的字段
 basecfg:
   Pprof: true
-  ZKAddr: '192.168.50.250:2182'
-  RabbitMQAddr: 'amqp://guest:guest@192.168.50.250:5672/'
+  ZKAddr: '113.45.34.170:12181'
+  RabbitMQAddr: 'amqp://guest:guest@113.45.34.170:15672/'
   GameDataDir: ../common/gamedata/data
   SensitiveWordsFile: ../common/conf/sensitive.txt
 
@@ -18,14 +18,14 @@ basecfg:
 
   DbInstances:
     - InstanceId: 1
-      Ip: 192.168.50.250
-      Port: 6379
+      Ip: 113.45.34.170
+      Port: 16379
       Password: 123456
       IsCluster: false
       Description: role info data
     - InstanceId: 3
-      Ip: 192.168.50.250
-      Port: 6379
+      Ip: 113.45.34.170
+      Port: 16379
       Password: 123456
       IsCluster: false
       Description: brief info data
@@ -34,11 +34,11 @@ basecfg:
   OrmInstances:
     - index_name: default
       master:
-        ip: 192.168.50.250
-        port: 3306
-        user: root
-        password: sxy123456
-        db_name: poker
+        ip: 113.45.34.170
+        port: 13306
+        user: g1_game
+        password: gg123456
+        db_name: g1_game
       slaves: []
       description: test db1
       max_idle: 10
@@ -51,11 +51,11 @@ basecfg:
   RestApiConfig:
     - service_name: default
       urls:
-        - 'http://192.168.50.250:8000/mg/api/sdk/getGameRole?'
+        - 'http://113.45.34.170:8000/mg/api/sdk/getGameRole?'
       sign_name: default
 
   CenterConfAddr:
-    ip_addr: 192.168.50.250
+    ip_addr: 113.45.34.170
     port: 8848
     namespace_id: df4ad231-f231-49a1-b309-44493e949dd0
     group_name: poker_gameconf
