@@ -1,0 +1,4 @@
+2025-04-27T12:14:36.704+0800	INFO	mainsvr/app.go:56	pprof listen on :8102
+2025-04-27T12:14:36.712+0800	ERROR	bus/bus_impl_rmq.go:143	Start bus service {myQueueName:bus_10102fb}
+2025-04-27T12:14:36.712+0800	INFO	redis/redis_mgr.go:42	RedisMgr   InsInit.. | [{1 192.168.50.250 6379 123456 false 0 role info data} {3 192.168.50.250 6379 123456 false 0 brief info data}]
+2025-04-27T12:14:46.713+0800	ERROR	mainsvr/app.go:76	RedisMgr InitAndRun error !! err=failed to create redis client | dial tcp 192.168.50.250:6379: i/o timeout

@@ -1,0 +1,14 @@
+2025-04-27T12:12:52.793+0800	INFO	http_sign/Sign_Mgr.go:69	SignMgr   InsInit.. 
+2025-04-27T12:12:52.793+0800	ERROR	bus/bus_impl_rmq.go:143	Start bus service {myQueueName:bus_10101fb}
+2025-04-27T12:12:52.794+0800	INFO	http_sign/Sign_Mgr.go:82	SignMgr   InsInit... Done !
+2025-04-27T12:12:52.794+0800	INFO	rest_api/rest_api_mgr.go:73	RestApiMgr   InsInit.. 
+2025-04-27T12:12:52.794+0800	INFO	rest_api/rest_api.go:51	[default] RestIns Init. 
+2025-04-27T12:12:52.794+0800	INFO	rest_api/rest_api_mgr.go:79	RestApiMgr   InsInit... Done !
+2025-04-27T12:12:52.794+0800	INFO	cmd_handler/register.go:11	register transaction commands
+2025-04-27T12:12:52.794+0800	INFO	net_mgr/net_factory.go:15	 -----  CreateTcpServer ---- implType =, port =11001
+2025-04-27T12:12:52.794+0800	INFO	tcp_server/tcp_server.go:52	Listening on 0.0.0.0:11001
+2025-04-27T12:12:52.794+0800	INFO	net_mgr/net_factory.go:73	 -----  CreateWebSocketServer ---- implType =gin, port =11000
+2025-04-27T12:12:52.794+0800	INFO	ws_server/ws.go:53	init type default gin ws !
+2025-04-27T12:12:52.794+0800	INFO	ws_server/gin_ws.go:36	------ Http Gin WsServer Running by :11000 ------
+2025-04-27T12:13:09.854+0800	INFO	connsvr/app.go:117	service exit, right now !
+2025-04-27T12:13:09.854+0800	INFO	connsvr/app.go:118	================== AppSvrImpl Stop =========================

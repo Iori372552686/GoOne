@@ -6,6 +6,7 @@ import (
 	"github.com/Iori372552686/GoOne/common/define"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	pb "github.com/Iori372552686/game_protocol/protocol"
+	"github.com/cespare/xxhash/v2"
 	"strconv"
 )
 

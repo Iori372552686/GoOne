@@ -2,6 +2,7 @@ package cmd_handler
 
 import (
 	"fmt"
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 
 	"github.com/Iori372552686/GoOne/common/gamedata/repository/texas_config"
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
@@ -216,8 +217,8 @@ func BuyIn(c cmd_handler.IContext, data []byte, myRole *role.Role) g1_protocol.E
 		return g1_protocol.ErrorCode_ERR_MARSHAL
 	}
 
-	rsp := room.OnBuyin(c, req, myRole)
-	c.SendMsgBack(rsp)
+	//rsp := room.OnBuyin(c, req, myRole)
+	//c.SendMsgBack(rsp)
 	return g1_protocol.ErrorCode_ERR_OK
 }
 
