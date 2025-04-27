@@ -1,0 +1,51 @@
+services:
+  mysql:
+    image: mysql:8.4.3
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: sxy123456
+      MYSQL_DATABASE: poker
+    ports:
+      - "3306:3306"
+    networks:
+      my_bridge_network:
+
+  redis:
+    image: redis:7.4.0
+    container_name: redis
+    ports:
+      - "6379:6379"
+    environment:
+      REDIS_PASSWORD: 123456
+    networks:
+      my_bridge_network:
+
+  zookeeper:
+    image: ubuntu/zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_SERVERS: server.1=zookeeper:2888:3888
+    networks:
+      my_bridge_network:
+
+  rabbitmq:
+    image: rabbitmq:3.13.6-management-alpine
+    container_name: rabbitmq
+    hostname: bt-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_LOOPBACK_USERS: "none"  # 允许 guest 远程访问
+    ports:
+      - "5672:5672" # 映射 RabbitMQ 的 AMQP 端口
+      - "15672:15672" # 映射 RabbitMQ 的管理界面端口
+    restart: always
+    networks:
+      my_bridge_network:
+
+networks:
+  my_bridge_network:
+    driver: bridge
