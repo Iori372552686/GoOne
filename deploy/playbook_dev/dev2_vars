@@ -3,7 +3,7 @@ zk_address: 127.0.0.1:2181
 rabbitmq_address: amqp://guest:guest@127.0.0.1:5672/
 redis_ip: 127.0.0.1
 redis_port: 6379
-redis_passwd: syx123
+redis_passwd: 123456
 redis_use_cluster: "false"
 mysql_ip: 127.0.0.1
 mysql_port: 3306
