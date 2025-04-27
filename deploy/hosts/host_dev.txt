@@ -1,5 +1,5 @@
 [dev1]
-192.168.50.250 ansible_ssh_user=root ansible_ssh_pass=poker123 ansible_sudo_pass=syx123456 ansible_python_interpreter=/usr/bin/python3 ansible_python_path=/usr/lib/python3/dist-packages
+192.168.50.250 ansible_ssh_user=root ansible_ssh_pass=root ansible_sudo_pass=123456 ansible_python_interpreter=/usr/bin/python3 ansible_python_path=/usr/lib/python3/dist-packages
 
 [dev2]
 13.203.103.190 ansible_connection=ssh ansible_ssh_user=ec2-user ansible_ssh_private_key_file=~/.ssh/id_ed25519 ansible_python_interpreter=/usr/bin/python3 ansible_python_path=/usr/lib/python3/dist-packages

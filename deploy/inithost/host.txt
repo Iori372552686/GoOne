@@ -1,5 +1,5 @@
 [dst]
-192.168.50.250 ansible_ssh_user=root ansible_ssh_pass=syx123456 ansible_sudo_pass=syx123456 ansible_python_interpreter=/usr/bin/python3 ansible_python_path=/usr/lib/python3/dist-packages
+192.168.50.250 ansible_ssh_user=root ansible_ssh_pass=123456 ansible_sudo_pass=123456 ansible_python_interpreter=/usr/bin/python3 ansible_python_path=/usr/lib/python3/dist-packages
 
 
 
