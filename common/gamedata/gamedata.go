@@ -2,12 +2,11 @@ package gamedata
 
 import (
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/api/uerror"
 	"io/ioutil"
 	"path/filepath"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/lib/uerror"
-
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/config_client"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 )

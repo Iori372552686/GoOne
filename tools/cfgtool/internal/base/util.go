@@ -1,13 +1,12 @@
 package base
 
 import (
+	"github.com/Iori372552686/GoOne/lib/api/uerror"
 	"go/format"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
-
-	"github.com/Iori372552686/GoOne/lib/uerror"
 )
 
 func Sub(a, b int) int {

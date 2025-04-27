@@ -11,7 +11,7 @@ SERVER_NAME=`echo ${SERVER_PATH##*/}`
 # BASE_PATH=`echo ${SERVER_PATH%/*}`
 
 SERVER_BIN_PATH="${SERVER_PATH}/"
-SERVER_PARAM="/data/PokerGo/commconf/server_conf.yaml"
+SERVER_PARAM="/data/GoOne/commconf/server_conf.yaml"
 SERVER_PARAM_OTHER="${SERVER_PATH}/${SERVER_NAME}_conf2.json"
 echo ${SERVER_BIN_PATH}
 echo ${SERVER_PARAM}

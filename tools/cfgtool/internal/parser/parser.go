@@ -2,10 +2,10 @@ package parser
 
 import (
 	"fmt"
+	"github.com/Iori372552686/GoOne/lib/api/uerror"
 	"path/filepath"
 	"strings"
 
-	"github.com/Iori372552686/GoOne/lib/uerror"
 	"github.com/Iori372552686/GoOne/tools/cfgtool/domain"
 	"github.com/Iori372552686/GoOne/tools/cfgtool/internal/base"
 	"github.com/Iori372552686/GoOne/tools/cfgtool/internal/manager"

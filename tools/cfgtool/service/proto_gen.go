@@ -2,9 +2,9 @@ package service
 
 import (
 	"bytes"
+	"github.com/Iori372552686/GoOne/lib/api/uerror"
 	"sort"
 
-	"github.com/Iori372552686/GoOne/lib/uerror"
 	"github.com/Iori372552686/GoOne/tools/cfgtool/domain"
 	"github.com/Iori372552686/GoOne/tools/cfgtool/internal/base"
 	"github.com/Iori372552686/GoOne/tools/cfgtool/internal/manager"

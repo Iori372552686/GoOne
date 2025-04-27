@@ -2,8 +2,7 @@ package service
 
 import (
 	"bytes"
-
-	"github.com/Iori372552686/GoOne/lib/uerror"
+	"github.com/Iori372552686/GoOne/lib/api/uerror"
 
 	"sort"
 

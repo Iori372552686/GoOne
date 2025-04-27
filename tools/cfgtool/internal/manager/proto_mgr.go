@@ -2,8 +2,8 @@ package manager
 
 import (
 	"bytes"
+	"github.com/Iori372552686/GoOne/lib/api/uerror"
 
-	"github.com/Iori372552686/GoOne/lib/uerror"
 	"github.com/Iori372552686/GoOne/tools/cfgtool/domain"
 	"github.com/Iori372552686/GoOne/tools/cfgtool/internal/base"
 	"github.com/jhump/protoreflect/desc"
