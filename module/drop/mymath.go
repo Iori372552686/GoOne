@@ -1,4 +1,4 @@
-package math
+package drop
 
 import "math/rand"
 

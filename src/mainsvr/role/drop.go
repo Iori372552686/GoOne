@@ -6,7 +6,7 @@ import (
 	"math/rand"
 
 	"github.com/Iori372552686/GoOne/common/gamedata/repository/drop_item_confing"
-	"github.com/Iori372552686/GoOne/module/math"
+	"github.com/Iori372552686/GoOne/module/drop"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
@@ -49,7 +49,7 @@ func (r *Role) DropGetItemByDropID(dropID int32) *[]*g1_protocol.PbItem {
 	})
 
 	if len(dropByWeight) > 0 {
-		idx := math.WeightedRandomSelect(weightList)
+		idx := drop.WeightedRandomSelect(weightList)
 		item := g1_protocol.PbItem{Id: dropByWeight[idx].ItemId, Count: dropByWeight[idx].Count}
 		items = append(items, &item)
 	}
