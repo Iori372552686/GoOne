@@ -37,7 +37,6 @@ func onWebSocketPacket(conn net.Conn, data []byte) {
 		return
 	}
 
-	// 实现帐号认证系统之前，由client决定uid
 	uid := packetHeader.Uid
 	var client *net_mgr.Client
 	if uid > 0 {
@@ -77,7 +76,7 @@ func onWebSocketPacket(conn net.Conn, data []byte) {
 			}
 
 			uid = accUid
-			zone := uint32(1)                                             //根据channelid 从配置获取 todo
+			zone := uint32(1)                                             //根据serverid 从配置获取 todo
 			client = globals.ConnWsSvr.UpdateClientByUid(conn, uid, zone) // update conn
 		} else {
 			logger.Errorf("Cannot find conn by uid , need login!!: %v", uid)
@@ -110,7 +109,6 @@ func onTcpPacket(conn net.Conn, data []byte) {
 		return
 	}
 
-	// 实现帐号认证系统之前，由client决定uid
 	uid := packetHeader.Uid
 	var client *net_mgr.Client
 	if uid > 0 {
@@ -149,7 +147,7 @@ func onTcpPacket(conn net.Conn, data []byte) {
 			}
 
 			uid = accUid
-			zone := uint32(1)                                              //根据channelid 从配置获取 todo
+			zone := uint32(1)                                              //根据serverid 从配置获取 todo
 			client = globals.ConnTcpSvr.UpdateClientByUid(conn, uid, zone) // update conn
 		} else {
 			logger.Errorf("Cannot find conn by uid , need login!!: %v", uid)

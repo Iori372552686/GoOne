@@ -2,3 +2,4 @@
 *.exe
 doc/~$服务器技术架构文档.docx
 build/*
+/logs

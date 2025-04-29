@@ -25,7 +25,5 @@ func (t *roleAdapter) ProcessCmd(c cmd_handler.IContext, data []byte) g1_protoco
 		return g1_protocol.ErrorCode_ERR_ARGV
 	}
 
-	//myRole.Lock()  不加也行
-	//defer myRole.Unlock()
 	return t.roleCmd(c, data, myRole)
 }
