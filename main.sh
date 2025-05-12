@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #add by  Iori  2020.9.1
 
 ROOT_DIR=$(pwd)           # 启动目录

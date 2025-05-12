@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #add by  Iori  2020.10.22
 
 PRONAME="$1"					# 参数1
