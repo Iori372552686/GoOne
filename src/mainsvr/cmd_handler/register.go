@@ -57,7 +57,6 @@ func RegisterCmd() {
 	globals.TransMgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_CHANGE_SKIN_REQ, NewRoleAdapter(ChangeSkin))                  //更换皮肤请求
 	globals.TransMgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_RABBIT_HUNTING_REQ, NewRoleAdapter(RabbitHunting))            //特殊活动请求
 	globals.TransMgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_EARLY_SETTLE_REQ, NewRoleAdapter(EarlySettle))                //提前结算请求
-
-	globals.TransMgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_PREOPERATION_REQ, NewRoleAdapter(Preoperation)) //预操作指令提交
+	globals.TransMgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_PREOPERATION_REQ, NewRoleAdapter(Preoperation))               //预操作指令提交
 	//------- 德州游戏房间操作  end--------
 }
