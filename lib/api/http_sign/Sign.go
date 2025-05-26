@@ -29,15 +29,13 @@ const (
 type EVersionType string
 
 const (
-	Version_Overseas_NewV1 EVersionType = "1"     //海外新签名规范版本1  20220104
-	Version_Overseas_NewV2 EVersionType = "2"     //海外新签名规范版本2  20230111
-	Version_Cloud          EVersionType = "cloud" // 云服签名规范
+	Version_NewV1 EVersionType = "1" //海外新签名规范版本1  20220104
+	Version_NewV2 EVersionType = "2" //海外新签名规范版本2  20230111
 )
 
 var version_type = map[string]EVersionType{
-	string(Version_Overseas_NewV1): Version_Overseas_NewV1,
-	string(Version_Overseas_NewV2): Version_Overseas_NewV2,
-	string(Version_Cloud):          Version_Cloud,
+	string(Version_NewV1): Version_NewV1,
+	string(Version_NewV2): Version_NewV2,
 }
 
 // 签名类型
@@ -284,7 +282,7 @@ func (this *HttpSign) toVersionType(verStr string) EVersionType {
 	}
 
 	//default
-	return Version_Overseas_NewV1
+	return Version_NewV1
 }
 
 /**
