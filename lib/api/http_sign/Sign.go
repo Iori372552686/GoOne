@@ -29,8 +29,8 @@ const (
 type EVersionType string
 
 const (
-	Version_NewV1 EVersionType = "1" //海外新签名规范版本1  20220104
-	Version_NewV2 EVersionType = "2" //海外新签名规范版本2  20230111
+	Version_NewV1 EVersionType = "1" //新签名规范版本1
+	Version_NewV2 EVersionType = "2" //新签名规范版本2
 )
 
 var version_type = map[string]EVersionType{
