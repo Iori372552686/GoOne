@@ -176,8 +176,8 @@ func (this *HttpSign) checkTimestamp(params *map[string]string) (bool, error, in
  * @return bool 认证成功返回tue 否则返回false
  * @return error 认证成功返回nil 否则返回异常值
  **/
-func (this *HttpSign) CheckSign(head map[string][]string, params *map[string]string, body []byte, sign string) (bool, error, int) {
-	if params == nil && body == nil && head == nil {
+func (this *HttpSign) CheckSign(params *map[string]string, body []byte, sign string) (bool, error, int) {
+	if params == nil && body == nil {
 		return false, errors.New(ARGUMENTS_INVALID.String()), int(ARGUMENTS_INVALID)
 	}
 
@@ -196,7 +196,7 @@ func (this *HttpSign) CheckSign(head map[string][]string, params *map[string]str
 	}
 
 	//签名检测
-	local_sign, uri_str := this.buildSign(head, params, body,
+	local_sign, uri_str := this.buildSign(params, body,
 		this.toSignType((*params)[Const_SignType_Name]),
 		this.toVersionType((*params)[Const_SignVer_Name]))
 	if sign != local_sign {
@@ -215,8 +215,7 @@ func (this *HttpSign) CheckSign(head map[string][]string, params *map[string]str
  * @return bool 认证成功返回tue 否则返回false
  * @return error 认证成功返回nil 否则返回异常值
  **/
-func (this *HttpSign) PushSign(head map[string][]string, params *map[string]string, body []byte,
-	signType ESignType) *map[string]string {
+func (this *HttpSign) PushSign(params *map[string]string, body []byte, signType ESignType) *map[string]string {
 	if params == nil {
 		params = &map[string]string{}
 	}
@@ -248,7 +247,7 @@ func (this *HttpSign) PushSign(head map[string][]string, params *map[string]stri
 	}
 
 	//添加签名与签名方式
-	sign_, _ := this.buildSign(head, params, body, signType, this.versionType)
+	sign_, _ := this.buildSign(params, body, signType, this.versionType)
 	(*params)[this.signName] = sign_
 	return params
 }
@@ -294,8 +293,7 @@ func (this *HttpSign) toVersionType(verStr string) EVersionType {
  * @param secret 盐值
  * @return string 签名值
  **/
-func (this *HttpSign) buildSign(head map[string][]string, params *map[string]string, body []byte,
-	signType ESignType, verType EVersionType) (string, string) {
+func (this *HttpSign) buildSign(params *map[string]string, body []byte, signType ESignType, verType EVersionType) (string, string) {
 	var uriStr bytes.Buffer
 
 	if params == nil {

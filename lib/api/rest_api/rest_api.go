@@ -105,7 +105,7 @@ func (self *RestApi) SignGet(uin int64, uriMap *map[string]string) ([]byte, erro
 		return nil, errors.New("signImpl  is nil ,not signReq !")
 	}
 
-	url := self.urlAddr.GetHashUrl(uin) + http_sign.Map2uri(self.signImpl.PushSign(nil, uriMap, nil, http_sign.Sign_Md5), "", true, false)
+	url := self.urlAddr.GetHashUrl(uin) + http_sign.Map2uri(self.signImpl.PushSign(uriMap, nil, http_sign.Sign_Md5), "", true, false)
 	rspBody, err := http_client.HttpGetRequest(url, "")
 	if err != nil {
 		logger.Errorf("SignGet Request err | %v", err.Error())
@@ -163,7 +163,7 @@ func (self *RestApi) SignPost(common_param, actions *map[string]interface{}) ([]
 	//gen body
 	bodystr := convert.StructToJson(&map[string]interface{}{"common_param": common_param, "actions": actions})
 	rspBody, err := http_client.HttpPostRequest(self.urlAddr.GetHashUrl(uin)+
-		http_sign.Map2uri(self.signImpl.PushSign(nil, &uriMap, bodystr, http_sign.Sign_Md5), "", true, false), convert.Bytes2str(bodystr))
+		http_sign.Map2uri(self.signImpl.PushSign(&uriMap, bodystr, http_sign.Sign_Md5), "", true, false), convert.Bytes2str(bodystr))
 	if err != nil {
 		logger.Errorf("SignPost Request err | %v", err.Error())
 		return nil, err
@@ -223,7 +223,7 @@ func (self *RestApi) SignPostV2(headMap, uriMap *map[string]string, actions *map
 
 	//gen body
 	bodystr := convert.StructToJson(actions)
-	rspBody, err := http_client.HeaderHttpPostRequest(self.urlAddr.GetHashUrl(uid)+http_sign.Map2uri(self.signImpl.PushSign(nil, uriMap, bodystr, http_sign.Sign_Md5), "", true, false),
+	rspBody, err := http_client.HeaderHttpPostRequest(self.urlAddr.GetHashUrl(uid)+http_sign.Map2uri(self.signImpl.PushSign(uriMap, bodystr, http_sign.Sign_Md5), "", true, false),
 		convert.Bytes2str(bodystr), headMap)
 	if err != nil {
 		logger.Errorf("SignPost Request err | %v", err.Error())
