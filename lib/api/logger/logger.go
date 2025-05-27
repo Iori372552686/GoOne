@@ -5,10 +5,8 @@ import (
 	"reflect"
 
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
-
 	"github.com/Iori372552686/GoOne/lib/api/logger/plug"
 	"github.com/Iori372552686/GoOne/lib/api/logger/zap"
-	pb "github.com/Iori372552686/game_protocol/protocol"
 )
 
 var logPlug *plug.CmdBlacklist
@@ -20,8 +18,8 @@ func Flush() {
 
 func init() {
 	logPlug = plug.NewCmdBlacklist()
-	logPlug.Register(uint32(pb.CMD_MAIN_HEARTBEAT_REQ))
-	logPlug.Register(uint32(pb.CMD_MAIN_HEARTBEAT_RSP))
+	logPlug.Register(131076) //CMD_MAIN_HEARTBEAT_REQ
+	logPlug.Register(131077) //CMD_MAIN_HEARTBEAT_RSP
 }
 
 // init logger
@@ -45,9 +43,9 @@ func InitLogger(logPath string, level string, name string) (zap.Logger, error) {
 }
 
 // reg cmd to black list
-func RegisterCmdBacklist(cmds ...pb.CMD) {
+func RegisterCmdBacklist(cmds ...uint32) {
 	for _, cmd := range cmds {
-		logPlug.Register(uint32(cmd))
+		logPlug.Register(cmd)
 	}
 }
 

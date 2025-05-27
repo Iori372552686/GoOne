@@ -73,7 +73,7 @@ func (a *RoomMgrSvrImpl) OnInit() error {
 		room_ai.OnAiInitRoom()
 	})
 
-	logger.RegisterCmdBacklist(pb.CMD_ROOM_CENTER_INNER_TICK_REQ)
+	logger.RegisterCmdBacklist(uint32(pb.CMD_ROOM_CENTER_INNER_TICK_REQ))
 	logger.Infof("roomcenter svr init success")
 	return globals.RoomListMgr.Init()
 }
