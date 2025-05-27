@@ -31,7 +31,7 @@ func TestInitLogger(t *testing.T) {
 	config := Config{
 		Level: "debug",
 	}
-	err := InitLogger(config)
+	_, err := InitLogger(config)
 	assert.NoError(t, err)
 	reset()
 }
@@ -42,14 +42,14 @@ func TestGetLogger(t *testing.T) {
 	config := Config{
 		Level: "debug",
 	}
-	_ = InitLogger(config)
+	InitLogger(config)
 	// after init logger
 	log2 := GetLogger()
 	assert.NotEqual(t, log, log2)
 
 	// the secend init logger
 	config.Level = "info"
-	_ = InitLogger(config)
+	InitLogger(config)
 	log3 := GetLogger()
 	assert.NotEqual(t, log2, log3)
 	reset()

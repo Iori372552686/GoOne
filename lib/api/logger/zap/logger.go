@@ -95,12 +95,13 @@ func init() {
 }
 
 // InitLogger is init global logger for nacos
-func InitLogger(config Config) (err error) {
-	l, err := initNacosLogger(config)
+func InitLogger(config Config) (ins Logger, err error) {
+	ins, err = initNacosLogger(config)
 	if err != nil {
-		return err
+		return
 	}
-	setLogger(l)
+
+	setLogger(ins)
 	return
 }
 

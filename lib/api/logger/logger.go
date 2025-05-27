@@ -25,7 +25,7 @@ func init() {
 }
 
 // init logger
-func InitLog(logPath string, level string, name string) error {
+func InitLogger(logPath string, level string, name string) (zap.Logger, error) {
 	if logPath == "" {
 		logPath = "./logs"
 	}

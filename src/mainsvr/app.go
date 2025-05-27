@@ -47,7 +47,7 @@ func (self *MainSvrImpl) OnInit() error {
 	}
 
 	// init zap logger
-	if err = logger.InitLog(gconf.MainSvrCfg.MainSvr.LogDir, gconf.MainSvrCfg.MainSvr.LogLevel, "mainsvr"); err != nil {
+	if _, err = logger.InitLogger(gconf.MainSvrCfg.MainSvr.LogDir, gconf.MainSvrCfg.MainSvr.LogLevel, "mainsvr"); err != nil {
 		return err
 	}
 

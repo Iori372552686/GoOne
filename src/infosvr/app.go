@@ -33,7 +33,7 @@ func (a *InfoSvrImpl) OnInit() error {
 	}
 
 	// init zap logger
-	if err = logger.InitLog(gconf.InfoSvrCfg.InfoSvr.LogDir, gconf.InfoSvrCfg.InfoSvr.LogLevel, "infosvr"); err != nil {
+	if _, err = logger.InitLogger(gconf.InfoSvrCfg.InfoSvr.LogDir, gconf.InfoSvrCfg.InfoSvr.LogLevel, "infosvr"); err != nil {
 		return err
 	}
 

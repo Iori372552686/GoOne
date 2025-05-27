@@ -34,7 +34,7 @@ func (a *MysqlSvrImpl) OnInit() error {
 	}
 
 	// init logger
-	if err = logger.InitLog(gconf.MySqlSvrCfg.MySqlSvr.LogDir, gconf.MySqlSvrCfg.MySqlSvr.LogLevel, "mysqlsvr"); err != nil {
+	if _, err = logger.InitLogger(gconf.MySqlSvrCfg.MySqlSvr.LogDir, gconf.MySqlSvrCfg.MySqlSvr.LogLevel, "mysqlsvr"); err != nil {
 		return err
 	}
 
