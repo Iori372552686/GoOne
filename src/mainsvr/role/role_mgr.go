@@ -89,7 +89,6 @@ func loadRole(uid uint64, trans cmd_handler.IContext) (error, *Role) {
 	// 这里主要是老的数据添加新增的数据段，不然新数据段就是nil
 	role.RoleInitField(role.PbRole.RegisterInfo.Uid)
 	return nil, &role
-	return nil, nil
 }
 
 func (m *RoleMgr) obtainRole(uid uint64, trans cmd_handler.IContext, createIfNotExist bool) *Role {
