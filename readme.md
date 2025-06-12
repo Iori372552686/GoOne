@@ -26,7 +26,8 @@ GoOne 是一款基于Go语言实现的Reactor模型的微服务式分布式游�
 ```
 
 * [[GoOne架构---点击查看详细说明文档]](/doc/G1服务器技术架构文档.docx)
-* 项目还在持续优化中,欢迎加入一起创作
+* 项目还在持续优化中,欢迎加入一起创作： 
+* 联系QQ：372552686   加入讨论组
 
 # Environment Setup
 * [linux setup](/doc/setup_linux.md)
