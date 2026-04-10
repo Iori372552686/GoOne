@@ -11,3 +11,4 @@ deploy/hosts/host_dev.txt
 /.gocache
 /tools/cfgtool/gen
 /plan
+/plan
