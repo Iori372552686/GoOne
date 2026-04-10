@@ -56,6 +56,17 @@ split_csv_roles() {
   done
 }
 
+ACTIVE_DEFAULT_ROLES=(
+  commconf
+  gamedata
+  connsvr
+  mainsvr
+  infosvr
+  mysqlsvr
+  roomcentersvr
+  websvr
+)
+
 cmd="${1:-help}"
 shift || true
 
@@ -213,11 +224,11 @@ if [[ "$NO_HOSTKEY_CHECK" == true ]]; then
   export ANSIBLE_HOST_KEY_CHECKING=False
 fi
 
-# default roles: all roles found under roles/
+# default roles: active role set only
 if [[ ${#ROLES[@]} -eq 0 ]]; then
-  while IFS= read -r r; do
-    [[ -n "$r" ]] && ROLES+=("$r")
-  done < <(list_roles)
+  for r in "${ACTIVE_DEFAULT_ROLES[@]}"; do
+    ROLES+=("$r")
+  done
 fi
 
 # validate role names (warn only)

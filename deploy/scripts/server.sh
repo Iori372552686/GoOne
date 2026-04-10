@@ -3,7 +3,7 @@
 #ulimit -c unlimited
 source /etc/profile
 
-# 颜色支持（如果是非 TTY 或设置了 NO_COLOR，则自动关闭颜色）
+# 棰滆壊鏀寔锛堝鏋滄槸闈?TTY 鎴栬缃簡 NO_COLOR锛屽垯鑷姩鍏抽棴棰滆壊锛?
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
     COLOR_RED=$'\033[0;31m'
     COLOR_GREEN=$'\033[0;32m'
@@ -67,13 +67,13 @@ kill_process_force() {
     fi
 }
 
-# 脚本所在目录，避免依赖当前工作目录
+# 鑴氭湰鎵€鍦ㄧ洰褰曪紝閬垮厤渚濊禆褰撳墠宸ヤ綔鐩綍
 SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)"
 SERVER_PATH="$SCRIPT_PATH"
 SERVER_NAME="$(basename "$SERVER_PATH")"
 
 SERVER_BIN_PATH="${SERVER_PATH}/"
-# 可通过环境变量 SERVER_CONF 覆盖默认配置文件路径
+# 鍙€氳繃鐜鍙橀噺 SERVER_CONF 瑕嗙洊榛樿閰嶇疆鏂囦欢璺緞
 SERVER_PARAM="${SERVER_CONF:-/data/GoOne/commconf/server_conf.yaml}"
 SERVER_PARAM_OTHER="${SERVER_PATH}/${SERVER_NAME}_conf2.json"
 
@@ -84,7 +84,7 @@ log_info "Server conf   : ${SERVER_PARAM}"
 
 is_running()
 {
-    # 优先使用 pid 文件，如果存在的话
+    # 浼樺厛浣跨敤 pid 鏂囦欢锛屽鏋滃瓨鍦ㄧ殑璇?
     if [ -f "${SERVER_NAME}.pid" ]; then
         pid=$(cat "${SERVER_NAME}.pid" 2>/dev/null || echo "")
         if [ -n "$pid" ] && ps -p "$pid" -o comm= 2>/dev/null | grep -qw "$SERVER_NAME"; then
@@ -93,7 +93,7 @@ is_running()
         fi
     fi
 
-    # 回退到进程名检测
+    # 鍥為€€鍒拌繘绋嬪悕妫€娴?
     proc_num=$(ps -C "${SERVER_NAME}" 2>/dev/null | sed -e '1d' | wc -l)
     if [ "${proc_num}" -gt 0 ]; then
         log_ok "Server ${SERVER_NAME} is already running!"
@@ -166,7 +166,7 @@ stop()
     if [ ${stop_flag} -eq 0 ] ; then
         kill_process_force "${SERVER_NAME}"
         is_running
-        # is_running 返回 1 表示已经不在运行
+        # is_running 杩斿洖 1 琛ㄧず宸茬粡涓嶅湪杩愯
         if [ $? -eq 1 ]; then
             stop_flag=1
         fi

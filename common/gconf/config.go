@@ -151,10 +151,6 @@ type RoomCenterSvr struct {
 	TransShardCount int `json:"trans_shard_count" yaml:"trans_shard_count"`
 }
 
-type TexasSvr struct {
-	ServiceCommonConfig `yaml:",inline"`
-}
-
 type WebSvr struct {
 	ServiceCommonConfig `yaml:",inline"`
 	Runtime             WebRuntimeConfig `json:"runtime" yaml:"runtime"`
@@ -217,14 +213,6 @@ type webSvrConfig struct {
 
 var WebSvrCfg webSvrConfig
 
-// texassvr配置
-type TexasConfig struct {
-	BaseCfg  `json:"base_cfg" yaml:"base_cfg"`
-	TexasSvr `json:"texassvr" yaml:"texassvr"`
-}
-
-var TexasSvrCfg TexasConfig
-
 type configDocument interface {
 	normalize()
 	validate() error
@@ -252,10 +240,6 @@ func LoadRoomCenterConfig(file string) error {
 
 func LoadWebConfig(file string) error {
 	return loadConfig(file, &WebSvrCfg)
-}
-
-func LoadTexasConfig(file string) error {
-	return loadConfig(file, &TexasSvrCfg)
 }
 
 func loadConfig(file string, cfg configDocument) error {
@@ -411,14 +395,6 @@ func (c *RoomCenterSvr) validate() error {
 	return nil
 }
 
-func (c *TexasSvr) normalize() {
-	c.ServiceCommonConfig.normalize()
-}
-
-func (c *TexasSvr) validate() error {
-	return c.ServiceCommonConfig.validate("texassvr")
-}
-
 func (c *WebSvr) normalize() {
 	c.ServiceCommonConfig.normalize()
 	c.Runtime.HttpServer = coalesceStruct(c.Runtime.HttpServer, c.HttpServer)
@@ -552,20 +528,6 @@ func (c *webSvrConfig) validate() error {
 	return nil
 }
 
-func (c *TexasConfig) normalize() {
-	c.BaseCfg.normalize()
-	c.TexasSvr.normalize()
-}
-
-func (c *TexasConfig) validate() error {
-	if err := c.BaseCfg.validate(); err != nil {
-		return err
-	}
-	if err := c.BaseCfg.validateBusRuntime("texassvr"); err != nil {
-		return err
-	}
-	return c.TexasSvr.validate()
-}
 
 func coalesceString(current, legacy string) string {
 	if strings.TrimSpace(current) != "" {

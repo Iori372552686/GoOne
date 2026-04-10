@@ -11,10 +11,7 @@
     - gamedata
     - connsvr
     - mainsvr
-    - dbsvr
     - infosvr
     - mysqlsvr
-    - opvpsvr
-    - mailsvr
-    - friendsvr
-    - chatsvr
+    - roomcentersvr
+    - websvr

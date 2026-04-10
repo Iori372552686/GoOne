@@ -112,12 +112,6 @@ roomcentersvr:
   capacity:
     trans_shard_count: 0
 
-texassvr:
-  identity:
-    self_bus_id: '1.1.80.{{ instance_id }}'
-  debug:
-    log_dir: ../logs/texassvr
-    log_level: debug
 
 websvr:
   identity:

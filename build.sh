@@ -1,178 +1,88 @@
 #!/bin/bash
-#add by  Iori  2020.10.22
 
-PRONAME="$1"					# 参数1
-PRO2="$2"					    # 参数2
-project_root_dir=$(pwd)
-##export GOPATH=${project_root_dir}/gopath
+set -euo pipefail
 
-connsvr() {
-  echo "building connsvr !"
-  cd ${project_root_dir}/cmd/connsvr
-  go build -o ${project_root_dir}/build/connsvr
+project_root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+target="${1:-all}"
+
+usage() {
+  cat <<EOF
+Usage:
+  ./build.sh
+  ./build.sh all
+  ./build.sh list
+  ./build.sh help
+  ./build.sh <target>
+
+Targets:
+  conn        -> cmd/connsvr       -> build/connsvr
+  main        -> cmd/mainsvr       -> build/mainsvr
+  info        -> cmd/infosvr       -> build/infosvr
+  mysql       -> cmd/mysqlsvr      -> build/mysqlsvr
+  roomcenter  -> cmd/roomcentersvr -> build/roomcentersvr
+  web         -> cmd/web_svr       -> build/websvr
+
+Aliases:
+  connsvr, mainsvr, infosvr, mysqlsvr, room, roomcentersvr, websvr, web_svr
+EOF
 }
 
-mainsvr() {
-  echo "building mainsvr !"
-  cd ${project_root_dir}/cmd/mainsvr
-  go build -o ${project_root_dir}/build/mainsvr
+build_one() {
+  local source_dir="$1"
+  local output_name="$2"
+  echo "building ${output_name} !"
+  (cd "${project_root_dir}/${source_dir}" && go build -o "${project_root_dir}/build/${output_name}")
 }
 
-dbsvr() {
-  echo "building dbsvr !"
-  cd ${project_root_dir}/src/dbsvr
-  go build -o ${project_root_dir}/build/dbsvr
+connsvr() { build_one "cmd/connsvr" "connsvr"; }
+mainsvr() { build_one "cmd/mainsvr" "mainsvr"; }
+infosvr() { build_one "cmd/infosvr" "infosvr"; }
+mysqlsvr() { build_one "cmd/mysqlsvr" "mysqlsvr"; }
+roomcentersvr() { build_one "cmd/roomcentersvr" "roomcentersvr"; }
+websvr() { build_one "cmd/web_svr" "websvr"; }
+
+run_all() {
+  connsvr
+  mainsvr
+  mysqlsvr
+  infosvr
+  roomcentersvr
+  websvr
 }
 
-mysqlsvr() {
-  echo "building mysqlsvr !"
-  cd ${project_root_dir}/cmd/mysqlsvr
-  go build -o ${project_root_dir}/build/mysqlsvr
-}
-
-gmconnsvr() {
-  echo "building gmconnsvr !"
-  cd ${project_root_dir}/src/gmconnsvr
-  go build -o ${project_root_dir}/build/gmconnsvr
-}
-
-rcmdsvr() {
-   echo "building rcmdsvr !"
-  cd ${project_root_dir}/src/rcmdsvr
-  go build -o ${project_root_dir}/build/rcmdsvr
-}
-
-infosvr() {
-  echo "building infosvr !"
-  cd ${project_root_dir}/cmd/infosvr
-  go build -o ${project_root_dir}/build/infosvr
-}
-
-roomcentersvr() {
-  echo "building roomcentersvr !"
-  cd ${project_root_dir}/cmd/roomcentersvr
-  go build -o ${project_root_dir}/build/roomcentersvr
-}
-
-gamesvr() {
-  echo "building gamesvr !"
-  cd ${project_root_dir}/src/gamesvr
-  go build -o ${project_root_dir}/build/gamesvr
-}
-
-opvpsvr() {
-  echo "building opvpsvr !"
-  cd ${project_root_dir}/src/opvpsvr
-  go build -o ${project_root_dir}/build/opvpsvr
-}
-
-mailsvr() {
-  echo "building mailsvr !"
-  cd ${project_root_dir}/src/mailsvr
-  go build -o ${project_root_dir}/build/mailsvr
-}
-
-chatsvr() {
-  echo "building chatsvr !"
-  cd ${project_root_dir}/src/chatsvr
-  go build -o ${project_root_dir}/build/chatsvr
-}
-
-friendsvr() {
-  echo "building friendsvr !"
-  cd ${project_root_dir}/src/friendsvr
-  go build -o ${project_root_dir}/build/friendsvr
-}
-
-websvr() {
-  echo "building websvr !"
-  cd ${project_root_dir}/cmd/web_svr
-  go build -o ${project_root_dir}/build/websvr
-}
-
-ranksvr() {
-  echo "building ranksvr !"
-  cd ${project_root_dir}/src/ranksvr
-  go build -o ${project_root_dir}/build/ranksvr
-}
-
-guildsvr() {
-  echo "building guildsvr !"
-  cd ${project_root_dir}/src/guildsvr
-  go build -o ${project_root_dir}/build/guildsvr
-}
-
-case "$PRONAME" in
-conn)
+case "${target}" in
+  help|-h|--help)
+    usage
+    ;;
+  list)
+    printf '%s\n' conn main info mysql roomcenter web
+    ;;
+  all|"")
+    run_all
+    ;;
+  conn|connsvr)
     connsvr
     ;;
-
-main)
+  main|mainsvr)
     mainsvr
     ;;
-
-mysql)
-    mysqlsvr
-    ;;
-
-db)
-    dbsvr
-    ;;
-
-gmconn)
-    gmconnsvr
-    ;;
-
-rcmd)
-    rcmdsvr
-    ;;
-
-info)
+  info|infosvr)
     infosvr
     ;;
-
-roomcenter)
-    roomcentersvr
-    ;;
-
-game)
-    gamesvr
-    ;;
-
-opvp)
-    opvpsvr
-    ;;
-
-mail)
-    mailsvr
-    ;;
-
-chat)
-    chatsvr
-    ;;
-
-friend)
-    friendsvr
-    ;;
-
-web)
-    websvr
-    ;;
-
-rank)
-    ranksvr
-    ;;
-
-guild)
-    guildsvr
-    ;;
-*)
-    connsvr
-    mainsvr
+  mysql|mysqlsvr)
     mysqlsvr
-    infosvr
+    ;;
+  roomcenter|room|roomcentersvr)
     roomcentersvr
+    ;;
+  web|websvr|web_svr)
     websvr
+    ;;
+  *)
+    echo "Unsupported build target: ${target}" >&2
+    usage
+    exit 1
+    ;;
 esac
 
 

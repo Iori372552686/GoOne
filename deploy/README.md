@@ -50,13 +50,13 @@ cd ..
 
 - **示例**
   - 初始化所有服务（dev1 环境）  
-    `./deploy.sh dev1 init`
+    `./deploy.sh run --env dev1 --action init`
   - 只部署并重启 `mainsvr`、`connsvr`  
-    `./deploy.sh dev1 restart mainsvr connsvr`
+    `./deploy.sh run --env dev1 --action restart --roles mainsvr,connsvr`
 
 - **说明**
   - `env`：对应 `playbook_dev/<env>.yml`，比如 `dev1`、`dev2`、`dev_local`。
-  - 不指定 role 时，会对 `ALL_TARGET_ROLES` 中列出的所有服务生效。
+  - 不指定 role 时，默认会对活跃角色集合生效：`commconf,gamedata,connsvr,mainsvr,infosvr,mysqlsvr,roomcentersvr,websvr`。
   - 如果存在 `hosts/host_<env>.txt` 会优先用该文件，否则使用 `hosts/host_dev.txt`。
   - 输出中会高亮显示：
     - Env / Option / Target roles / Hosts file / Ansible tags
