@@ -1,4 +1,4 @@
-package main
+package connsvr
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/Iori372552686/GoOne/src/connsvr/service"
 )
 
-func newApp() *bootstrap.ServiceApp {
+func NewApp() *bootstrap.ServiceApp {
 	return bootstrap.NewServiceApp(bootstrap.Options{
 		ServiceName: "connsvr",
 		LoadConfig: func() error {

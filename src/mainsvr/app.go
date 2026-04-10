@@ -1,4 +1,4 @@
-package main
+package mainsvr
 
 import (
 	"context"
@@ -29,7 +29,7 @@ func onRecvSSPacket(packet *sharedstruct.SSPacket) {
 	packet = nil // packet所有权转交给transmgr，后面不能再用packet（包括data）
 }
 
-func newApp() *bootstrap.ServiceApp {
+func NewApp() *bootstrap.ServiceApp {
 	return bootstrap.NewServiceApp(bootstrap.Options{
 		ServiceName: "mainsvr",
 		LoadConfig: func() error {
@@ -129,10 +129,11 @@ func newApp() *bootstrap.ServiceApp {
 			shutdownErr := globals.TransMgr.Close(ctx)
 			if err := router.Close(); err != nil && shutdownErr == nil {
 				shutdownErr = err
-			return shutdownErr
+			}
 			if err := ssrpc.ShutdownTracing(ctx); err != nil {
 				shutdownErr = errors.Join(shutdownErr, err)
 			}
+			return shutdownErr
 		},
 		OnExit: func() {
 			logger.Infof("================== mainsvr Stop =========================")

@@ -22,7 +22,9 @@ type LoggerConfig struct {
 }
 
 type Options struct {
-	ServiceName       string
+	ServiceName     string
+	ShutdownTimeout time.Duration
+
 	LoadConfig        func() error
 	BuildInfo         func() BuildInfo
 	LoggerConfig      func() LoggerConfig
@@ -35,8 +37,7 @@ type Options struct {
 	OnTick            func(lastMs, nowMs int64)
 	// OnShutdown runs before admin shutdown / OnExit and should perform
 	// graceful, timeout-bound runtime stop work.
-	OnShutdown      func(ctx context.Context) error
-	ShutdownTimeout time.Duration
+	OnShutdown func(ctx context.Context) error
 	// OnExit runs after graceful shutdown attempts and is meant for final
 	// best-effort cleanup/logging.
 	OnExit func()

@@ -1,8 +1,10 @@
-package main
+package roomcentersvr
 
 import (
 	"context"
 	"errors"
+
+	roomcenterv1 "github.com/Iori372552686/GoOne/api/gen/game/roomcenter/v1"
 	"github.com/Iori372552686/GoOne/common/gamedata"
 	"github.com/Iori372552686/GoOne/common/gconf"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
@@ -27,14 +29,7 @@ func onRecvSSPacket(packet *sharedstruct.SSPacket) {
 	packet = nil // packet所有权转交给transmgr，后面不能再用packet（包括data）
 }
 
-			if err := ssrpc.InitTracing("roomcentersvr", ssrpc.TracingConfig{
-				Enabled:      gconf.RoomCenterSvrCfg.CommonRuntime.Tracing.Enabled,
-				Exporter:     gconf.RoomCenterSvrCfg.CommonRuntime.Tracing.Exporter,
-				Endpoint:     gconf.RoomCenterSvrCfg.CommonRuntime.Tracing.Endpoint,
-				Insecure:     gconf.RoomCenterSvrCfg.CommonRuntime.Tracing.Insecure,
-				SamplerRatio: gconf.RoomCenterSvrCfg.CommonRuntime.Tracing.SamplerRatio,
-				Headers:      gconf.RoomCenterSvrCfg.CommonRuntime.Tracing.Headers,
-			}); err != nil {
+func NewApp() *bootstrap.ServiceApp {
 	return bootstrap.NewServiceApp(bootstrap.Options{
 		ServiceName: "roomcentersvr",
 		LoadConfig: func() error {
@@ -67,10 +62,17 @@ func onRecvSSPacket(packet *sharedstruct.SSPacket) {
 			)
 		},
 		InitDeps: func() error {
-			idGen, err := idgen.NewIDGen()
-			if err := ssrpc.InitTracing("roomcentersvr", gconf.RoomCenterSvrCfg.CommonRuntime.Tracing); err != nil {
+			if err := ssrpc.InitTracing("roomcentersvr", ssrpc.TracingConfig{
+				Enabled:      gconf.RoomCenterSvrCfg.CommonRuntime.Tracing.Enabled,
+				Exporter:     gconf.RoomCenterSvrCfg.CommonRuntime.Tracing.Exporter,
+				Endpoint:     gconf.RoomCenterSvrCfg.CommonRuntime.Tracing.Endpoint,
+				Insecure:     gconf.RoomCenterSvrCfg.CommonRuntime.Tracing.Insecure,
+				SamplerRatio: gconf.RoomCenterSvrCfg.CommonRuntime.Tracing.SamplerRatio,
+				Headers:      gconf.RoomCenterSvrCfg.CommonRuntime.Tracing.Headers,
+			}); err != nil {
 				return err
 			}
+			idGen, err := idgen.NewIDGen()
 			if err != nil {
 				return err
 			}
@@ -132,11 +134,12 @@ func onRecvSSPacket(packet *sharedstruct.SSPacket) {
 			shutdownErr := globals.TransMgr.Close(ctx)
 			if err := service_router.Close(); err != nil && shutdownErr == nil {
 				shutdownErr = err
-			return shutdownErr
-		},
+			}
 			if err := ssrpc.ShutdownTracing(ctx); err != nil {
 				shutdownErr = errors.Join(shutdownErr, err)
 			}
+			return shutdownErr
+		},
 		OnExit: func() {
 			logger.Infof("================== roomcentersvr Stop =========================")
 		},

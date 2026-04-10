@@ -8,13 +8,13 @@ project_root_dir=$(pwd)
 
 connsvr() {
   echo "building connsvr !"
-  cd ${project_root_dir}/src/connsvr
+  cd ${project_root_dir}/cmd/connsvr
   go build -o ${project_root_dir}/build/connsvr
 }
 
 mainsvr() {
   echo "building mainsvr !"
-  cd ${project_root_dir}/src/mainsvr
+  cd ${project_root_dir}/cmd/mainsvr
   go build -o ${project_root_dir}/build/mainsvr
 }
 
@@ -26,7 +26,7 @@ dbsvr() {
 
 mysqlsvr() {
   echo "building mysqlsvr !"
-  cd ${project_root_dir}/src/mysqlsvr
+  cd ${project_root_dir}/cmd/mysqlsvr
   go build -o ${project_root_dir}/build/mysqlsvr
 }
 
@@ -44,8 +44,14 @@ rcmdsvr() {
 
 infosvr() {
   echo "building infosvr !"
-  cd ${project_root_dir}/src/infosvr
+  cd ${project_root_dir}/cmd/infosvr
   go build -o ${project_root_dir}/build/infosvr
+}
+
+roomcentersvr() {
+  echo "building roomcentersvr !"
+  cd ${project_root_dir}/cmd/roomcentersvr
+  go build -o ${project_root_dir}/build/roomcentersvr
 }
 
 gamesvr() {
@@ -80,7 +86,7 @@ friendsvr() {
 
 websvr() {
   echo "building websvr !"
-  cd ${project_root_dir}/src/web_svr
+  cd ${project_root_dir}/cmd/web_svr
   go build -o ${project_root_dir}/build/websvr
 }
 
@@ -125,6 +131,10 @@ info)
     infosvr
     ;;
 
+roomcenter)
+    roomcentersvr
+    ;;
+
 game)
     gamesvr
     ;;
@@ -161,6 +171,7 @@ guild)
     mainsvr
     mysqlsvr
     infosvr
+    roomcentersvr
     websvr
 esac
 

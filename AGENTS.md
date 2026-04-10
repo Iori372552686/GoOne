@@ -11,7 +11,7 @@ Prefer code over README or older docs when they disagree.
 - Deployment and local environment entrypoints are `main.sh`, `deploy/`, and `etc/env/`.
 
 ## Runtime Model
-- Service entrypoints follow `src/<service>/main.go`: parse flags, call `application.Init(newApp())`, then `application.Run()`.
+- Service entrypoints follow `cmd/<service>/main.go`: parse flags, call `application.Init(<pkg>.NewApp())`, then `application.Run()`; wiring lives in `src/<service>/app.go` as package `connsvr` / `mainsvr` / `infosvr` / `mysqlsvr` / `roomcentersvr` / `websvr` (for `web_svr`).
 - `newApp()` normally returns `bootstrap.NewServiceApp(...)` and defines `LoadConfig`, `InitDeps`, `RegisterHandlers`, `StartRuntime`, `OnProc`, `OnTick`, and `OnExit`.
 - Main packet flow is: client -> `connsvr` -> `lib/service/router` -> bus/routing rules -> target service `globals.TransMgr`.
 - `web_svr` is the main exception: it starts Gin HTTP routes and optional gRPC listeners rather than joining the normal bus transaction loop.

@@ -1,4 +1,4 @@
-package main
+package websvr
 
 import (
 	"github.com/Iori372552686/GoOne/common/gconf"

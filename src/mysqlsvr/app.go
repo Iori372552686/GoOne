@@ -1,4 +1,4 @@
-package main
+package mysqlsvr
 
 import (
 	"context"
@@ -22,7 +22,7 @@ func onRecvSSPacket(packet *sharedstruct.SSPacket) {
 	packet = nil // packet所有权转交给transmgr，后面不能再用packet（包括data）
 }
 
-func newApp() *bootstrap.ServiceApp {
+func NewApp() *bootstrap.ServiceApp {
 	return bootstrap.NewServiceApp(bootstrap.Options{
 		ServiceName: "mysqlsvr",
 		LoadConfig: func() error {

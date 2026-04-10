@@ -1,4 +1,4 @@
-package main
+package websvr
 
 import (
 	"context"
@@ -31,7 +31,7 @@ type webRuntime struct {
 	grpcSrv *grpc.Server
 }
 
-func newApp() *bootstrap.ServiceApp {
+func NewApp() *bootstrap.ServiceApp {
 	runtime := &webRuntime{}
 	return bootstrap.NewServiceApp(bootstrap.Options{
 		ServiceName: "websvr",
