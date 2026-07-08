@@ -50,7 +50,9 @@ func (s *WsTcpSvr) InitAndRun(implType, mod string, port int, handler IWsTcpSvrE
 	s.lockOfConnInfo.Unlock()
 
 	switch implType {
-	case "beego": //todo
+	case "beego":
+		// 未实现的后端：显式报错，避免调用方误以为服务已启动。
+		return fmt.Errorf("ws implType %q is not implemented yet, use default (gin)", implType)
 	default:
 		logger.Infof("init type default gin ws !")
 	}

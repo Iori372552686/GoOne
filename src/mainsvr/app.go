@@ -10,8 +10,8 @@ import (
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
-	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/service/bootstrap"
+	"github.com/Iori372552686/GoOne/lib/service/bootstrap/busapp"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
@@ -26,14 +26,10 @@ import (
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
-func onRecvSSPacket(packet *sharedstruct.SSPacket) {
-	globals.TransMgr.ProcessSSPacket(packet)
-	packet = nil // packet所有权转交给transmgr，后面不能再用packet（包括data）
-}
-
 func NewApp() *bootstrap.ServiceApp {
-	return bootstrap.NewServiceApp(bootstrap.Options{
+	return busapp.New(busapp.Options{
 		ServiceName: "mainsvr",
+		ServerType:  misc.ServerType_MainSvr,
 		LoadConfig: func() error {
 			if err := gconf.LoadMainConfig(*gconf.SvrConfFile); err != nil {
 				return err
@@ -47,36 +43,42 @@ func NewApp() *bootstrap.ServiceApp {
 			logger.Infof("gconf file load success | %+v", gconf.MainSvrCfg)
 			return nil
 		},
-		LoggerConfig: func() bootstrap.LoggerConfig {
-			return bootstrap.LoggerConfig{
-				Dir:   gconf.MainSvrCfg.Debug.LogDir,
-				Level: gconf.MainSvrCfg.Debug.LogLevel,
-				Name:  "mainsvr",
+		Common: func() busapp.Common {
+			c := &gconf.MainSvrCfg
+			return busapp.Common{
+				LogDir:       c.Debug.LogDir,
+				LogLevel:     c.Debug.LogLevel,
+				SelfBusId:    c.Identity.SelfBusId,
+				BusMQAddr:    c.CommonRuntime.BusMQAddr,
+				RegisterAddr: c.CommonRuntime.RegisterAddr,
+				AdminEnabled: c.CommonRuntime.AdminServer.Enabled,
+				AdminIP:      c.CommonRuntime.AdminServer.IP,
+				AdminPort:    c.CommonRuntime.AdminServer.Port,
+				Pprof:        c.CommonDebug.Pprof,
+				Tracing: ssrpc.TracingConfig{
+					Enabled:      c.CommonRuntime.Tracing.Enabled,
+					Exporter:     c.CommonRuntime.Tracing.Exporter,
+					Endpoint:     c.CommonRuntime.Tracing.Endpoint,
+					Insecure:     c.CommonRuntime.Tracing.Insecure,
+					SamplerRatio: c.CommonRuntime.Tracing.SamplerRatio,
+					Headers:      c.CommonRuntime.Tracing.Headers,
+				},
 			}
 		},
-		// bus 断连时 /readyz 返回 503，摘除流量直至重连成功
-		ReadyCheck: router.ReadyCheck,
-		AdminConfig: func() bootstrap.AdminConfig {
-			return bootstrap.NewAdminConfig(
-				"mainsvr",
-				misc.ServerType_MainSvr,
-				gconf.MainSvrCfg.CommonRuntime.AdminServer.Enabled,
-				gconf.MainSvrCfg.CommonDebug.Pprof,
-				gconf.MainSvrCfg.CommonRuntime.AdminServer.IP,
-				gconf.MainSvrCfg.CommonRuntime.AdminServer.Port,
-			)
+		TransMgr: globals.TransMgr,
+		TransConfig: func() transaction.TransactionMgrConfig {
+			transShardCount := gconf.MainSvrCfg.Capacity.TransShardCount
+			if transShardCount <= 0 {
+				transShardCount = transaction.DefaultShardCount()
+			}
+			logger.Infof("mainsvr transmgr shards=%d serial_key=routerid_or_uid", transShardCount)
+			return transaction.TransactionMgrConfig{
+				MaxTrans:         misc.MaxTransNumber,
+				ShardCount:       transShardCount,
+				MaxPendingPerKey: 100,
+			}
 		},
 		InitDeps: func() error {
-			if err := ssrpc.InitTracing("mainsvr", ssrpc.TracingConfig{
-				Enabled:      gconf.MainSvrCfg.CommonRuntime.Tracing.Enabled,
-				Exporter:     gconf.MainSvrCfg.CommonRuntime.Tracing.Exporter,
-				Endpoint:     gconf.MainSvrCfg.CommonRuntime.Tracing.Endpoint,
-				Insecure:     gconf.MainSvrCfg.CommonRuntime.Tracing.Insecure,
-				SamplerRatio: gconf.MainSvrCfg.CommonRuntime.Tracing.SamplerRatio,
-				Headers:      gconf.MainSvrCfg.CommonRuntime.Tracing.Headers,
-			}); err != nil {
-				return err
-			}
 			sensitive_words.Init(gconf.MainSvrCfg.Dependencies.SensitiveWordsFile)
 			if err := rds.RedisMgr.InitAndRun(gconf.MainSvrCfg.Dependencies.DbInstances); err != nil {
 				return err
@@ -101,27 +103,7 @@ func NewApp() *bootstrap.ServiceApp {
 			d.RegisterToTransactionMgr(globals.TransMgr)
 			return nil
 		},
-		StartRuntime: func() error {
-			transShardCount := gconf.MainSvrCfg.Capacity.TransShardCount
-			if transShardCount <= 0 {
-				transShardCount = transaction.DefaultShardCount()
-			}
-			globals.TransMgr.InitAndRunWithConfig(transaction.TransactionMgrConfig{
-				MaxTrans:         misc.MaxTransNumber,
-				ShardCount:       transShardCount,
-				MaxPendingPerKey: 100,
-			})
-			logger.Infof("mainsvr transmgr shards=%d serial_key=routerid_or_uid", transShardCount)
-			if err := router.InitAndRun(
-				gconf.MainSvrCfg.Identity.SelfBusId,
-				onRecvSSPacket,
-				gconf.MainSvrCfg.CommonRuntime.BusMQAddr,
-				misc.ServerRouteRules,
-				gconf.MainSvrCfg.CommonRuntime.RegisterAddr,
-			); err != nil {
-				return err
-			}
-
+		StartExtra: func() error {
 			// 心跳过期淘汰改经事务串行执行：Tick 协程只投递登出请求，
 			// 落盘与删除在 Logout handler 内按 uid 串行键执行，
 			// 消除 Tick 与业务 handler 对同一 *Role 的并发读写。
@@ -130,31 +112,18 @@ func NewApp() *bootstrap.ServiceApp {
 			}
 			return nil
 		},
-		OnProc: func() bool {
-			return true
-		},
 		OnTick: func(lastMs, nowMs int64) {
 			if lastMs/datetime.MS_PER_MINUTE != nowMs/datetime.MS_PER_MINUTE {
 				safego.Go(func() { globals.RoleMgr.Tick() })
 			}
 		},
-		OnShutdown: func(ctx context.Context) error {
-			router.BeginShutdown()
-			shutdownErr := globals.TransMgr.Close(ctx)
-
+		OnShutdownExtra: func(ctx context.Context) error {
 			// TransMgr 已排空，此时没有 handler 并发修改角色，安全地全量落盘，
 			// 避免 write-behind 防抖窗口内的变更在停机时丢失。
-			if _, failed := globals.RoleMgr.FlushAllToDB(); failed > 0 && shutdownErr == nil {
-				shutdownErr = errors.New("failed to flush all roles to db on shutdown")
+			if _, failed := globals.RoleMgr.FlushAllToDB(); failed > 0 {
+				return errors.New("failed to flush all roles to db on shutdown")
 			}
-
-			if err := router.Close(); err != nil && shutdownErr == nil {
-				shutdownErr = err
-			}
-			if err := ssrpc.ShutdownTracing(ctx); err != nil {
-				shutdownErr = errors.Join(shutdownErr, err)
-			}
-			return shutdownErr
+			return nil
 		},
 		OnExit: func() {
 			logger.Infof("================== mainsvr Stop =========================")

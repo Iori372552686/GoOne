@@ -1,4 +1,4 @@
-package texas_room
+﻿package texas_room
 
 import (
 	"sync"
@@ -79,7 +79,7 @@ func (impl *TexasRoomCenterMgr) checkAndSync(nowMs int64) {
 		//check creat room
 		for _, room := range rstage.RoomsMap {
 			if room.Base.CurPlayerNum >= room.Base.MaxPlayer {
-				room_ai.OnAiCreatRoom(room.Base.GameId, int32(room.Base.Stage), int32(room.Base.CoinType))
+				room_ai.OnAiCreateRoom(room.Base.GameId, int32(room.Base.Stage), int32(room.Base.CoinType))
 			}
 		}
 
@@ -108,7 +108,7 @@ func (impl *TexasRoomCenterMgr) checkAndCreate(nowMs int64) {
 
 		// 该 stage 下所有房间都满员时补一间新房，保证玩家总有可加入的房间。
 		if fullCnt == len(rstage.RoomsMap) && sample != nil {
-			room_ai.OnAiCreatRoom(sample.Base.GameId, int32(sample.Base.Stage), int32(sample.Base.CoinType))
+			room_ai.OnAiCreateRoom(sample.Base.GameId, int32(sample.Base.Stage), int32(sample.Base.CoinType))
 		}
 	}
 }

@@ -1,15 +1,13 @@
 package infosvr
 
 import (
-	"context"
-	"errors"
 	"fmt"
 
 	infosvrv1 "github.com/Iori372552686/GoOne/api/gen/game/infosvr/v1"
 	"github.com/Iori372552686/GoOne/common/gconf"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/service/bootstrap"
+	"github.com/Iori372552686/GoOne/lib/service/bootstrap/busapp"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
@@ -18,36 +16,36 @@ import (
 	"github.com/Iori372552686/GoOne/src/infosvr/service"
 )
 
-func onRecvSSPacket(packet *sharedstruct.SSPacket) {
-	globals.TransMgr.ProcessSSPacket(packet)
-	packet = nil // packet所有权转交给transmgr，后面不能再用packet（包括data）
-}
-
 func NewApp() *bootstrap.ServiceApp {
-	return bootstrap.NewServiceApp(bootstrap.Options{
+	return busapp.New(busapp.Options{
 		ServiceName: "infosvr",
+		ServerType:  misc.ServerType_InfoSvr,
 		LoadConfig: func() error {
 			return gconf.LoadInfoConfig(*gconf.SvrConfFile)
 		},
-		LoggerConfig: func() bootstrap.LoggerConfig {
-			return bootstrap.LoggerConfig{
-				Dir:   gconf.InfoSvrCfg.Debug.LogDir,
-				Level: gconf.InfoSvrCfg.Debug.LogLevel,
-				Name:  "infosvr",
+		Common: func() busapp.Common {
+			c := &gconf.InfoSvrCfg
+			return busapp.Common{
+				LogDir:       c.Debug.LogDir,
+				LogLevel:     c.Debug.LogLevel,
+				SelfBusId:    c.Identity.SelfBusId,
+				BusMQAddr:    c.CommonRuntime.BusMQAddr,
+				RegisterAddr: c.CommonRuntime.RegisterAddr,
+				AdminEnabled: c.CommonRuntime.AdminServer.Enabled,
+				AdminIP:      c.CommonRuntime.AdminServer.IP,
+				AdminPort:    c.CommonRuntime.AdminServer.Port,
+				Pprof:        c.CommonDebug.Pprof,
+				Tracing: ssrpc.TracingConfig{
+					Enabled:      c.CommonRuntime.Tracing.Enabled,
+					Exporter:     c.CommonRuntime.Tracing.Exporter,
+					Endpoint:     c.CommonRuntime.Tracing.Endpoint,
+					Insecure:     c.CommonRuntime.Tracing.Insecure,
+					SamplerRatio: c.CommonRuntime.Tracing.SamplerRatio,
+					Headers:      c.CommonRuntime.Tracing.Headers,
+				},
 			}
 		},
-		// bus 断连时 /readyz 返回 503，摘除流量直至重连成功
-		ReadyCheck: router.ReadyCheck,
-		AdminConfig: func() bootstrap.AdminConfig {
-			return bootstrap.NewAdminConfig(
-				"infosvr",
-				misc.ServerType_InfoSvr,
-				gconf.InfoSvrCfg.CommonRuntime.AdminServer.Enabled,
-				gconf.InfoSvrCfg.CommonDebug.Pprof,
-				gconf.InfoSvrCfg.CommonRuntime.AdminServer.IP,
-				gconf.InfoSvrCfg.CommonRuntime.AdminServer.Port,
-			)
-		},
+		TransMgr: globals.TransMgr,
 		ComponentStatuses: func() []bootstrap.ComponentStatus {
 			return buildInfoSvrComponentStatuses(
 				globals.InfoMgr.RedisMgr.InstanceCount(),
@@ -56,16 +54,6 @@ func NewApp() *bootstrap.ServiceApp {
 			)
 		},
 		InitDeps: func() error {
-			if err := ssrpc.InitTracing("infosvr", ssrpc.TracingConfig{
-				Enabled:      gconf.InfoSvrCfg.CommonRuntime.Tracing.Enabled,
-				Exporter:     gconf.InfoSvrCfg.CommonRuntime.Tracing.Exporter,
-				Endpoint:     gconf.InfoSvrCfg.CommonRuntime.Tracing.Endpoint,
-				Insecure:     gconf.InfoSvrCfg.CommonRuntime.Tracing.Insecure,
-				SamplerRatio: gconf.InfoSvrCfg.CommonRuntime.Tracing.SamplerRatio,
-				Headers:      gconf.InfoSvrCfg.CommonRuntime.Tracing.Headers,
-			}); err != nil {
-				return err
-			}
 			return globals.InfoMgr.RedisMgr.InitAndRun(gconf.InfoSvrCfg.Dependencies.DbInstances)
 		},
 		RegisterHandlers: func() error {
@@ -74,30 +62,6 @@ func NewApp() *bootstrap.ServiceApp {
 			infosvrv1.RegisterInfoServiceToDispatcher(d, srv)
 			d.RegisterToTransactionMgr(globals.TransMgr)
 			return nil
-		},
-		StartRuntime: func() error {
-			globals.TransMgr.InitAndRun(misc.MaxTransNumber, false, 0)
-			return router.InitAndRun(
-				gconf.InfoSvrCfg.Identity.SelfBusId,
-				onRecvSSPacket,
-				gconf.InfoSvrCfg.CommonRuntime.BusMQAddr,
-				misc.ServerRouteRules,
-				gconf.InfoSvrCfg.CommonRuntime.RegisterAddr,
-			)
-		},
-		OnProc: func() bool {
-			return true
-		},
-		OnShutdown: func(ctx context.Context) error {
-			router.BeginShutdown()
-			shutdownErr := globals.TransMgr.Close(ctx)
-			if err := router.Close(); err != nil && shutdownErr == nil {
-				shutdownErr = err
-			}
-			if err := ssrpc.ShutdownTracing(ctx); err != nil {
-				shutdownErr = errors.Join(shutdownErr, err)
-			}
-			return shutdownErr
 		},
 		OnExit: func() {
 			logger.Infof("================== infosvr Stop =========================")

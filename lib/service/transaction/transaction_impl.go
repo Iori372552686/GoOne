@@ -5,11 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
+	"github.com/Iori372552686/GoOne/lib/api/gerr"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/service/router"
@@ -237,13 +237,13 @@ func (t *Transaction) waitRsp(dstSvrType uint32, dstSvrIns uint32, cmd g1_protoc
 			observeTransactionTimeout("wait_rsp", cmd)
 			logger.Errorf("timeout to CallMsgBySvrType {svrType:%v, svrIns:%v, uid:%v, cmd:%v, reqType:%s}",
 				dstSvrType, dstSvrIns, t.Uid(), cmd, protoMessageType(req))
-			return errors.New("timeout")
+			return gerr.ErrTimeout.WithMessage("wait rsp for cmd %v timed out after %v", cmd, d)
 		case packet, ok := <-t.chanIn:
 			if !ok {
 				logger.Errorf("Failed to CallMsgBySvrType as chanInPacket is closed "+
 					"{svrType:%v, svrIns:%v, uid:%v, cmd:%v, rid:%v, reqType:%s}",
 					dstSvrType, dstSvrIns, t.Uid(), cmd, t.Rid(), protoMessageType(req))
-				return errors.New("channel is closed")
+				return gerr.ErrClosed.WithMessage("transaction chanIn closed while waiting rsp for cmd %v", cmd)
 			}
 			// Primary match is CmdSeq (Transaction-driven request/response correlation).
 			// Historically we also enforced rspCmd == reqCmd+1, but IDL-driven ssrpc may override cmd_resp.

@@ -1,4 +1,4 @@
-package room_ai
+﻿package room_ai
 
 import (
 	"fmt"
@@ -20,13 +20,13 @@ func OnAiInitRoom() {
 	time.Sleep(2 * time.Second)
 	if gameconfs != nil {
 		for _, conf := range gameconfs {
-			OnAiCreatRoom(pb.GameTypeId(1), conf.RoomStage, conf.CoinType)
+			OnAiCreateRoom(pb.GameTypeId(1), conf.RoomStage, conf.CoinType)
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
 }
 
-func OnAiCreatRoom(gameId pb.GameTypeId, stage, coinType int32) (*pb.RoomBaseInfo, error) {
+func OnAiCreateRoom(gameId pb.GameTypeId, stage, coinType int32) (*pb.RoomBaseInfo, error) {
 	sysUid := uint64(100000)
 	conf := texas_config.GetByRoomStageCoinType(stage, coinType)
 	if conf == nil {

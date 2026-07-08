@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Iori372552686/GoOne/lib/api/gerr"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
@@ -63,8 +64,9 @@ func ToErrorCode(err error) g1_protocol.ErrorCode {
 			return e.Code
 		}
 	}
-	// default mapping
-	return g1_protocol.ErrorCode_ERR_INTERNAL
+	// Framework errors (gerr) carry their own wire code; this also handles
+	// plain errors by mapping them to ERR_INTERNAL.
+	return gerr.Code(err)
 }
 
 

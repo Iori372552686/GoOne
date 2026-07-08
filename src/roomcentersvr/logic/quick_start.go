@@ -1,4 +1,4 @@
-package logic
+﻿package logic
 
 import (
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/room_ai"
@@ -26,7 +26,7 @@ func OnCenterQuickStart(req *g1_protocol.QuickStartReq, roomMgr *texas_room.Texa
 	}
 
 	// 如果没有空余的房间，创建一个新的房间
-	base, err := room_ai.OnAiCreatRoom(req.GameId, int32(req.CoinType), int32(req.Stage))
+	base, err := room_ai.OnAiCreateRoom(req.GameId, int32(req.CoinType), int32(req.Stage))
 	if err != nil {
 		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_TEXAS_SEAT_NOT_FOUND
 	}

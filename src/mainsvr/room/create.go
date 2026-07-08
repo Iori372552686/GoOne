@@ -1,4 +1,4 @@
-package room
+﻿package room
 
 import (
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
@@ -10,7 +10,7 @@ import (
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
-func OnMainCreatRoom(c cmd_handler.IContext, req *g1_protocol.CreateRoomReq, myRole *role.Role) *g1_protocol.CreateRoomRsp {
+func OnMainCreateRoom(c cmd_handler.IContext, req *g1_protocol.CreateRoomReq, myRole *role.Role) *g1_protocol.CreateRoomRsp {
 	rsp := &g1_protocol.CreateRoomRsp{Ret: &g1_protocol.Ret{Code: g1_protocol.ErrorCode_ERR_OK}}
 
 	genId, err := globals.IDGen.GenID()

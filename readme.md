@@ -2,15 +2,15 @@
 
 GoOne 是一套基于 Go 实现的微服务分布式游戏服务器框架，核心思路是 **Reactor + CSP**（并发消息驱动）且继承了很多C++游戏架构的思想，并配套提供：服务治理、配置中心、消息总线、网络层、部署控制台等“工程化”能力，适用于中小型游戏、MMO 等游戏后端业务。
 
-[![Go Version](https://img.shields.io/github/go-mod/go-version/Iori372552686/GoOne)](go.mod)
-[![License](https://img.shields.io/github/license/Iori372552686/GoOne)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/Iori372552686/GoOne?style=flat)](https://github.com/Iori372552686/GoOne/stargazers)
+[Go Version](go.mod)
+[License](LICENSE)
+[Stars](https://github.com/Iori372552686/GoOne/stargazers)
 
 ---
 
 ## 1. 架构概览
 
-![image](https://github.com/user-attachments/assets/991e2091-dbd9-4f8f-9e0b-5c24ed98bf3b)
+image
 
 - **网关服（connsvr）**：管理客户端连接，接入并转发消息
 - **核心逻辑服（mainsvr）**：核心业务逻辑
@@ -20,8 +20,12 @@ GoOne 是一套基于 Go 实现的微服务分布式游戏服务器框架，核�
 - **Web 管理（websvr）**：HTTP / gRPC 管理接口与对外 API
 
 更详细的运行时与协议说明见：
-- [`docs/ssrpc_idl.md`](docs/ssrpc_idl.md)
-- `plan/01-architecture-review.md`
+
+- `[docs/ssrpc_idl.md](docs/ssrpc_idl.md)`（ssrpc / IDL 方案）
+- `[docs/architecture_review_2026-07.md](docs/architecture_review_2026-07.md)`（架构评审与对标分析）
+- `[docs/optimization_roadmap.md](docs/optimization_roadmap.md)`（优化迭代计划与进展）
+- `[docs/STYLE.md](docs/STYLE.md)`（代码风格规范）
+- `[docs/benchmarks/baseline.md](docs/benchmarks/baseline.md)`（性能基线与优化对比）
 
 ---
 
@@ -51,28 +55,30 @@ GoOne 是一套基于 Go 实现的微服务分布式游戏服务器框架，核�
 
 GoOne 的 ssrpc 模块借鉴 CloudWeGo 的 IDL 驱动思路与 Kratos 的 middleware / transport 分层，嫁接到现有的 `TransactionMgr + SSPacket` 执行模型上。
 
-更完整的现状说明见 [`docs/ssrpc_idl.md`](docs/ssrpc_idl.md)。
+更完整的现状说明见 `[docs/ssrpc_idl.md](docs/ssrpc_idl.md)`。
 
-| 传输层    | Wrap 函数        | 挂载点              | Proto option             | 当前状态 |
-|----------|------------------|---------------------|--------------------------|----------|
-| SSPacket | `WrapUnary`      | `TransactionMgr`    | `cmd/cmd_enum/cmd_name`  | 主通路 |
-| HTTP     | `WrapHTTPGin`    | `gin.IRoutes`       | `http_path`              | 已在 `web_svr` 使用 |
-| WS       | `WrapWS`         | `ssrpc.Dispatcher`  | `ws: true`               | 已在 `connsvr` 登录前置使用 |
-| gRPC     | `WrapGRPCUnary` / `WrapGRPCServerStreamTyped` | `grpc.Server` | `grpc: true` | runtime / codegen ready，支持 unary + server-streaming |
+
+| 传输层      | Wrap 函数                                       | 挂载点                | Proto option            | 当前状态                                                |
+| -------- | --------------------------------------------- | ------------------ | ----------------------- | --------------------------------------------------- |
+| SSPacket | `WrapUnary`                                   | `TransactionMgr`   | `cmd/cmd_enum/cmd_name` | 主通路                                                 |
+| HTTP     | `WrapHTTPGin`                                 | `gin.IRoutes`      | `http_path`             | 已在 `web_svr` 使用                                     |
+| WS       | `WrapWS`                                      | `ssrpc.Dispatcher` | `ws: true`              | 已在 `connsvr` 登录前置使用                                 |
+| gRPC     | `WrapGRPCUnary` / `WrapGRPCServerStreamTyped` | `grpc.Server`      | `grpc: true`            | runtime / codegen ready，支持 unary + server-streaming |
+
 
 **关键组件：**
 
-- **`ssrpc.Dispatcher`**：统一注册中心；生成器会产出 `Register<Service>ToDispatcher(...)`
-- **`ssrpc.Context`**：统一请求上下文，middleware 不用关心底层 transport
-- **`ssrpc.Middleware`**：`func(next Handler) Handler` 链式中间件
-- **`New<Service>SServer(...)`**：统一默认中间件链入口
-- **`protoc-gen-goone`**：从 proto service 生成 server 注册与 client stub
-- **`ssrpc.CallByCmd` / `CallByCmdWithRouter` / `SendByCmdSimple`**：生成 client stub 依赖的 helper
+- `**ssrpc.Dispatcher`**：统一注册中心；生成器会产出 `Register<Service>ToDispatcher(...)`
+- `**ssrpc.Context**`：统一请求上下文，middleware 不用关心底层 transport
+- `**ssrpc.Middleware**`：`func(next Handler) Handler` 链式中间件
+- `**New<Service>SServer(...)**`：统一默认中间件链入口
+- `**protoc-gen-goone**`：从 proto service 生成 server 注册与 client stub
+- `**ssrpc.CallByCmd` / `CallByCmdWithRouter` / `SendByCmdSimple**`：生成 client stub 依赖的 helper
 
 **当前协议归属：**
 
 - `game_protocol/`：共享消息、枚举、`CMD`，以及主线业务 service proto
-- `api/proto/goone/**`、`api/proto/game/**`、存在时的 `api/proto/web/**`：repo-owned proto 输入
+- `api/proto/goone/`**、`api/proto/game/**`、存在时的 `api/proto/web/**`：repo-owned proto 输入
 - `api/gen/**`：统一生成产物
 
 **当前推荐生成命令：**
@@ -118,6 +124,7 @@ Windows / PowerShell：
 - 主线已在 `game_protocol/websvr.proto` 启用 `grpc: true`（`Ping` / `WatchPing`）作为真实生成示例
 - `web_svr` 已接入可选的 `grpc_server` listener 配置；其他服务若要对外监听 gRPC，仍需各自在 app 层挂载
 - `web_svr` 的 gRPC listener 已附带标准 health / reflection，便于本地调试
+
 ---
 
 ## 3.2 脚手架工具
@@ -173,7 +180,7 @@ docker compose -f etc/env/env_docker.yaml up -d
 ./main.sh docker status  --env dev_local
 ```
 
-> Docker 配置来自：[`etc/env/env_docker.yaml`](etc/env/env_docker.yaml)
+> Docker 配置来自：`[etc/env/env_docker.yaml](etc/env/env_docker.yaml)`
 
 ### 4.4 编译
 
@@ -197,6 +204,7 @@ Windows / PowerShell 可直接使用对应构建脚本：
 ### 4.5 本地运行（IDE/调试）
 
 各服务通过统一 flag 读取配置（`-svr_conf`），示例配置见：
+
 - `etc/config/server_conf_ide.yaml`
 
 示例（按需启动）：
@@ -245,7 +253,8 @@ Windows 下如果使用 `build.ps1`，对应可执行文件通常在 `build\*.ex
 ```
 
 更多说明：
-- 部署说明：[`deploy/README.md`](deploy/README.md)
+
+- 部署说明：`[deploy/README.md](deploy/README.md)`
 
 ---
 
@@ -292,7 +301,7 @@ main.sh     主控制台脚本（推荐入口）
 - **本地 go test 会因为 MQ/注册中心没启动而失败吗？**
   - 某些包是集成测试性质，建议先启动 `etc/env/env_docker.yaml` 中的依赖后再联调。
 - **部署 inventory/账号密码在哪里配置？**
-  - 在 `deploy/hosts/*` 与 `deploy/playbook_dev/*`；生产环境务必使用安全的凭据管理方式，避免明文提交。
+  - 在 `deploy/hosts/`* 与 `deploy/playbook_dev/*`；生产环境务必使用安全的凭据管理方式，避免明文提交。
 
 ---
 
@@ -305,4 +314,4 @@ main.sh     主控制台脚本（推荐入口）
 
 ## 10. License
 
-GoOne 使用 MIT 协议发布，详见 [`LICENSE`](LICENSE)。
+GoOne 使用 MIT 协议发布，详见 `[LICENSE](LICENSE)`。

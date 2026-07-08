@@ -2,10 +2,11 @@ package net_mgr
 
 import (
 	"errors"
-	"github.com/Iori372552686/GoOne/lib/api/logger"
-	gnet_svr "github.com/Iori372552686/GoOne/lib/net/gnet_server"
+	"fmt"
 	"net"
 
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	gnet_svr "github.com/Iori372552686/GoOne/lib/net/gnet_server"
 	"github.com/panjf2000/gnet"
 	Kcp "github.com/xtaci/kcp-go/v5"
 )
@@ -18,13 +19,9 @@ func (self *ConnTcpSvr) CreateTcpServer(implType string, port int, cb func(conn 
 	}
 
 	switch implType {
-	case "gev":
-		//todo   -- need time, wait!
-		return nil
-
-	case "gnet":
-		//todo   -- need time, wait!
-		return nil
+	case "gev", "gnet":
+		// 未实现的事件驱动后端：显式报错，避免调用方误以为服务已启动。
+		return fmt.Errorf("tcp implType %q is not implemented yet, use default (gonet)", implType)
 
 	default: //"gonet"
 		return self.initAndRun("0.0.0.0", port, cb)
@@ -39,13 +36,9 @@ func CreateUdpServer(implType string, port int, cb func(conn gnet.Conn, data []b
 	}
 
 	switch implType {
-	case "gev":
-		//todo   -- need you, wait!
-		return nil
-
-	case "gonet":
-		//todo   -- need time, wait!
-		return nil
+	case "gev", "gonet":
+		// 未实现的后端：显式报错，避免调用方误以为服务已启动。
+		return fmt.Errorf("udp implType %q is not implemented yet, use default (gnet)", implType)
 
 	default: //"gnet"
 		return gnet_svr.NewUdpServer(port, cb)

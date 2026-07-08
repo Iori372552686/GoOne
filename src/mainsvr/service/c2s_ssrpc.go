@@ -1,4 +1,4 @@
-package service
+﻿package service
 
 import (
 	"fmt"
@@ -264,7 +264,7 @@ func (s *MainC2SServiceImpl) CreateRoom(ctx *ssrpc.Context, req *g1_protocol.Cre
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}
-	return room.OnMainCreatRoom(ctx, req, myRole), nil
+	return room.OnMainCreateRoom(ctx, req, myRole), nil
 }
 
 func (s *MainC2SServiceImpl) JoinRoom(ctx *ssrpc.Context, req *g1_protocol.JoinRoomReq) (*g1_protocol.JoinRoomRsp, error) {
