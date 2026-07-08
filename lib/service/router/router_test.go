@@ -41,13 +41,11 @@ func (b *fakeBus) Close() error {
 func TestRouterCloseClosesBusAndClearsState(t *testing.T) {
 	oldBus := router.busImpl
 	oldCb := router.cbOnRecvSSPacket
-	oldBegin := router.beginShutdownOnce
-	oldClose := router.closeOnce
 	t.Cleanup(func() {
 		router.busImpl = oldBus
 		router.cbOnRecvSSPacket = oldCb
-		router.beginShutdownOnce = oldBegin
-		router.closeOnce = oldClose
+		router.beginShutdownOnce = sync.Once{}
+		router.closeOnce = sync.Once{}
 	})
 
 	fb := &fakeBus{selfBusID: 0x01020304}

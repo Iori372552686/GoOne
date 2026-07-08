@@ -1,14 +1,19 @@
 package nsq
 
 import (
-	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"log"
 	"math/rand"
 	"testing"
 	"time"
+
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 )
 
+// TestConsumer is a manual integration test: it requires an external nsq
+// lookupd and never terminates by itself, so it is skipped by default.
 func TestConsumer(t *testing.T) {
+	t.Skip("manual integration test; requires external nsqlookupd")
+
 	_, err := NewConsumer("test", "ch1", "nacos.miniworldplus.com:4161", []string{}, 3, nil)
 	if err != nil {
 		logger.Errorf("init Consumer error")
@@ -20,15 +25,20 @@ func TestConsumer(t *testing.T) {
 	select {}
 }
 
+// TestProducer is a manual integration test: it requires an external nsqd,
+// so it is skipped by default.
 func TestProducer(t *testing.T) {
+	t.Skip("manual integration test; requires external nsqd")
+
 	producer, err := NewProducer("nacos.miniworldplus.com:4150")
 	if err != nil {
 		log.Panic(err)
 	}
+	defer producer.Stop()
 
 	chars := []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-	for {
+	for n := 0; n < 10; n++ {
 		buf := make([]byte, 4)
 		for i := 0; i < 4; i++ {
 			buf[i] = chars[rand.Intn(len(chars))]
@@ -40,6 +50,4 @@ func TestProducer(t *testing.T) {
 		}
 		time.Sleep(time.Second * 1)
 	}
-
-	producer.Stop()
 }

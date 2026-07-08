@@ -107,7 +107,7 @@ func convertInt32(str string) interface{} {
 
 	str, err := extractDigits(str)
 	if err != nil {
-		logx.Warnf(err.Error())
+		logx.Warnf("%s", err.Error())
 	}
 	return cast.ToInt32(str)
 }
@@ -119,7 +119,7 @@ func convertInt64(str string) interface{} {
 
 	str, err := extractDigits(str)
 	if err != nil {
-		logx.Warnf(err.Error())
+		logx.Warnf("%s", err.Error())
 	}
 	return cast.ToInt64(str) //str如有空格 cast.ToInt64会返回为0
 }
@@ -131,7 +131,7 @@ func convertUint32(str string) interface{} {
 
 	str, err := extractDigits(str)
 	if err != nil {
-		logx.Warnf(err.Error())
+		logx.Warnf("%s", err.Error())
 	}
 	return cast.ToUint32(str)
 }
@@ -143,7 +143,7 @@ func convertUint64(str string) interface{} {
 
 	str, err := extractDigits(str)
 	if err != nil {
-		logx.Warnf(err.Error())
+		logx.Warnf("%s", err.Error())
 	}
 	return cast.ToUint64(str)
 }

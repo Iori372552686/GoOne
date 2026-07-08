@@ -33,7 +33,7 @@ func InitLocal(dir string) error {
 		//fmt.Println("---------->dir:", dir, err)
 		buf, err := ioutil.ReadFile(filepath.Join(configureDir, fileName))
 		if err != nil {
-			return uerror.New(1, -1, err.Error())
+			return uerror.New(1, -1, "%s", err.Error())
 		}
 
 		if err := f(string(buf)); err != nil {

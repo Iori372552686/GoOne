@@ -47,7 +47,11 @@ func (self *ConnKcpSvr) OnConn(conn *Kcp.UDPSession) {
 * @Date: 2022-02-15 14:48:15
 **/
 func (self *ConnKcpSvr) OnRead(conn *Kcp.UDPSession, data []byte) int {
-	go self.handler(conn, data)
+	// data aliases the read loop's reusable buffer. Copy it before handing it
+	// to another goroutine, otherwise the next Read overwrites it in place.
+	packet := make([]byte, len(data))
+	copy(packet, data)
+	go self.handler(conn, packet)
 	return 0
 }
 

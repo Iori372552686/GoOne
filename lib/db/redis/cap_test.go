@@ -17,7 +17,7 @@ func TestCap(t *testing.T) {
 	redisMgr := NewRedisMgr()
 	err := redisMgr.AddInstance(1, "10.0.0.173", 6379, "mWtiidKGE6Bb8esnFB8", 0, false)
 	if err != nil {
-		t.Fatal(err)
+		t.Skipf("redis unavailable, skipping integration test: %v", err)
 	}
 	now := time.Now()
 	for i := 0; i < 100; i++ {
@@ -34,7 +34,7 @@ func TestIncBy(t *testing.T) {
 	redisMgr := NewRedisMgr()
 	err := redisMgr.AddInstance(1, "10.0.0.173", 6379, "mWtiidKGE6Bb8esnFB8", 0, false)
 	if err != nil {
-		t.Fatal(err)
+		t.Skipf("redis unavailable, skipping integration test: %v", err)
 	}
 
 	for i := 1; i <= 24; i++ {

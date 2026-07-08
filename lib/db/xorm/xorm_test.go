@@ -3,6 +3,7 @@ package orm
 import (
 	"fmt"
 	"log"
+	"os"
 	"testing"
 
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
@@ -12,25 +13,37 @@ import (
 
 var engine *xorm.Engine
 
+// TestMain is integration-flavoured: it requires a local MySQL. When MySQL is
+// unavailable (e.g. CI with -short), all tests in this package are skipped.
 func TestMain(m *testing.M) {
-	// 创建xorm数据库连接
 	cnn, err := xorm.NewEngine("mysql", "root:123456@tcp(127.0.0.1:3306)/testdb?charset=utf8")
 	if err != nil {
-		panic(err)
+		log.Printf("skip xorm integration tests: %v", err)
+		os.Exit(0)
 	}
 
-	if err := cnn.Sync2(new(g1_protocol.TexasData)); err != nil {
-		panic(err)
+	if err := cnn.Ping(); err != nil {
+		log.Printf("skip xorm integration tests, mysql unavailable: %v", err)
+		os.Exit(0)
+	}
+
+	if err := cnn.Sync2(new(g1_protocol.MysqlTexasRoomInfo)); err != nil {
+		log.Printf("skip xorm integration tests, sync failed: %v", err)
+		os.Exit(0)
 	}
 
 	engine = cnn
-	m.Run()
+	os.Exit(m.Run())
 }
 
 func TestXorm(t *testing.T) {
-	item := &g1_protocol.TexasData{
-		RoomId:   1,
-		CurState: g1_protocol.GameState_STATE_START,
+	if testing.Short() {
+		t.Skip("integration test; requires local mysql")
+	}
+
+	item := &g1_protocol.MysqlTexasRoomInfo{
+		RoomId:  1,
+		TableId: 1,
 	}
 
 	affected, err := engine.Insert(item)
@@ -48,16 +61,20 @@ type User struct {
 }
 
 func TestUser(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test; requires local mysql")
+	}
+
 	// 同步结构体到数据库表结构
 	if err := engine.Sync2(new(User)); err != nil {
-		log.Fatalf("同步表结构失败: %v", err)
+		t.Fatalf("同步表结构失败: %v", err)
 	}
 
 	// 插入数据
 	user := &User{Name: "Alice", Age: 25}
 	affected, err := engine.Insert(user)
 	if err != nil {
-		log.Fatalf("插入数据失败: %v", err)
+		t.Fatalf("插入数据失败: %v", err)
 	}
 	fmt.Printf("插入 %d 条记录\n", affected)
 
@@ -65,7 +82,7 @@ func TestUser(t *testing.T) {
 	var users []User
 	err = engine.Find(&users)
 	if err != nil {
-		log.Fatalf("查询数据失败: %v", err)
+		t.Fatalf("查询数据失败: %v", err)
 	}
 	fmt.Println("查询到的所有用户:")
 	for _, u := range users {
@@ -76,17 +93,7 @@ func TestUser(t *testing.T) {
 	user.Age = 26
 	affected, err = engine.ID(user.ID).Update(user)
 	if err != nil {
-		log.Fatalf("更新数据失败: %v", err)
+		t.Fatalf("更新数据失败: %v", err)
 	}
 	fmt.Printf("更新 %d 条记录\n", affected)
-
-	/*
-		// 删除数据
-		affected, err = engine.ID(user.ID).Delete(new(User))
-		if err != nil {
-			log.Fatalf("删除数据失败: %v", err)
-		}
-		fmt.Printf("删除 %d 条记录\n", affected)
-	*/
-
 }

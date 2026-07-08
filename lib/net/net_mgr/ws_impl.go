@@ -78,17 +78,20 @@ func (t *ConnWsTcpSvr) SendByUid(uid uint64, data1 []byte, data2 []byte) error {
 	return nil
 }
 
+// BroadcastByZone 向指定 zone 的所有在线客户端广播；zone <= 0 表示全服广播。
 func (t *ConnWsTcpSvr) BroadcastByZone(zone int32, data1 []byte, data2 []byte) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	for _, conn := range t.uidConnMap {
-		// TODO check zone
-		err := t.WriteData(conn.Conn, data1, data2)
+	for _, client := range t.uidConnMap {
+		if zone > 0 && client.Zone != uint32(zone) {
+			continue
+		}
+		err := t.WriteData(client.Conn, data1, data2)
 		if err != nil {
-			conn.Conn.Close()
+			client.Conn.Close()
 			observeGatewayEvent("ws", "write_error")
-			logger.Errorf("Closed connection for failing to write data {uid: %v}| %v\", uid, err")
+			logger.Errorf("Closed connection for failing to write data {uid: %v} | %v", client.Uid, err)
 			continue
 		}
 	}

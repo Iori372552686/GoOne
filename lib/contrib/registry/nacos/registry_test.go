@@ -30,8 +30,20 @@ func getIntranetIP() string {
 	return "127.0.0.1"
 }
 
+// requireNacos skips the test when no nacos server is reachable
+// (integration test dependency).
+func requireNacos(t *testing.T, ip string) {
+	t.Helper()
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(ip, "8848"), 2*time.Second)
+	if err != nil {
+		t.Skipf("nacos unavailable at %s:8848, skipping integration test: %v", ip, err)
+	}
+	_ = conn.Close()
+}
+
 func TestRegistry(t *testing.T) {
 	ip := getIntranetIP()
+	requireNacos(t, ip)
 	serviceName := "golang-sms@grpc"
 	ctx := context.Background()
 
@@ -45,8 +57,6 @@ func TestRegistry(t *testing.T) {
 		NotLoadCacheAtStart: true,
 		LogDir:              "/tmp/nacos/zap",
 		CacheDir:            "/tmp/nacos/cache",
-		RotateTime:          "1h",
-		MaxAge:              3,
 		LogLevel:            "debug",
 	}
 
@@ -125,6 +135,7 @@ func TestRegistry(t *testing.T) {
 
 func TestRegistryMany(t *testing.T) {
 	ip := getIntranetIP()
+	requireNacos(t, ip)
 	serviceName := "golang-sms@grpc"
 	// ctx := context.Background()
 
@@ -138,8 +149,6 @@ func TestRegistryMany(t *testing.T) {
 		NotLoadCacheAtStart: true,
 		LogDir:              "/tmp/nacos/zap",
 		CacheDir:            "/tmp/nacos/cache",
-		RotateTime:          "1h",
-		MaxAge:              3,
 		LogLevel:            "debug",
 	}
 

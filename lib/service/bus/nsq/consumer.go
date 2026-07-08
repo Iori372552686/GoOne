@@ -1,11 +1,11 @@
 package nsq
 
 import (
-	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/nsqio/go-nsq"
-	"log"
 	"sync"
 	"time"
+
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/nsqio/go-nsq"
 )
 
 // cb  handler
@@ -32,7 +32,9 @@ type ConsumerHandler struct {
 * @Date: 2022-04-22 12:02:04
 **/
 func (ch *ConsumerHandler) HandleMessage(msg *nsq.Message) error {
-	log.Printf("receive ID:%s,addr:%s,message:%s", msg.ID, msg.NSQDAddress, string(msg.Body))
+	if logger.DebugEnabled() {
+		logger.Debugf("nsq receive ID:%s, addr:%s, bodyLen:%d", msg.ID, msg.NSQDAddress, len(msg.Body))
+	}
 	if ch.onRecv != nil {
 		ch.onRecv(0, msg.Body)
 	}

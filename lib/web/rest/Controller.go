@@ -22,7 +22,7 @@ func NoRoute(ctx *gin.Context) {
 
 func NoMethod(ctx *gin.Context) {
 	uri := ctx.Request.RequestURI
-	fmt.Printf("NoMethod" + uri)
+	fmt.Printf("NoMethod%s", uri)
 	uri = strings.TrimLeft(uri, "/")
 	uri = strings.TrimSuffix(uri, ".shtml")
 	//ctx.HTML(http.StatusOK, model+"/"+action+".html", gin.H{"title": "test"})

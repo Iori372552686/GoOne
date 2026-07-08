@@ -52,6 +52,26 @@ func (m *RoleMgr) Tick() {
 	m.removeExpiredRoles()
 }
 
+// FlushAllToDB 同步落盘内存中的全部角色数据。
+// 用于优雅停机：必须在 TransactionMgr 排空之后调用，保证没有 handler 并发修改角色。
+func (m *RoleMgr) FlushAllToDB() (saved int, failed int) {
+	m.mapUidToRole.Range(func(key, value interface{}) bool {
+		role, ok := value.(*Role)
+		if !ok || role == nil {
+			return true
+		}
+		if err := role.SaveToDBSync(); err != nil {
+			failed++
+		} else {
+			saved++
+		}
+		return true
+	})
+
+	logger.Infof("RoleMgr FlushAllToDB done {saved:%d, failed:%d}", saved, failed)
+	return saved, failed
+}
+
 // -------------------------------- private --------------------------------
 
 func (m *RoleMgr) setRole(uid uint64, role *Role) {

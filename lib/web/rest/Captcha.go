@@ -390,7 +390,6 @@ func NewLenChars(length int, chars []byte) string {
 			}
 		}
 	}
-	panic("unreachable")
 }
 
 func LoadVerify(ctx *gin.Context) {

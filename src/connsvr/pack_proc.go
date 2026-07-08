@@ -104,8 +104,14 @@ func onRecvSSPacket(packet *sharedstruct.SSPacket) {
 			BodyLen: packet.Header.BodyLen,
 		}
 
-		globals.ConnTcpSvr.SendByUid(packet.Header.Uid, csPacketHeader.ToBytes(), packet.Body)
-		//globals.ConnWsSvr.SendByUid(packet.Header.Uid, csPacketHeader.ToBytes(), packet.Body)
+		// 同一个 uid 只会绑定在一种传输通道上：先尝试 TCP，找不到再尝试 WS。
+		headerBytes := csPacketHeader.ToBytes()
+		if err := globals.ConnTcpSvr.SendByUid(packet.Header.Uid, headerBytes, packet.Body); err != nil {
+			if wsErr := globals.ConnWsSvr.SendByUid(packet.Header.Uid, headerBytes, packet.Body); wsErr != nil {
+				logger.Debugf("downstream packet dropped, uid not on tcp/ws {uid:%v, cmd:%v}",
+					packet.Header.Uid, packet.Header.Cmd)
+			}
+		}
 	} else if packet.Header.Cmd == uint32(g1_protocol.CMD_CONN_KICK_OUT_REQ) {
 		//onSSPacketConnKickout(packet)
 	} else {

@@ -302,7 +302,7 @@ func TestDispatcher_MountGRPC_ServerStreamRoundTrip(t *testing.T) {
 		t.Fatalf("RecvMsg #2 err: %v", err)
 	}
 	if rsp1.GetComment() != "first" || rsp1.GetCmd() != 8 || rsp2.GetComment() != "second" || rsp2.GetCmd() != 9 {
-		t.Fatalf("unexpected stream responses: %#v / %#v", rsp1, rsp2)
+		t.Fatalf("unexpected stream responses: %#v / %#v", &rsp1, &rsp2)
 	}
 
 	var rsp3 optionsv1.SsRpc

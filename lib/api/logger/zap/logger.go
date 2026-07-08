@@ -20,6 +20,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -30,6 +31,10 @@ import (
 var (
 	logger  Logger
 	logLock sync.RWMutex
+
+	// currentLevel mirrors the active core level so hot paths can cheaply
+	// check DebugEnabled() before boxing log arguments.
+	currentLevel atomic.Int32
 
 	// ZapLogger is kept for backward compatibility with existing integrations
 	// (e.g. gin middleware expecting *zap.Logger).
@@ -84,7 +89,19 @@ func init() {
 	// Default logger: stdout only.
 	zlogger := newZapLogger(zapcore.InfoLevel, zapcore.AddSync(os.Stdout), 1)
 	ZapLogger = zlogger
+	currentLevel.Store(int32(zapcore.InfoLevel))
 	setLogger(&NacosLogger{zlogger.Sugar()})
+}
+
+// DebugEnabled reports whether debug-level logs are active. Hot paths should
+// guard verbose logging with this to avoid fmt boxing when debug is off.
+func DebugEnabled() bool {
+	return zapcore.Level(currentLevel.Load()) <= zapcore.DebugLevel
+}
+
+// InfoEnabled reports whether info-level logs are active.
+func InfoEnabled() bool {
+	return zapcore.Level(currentLevel.Load()) <= zapcore.InfoLevel
 }
 
 // InitLogger is init global logger for nacos
@@ -109,6 +126,7 @@ func initNacosLogger(config Config) (Logger, error) {
 
 	zlogger := newZapLogger(logLevel, writer, 2)
 	ZapLogger = zlogger
+	currentLevel.Store(int32(logLevel))
 	return &NacosLogger{zlogger.Sugar()}, nil
 }
 

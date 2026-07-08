@@ -143,7 +143,6 @@ func (s *TcpSvr) runConnRead(conn net.Conn) {
 	for {
 		_ = conn.SetReadDeadline(datetime.NowT().Add(s.TcpReadTimeout))
 		readLen, err := conn.Read(readBuf)
-		logger.Infof("read len: %d", readLen)
 
 		if err == nil {
 			buff.Write(readBuf[0:readLen])

@@ -38,6 +38,9 @@ func TestRegister(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create consul client failed: %v", err)
 	}
+	if _, err := cli.Status().Leader(); err != nil {
+		t.Skipf("consul unavailable, skipping integration test: %v", err)
+	}
 	opts := []Option{
 		WithHeartbeat(true),
 		WithHealthCheck(true),

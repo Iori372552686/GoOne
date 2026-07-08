@@ -1,10 +1,11 @@
 package texas_room
 
 import (
-	"github.com/Iori372552686/GoOne/src/roomcentersvr/room_ai"
 	"sync"
 
+	"github.com/Iori372552686/GoOne/src/roomcentersvr/room_ai"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/room_mgr/texas_room/texas"
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 )
@@ -92,23 +93,22 @@ func (impl *TexasRoomCenterMgr) checkAndCreate(nowMs int64) {
 	}
 
 	for _, rstage := range impl.TexasMap {
-		cnt := 0
-
-		if rstage == nil || rstage.RoomsMap == nil {
+		if rstage == nil || len(rstage.RoomsMap) == 0 {
 			continue
 		}
 
-		//check creat room
+		fullCnt := 0
+		var sample *g1_protocol.RoomShowInfo
 		for _, room := range rstage.RoomsMap {
+			sample = room
 			if room.Base.CurPlayerNum >= room.Base.MaxPlayer {
-				cnt += 1
-			}
-
-			if len(rstage.RoomsMap) == cnt {
-				room_ai.OnAiCreatRoom(room.Base.GameId, int32(room.Base.Stage), int32(room.Base.CoinType))
+				fullCnt += 1
 			}
 		}
 
+		// 该 stage 下所有房间都满员时补一间新房，保证玩家总有可加入的房间。
+		if fullCnt == len(rstage.RoomsMap) && sample != nil {
+			room_ai.OnAiCreatRoom(sample.Base.GameId, int32(sample.Base.Stage), int32(sample.Base.CoinType))
+		}
 	}
-
 }

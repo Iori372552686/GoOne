@@ -147,9 +147,15 @@ func buildField(tab *base.Table, col int) (*base.Field, error) {
 }
 
 func parseStruct(tab *base.Table) {
+	// 表头至少需要 3 行：描述行 / 字段名行 / 类型行
+	if len(tab.Rows) < 3 {
+		logx.Warnf("结构表%s(%s)表头不足3行，已跳过\n", tab.Sheet, tab.FileName)
+		return
+	}
+
 	st := manager.GetOrNewStruct(tab.FileName, tab.Sheet, tab.Type)
 	for i, val := range tab.Rows[2] {
-		if len(val) <= 0 || len(tab.Rows[0][i]) <= 0 {
+		if i >= len(tab.Rows[0]) || len(val) <= 0 || len(tab.Rows[0][i]) <= 0 {
 			continue
 		}
 
@@ -177,13 +183,19 @@ func parseStruct(tab *base.Table) {
 }
 
 func parseConfig(tab *base.Table) {
+	// 表头至少需要 4 行：描述行 / 字段名行 / 类型行 / 标记行
+	if len(tab.Rows) < 4 {
+		logx.Warnf("配置表%s(%s)表头不足4行，已跳过\n", tab.Sheet, tab.FileName)
+		return
+	}
+
 	cfg := manager.GetOrNewConfig(tab.FileName, tab.Sheet, tab.Type)
 
 	// 收集第四行标记为 "key"/"KEY" 的字段，用于自动生成主键索引
 	var autoKeyFields []*base.Field
 
 	for i, val := range tab.Rows[2] {
-		if len(val) <= 0 || len(tab.Rows[0][i]) <= 0 {
+		if i >= len(tab.Rows[0]) || len(val) <= 0 || len(tab.Rows[0][i]) <= 0 {
 			continue
 		}
 

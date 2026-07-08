@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main, master]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        # composites disabled: generated gamedata repositories use unkeyed
+        # Index2 literals (tracked in docs/optimization_roadmap.md 3.6).
+        run: go vet -composites=false ./...
+
+      - name: Test
+        # Integration tests self-skip when local middleware (redis/consul/
+        # zookeeper/nacos/mysql) is unavailable.
+        # Excluded for now (tracked in docs/optimization_roadmap.md):
+        #   - tools/cfgtool/test: fixture xlsx incompatible with parser
+        #   - tools/tester: end-to-end client that dials a remote dev server
+        run: >
+          go test -count=1 -timeout 600s
+          ./lib/... ./src/... ./common/... ./module/...
+          ./tools/protoc-gen-goone/... ./tools/cmd/...
+
+      - name: Race (core packages)
+        run: >
+          go test -race -count=1 -timeout 300s
+          ./lib/net/...
+          ./lib/service/transaction/...
+          ./lib/service/router/...
+          ./lib/service/ssrpc/...
+          ./lib/util/safego/...
+
+  check-genproto:
+    name: Check generated proto
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+          protoc --version
+
+      - name: check-genproto
+        run: ./main.sh check-genproto
+
+  lint:
+    name: golangci-lint (new issues only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          # Only fail on issues introduced by the change under review.
+          args: --new-from-rev=origin/${{ github.base_ref || 'dev' }}
+        continue-on-error: true

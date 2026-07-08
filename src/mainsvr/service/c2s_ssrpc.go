@@ -214,7 +214,7 @@ func (s *MainC2SServiceImpl) GmAddItem(ctx *ssrpc.Context, req *g1_protocol.GMAd
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}
 
-	ret := myRole.ItemAdd(req.GetId(), req.GetCount(), &role.Reason{g1_protocol.Reason_REASON_GM, 0})
+	ret := myRole.ItemAdd(req.GetId(), req.GetCount(), &role.Reason{Reason: g1_protocol.Reason_REASON_GM, Scene: 0})
 	_ = myRole.FlushPending(ctx, false)
 	return &g1_protocol.GMAddItemRsp{Ret: &g1_protocol.Ret{Code: ret}}, nil
 }
@@ -248,7 +248,7 @@ func (s *MainC2SServiceImpl) MallBuyPackage(ctx *ssrpc.Context, req *g1_protocol
 		// ret = RechargeAdd(conf.Rmb, myRole)
 	} else {
 		rsp.Ret.Code = myRole.ItemExchange(conf.CostItemID, int64(conf.CostItemCnt), conf.PackageID,
-			1, &role.Reason{g1_protocol.Reason_REASON_MALL_PACKAGE, req.GetConfId()})
+			1, &role.Reason{Reason: g1_protocol.Reason_REASON_MALL_PACKAGE, Scene: req.GetConfId()})
 		if rsp.Ret.Code != g1_protocol.ErrorCode_ERR_OK {
 			return rsp, nil
 		}

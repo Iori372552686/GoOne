@@ -66,7 +66,7 @@ func (self *OrmSql) AddInstance(conf Config, tables ...interface{}) (*xorm.Engin
 				slaveCfg.User,
 				slaveCfg.Password,
 				slaveCfg.IP,
-				conf.Master.Port,
+				slaveCfg.Port,
 				slaveCfg.DBName),
 		)
 	}

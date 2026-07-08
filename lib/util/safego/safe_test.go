@@ -1,32 +1,42 @@
 package safego
 
 import (
-	"context"
-	"strconv"
 	"sync"
 	"testing"
 )
 
-func TestSafeMap(t *testing.T) {
-	var m map[string]string
-	SafeFunc(context.Background(), func(c context.Context) {
-		m["k"] = "v"
+// TestSafeFuncRecoversPanic verifies that a panic inside SafeFunc is recovered
+// and does not terminate the process.
+func TestSafeFuncRecoversPanic(t *testing.T) {
+	SafeFunc(func() {
+		var m map[string]string
+		m["k"] = "v" // panics: assignment to entry in nil map
 	})
-	m = make(map[string]string)
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-	Go(context.Background(), func(c context.Context) {
-		for i := 0; i < 1000000; i++ {
-			m["k"] = strconv.Itoa(i)
-		}
-		wg.Done()
-	})
-	Go(context.Background(), func(c context.Context) {
-		for i := 0; i < 1000000; i++ {
-			m["k"] = strconv.Itoa(i)
-		}
-		wg.Done()
+	// Reaching here means the panic was recovered.
+}
+
+func TestSafeFuncNil(t *testing.T) {
+	SafeFunc(func() {})
+	Go(nil) // must not panic
+}
+
+func TestGoRunsFunc(t *testing.T) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	Go(func() {
+		defer wg.Done()
 	})
 	wg.Wait()
-	t.Log("safe")
+}
+
+// TestGoRecoversPanic verifies that a panicking goroutine spawned via Go does
+// not crash the process.
+func TestGoRecoversPanic(t *testing.T) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	Go(func() {
+		defer wg.Done()
+		panic("boom")
+	})
+	wg.Wait()
 }

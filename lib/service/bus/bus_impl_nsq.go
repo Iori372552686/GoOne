@@ -242,8 +242,6 @@ func (b *BusImplNsqMQ) process() error {
 			}
 		}
 	}
-
-	return nil
 }
 
 /**

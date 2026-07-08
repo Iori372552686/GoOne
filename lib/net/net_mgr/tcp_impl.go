@@ -40,7 +40,12 @@ func (t *ConnTcpSvr) OnConn(conn net.Conn) {
 
 // 被Read协程调用，每个Connection对应一个Read协调
 func (t *ConnTcpSvr) OnPacket(conn net.Conn, data []byte) {
-	go t.handler(conn, data)
+	// data aliases the read loop's reusable buffer (bytes.Buffer). It must be
+	// copied before crossing the goroutine boundary, otherwise the read loop
+	// may recycle the underlying array while the handler is still using it.
+	packet := make([]byte, len(data))
+	copy(packet, data)
+	go t.handler(conn, packet)
 }
 
 // 被Read协程调用，每个Connection对应一个Read协调
@@ -86,17 +91,20 @@ func (t *ConnTcpSvr) SendByUid(uid uint64, data1 []byte, data2 []byte) error {
 	return nil
 }
 
+// BroadcastByZone 向指定 zone 的所有在线客户端广播；zone <= 0 表示全服广播。
 func (t *ConnTcpSvr) BroadcastByZone(zone int32, data1 []byte, data2 []byte) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	for _, conn := range t.uidConnMap {
-		// TODO check zone
-		err := t.WriteData(conn.Conn, data1, data2)
+	for _, client := range t.uidConnMap {
+		if zone > 0 && client.Zone != uint32(zone) {
+			continue
+		}
+		err := t.WriteData(client.Conn, data1, data2)
 		if err != nil {
-			conn.Conn.Close()
+			client.Conn.Close()
 			observeGatewayEvent("tcp", "write_error")
-			logger.Errorf("Closed connection for failing to write data {uid: %v}| %v\", uid, err")
+			logger.Errorf("Closed connection for failing to write data {uid: %v} | %v", client.Uid, err)
 			continue
 		}
 	}

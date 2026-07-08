@@ -1,0 +1,39 @@
+version: "2"
+
+run:
+  timeout: 10m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - misspell
+    - unused
+  settings:
+    govet:
+      disable:
+        # generated gamedata repositories use unkeyed Index2 composite
+        # literals; re-enable once the cfgtool generator emits keyed fields.
+        - composites
+    errcheck:
+      # legacy code ignores many non-critical errors; start with the most
+      # dangerous ones and tighten gradually.
+      check-type-assertions: false
+      check-blank: false
+
+issues:
+  # Freeze legacy debt: only lint findings introduced by new changes fail CI.
+  # Run `golangci-lint run --new-from-rev=origin/dev` locally for the same view.
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+exclusions:
+  generated: lax
+  paths:
+    - api/gen
+    - game_protocol/protocol
+    - common/gamedata/repository

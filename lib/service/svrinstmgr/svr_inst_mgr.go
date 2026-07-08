@@ -189,7 +189,7 @@ func (s *ServerInstanceMgr) refreshServices(services []*registry.ServiceInstance
 		// ID is used as the node key: /online/<ID>
 		children = append(children, si.ID)
 	}
-	logger.Infof("refresh nodes: %v", children)
+	logger.Debugf("refresh nodes: %v", children)
 
 	oldIns := make(map[uint32]bool)
 	newIns := make(map[uint32]bool)
@@ -208,7 +208,7 @@ func (s *ServerInstanceMgr) refreshServices(services []*registry.ServiceInstance
 	for _, child := range children {
 		busID, _, _, severType, _ := bus.ParseBusID(child)
 		s.mapSvrTypeToIns[severType] = append(s.mapSvrTypeToIns[severType], busID)
-		logger.Infof("add %s to type %d", child, severType)
+		logger.Debugf("add %s to type %d", child, severType)
 		newIns[busID] = true
 	}
 
@@ -234,11 +234,11 @@ func (s *ServerInstanceMgr) refreshServices(services []*registry.ServiceInstance
 			b.WriteString(bus.IpIntToString(u))
 		}
 		b.WriteString("]}")
-		logger.Infof(b.String())
+		logger.Infof("%s", b.String())
 	}
 	s.lock.Unlock()
 
-	logger.Infof("refresh finish")
+	logger.Debugf("refresh finish")
 
 	// 打印出删除和发现的svr
 	for k := range oldIns {

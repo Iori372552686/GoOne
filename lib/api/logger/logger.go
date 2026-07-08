@@ -49,6 +49,16 @@ func RegisterCmdBacklist(cmds ...uint32) {
 	}
 }
 
+// DebugEnabled reports whether debug-level logs are active. Hot paths should
+// use this to skip building log arguments entirely when debug is off:
+//
+//	if logger.DebugEnabled() {
+//		logger.Debugf("...", expensiveArgs)
+//	}
+func DebugEnabled() bool {
+	return zap.DebugEnabled()
+}
+
 func Fatalf(format string, args ...interface{}) {
 	text := fmt.Sprintf(format, args...)
 	plug.UploadFatalToDingHook(text)
@@ -84,10 +94,16 @@ func InfoDepth(depth int, format string, args ...interface{}) {
 }
 
 func DebugDepthf(depth int, format string, args ...interface{}) {
+	if !zap.DebugEnabled() {
+		return
+	}
 	zap.Debugf(format, args...)
 }
 
 func CmdDebugDepthf(cmd uint32, depth int, format string, args ...interface{}) {
+	if !zap.DebugEnabled() {
+		return
+	}
 	if !logPlug.IsBlocked(cmd) {
 		//logger.V(5).InfoDepth(1+depth, fmt.Sprintf(format, args...))
 		zap.Debugf(format, args...)
@@ -111,10 +127,16 @@ func Infof(format string, args ...interface{}) {
 }
 
 func Debugf(format string, args ...interface{}) {
+	if !zap.DebugEnabled() {
+		return
+	}
 	zap.Debugf(format, args...)
 }
 
 func CmdDebugf(cmd uint32, format string, args ...interface{}) {
+	if !zap.DebugEnabled() {
+		return
+	}
 	if !logPlug.IsBlocked(cmd) {
 		zap.Debugf(format, args...)
 		//DebugDepthf(1, fmt.Sprintf(format, args...))

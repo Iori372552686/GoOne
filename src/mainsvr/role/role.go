@@ -194,6 +194,27 @@ func (r *Role) SaveToMysql(trans cmd_handler.IContext) error {
 	return nil
 }
 
+// SaveToDBSync 同步持久化角色数据到 redis，不依赖事务上下文。
+// 用于优雅停机等没有 transaction 可用的场景。
+func (r *Role) SaveToDBSync() error {
+	data, err := proto.Marshal(r.PbRole)
+	if err != nil {
+		r.Errorf("role marshal error {uid:%v, reasons:%v} | %v", r.Uid(), sortedStringValues(r.persistReasons), err)
+		return err
+	}
+
+	err = rds.RedisMgr.SetBytes(uint32(g1_protocol.DBType_DB_TYPE_ROLE), fmt.Sprintf("%s:%d", g1_protocol.DBType_DB_TYPE_ROLE.String(), r.Uid()), data)
+	if err != nil {
+		logger.Errorf("role SaveToDBSync set redis error {uid:%v} | %v", r.Uid(), err)
+		return err
+	}
+
+	r.needPersist = false
+	r.persistDirtySince = 0
+	r.persistReasons = nil
+	return nil
+}
+
 // 保存玩家数据，不等待返回结果。只在特殊情况下使用。比如：RoleMgr::removeExpiredRoles中
 func (r *Role) SaveToDBIgnoreRsp() {
 	data, err := proto.Marshal(r.PbRole)

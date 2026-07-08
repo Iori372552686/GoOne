@@ -263,7 +263,7 @@ func parseStructMessage(f *base.Struct, rowIndex int, raw string) (*dynamic.Mess
 func parseArrayValue(file, sheet string, field *base.Field, rowIndex int, raw string, depth int) ([]interface{}, error) {
 	delimiter, err := arrayDelimiter(field.Type.TypeOf, depth)
 	if err != nil {
-		return nil, errs.New(file, sheet, field.Name, rowIndex, "类型错误", err.Error())
+		return nil, errs.New(file, sheet, field.Name, rowIndex, "类型错误", "%s", err.Error())
 	}
 
 	parts := strings.Split(raw, delimiter)

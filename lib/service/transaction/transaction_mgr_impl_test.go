@@ -131,6 +131,10 @@ func TestTransactionMgrCloseRejectsNewRequestsAndWaitsForInflight(t *testing.T) 
 		closeDone <- mgr.Close(ctx)
 	}()
 
+	// Wait until shutdown has actually begun before probing rejection,
+	// otherwise the new packet may race ahead of Close().
+	waitFor(t, func() bool { return mgr.closing.Load() }, "shutdown to begin")
+
 	// New requests should be rejected once shutdown begins.
 	mgr.ProcessSSPacket(makeTestPacket(3002, 0, testTransactionCmd))
 	ensureNoStart(t, started, 150*time.Millisecond)

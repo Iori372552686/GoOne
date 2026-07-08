@@ -1,6 +1,8 @@
 package service
 
 import (
+	"strconv"
+
 	"github.com/Iori372552686/GoOne/api/gen/game/mysqlsvr/v1"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
@@ -23,10 +25,15 @@ func (s *MysqlServiceImpl) UpdateRoleInfo(ctx *ssrpc.Context, req *g1_protocol.M
 		return rsp, nil
 	}
 
-	instance := uint32(g1_protocol.EMysqlType_MYSQL_TYPE_ROLE_INFO)
+	engine := globals.OrmMgr.GetOrmEngine()
+	if engine == nil {
+		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_INTERNAL
+		return rsp, nil
+	}
+
 	if mysqlRoleExists(ctx) {
 		ctx.Infof("role exist")
-		if _, err := globals.MysqlMgr.Execute(instance, "UPDATE role_info SET name = ? WHERE uid = ?", req.GetName(), ctx.Uid()); err != nil {
+		if _, err := engine.Exec("UPDATE role_info SET name = ? WHERE uid = ?", req.GetName(), ctx.Uid()); err != nil {
 			logger.Errorf("failed to update role info | %v", err)
 			rsp.Ret.Code = g1_protocol.ErrorCode_ERR_FAIL
 		}
@@ -34,7 +41,7 @@ func (s *MysqlServiceImpl) UpdateRoleInfo(ctx *ssrpc.Context, req *g1_protocol.M
 	}
 
 	ctx.Infof("role not exist")
-	if _, err := globals.MysqlMgr.Execute(instance, "INSERT INTO role_info VALUES (?, ?)", ctx.Uid(), req.GetName()); err != nil {
+	if _, err := engine.Exec("INSERT INTO role_info VALUES (?, ?)", ctx.Uid(), req.GetName()); err != nil {
 		logger.Errorf("failed to insert role info | %v", err)
 		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_FAIL
 	}
@@ -44,21 +51,26 @@ func (s *MysqlServiceImpl) UpdateRoleInfo(ctx *ssrpc.Context, req *g1_protocol.M
 func (s *MysqlServiceImpl) SearchRole(ctx *ssrpc.Context, req *g1_protocol.MysqlInnerSearchRoleReq) (*g1_protocol.MysqlInnerSearchRoleRsp, error) {
 	rsp := &g1_protocol.MysqlInnerSearchRoleRsp{Ret: &g1_protocol.Ret{Code: g1_protocol.ErrorCode_ERR_OK}}
 
-	instance := uint32(g1_protocol.EMysqlType_MYSQL_TYPE_ROLE_INFO)
-	rows, err := globals.MysqlMgr.Query(instance, "SELECT uid FROM role_info WHERE name = (?)", req.GetSearchString())
+	engine := globals.OrmMgr.GetOrmEngine()
+	if engine == nil {
+		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_INTERNAL
+		return rsp, nil
+	}
+
+	results, err := engine.QueryString("SELECT uid FROM role_info WHERE name = ?", req.GetSearchString())
 	if err != nil {
 		logger.Errorf("failed to select role info: %v", err)
 		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_FAIL
 		return rsp, nil
 	}
-	if rows != nil {
-		defer rows.Close()
-	}
 
-	for rows != nil && rows.Next() {
-		if err := rows.Scan(&rsp.Uid); err != nil {
-			logger.Errorf("scan error: %v", err)
+	for _, row := range results {
+		uid, parseErr := strconv.ParseUint(row["uid"], 10, 64)
+		if parseErr != nil {
+			logger.Errorf("scan error: %v", parseErr)
+			continue
 		}
+		rsp.Uid = uid
 	}
 	return rsp, nil
 }
@@ -169,16 +181,17 @@ func (s *MysqlServiceImpl) QueryGameInfo(ctx *ssrpc.Context, req *g1_protocol.Qu
 }
 
 func mysqlRoleExists(ctx *ssrpc.Context) bool {
-	instance := uint32(g1_protocol.EMysqlType_MYSQL_TYPE_ROLE_INFO)
-	res, err := globals.MysqlMgr.Query(instance, "SELECT uid FROM role_info where uid = (?)", ctx.Uid())
-	if err != nil {
-		logger.Errorf("failed to check role exist | %v", err)
-	}
-	if res == nil {
+	engine := globals.OrmMgr.GetOrmEngine()
+	if engine == nil {
 		return false
 	}
-	defer res.Close()
-	return res.Next()
+
+	results, err := engine.QueryString("SELECT uid FROM role_info WHERE uid = ?", ctx.Uid())
+	if err != nil {
+		logger.Errorf("failed to check role exist | %v", err)
+		return false
+	}
+	return len(results) > 0
 }
 
 func saveRoomInfo(buf []byte) func() {

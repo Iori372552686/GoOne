@@ -91,7 +91,6 @@ func NewApp() *bootstrap.ServiceApp {
 		},
 		OnExit: func() {
 			manager.Close()
-			globals.MysqlMgr.Destroy()
 			logger.Infof("================== mysqlsvr Stop =========================")
 		},
 	})

@@ -156,8 +156,6 @@ func (b *BusImplRabbitMQ) process(rabbitmqAddr string, myQueueName string) error
 			}
 		}
 	}
-
-	return nil
 }
 
 func (b *BusImplRabbitMQ) run(rabbitmqAddr string) {

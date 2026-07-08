@@ -2,28 +2,50 @@ package kcp_server
 
 import (
 	"io"
-	"log"
 	"testing"
 	"time"
 
 	Kcp "github.com/xtaci/kcp-go/v5"
 )
 
+// Test_main runs a bounded KCP echo round-trip over loopback.
 func Test_main(t *testing.T) {
-	//key := pbkdf2.Key([]byte("demo pass"), []byte("demo salt"), 1024, 32, sha1.New)
-	//block, _ := kcp.NewAESBlockCrypt(key)
-	if listener, err := Kcp.ListenWithOptions("127.0.0.1:12345", nil, 10, 3); err == nil {
-		// spin-up the client
-		go client()
+	listener, err := Kcp.ListenWithOptions("127.0.0.1:0", nil, 10, 3)
+	if err != nil {
+		t.Fatalf("listen kcp failed: %v", err)
+	}
+	defer listener.Close()
+
+	go func() {
 		for {
-			s, err := listener.AcceptKCP()
-			if err != nil {
-				log.Fatal(err)
+			s, acceptErr := listener.AcceptKCP()
+			if acceptErr != nil {
+				return
 			}
 			go handleEcho(s)
 		}
-	} else {
-		log.Fatal(err)
+	}()
+
+	sess, err := Kcp.DialWithOptions(listener.Addr().String(), nil, 10, 3)
+	if err != nil {
+		t.Fatalf("dial kcp failed: %v", err)
+	}
+	defer sess.Close()
+	_ = sess.SetDeadline(time.Now().Add(10 * time.Second))
+
+	for i := 0; i < 3; i++ {
+		data := []byte(time.Now().String())
+		if _, err := sess.Write(data); err != nil {
+			t.Fatalf("write failed: %v", err)
+		}
+
+		buf := make([]byte, len(data))
+		if _, err := io.ReadFull(sess, buf); err != nil {
+			t.Fatalf("read failed: %v", err)
+		}
+		if string(buf) != string(data) {
+			t.Fatalf("echo mismatch: sent %q, got %q", data, buf)
+		}
 	}
 }
 
@@ -33,44 +55,12 @@ func handleEcho(conn *Kcp.UDPSession) {
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
-			log.Println(err)
 			return
 		}
 
-		n, err = conn.Write(buf[:n])
+		_, err = conn.Write(buf[:n])
 		if err != nil {
-			log.Println(err)
 			return
 		}
-	}
-}
-
-func client() {
-	//key := pbkdf2.Key([]byte("demo pass"), []byte("demo salt"), 1024, 32, sha1.New)
-	//block, _ := kcp.NewAESBlockCrypt(key)
-
-	// wait for server to become ready
-	time.Sleep(time.Second)
-
-	// dial to the echo server
-	if sess, err := Kcp.DialWithOptions("127.0.0.1:12345", nil, 10, 3); err == nil {
-		for {
-			data := time.Now().String()
-			buf := make([]byte, len(data))
-			log.Println("sent:", data)
-			if _, err := sess.Write([]byte(data)); err == nil {
-				// read back the data
-				if _, err := io.ReadFull(sess, buf); err == nil {
-					log.Println("recv:", string(buf))
-				} else {
-					log.Fatal(err)
-				}
-			} else {
-				log.Fatal(err)
-			}
-			time.Sleep(time.Second)
-		}
-	} else {
-		log.Fatal(err)
 	}
 }

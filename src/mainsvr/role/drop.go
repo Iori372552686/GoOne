@@ -26,14 +26,14 @@ func (r *Role) DropGetItemByDropID(dropID int32) *[]*g1_protocol.PbItem {
 		}
 
 		if v.DropWay == int32(g1_protocol.EItemDropWay_CERTAIN) { // 一定掉落
-			item := g1_protocol.PbItem{Id: v.ItemId, Count: v.Count}
-			items = append(items, &item)
+			item := &g1_protocol.PbItem{Id: v.ItemId, Count: v.Count}
+			items = append(items, item)
 			r.Debugf("DROP|add certain: %v", item)
 		} else if v.DropWay == int32(g1_protocol.EItemDropWay_PROBABILITY) { // 概率掉落
 			randV := int32(rand.Intn(MAX_PROBABILITY))
 			if randV < v.Probability {
-				item := g1_protocol.PbItem{Id: v.ItemId, Count: v.Count}
-				items = append(items, &item)
+				item := &g1_protocol.PbItem{Id: v.ItemId, Count: v.Count}
+				items = append(items, item)
 				r.Debugf("DROP|add probability: %v", item)
 			}
 		} else if v.DropWay == int32(g1_protocol.EItemDropWay_WEIGHT) { // 分组权重掉落

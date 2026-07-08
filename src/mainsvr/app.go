@@ -127,6 +127,13 @@ func NewApp() *bootstrap.ServiceApp {
 		OnShutdown: func(ctx context.Context) error {
 			router.BeginShutdown()
 			shutdownErr := globals.TransMgr.Close(ctx)
+
+			// TransMgr 已排空，此时没有 handler 并发修改角色，安全地全量落盘，
+			// 避免 write-behind 防抖窗口内的变更在停机时丢失。
+			if _, failed := globals.RoleMgr.FlushAllToDB(); failed > 0 && shutdownErr == nil {
+				shutdownErr = errors.New("failed to flush all roles to db on shutdown")
+			}
+
 			if err := router.Close(); err != nil && shutdownErr == nil {
 				shutdownErr = err
 			}

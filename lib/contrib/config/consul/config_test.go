@@ -11,15 +11,26 @@ const testPath = "kratos/test/config"
 
 const testKey = "kratos/test/config/key"
 
-func TestConfig(t *testing.T) {
+// newTestClient returns a consul client, skipping the test when no local
+// consul agent is reachable (integration test dependency).
+func newTestClient(t *testing.T) *api.Client {
+	t.Helper()
 	client, err := api.NewClient(&api.Config{
 		Address: "127.0.0.1:8500",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := client.Status().Leader(); err != nil {
+		t.Skipf("consul unavailable, skipping integration test: %v", err)
+	}
+	return client
+}
 
-	if _, err = client.KV().Put(&api.KVPair{Key: testKey, Value: []byte("test config")}, nil); err != nil {
+func TestConfig(t *testing.T) {
+	client := newTestClient(t)
+
+	if _, err := client.KV().Put(&api.KVPair{Key: testKey, Value: []byte("test config")}, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -63,17 +74,12 @@ func TestConfig(t *testing.T) {
 }
 
 func TestExtToFormat(t *testing.T) {
-	client, err := api.NewClient(&api.Config{
-		Address: "127.0.0.1:8500",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	client := newTestClient(t)
 	tp := "kratos/test/ext"
 	tn := "a.bird.json"
 	tk := tp + "/" + tn
 	tc := `{"a":1}`
-	if _, err = client.KV().Put(&api.KVPair{Key: tk, Value: []byte(tc)}, nil); err != nil {
+	if _, err := client.KV().Put(&api.KVPair{Key: tk, Value: []byte(tc)}, nil); err != nil {
 		t.Fatal(err)
 	}
 

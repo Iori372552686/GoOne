@@ -51,7 +51,11 @@ func (self *WsTcpSvr) wsGinPageUpgrader(c *gin.Context) {
 	self.lockOfConnInfo.Unlock()
 
 	//opt
-	socket.NetConn().(*net.TCPConn).SetNoDelay(true) // true 表示禁用 Nagle
+	if tcpConn, ok := socket.NetConn().(*net.TCPConn); ok {
+		_ = tcpConn.SetNoDelay(true) // true 表示禁用 Nagle
+	}
+
+	self.handler.OnConn(socket.NetConn())
 	go self.runConnRead(socket)
 	go self.runConnWrite(socket, chanWrite)
 	logger.Infof("gin webSocket 建立连接:%v", socket.RemoteAddr().String())

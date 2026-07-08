@@ -32,7 +32,6 @@ func (s *TcpPacketSvr) OnConn(conn net.Conn) {
 func (s *TcpPacketSvr) OnRead(conn net.Conn, data []byte) int {
 	dataLen := len(data)
 	headerLen := s.packetInfo.HeaderLen
-	logger.Infof("on read, len=%d, headlen=%d", dataLen, headerLen)
 	consumed := 0
 	for { // There likely be more than one packet
 		if dataLen >= consumed+headerLen { // header is ready
@@ -72,8 +71,6 @@ func (s *TcpPacketSvr) OnRead2(conn net.Conn, data []byte) int {
 			return consumed
 		}
 	}
-
-	return 0
 }
 
 func (s *TcpPacketSvr) OnClose(conn net.Conn) {
