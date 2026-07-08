@@ -30,11 +30,15 @@ type Options struct {
 	LoggerConfig      func() LoggerConfig
 	AdminConfig       func() AdminConfig
 	ComponentStatuses func() []ComponentStatus
-	InitDeps          func() error
-	RegisterHandlers  func() error
-	StartRuntime      func() error
-	OnProc            func() bool
-	OnTick            func(lastMs, nowMs int64)
+	// ReadyCheck, when set, is consulted by /readyz in addition to the
+	// lifecycle ready flag. Return a non-nil error to report not-ready
+	// (e.g. bus/registry connection lost at runtime).
+	ReadyCheck       func() error
+	InitDeps         func() error
+	RegisterHandlers func() error
+	StartRuntime     func() error
+	OnProc           func() bool
+	OnTick           func(lastMs, nowMs int64)
 	// OnShutdown runs before admin shutdown / OnExit and should perform
 	// graceful, timeout-bound runtime stop work.
 	OnShutdown func(ctx context.Context) error
@@ -266,8 +270,18 @@ func (a *ServiceApp) startAdmin() error {
 	}
 	a.setComponentStatus(componentAdminServer, componentStateRunning, false, "starting admin server")
 	admin, err := StartAdminServer(cfg, AdminState{
-		IsAlive:    func() bool { return a.alive.Load() },
-		IsReady:    func() bool { return a.ready.Load() },
+		IsAlive: func() bool { return a.alive.Load() },
+		IsReady: func() bool {
+			if !a.ready.Load() {
+				return false
+			}
+			if a.options.ReadyCheck != nil {
+				if err := a.options.ReadyCheck(); err != nil {
+					return false
+				}
+			}
+			return true
+		},
 		Info:       a.infoSnapshot,
 		Components: a.componentsSnapshot,
 	})

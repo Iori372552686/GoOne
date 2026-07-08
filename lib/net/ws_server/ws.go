@@ -2,14 +2,16 @@ package ws_server
 
 import (
 	"fmt"
-	"github.com/Iori372552686/GoOne/lib/api/datetime"
-	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/module/misc"
-	"github.com/gorilla/websocket"
 	"net"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/Iori372552686/GoOne/lib/api/datetime"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/util/bufpool"
+	"github.com/Iori372552686/GoOne/module/misc"
+	"github.com/gorilla/websocket"
 )
 
 // 场景	ReadBufferSize	WriteBufferSize	备注
@@ -66,14 +68,19 @@ func (s *WsTcpSvr) WriteData(conn net.Conn, data1 []byte, data2 []byte) error {
 		return fmt.Errorf("connection doesn't exist")
 	}
 
-	data := make([]byte, len(data1)+len(data2))
+	// 写缓冲从池中获取，由写协程在 WriteMessage 完成后归还。
+	data := bufpool.Get(len(data1) + len(data2))
 	pos := 0
 	copy(data[pos:], data1)
 	pos += len(data1)
 	copy(data[pos:], data2)
 	pos += len(data2)
 
-	return sendToWriteChan(chanWrite, data)
+	err := sendToWriteChan(chanWrite, data)
+	if err != nil {
+		bufpool.Put(data)
+	}
+	return err
 }
 
 func (s *WsTcpSvr) Close(conn net.Conn) error {
@@ -155,6 +162,7 @@ func (s *WsTcpSvr) runConnWrite(conn *websocket.Conn, chanWrite <-chan []byte) {
 
 		conn.SetWriteDeadline(datetime.NowT().Add(s.wsWriteTimeout))
 		err := conn.WriteMessage(websocket.BinaryMessage, writeData)
+		bufpool.Put(writeData)
 		if err != nil {
 			logger.Errorf("Failed to write tcp data {err:%v, dataLen: %v}", err, len(writeData))
 			break

@@ -35,13 +35,19 @@ func newTransaction(transID uint32, oriPacketHeader sharedstruct.SSPacketHeader,
 	t.OriPacketHeader = oriPacketHeader
 	t.chanIn = chanIn
 	t.sendSeq = 0
-	t.traceCtx = contextForSSPacketTrace(oriPacketHeader.SrcBusID, oriPacketHeader.SrcTransID, oriPacketHeader.CmdSeq, oriPacketHeader.Cmd)
 	return t
 }
 
+// Context lazily builds the trace context: the sha256/hex/WithValue chain
+// costs several allocations, so it is only paid when a middleware or handler
+// actually asks for it. A Transaction is driven by a single goroutine, so the
+// unsynchronized memoization is safe.
 func (t *Transaction) Context() context.Context {
-	if t == nil || t.traceCtx == nil {
+	if t == nil {
 		return context.Background()
+	}
+	if t.traceCtx == nil {
+		t.traceCtx = contextForSSPacketTrace(t.OriPacketHeader.SrcBusID, t.OriPacketHeader.SrcTransID, t.OriPacketHeader.CmdSeq, t.OriPacketHeader.Cmd)
 	}
 	return t.traceCtx
 }

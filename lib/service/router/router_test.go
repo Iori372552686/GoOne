@@ -33,6 +33,8 @@ func (b *fakeBus) Send(dstBusId uint32, data1 []byte, data2 []byte) error {
 
 func (b *fakeBus) SetReceiver(_ bus.MsgHandler) {}
 
+func (b *fakeBus) Healthy() bool { return true }
+
 func (b *fakeBus) Close() error {
 	b.closeCalls++
 	return nil

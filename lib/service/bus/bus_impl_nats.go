@@ -23,6 +23,7 @@ type BusImplNatsMQ struct {
 	queueGroup    string
 	stopCh        chan struct{}
 	closed        atomic.Bool
+	connected     atomic.Bool
 	closeOnce     sync.Once
 }
 
@@ -48,6 +49,7 @@ func NewBusImplNatsMQ(selfBusId uint32, onRecvMsg MsgHandler, conf NatsConfig) I
 
 func (b *BusImplNatsMQ) SelfBusId() uint32                { return b.selfBusId }
 func (b *BusImplNatsMQ) SetReceiver(onRecvMsg MsgHandler) { b.onRecv = onRecvMsg }
+func (b *BusImplNatsMQ) Healthy() bool                    { return b.connected.Load() && !b.closed.Load() }
 
 func (b *BusImplNatsMQ) subjectFor(busId uint32) string {
 	return b.subjectPrefix + "." + calcQueueName(busId)
@@ -57,27 +59,14 @@ func (b *BusImplNatsMQ) Send(dstBusId uint32, data1 []byte, data2 []byte) error 
 	if b.closed.Load() {
 		return ErrBusClosed
 	}
-	header := busPacketHeader{}
-	header.version = 0
-	header.passCode = passCode
-	header.srcBusId = b.SelfBusId()
-	header.dstBusId = dstBusId
-
-	msg := outMsg{}
-	msg.busId = dstBusId
-	msg.topics = b.subjectFor(dstBusId)
-	msg.data = make([]byte, byteLenOfBusPacketHeader()+len(data1)+len(data2))
-	pos := 0
-	header.To(msg.data[pos:])
-	pos += byteLenOfBusPacketHeader()
-	copy(msg.data[pos:], data1)
-	pos += len(data1)
-	if data2 != nil && len(data2) > 0 {
-		copy(msg.data[pos:], data2)
-		pos += len(data2)
+	msg := outMsg{
+		busId:  dstBusId,
+		topics: b.subjectFor(dstBusId),
+		data:   buildFrame(b.SelfBusId(), dstBusId, data1, data2),
 	}
 
 	if !sendToMsgChan(b.chanOut, msg, b.timeout) {
+		putFrameBuf(msg.data)
 		return fmt.Errorf("nats bus.chanOut<-msg time out")
 	}
 	return nil
@@ -143,6 +132,9 @@ func (b *BusImplNatsMQ) process() error {
 	defer sub.Unsubscribe()
 	_ = nc.Flush()
 
+	b.connected.Store(true)
+	defer b.connected.Store(false)
+
 	for {
 		select {
 		case <-b.stopCh:
@@ -154,6 +146,7 @@ func (b *BusImplNatsMQ) process() error {
 			if err := nc.Publish(msgOut.topics, msgOut.data); err != nil {
 				logger.Errorf("Failed to publish nats message {subject:%v, dataLen:%v}| %v", msgOut.topics, len(msgOut.data), err)
 			}
+			putFrameBuf(msgOut.data) // Publish 已同步拷入客户端缓冲，可安全回收
 		case data, ok := <-b.chanIn:
 			if !ok {
 				return fmt.Errorf("chanIn of bus is closed")

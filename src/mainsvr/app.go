@@ -21,7 +21,9 @@ import (
 	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals"
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals/rds"
+	"github.com/Iori372552686/GoOne/src/mainsvr/role"
 	"github.com/Iori372552686/GoOne/src/mainsvr/service"
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
 func onRecvSSPacket(packet *sharedstruct.SSPacket) {
@@ -52,6 +54,8 @@ func NewApp() *bootstrap.ServiceApp {
 				Name:  "mainsvr",
 			}
 		},
+		// bus 断连时 /readyz 返回 503，摘除流量直至重连成功
+		ReadyCheck: router.ReadyCheck,
 		AdminConfig: func() bootstrap.AdminConfig {
 			return bootstrap.NewAdminConfig(
 				"mainsvr",
@@ -108,13 +112,23 @@ func NewApp() *bootstrap.ServiceApp {
 				MaxPendingPerKey: 100,
 			})
 			logger.Infof("mainsvr transmgr shards=%d serial_key=routerid_or_uid", transShardCount)
-			return router.InitAndRun(
+			if err := router.InitAndRun(
 				gconf.MainSvrCfg.Identity.SelfBusId,
 				onRecvSSPacket,
 				gconf.MainSvrCfg.CommonRuntime.BusMQAddr,
 				misc.ServerRouteRules,
 				gconf.MainSvrCfg.CommonRuntime.RegisterAddr,
-			)
+			); err != nil {
+				return err
+			}
+
+			// 心跳过期淘汰改经事务串行执行：Tick 协程只投递登出请求，
+			// 落盘与删除在 Logout handler 内按 uid 串行键执行，
+			// 消除 Tick 与业务 handler 对同一 *Role 的并发读写。
+			role.SelfLogoutSender = func(uid uint64, zone uint32, req *g1_protocol.LogoutReq) {
+				globals.TransMgr.SendPbMsgToMyself(router.SelfBusId(), uid, uid, zone, g1_protocol.CMD_MAIN_LOGOUT_REQ, req)
+			}
+			return nil
 		},
 		OnProc: func() bool {
 			return true

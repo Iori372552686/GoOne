@@ -17,6 +17,7 @@ type BusImplRabbitMQ struct {
 	onRecv    MsgHandler
 	stopCh    chan struct{}
 	closed    atomic.Bool
+	connected atomic.Bool
 	closeOnce sync.Once
 }
 
@@ -39,31 +40,21 @@ func (b *BusImplRabbitMQ) SetReceiver(onRecvMsg MsgHandler) {
 	b.onRecv = onRecvMsg
 }
 
+func (b *BusImplRabbitMQ) Healthy() bool {
+	return b.connected.Load() && !b.closed.Load()
+}
+
 func (b *BusImplRabbitMQ) Send(dstBusId uint32, data1 []byte, data2 []byte) error {
 	if b.closed.Load() {
 		return ErrBusClosed
 	}
-	header := busPacketHeader{}
-	header.version = 0
-	header.passCode = passCode
-	header.srcBusId = b.SelfBusId()
-	header.dstBusId = dstBusId
-
-	msg := outMsg{}
-	msg.busId = dstBusId
-	msg.data = make([]byte, byteLenOfBusPacketHeader()+len(data1)+len(data2))
-	pos := 0
-	header.To(msg.data[pos:])
-	pos += byteLenOfBusPacketHeader()
-	copy(msg.data[pos:], data1)
-	pos += len(data1)
-	if data2 != nil && len(data2) > 0 {
-		copy(msg.data[pos:], data2)
-		pos += len(data2)
+	msg := outMsg{
+		busId: dstBusId,
+		data:  buildFrame(b.SelfBusId(), dstBusId, data1, data2),
 	}
 
-	//logger.Debugf("Send bus message: %v, %#v\n", len(data1)+len(data2), header)
 	if !sendToMsgChan(b.chanOut, msg, b.timeout) {
+		putFrameBuf(msg.data)
 		return fmt.Errorf("bus.chanOut<-msg time out")
 	} // msg所有权已转移，后面不能再使用msg
 
@@ -107,6 +98,9 @@ func (b *BusImplRabbitMQ) process(rabbitmqAddr string, myQueueName string) error
 		return fmt.Errorf("failed to register a consumer | %v", err)
 	}
 
+	b.connected.Store(true)
+	defer b.connected.Store(false)
+
 	for {
 		select {
 		case <-b.stopCh:
@@ -130,6 +124,7 @@ func (b *BusImplRabbitMQ) process(rabbitmqAddr string, myQueueName string) error
 				logger.Errorf("Failed to publish a message {busId:%v, dataLen:%v}| %v", msgOut.busId, len(msgOut.data), err)
 				// todo: is it necessary to return the err?
 			}
+			putFrameBuf(msgOut.data) // Publish 已同步序列化到连接缓冲，可安全回收
 		case delivery, ok := <-chanRecv:
 			if !ok {
 				return fmt.Errorf("chanRecv of bus is closed")

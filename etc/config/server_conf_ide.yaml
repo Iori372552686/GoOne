@@ -1,7 +1,7 @@
 # 分组配置写法，仍兼容旧的平铺字段
 base_cfg:
   runtime:
-    register_addr: '43.139.3.228:12379'
+    register_addr: 'etcd://43.139.3.228:12379?service=online&timeout=5s&namespace=/GoOneServices'
     bus_mq_addr: 'amqp://guest:guest@43.139.3.228:15672/'
     admin_server:
       enabled: true

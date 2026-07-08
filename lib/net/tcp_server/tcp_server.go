@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/util/bufpool"
 	"github.com/Iori372552686/GoOne/module/misc"
-
-	"strconv"
-	"time"
 )
 
 const (
@@ -68,14 +68,19 @@ func (s *TcpSvr) WriteData(conn net.Conn, data1 []byte, data2 []byte) error {
 		return fmt.Errorf("connection doesn't exist")
 	}
 
-	data := make([]byte, len(data1)+len(data2))
+	// 写缓冲从池中获取，由写协程在 conn.Write 完成后归还。
+	data := bufpool.Get(len(data1) + len(data2))
 	pos := 0
 	copy(data[pos:], data1)
 	pos += len(data1)
 	copy(data[pos:], data2)
 	pos += len(data2)
 
-	return sendToWriteChan(chanWrite, data)
+	err := sendToWriteChan(chanWrite, data)
+	if err != nil {
+		bufpool.Put(data)
+	}
+	return err
 }
 
 func (s *TcpSvr) Close(conn net.Conn) error {
@@ -192,6 +197,7 @@ func (s *TcpSvr) runConnWrite(conn net.Conn, chanWrite <-chan []byte) {
 
 		_ = conn.SetWriteDeadline(datetime.NowT().Add(s.TcpWriteTimeout))
 		sentLen, err := conn.Write(writeData)
+		bufpool.Put(writeData)
 		if sentLen < len(writeData) || err != nil { //todo: retry?
 			logger.Errorf("Failed to write tcp data {err:%v, dataLen: %v, sentLen: %v}", err, len(writeData), sentLen)
 			_ = conn.Close()

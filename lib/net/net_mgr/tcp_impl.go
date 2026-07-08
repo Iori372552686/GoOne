@@ -11,6 +11,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/util/convert"
+	"github.com/Iori372552686/GoOne/lib/util/safego"
 	"github.com/Iori372552686/GoOne/module/misc"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 
@@ -38,14 +39,11 @@ func (t *ConnTcpSvr) OnConn(conn net.Conn) {
 	observeGatewayEvent("tcp", "accepted")
 }
 
-// 被Read协程调用，每个Connection对应一个Read协调
+// 被Read协程调用，每个Connection对应一个Read协调。
+// handler 在读协程内同步执行：保证同连接消息顺序、天然背压，且 data
+// （读缓冲别名）在返回前使用完毕，无需拷贝。handler 内部不得保留 data 引用。
 func (t *ConnTcpSvr) OnPacket(conn net.Conn, data []byte) {
-	// data aliases the read loop's reusable buffer (bytes.Buffer). It must be
-	// copied before crossing the goroutine boundary, otherwise the read loop
-	// may recycle the underlying array while the handler is still using it.
-	packet := make([]byte, len(data))
-	copy(packet, data)
-	go t.handler(conn, packet)
+	safego.SafeFunc(func() { t.handler(conn, data) })
 }
 
 // 被Read协程调用，每个Connection对应一个Read协调

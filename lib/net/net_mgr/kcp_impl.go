@@ -2,6 +2,7 @@ package net_mgr
 
 import (
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/util/safego"
 	Kcp "github.com/xtaci/kcp-go/v5"
 )
 
@@ -46,12 +47,10 @@ func (self *ConnKcpSvr) OnConn(conn *Kcp.UDPSession) {
 * @Author: Iori
 * @Date: 2022-02-15 14:48:15
 **/
+// OnRead 在读协程内同步执行 handler：保证同连接消息顺序并提供天然背压，
+// 且 data（读缓冲别名）在返回前使用完毕，无需拷贝。handler 不得保留 data 引用。
 func (self *ConnKcpSvr) OnRead(conn *Kcp.UDPSession, data []byte) int {
-	// data aliases the read loop's reusable buffer. Copy it before handing it
-	// to another goroutine, otherwise the next Read overwrites it in place.
-	packet := make([]byte, len(data))
-	copy(packet, data)
-	go self.handler(conn, packet)
+	safego.SafeFunc(func() { self.handler(conn, data) })
 	return 0
 }
 

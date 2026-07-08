@@ -49,10 +49,14 @@ func InitAndRun(selfBusId string, cb CbOnRecvSSPacket, rabbitmqAddr string,
 	}
 
 	router.cbOnRecvSSPacket = cb
-	router.busImpl, _ = bus.CreateBus(bus.IpStringToInt(selfBusId), onRecvBusMsg, rabbitmqAddr)
-	if router.busImpl == nil {
+	busImpl, err := bus.CreateBus(bus.IpStringToInt(selfBusId), onRecvBusMsg, rabbitmqAddr)
+	if err != nil {
+		return fmt.Errorf("failed to create bus implement: %w", err)
+	}
+	if busImpl == nil {
 		return errors.New("failed to create bus implement")
 	}
+	router.busImpl = busImpl
 	return nil
 }
 
@@ -83,6 +87,7 @@ type AdminSnapshot struct {
 	Initialized  bool
 	SelfBusID    uint32
 	ShuttingDown bool
+	BusHealthy   bool
 }
 
 func Snapshot() AdminSnapshot {
@@ -90,7 +95,27 @@ func Snapshot() AdminSnapshot {
 		Initialized:  router.busImpl != nil,
 		SelfBusID:    SelfBusId(),
 		ShuttingDown: router.shuttingDown.Load(),
+		BusHealthy:   BusHealthy(),
 	}
+}
+
+// BusHealthy reports whether the underlying bus connection is currently up.
+func BusHealthy() bool {
+	b := router.busImpl
+	return b != nil && b.Healthy()
+}
+
+// ReadyCheck is a bootstrap-compatible readiness probe: it fails while the
+// router is shutting down or the bus connection is down, so /readyz flips to
+// 503 during MQ outages instead of silently accepting traffic.
+func ReadyCheck() error {
+	if router.shuttingDown.Load() {
+		return errors.New("router is shutting down")
+	}
+	if !BusHealthy() {
+		return errors.New("bus is not connected")
+	}
+	return nil
 }
 
 // 最终通过bus发消息的地方（其他都是易用性封装）

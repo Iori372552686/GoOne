@@ -28,6 +28,7 @@ type BusImplRocketMQ struct {
 	consumerGroup string
 	stopCh        chan struct{}
 	closed        atomic.Bool
+	connected     atomic.Bool
 	closeOnce     sync.Once
 }
 
@@ -57,6 +58,7 @@ func NewBusImplRocketMQ(selfBusId uint32, onRecvMsg MsgHandler, conf RocketMQCon
 
 func (b *BusImplRocketMQ) SelfBusId() uint32                { return b.selfBusId }
 func (b *BusImplRocketMQ) SetReceiver(onRecvMsg MsgHandler) { b.onRecv = onRecvMsg }
+func (b *BusImplRocketMQ) Healthy() bool                    { return b.connected.Load() && !b.closed.Load() }
 
 func (b *BusImplRocketMQ) tagFor(busId uint32) string {
 	return calcQueueName(busId)
@@ -66,26 +68,14 @@ func (b *BusImplRocketMQ) Send(dstBusId uint32, data1 []byte, data2 []byte) erro
 	if b.closed.Load() {
 		return ErrBusClosed
 	}
-	header := busPacketHeader{}
-	header.version = 0
-	header.passCode = passCode
-	header.srcBusId = b.SelfBusId()
-	header.dstBusId = dstBusId
-
-	msg := outMsg{}
-	msg.busId = dstBusId
-	msg.topics = b.tagFor(dstBusId) // tag
-	msg.data = make([]byte, byteLenOfBusPacketHeader()+len(data1)+len(data2))
-	pos := 0
-	header.To(msg.data[pos:])
-	pos += byteLenOfBusPacketHeader()
-	copy(msg.data[pos:], data1)
-	pos += len(data1)
-	if data2 != nil && len(data2) > 0 {
-		copy(msg.data[pos:], data2)
-		pos += len(data2)
+	msg := outMsg{
+		busId:  dstBusId,
+		topics: b.tagFor(dstBusId), // tag
+		data:   buildFrame(b.SelfBusId(), dstBusId, data1, data2),
 	}
+
 	if !sendToMsgChan(b.chanOut, msg, b.timeout) {
+		putFrameBuf(msg.data)
 		return fmt.Errorf("rocketmq bus.chanOut<-msg time out")
 	}
 	return nil
@@ -148,6 +138,9 @@ func (b *BusImplRocketMQ) process() error {
 
 	logger.Infof("RocketMQ bus started {topic:%s, tag:%s}", b.topic, tagExpr)
 
+	b.connected.Store(true)
+	defer b.connected.Store(false)
+
 	for {
 		select {
 		case <-b.stopCh:
@@ -161,6 +154,7 @@ func (b *BusImplRocketMQ) process() error {
 				logger.Errorf("Failed to publish rocketmq message {topic:%v, tag:%v, dataLen:%v}| %v",
 					b.topic, msgOut.topics, len(msgOut.data), err)
 			}
+			putFrameBuf(msgOut.data) // SendSync 已同步完成，可安全回收
 		case data, ok := <-b.chanIn:
 			if !ok {
 				return fmt.Errorf("chanIn of bus is closed")

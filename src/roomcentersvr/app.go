@@ -51,6 +51,8 @@ func NewApp() *bootstrap.ServiceApp {
 				Name:  "roomcentersvr",
 			}
 		},
+		// bus 断连时 /readyz 返回 503，摘除流量直至重连成功
+		ReadyCheck: service_router.ReadyCheck,
 		AdminConfig: func() bootstrap.AdminConfig {
 			return bootstrap.NewAdminConfig(
 				"roomcentersvr",

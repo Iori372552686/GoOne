@@ -32,8 +32,9 @@ func (t *ConnWsTcpSvr) OnConn(conn net.Conn) {
 	observeGatewayEvent("ws", "accepted")
 }
 
+// OnRead 在读协程内同步执行 handler：保证同连接消息顺序并提供天然背压。
 func (self *ConnWsTcpSvr) OnRead(conn net.Conn, data []byte) int {
-	safego.Go(func() { self.handler(conn, data) })
+	safego.SafeFunc(func() { self.handler(conn, data) })
 	return 0
 }
 

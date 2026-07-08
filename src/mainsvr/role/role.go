@@ -6,7 +6,6 @@ import (
 
 	infosvrv1 "github.com/Iori372552686/GoOne/api/gen/game/infosvr/v1"
 	mysqlsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/mysqlsvr/v1"
-	"github.com/Iori372552686/GoOne/lib/util/safego"
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals/rds"
 
 	"sync"
@@ -216,24 +215,6 @@ func (r *Role) SaveToDBSync() error {
 	r.persistDirtySince = 0
 	r.persistReasons = nil
 	return nil
-}
-
-// 保存玩家数据，不等待返回结果。只在特殊情况下使用。比如：RoleMgr::removeExpiredRoles中
-func (r *Role) SaveToDBIgnoreRsp() {
-	data, err := proto.Marshal(r.PbRole)
-	if err != nil {
-		r.Errorf("role marshal error {uid:%v, reasons:%v} | %v", r.Uid(), sortedStringValues(r.persistReasons), err)
-		return
-	}
-
-	uid := r.Uid()
-	safego.Go(func() {
-		err = rds.RedisMgr.SetBytes(uint32(g1_protocol.DBType_DB_TYPE_ROLE), fmt.Sprintf("%s:%d", g1_protocol.DBType_DB_TYPE_ROLE.String(), uid), data)
-		if err != nil {
-			logger.Errorf("role SaveToDBIgnoreRsp set redis error | %v", err)
-			return
-		}
-	})
 }
 
 func (r *Role) OnRoleCreate() {

@@ -29,7 +29,12 @@ type BusImplNsqMQ struct {
 	onRecv    MsgHandler
 	stopCh    chan struct{}
 	closed    atomic.Bool
+	connected atomic.Bool
 	closeOnce sync.Once
+}
+
+func (b *BusImplNsqMQ) Healthy() bool {
+	return b.connected.Load() && !b.closed.Load()
 }
 
 /**
@@ -96,28 +101,14 @@ func (b *BusImplNsqMQ) Send(dstBusId uint32, data1 []byte, data2 []byte) error {
 	if b.closed.Load() {
 		return ErrBusClosed
 	}
-	header := busPacketHeader{}
-	header.version = 0
-	header.passCode = passCode
-	header.srcBusId = b.SelfBusId()
-	header.dstBusId = dstBusId
-
-	msg := outMsg{}
-	msg.busId = dstBusId
-	msg.topics = b.topicFor(dstBusId)
-	msg.data = make([]byte, byteLenOfBusPacketHeader()+len(data1)+len(data2))
-	pos := 0
-	header.To(msg.data[pos:])
-	pos += byteLenOfBusPacketHeader()
-	copy(msg.data[pos:], data1)
-	pos += len(data1)
-	if data2 != nil && len(data2) > 0 {
-		copy(msg.data[pos:], data2)
-		pos += len(data2)
+	msg := outMsg{
+		busId:  dstBusId,
+		topics: b.topicFor(dstBusId),
+		data:   buildFrame(b.SelfBusId(), dstBusId, data1, data2),
 	}
 
-	logger.Debugf("Send nsq bus message: %v \n", len(data1)+len(data2))
 	if !sendToMsgChan(b.chanOut, msg, b.timeout) {
+		putFrameBuf(msg.data)
 		return fmt.Errorf("nsq bus.chanOut<-msg time out")
 	} // msg所有权已转移，后面不能再使用msg
 	return nil
@@ -206,6 +197,9 @@ func (b *BusImplNsqMQ) process() error {
 	}
 	defer producer.Stop()
 
+	b.connected.Store(true)
+	defer b.connected.Store(false)
+
 	//listen
 	for {
 		select {
@@ -215,9 +209,9 @@ func (b *BusImplNsqMQ) process() error {
 			if !ok {
 				return fmt.Errorf("chanOut of bus is closed")
 			}
-			logger.Debugf("Send message to MQ: {dstBusId:0x%x, dataLen:%v}\n", msgOut.busId, len(msgOut.data))
 			// send
 			err = producer.Publish(msgOut.topics, msgOut.data)
+			putFrameBuf(msgOut.data) // Publish 同步等待响应，返回即可回收
 			if err != nil {
 				logger.Errorf("Failed to publish a message {topics:%v, dataLen:%v}| %v", msgOut.topics, len(msgOut.data), err)
 				return err
