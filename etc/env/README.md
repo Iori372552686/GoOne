@@ -18,7 +18,7 @@
 - **只对某一台机器执行**
 
 ```bash
-./main.sh docker install --env dev1 --limit 113.45.34.170
+./main.sh docker install --env dev1 --limit 43.139.3.228
 ```
 
 直接运行底层脚本也可以（仓库根目录下）：

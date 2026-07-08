@@ -1,14 +1,15 @@
 package tester_util
 
 import (
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
-	"github.com/golang/protobuf/proto"
 	"net"
 	"testing"
+
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	"github.com/golang/protobuf/proto"
 )
 
 const (
-	SERVER_ADDR = "113.45.34.170:11001" //"192.168.50.251:11001"
+	SERVER_ADDR = "43.139.3.228:11001" //"192.168.50.251:11001"
 	UID         = 0
 )
 

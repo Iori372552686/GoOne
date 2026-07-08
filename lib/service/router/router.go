@@ -116,7 +116,11 @@ func SendMsg(packetHeader *sharedstruct.SSPacketHeader, packetBody []byte) error
 	}
 
 	finish := beginRouterObserve("send", "bus", packetHeader.Cmd)
-	err := router.busImpl.Send(packetHeader.DstBusID, packetHeader.ToBytes(), packetBody)
+	// 头编码到栈上数组：IBus.Send 会同步把 data1 拷贝进自己的帧缓冲，
+	// 不会保留引用，因此这里无需堆分配。
+	var headerBuf [54]byte
+	_ = packetHeader.To(headerBuf[:])
+	err := router.busImpl.Send(packetHeader.DstBusID, headerBuf[:], packetBody)
 	finish(len(packetBody), err)
 	if err != nil {
 		e := fmt.Sprintf("failed to send bus message {header:%#v, bodyLen:%v} | %v",
@@ -133,10 +137,12 @@ func SendPbMsg(packetHeader *sharedstruct.SSPacketHeader, pbMsg proto.Message) e
 		return err
 	}
 	packetHeader.BodyLen = uint32(len(packetBody))
-	logger.CmdDebugf(packetHeader.Cmd,
-		"SendPbMsg {cmd:%v, uid:%v, rid:%v, srcBusId:%v, dstBusId:%v, bodyLen:%d, msgType:%s}",
-		packetHeader.Cmd, packetHeader.Uid, packetHeader.RouterID, packetHeader.SrcBusID, packetHeader.DstBusID,
-		len(packetBody), protoMessageType(pbMsg))
+	if logger.DebugEnabled() {
+		logger.CmdDebugf(packetHeader.Cmd,
+			"SendPbMsg {cmd:%v, uid:%v, rid:%v, srcBusId:%v, dstBusId:%v, bodyLen:%d, msgType:%s}",
+			packetHeader.Cmd, packetHeader.Uid, packetHeader.RouterID, packetHeader.SrcBusID, packetHeader.DstBusID,
+			len(packetBody), protoMessageType(pbMsg))
+	}
 	return SendMsg(packetHeader, packetBody)
 }
 
@@ -167,9 +173,11 @@ func SendPbMsgByBusId(busId uint32, uid uint64, zone uint32, cmd g1_protocol.CMD
 	if err != nil {
 		return err
 	}
-	logger.CmdDebugf(uint32(cmd),
-		"SendPbMsgByBusId {dstBusId:%v, uid:%v, zone:%v, cmd:%v, bodyLen:%d, msgType:%s}",
-		busId, uid, zone, uint32(cmd), len(data), protoMessageType(pbMsg))
+	if logger.DebugEnabled() {
+		logger.CmdDebugf(uint32(cmd),
+			"SendPbMsgByBusId {dstBusId:%v, uid:%v, zone:%v, cmd:%v, bodyLen:%d, msgType:%s}",
+			busId, uid, zone, uint32(cmd), len(data), protoMessageType(pbMsg))
+	}
 	return SendMsgByBusId(busId, 0, uid, zone, cmd, sendSeq, srcTransId, data)
 }
 
@@ -247,9 +255,11 @@ func BroadcastPbMsgByServerType(svrType uint32, uid uint64, cmd g1_protocol.CMD,
 	if err != nil {
 		return err
 	}
-	logger.CmdDebugf(uint32(cmd),
-		"BroadcastPbMsgByServerType {svrType:%v, uid:%v, cmd:%v, bodyLen:%d, msgType:%s}",
-		svrType, uid, uint32(cmd), len(data), protoMessageType(pbMsg))
+	if logger.DebugEnabled() {
+		logger.CmdDebugf(uint32(cmd),
+			"BroadcastPbMsgByServerType {svrType:%v, uid:%v, cmd:%v, bodyLen:%d, msgType:%s}",
+			svrType, uid, uint32(cmd), len(data), protoMessageType(pbMsg))
+	}
 	return BroadcastMsgByServerType(svrType, uid, cmd, sendSeq, data)
 }
 
@@ -305,7 +315,9 @@ func onRecvBusMsg(srcBusId uint32, data []byte) error {
 	packet := new(sharedstruct.SSPacket)
 	packet.Header.From(data)
 	packet.Body = data[sharedstruct.ByteLenOfSSPacketHeader():]
-	logger.CmdDebugf(packet.Header.Cmd, "[uid: %d] Received bus message: %+v", packet.Header.Uid, packet.Header)
+	if logger.DebugEnabled() {
+		logger.CmdDebugf(packet.Header.Cmd, "[uid: %d] Received bus message: %+v", packet.Header.Uid, packet.Header)
+	}
 	finish := beginRouterObserve("receive", "bus", packet.Header.Cmd)
 	if router.cbOnRecvSSPacket != nil {
 		router.cbOnRecvSSPacket(packet)

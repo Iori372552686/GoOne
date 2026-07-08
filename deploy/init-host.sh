@@ -42,7 +42,7 @@ Examples:
   $0 --hosts 192.168.50.250,192.168.50.251
   $0 --env dev1
   $0 --env dev2
-  $0 --adhoc -u root -k ~/.ssh/id_ed25519 113.45.34.170
+  $0 --adhoc -u root -k ~/.ssh/id_ed25519 43.139.3.228
   $0 --variant centos 192.168.50.250
   $0 --dry-run 192.168.50.250 -- -vv
 EOF

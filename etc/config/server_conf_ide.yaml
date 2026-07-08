@@ -1,8 +1,8 @@
 # 分组配置写法，仍兼容旧的平铺字段
 base_cfg:
   runtime:
-    register_addr: '113.45.34.170:12181'
-    bus_mq_addr: 'amqp://guest:guest@113.45.34.170:15672/'
+    register_addr: '43.139.3.228:12379'
+    bus_mq_addr: 'amqp://guest:guest@43.139.3.228:15672/'
     admin_server:
       enabled: true
       ip: ""
@@ -29,13 +29,13 @@ base_cfg:
 
     db_instances:
       - instance_id: 1
-        ip: 113.45.34.170
+        ip: 43.139.3.228
         port: 16379
         password: go123456
         is_cluster: false
         description: role info data
       - instance_id: 3
-        ip: 113.45.34.170
+        ip: 43.139.3.228
         port: 16379
         password: go123456
         is_cluster: false
@@ -44,7 +44,7 @@ base_cfg:
     orm_instances:
       - index_name: default
         master:
-          ip: 113.45.34.170
+          ip: 43.139.3.228
           port: 13306
           user: g1_game
           password: gg123456
@@ -60,7 +60,7 @@ base_cfg:
     rest_api_config:
       - service_name: default
         urls:
-          - 'http://113.45.34.170:8000/mg/api/sdk/getGameRole?'
+          - 'http://43.139.3.228:8000/mg/api/sdk/getGameRole?'
         sign_name: default
 
     nacos_conf:

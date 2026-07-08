@@ -32,7 +32,7 @@ Examples:
   $0 role list
   $0 run --env dev1 --action restart --role websvr
   $0 run --env dev1 --action restart --roles websvr,mainsvr --dry-run
-  $0 run --env dev1 --action push --limit 113.45.34.170 --role websvr -- -vv
+  $0 run --env dev1 --action push --limit 43.139.3.228 --role websvr -- -vv
 EOF
 }
 

@@ -71,7 +71,36 @@ func calcQueueName(busId uint32) string {
 	return "bus_" + fmt.Sprintf("%x", busId)
 }
 
+// sleepOrStop waits for d, returning false immediately when stopCh closes.
+// Unlike a bare time.After in a select, the timer is always released.
+func sleepOrStop(stopCh <-chan struct{}, d time.Duration) bool {
+	if d <= 0 {
+		select {
+		case <-stopCh:
+			return false
+		default:
+			return true
+		}
+	}
+
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-stopCh:
+		return false
+	case <-t.C:
+		return true
+	}
+}
+
 func sendToMsgChan(ch chan outMsg, msg outMsg, timeout time.Duration) bool {
+	// Fast path: queue has room, no timer allocation.
+	select {
+	case ch <- msg:
+		return true
+	default:
+	}
+
 	t := time.NewTimer(timeout)
 	defer t.Stop()
 

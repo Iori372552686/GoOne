@@ -126,16 +126,24 @@ func (b *BusImplKafkaMQ) process() error {
 
 	readCtx, cancelRead := context.WithCancel(ctx)
 	defer cancelRead()
+
+	// readErr propagates reader failures so the retry loop reconnects instead
+	// of silently losing the consumer while the writer keeps running.
+	readErr := make(chan error, 1)
 	go func() {
 		for {
 			m, err := r.ReadMessage(readCtx)
 			if err != nil {
+				select {
+				case readErr <- err:
+				default:
+				}
 				return
 			}
-			buf := make([]byte, len(m.Value))
-			copy(buf, m.Value)
+			// m.Value is freshly allocated by kafka-go per message; pass
+			// ownership downstream without an extra copy.
 			select {
-			case b.chanIn <- buf:
+			case b.chanIn <- m.Value:
 			case <-b.stopCh:
 				return
 			}
@@ -146,6 +154,8 @@ func (b *BusImplKafkaMQ) process() error {
 		select {
 		case <-b.stopCh:
 			return nil
+		case err := <-readErr:
+			return fmt.Errorf("kafka reader failed: %w", err)
 		case msgOut, ok := <-b.chanOut:
 			if !ok {
 				return fmt.Errorf("chanOut of bus is closed")
@@ -170,9 +180,9 @@ func (b *BusImplKafkaMQ) process() error {
 				continue
 			}
 			if b.onRecv != nil {
-				recvData := make([]byte, len(data)-byteLenOfBusPacketHeader())
-				copy(recvData, data[byteLenOfBusPacketHeader():])
-				b.onRecv(header.srcBusId, recvData)
+				// data ownership is ours (allocated by the reader goroutine);
+				// hand it to onRecv without a second copy.
+				b.onRecv(header.srcBusId, data[byteLenOfBusPacketHeader():])
 			}
 		}
 	}
@@ -199,10 +209,8 @@ func (b *BusImplKafkaMQ) run() {
 		}
 		logger.Errorf("Error occur in processing bus(kafka). Retry later {retryTimes: %v, afterSeconds:%v} | %v",
 			retryCount, retryAfterSeconds, err)
-		select {
-		case <-b.stopCh:
+		if !sleepOrStop(b.stopCh, time.Duration(retryAfterSeconds)*time.Second) {
 			return
-		case <-time.After(time.Duration(retryAfterSeconds) * time.Second):
 		}
 	}
 }

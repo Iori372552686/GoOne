@@ -183,10 +183,8 @@ func (b *BusImplRabbitMQ) run(rabbitmqAddr string) {
 			retryAfterSeconds = 30
 		}
 		logger.Errorf("Error occur in processing bus. Retry later {retryTimes: %v, afterSeconds:%v} | %v", retryCount, retryAfterSeconds, err)
-		select {
-		case <-b.stopCh:
+		if !sleepOrStop(b.stopCh, time.Duration(retryAfterSeconds)*time.Second) {
 			return
-		case <-time.After(time.Duration(retryAfterSeconds) * time.Second):
 		}
 	}
 }

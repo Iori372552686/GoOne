@@ -66,6 +66,9 @@ func (t *Transaction) Debugf(format string, args ...interface{}) {
 }
 
 func (t *Transaction) DebugDepthf(depth int, format string, args ...interface{}) {
+	if !logger.DebugEnabled() {
+		return
+	}
 	f := fmt.Sprintf("[%v|%v|%v] %v", t.Uid(), t.Rid(), t.TransID(), format)
 	logger.CmdDebugDepthf(t.Cmd(), 1+depth, f, args...)
 }
@@ -255,8 +258,14 @@ func (t *Transaction) waitRsp(dstSvrType uint32, dstSvrIns uint32, cmd g1_protoc
 			t.Debugf("Received rsp {rspCmd:%v, bodyLen:%d, rspType:%s}", packet.Header.Cmd, len(packet.Body), protoMessageType(rsp))
 			return err
 		}
-		ti.Stop()
-		ti = time.NewTimer(d)
+		// Mismatched packet: restart the timeout window, reusing the timer.
+		if !ti.Stop() {
+			select {
+			case <-ti.C:
+			default:
+			}
+		}
+		ti.Reset(d)
 	}
 }
 

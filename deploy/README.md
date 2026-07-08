@@ -37,7 +37,7 @@ cd ..
   - 多 role + dry-run：
     - `./deploy.sh run --env dev1 --action restart --roles websvr,mainsvr --dry-run`
   - 限制主机 + 透传参数：
-    - `./deploy.sh run --env dev1 --action push --limit 113.45.34.170 --role websvr -- -vv`
+    - `./deploy.sh run --env dev1 --action push --limit 43.139.3.228 --role websvr -- -vv`
   - 指定 inventory：
     - `./deploy.sh run --env dev1 --action restart -i hosts/host_dev.txt --role websvr`
 
@@ -46,7 +46,7 @@ cd ..
   - 常用 key：
     - `GOONE_ENV=dev1`
     - `GOONE_INVENTORY=hosts/host_dev.txt`
-    - `GOONE_LIMIT=113.45.34.170`
+    - `GOONE_LIMIT=43.139.3.228`
 
 - **示例**
   - 初始化所有服务（dev1 环境）  
@@ -101,7 +101,7 @@ cd deploy
 ./init-host.sh --hosts 192.168.50.250,192.168.50.251
 ./init-host.sh --env dev1
 ./init-host.sh --env dev2
-./init-host.sh --adhoc -u root -k ~/.ssh/id_ed25519 113.45.34.170
+./init-host.sh --adhoc -u root -k ~/.ssh/id_ed25519 43.139.3.228
 ./init-host.sh --variant centos 192.168.50.250
 ./init-host.sh --dry-run 192.168.50.250
 ```

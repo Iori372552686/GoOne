@@ -116,7 +116,16 @@ func (m *TransactionMgr) ProcessSSPacket(packet *sharedstruct.SSPacket) {
 		logger.Errorf("transmgr is not initialized, drop packet {header:%#v}", packet.Header)
 		return
 	}
-	shard.chanInPacket <- packet
+
+	// Bounded enqueue: never block the bus consumer goroutine forever.
+	// A shard stuck for longer than the timeout indicates handler starvation;
+	// dropping with a metric is preferable to backpressuring the entire MQ
+	// consumption chain.
+	if !packet.SendToChan(shard.chanInPacket, 3*time.Second) {
+		m.onPacketDropped()
+		observeTransactionPacket("request", packet.Header.Cmd, "dropped_queue_full")
+		logger.Errorf("transmgr shard queue full, drop packet {shard:%d, header:%#v}", shard.index, packet.Header)
+	}
 }
 
 func (m *TransactionMgr) Close(ctx context.Context) error {
@@ -302,7 +311,9 @@ func (s *transactionShard) processSSPacket(packet *sharedstruct.SSPacket) int32 
 	rid := packet.Header.RouterID
 	dstTransID := packet.Header.DstTransID
 	cmd := packet.Header.Cmd
-	logger.CmdDebugf(cmd, "Recv uid: %v | SrcBusID: %v | cmd [%v]", uid, bus.IpIntToString(packet.Header.SrcBusID), g1_protocol.CMD(packet.Header.Cmd))
+	if logger.DebugEnabled() {
+		logger.CmdDebugf(cmd, "Recv uid: %v | SrcBusID: %v | cmd [%v]", uid, bus.IpIntToString(packet.Header.SrcBusID), g1_protocol.CMD(packet.Header.Cmd))
+	}
 
 	if dstTransID != 0 {
 		trans, in := s.transMap[dstTransID]

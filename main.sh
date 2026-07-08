@@ -69,7 +69,7 @@ ${COLOR_BOLD}Examples${COLOR_RESET}
   # deploy
   ./main.sh deploy --env dev1 --action restart --role websvr
   ./main.sh deploy --env dev1 --action restart --roles websvr,mainsvr --dry-run
-  ./main.sh deploy --env dev1 --action push --limit 113.45.34.170 --role websvr -- -vv
+  ./main.sh deploy --env dev1 --action push --limit 43.139.3.228 --role websvr -- -vv
 
   # init hosts
   ./main.sh host init

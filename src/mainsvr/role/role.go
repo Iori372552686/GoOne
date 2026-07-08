@@ -139,6 +139,9 @@ func (r *Role) Debugf(format string, args ...interface{}) {
 	r.DebugDepthf(1, format, args...)
 }
 func (r *Role) DebugDepthf(depth int, format string, args ...interface{}) {
+	if !logger.DebugEnabled() {
+		return
+	}
 	f := fmt.Sprintf("[%v|%v] %v", r.Uid(), r.Zone(), format)
 	logger.DebugDepthf(1+depth, f, args...)
 }

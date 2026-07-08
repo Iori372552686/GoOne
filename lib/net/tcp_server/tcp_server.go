@@ -75,15 +75,7 @@ func (s *TcpSvr) WriteData(conn net.Conn, data1 []byte, data2 []byte) error {
 	copy(data[pos:], data2)
 	pos += len(data2)
 
-	t := time.NewTimer(3 * time.Second)
-	defer t.Stop()
-	select {
-	case chanWrite <- data:
-	case <-t.C:
-		return fmt.Errorf("time out in 3 seconds")
-	}
-
-	return nil
+	return sendToWriteChan(chanWrite, data)
 }
 
 func (s *TcpSvr) Close(conn net.Conn) error {
@@ -100,15 +92,26 @@ func (s *TcpSvr) Close(conn net.Conn) error {
 		return fmt.Errorf("connection doesn't exist")
 	}
 
+	return sendToWriteChan(chanWrite, nil)
+}
+
+// sendToWriteChan enqueues data (nil means close) with a bounded wait.
+// The fast path avoids the timer allocation entirely.
+func sendToWriteChan(chanWrite chan []byte, data []byte) error {
+	select {
+	case chanWrite <- data:
+		return nil
+	default:
+	}
+
 	t := time.NewTimer(3 * time.Second)
 	defer t.Stop()
 	select {
-	case chanWrite <- nil:
+	case chanWrite <- data:
+		return nil
 	case <-t.C:
 		return fmt.Errorf("time out in 3 seconds")
 	}
-
-	return nil
 }
 
 func (s *TcpSvr) runListener(listener net.Listener) {

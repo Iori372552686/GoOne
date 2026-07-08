@@ -204,10 +204,8 @@ func (b *BusImplRocketMQ) run() {
 		}
 		logger.Errorf("Error occur in processing bus(rocketmq). Retry later {retryTimes: %v, afterSeconds:%v} | %v",
 			retryCount, retryAfterSeconds, err)
-		select {
-		case <-b.stopCh:
+		if !sleepOrStop(b.stopCh, time.Duration(retryAfterSeconds)*time.Second) {
 			return
-		case <-time.After(time.Duration(retryAfterSeconds) * time.Second):
 		}
 	}
 }

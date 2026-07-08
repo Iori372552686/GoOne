@@ -108,25 +108,34 @@ func (b *BusImplNatsMQ) process() error {
 	mySubject := b.subjectFor(b.selfBusId)
 	logger.Infof("NATS bus connected, subscribe: %s", mySubject)
 
+	// handleMsg copies the payload (nats owns m.Data) and enqueues it with a
+	// bounded wait, so a stuck consumer can never block the NATS callback
+	// thread forever.
+	handleMsg := func(m *nats.Msg) {
+		buf := make([]byte, len(m.Data))
+		copy(buf, m.Data)
+
+		select {
+		case b.chanIn <- buf:
+			return
+		default:
+		}
+
+		t := time.NewTimer(3 * time.Second)
+		defer t.Stop()
+		select {
+		case b.chanIn <- buf:
+		case <-b.stopCh:
+		case <-t.C:
+			logger.Errorf("nats bus chanIn full, drop message {len:%d}", len(buf))
+		}
+	}
+
 	var sub *nats.Subscription
 	if b.queueGroup != "" {
-		sub, err = nc.QueueSubscribe(mySubject, b.queueGroup, func(m *nats.Msg) {
-			buf := make([]byte, len(m.Data))
-			copy(buf, m.Data)
-			select {
-			case b.chanIn <- buf:
-			case <-b.stopCh:
-			}
-		})
+		sub, err = nc.QueueSubscribe(mySubject, b.queueGroup, handleMsg)
 	} else {
-		sub, err = nc.Subscribe(mySubject, func(m *nats.Msg) {
-			buf := make([]byte, len(m.Data))
-			copy(buf, m.Data)
-			select {
-			case b.chanIn <- buf:
-			case <-b.stopCh:
-			}
-		})
+		sub, err = nc.Subscribe(mySubject, handleMsg)
 	}
 	if err != nil {
 		return err
@@ -159,9 +168,9 @@ func (b *BusImplNatsMQ) process() error {
 				continue
 			}
 			if b.onRecv != nil {
-				recvData := make([]byte, len(data)-byteLenOfBusPacketHeader())
-				copy(recvData, data[byteLenOfBusPacketHeader():])
-				b.onRecv(header.srcBusId, recvData)
+				// data is our own copy made in the subscribe callback;
+				// hand ownership to onRecv without a second copy.
+				b.onRecv(header.srcBusId, data[byteLenOfBusPacketHeader():])
 			}
 		}
 	}
@@ -188,10 +197,8 @@ func (b *BusImplNatsMQ) run() {
 		}
 		logger.Errorf("Error occur in processing bus(nats). Retry later {retryTimes: %v, afterSeconds:%v} | %v",
 			retryCount, retryAfterSeconds, err)
-		select {
-		case <-b.stopCh:
+		if !sleepOrStop(b.stopCh, time.Duration(retryAfterSeconds)*time.Second) {
 			return
-		case <-time.After(time.Duration(retryAfterSeconds) * time.Second):
 		}
 	}
 }

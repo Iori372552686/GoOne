@@ -112,6 +112,13 @@ func (h *SSPacketHeader) ToBytes() []byte {
 }
 
 func (h *SSPacket) SendToChan(ch chan *SSPacket, timeout time.Duration) bool {
+	// Fast path: channel has room, no timer allocation.
+	select {
+	case ch <- h:
+		return true
+	default:
+	}
+
 	t := time.NewTimer(timeout)
 	defer t.Stop()
 	select {

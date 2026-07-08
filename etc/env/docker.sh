@@ -40,7 +40,7 @@ Examples:
   $0 status --env dev1
 
   # run only on one host inside the group
-  $0 install --env dev1 --limit 113.45.34.170
+  $0 install --env dev1 --limit 43.139.3.228
 
 EOF
 }

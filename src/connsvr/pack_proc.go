@@ -14,8 +14,10 @@ import (
 // proc WebSocket packet
 func onWebSocketPacket(conn net.Conn, data []byte) {
 	headerLen := sharedstruct.ByteLenOfCSPacketHeader()
-	logger.Debugf("onWebSocketPacket: {dataLen: %v, headerLen: %v, remoteAddr: %v}\n",
-		len(data), headerLen, conn.RemoteAddr().String())
+	if logger.DebugEnabled() {
+		logger.Debugf("onWebSocketPacket: {dataLen: %v, headerLen: %v, remoteAddr: %v}",
+			len(data), headerLen, conn.RemoteAddr().String())
+	}
 
 	packetHeader := sharedstruct.CSPacketHeader{}
 	if len(data) < packetHeader.Size() {
@@ -25,7 +27,9 @@ func onWebSocketPacket(conn net.Conn, data []byte) {
 
 	packetHeader.From(data)
 	packetBody := data[headerLen:]
-	logger.CmdDebugf(packetHeader.Cmd, "[uid: %d] Received client packet: %#v", packetHeader.Uid, packetHeader)
+	if logger.DebugEnabled() {
+		logger.CmdDebugf(packetHeader.Cmd, "[uid: %d] Received client packet: %#v", packetHeader.Uid, packetHeader)
+	}
 
 	if misc.IsInnerCmd(packetHeader.Cmd) {
 		logger.Debugf("Received an inner command from client: %#v", packetHeader)
@@ -56,8 +60,10 @@ func onWebSocketPacket(conn net.Conn, data []byte) {
 // proc tcp packet
 func onTcpPacket(conn net.Conn, data []byte) {
 	headerLen := sharedstruct.ByteLenOfCSPacketHeader()
-	logger.Debugf("OnTcpPacket: {dataLen: %v, headerLen: %v, remoteAddr: %v}\n",
-		len(data), headerLen, conn.RemoteAddr())
+	if logger.DebugEnabled() {
+		logger.Debugf("OnTcpPacket: {dataLen: %v, headerLen: %v, remoteAddr: %v}",
+			len(data), headerLen, conn.RemoteAddr())
+	}
 
 	packetHeader := sharedstruct.CSPacketHeader{}
 	if len(data) < packetHeader.Size() {
@@ -67,7 +73,9 @@ func onTcpPacket(conn net.Conn, data []byte) {
 
 	packetHeader.From(data)
 	packetBody := data[headerLen:]
-	logger.CmdDebugf(packetHeader.Cmd, "[uid: %d] Received client packet: %#v", packetHeader.Uid, packetHeader)
+	if logger.DebugEnabled() {
+		logger.CmdDebugf(packetHeader.Cmd, "[uid: %d] Received client packet: %#v", packetHeader.Uid, packetHeader)
+	}
 
 	if misc.IsInnerCmd(packetHeader.Cmd) {
 		logger.Debugf("Received an inner command from client: %#v", packetHeader)
@@ -104,10 +112,13 @@ func onRecvSSPacket(packet *sharedstruct.SSPacket) {
 			BodyLen: packet.Header.BodyLen,
 		}
 
+		// 头编码到栈上数组，避免每个下行包一次堆分配。
+		var headerBuf [28]byte
+		csPacketHeader.To(headerBuf[:])
+
 		// 同一个 uid 只会绑定在一种传输通道上：先尝试 TCP，找不到再尝试 WS。
-		headerBytes := csPacketHeader.ToBytes()
-		if err := globals.ConnTcpSvr.SendByUid(packet.Header.Uid, headerBytes, packet.Body); err != nil {
-			if wsErr := globals.ConnWsSvr.SendByUid(packet.Header.Uid, headerBytes, packet.Body); wsErr != nil {
+		if err := globals.ConnTcpSvr.SendByUid(packet.Header.Uid, headerBuf[:], packet.Body); err != nil {
+			if wsErr := globals.ConnWsSvr.SendByUid(packet.Header.Uid, headerBuf[:], packet.Body); wsErr != nil {
 				logger.Debugf("downstream packet dropped, uid not on tcp/ws {uid:%v, cmd:%v}",
 					packet.Header.Uid, packet.Header.Cmd)
 			}
