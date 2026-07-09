@@ -15,8 +15,8 @@ base_cfg:
       sampler_ratio: 1
 
   dependencies:
-    game_data_dir: ../common/gamedata/data
-    sensitive_words_file: ../common/conf/sensitive.txt
+    game_data_dir: ./common/gamedata/data
+    sensitive_words_file: ./common/sensitive/sensitive.txt
 
     http_sign:
       - index_name: default
@@ -30,13 +30,13 @@ base_cfg:
     db_instances:
       - instance_id: 1
         ip: 43.139.3.228
-        port: 16379
+        port: 6379
         password: go123456
         is_cluster: false
         description: role info data
       - instance_id: 3
         ip: 43.139.3.228
-        port: 16379
+        port: 6379
         password: go123456
         is_cluster: false
         description: brief info data
@@ -45,7 +45,7 @@ base_cfg:
       - index_name: default
         master:
           ip: 43.139.3.228
-          port: 13306
+          port: 3306
           user: g1_game
           password: gg123456
           db_name: g1_game
