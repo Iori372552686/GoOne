@@ -16,8 +16,12 @@ func (self *ConnTcpSvr) CreateTcpServer(implType string, port int, cb func(conn 
 	}
 
 	switch implType {
-	case "gev", "gnet":
-		// 未实现的事件驱动后端：显式报错，避免调用方误以为服务已启动。
+	case "gnet":
+		// 事件驱动后端（epoll/kqueue）：无每连接 goroutine，适合万级连接场景。
+		return self.initAndRunGnet("0.0.0.0", port, cb)
+
+	case "gev":
+		// 未实现的后端：显式报错，避免调用方误以为服务已启动。
 		return fmt.Errorf("tcp implType %q is not implemented yet, use default (gonet)", implType)
 
 	default: //"gonet"
@@ -33,4 +37,14 @@ func (self *ConnWsTcpSvr) CreateWebSocketServer(implType, mode string, port int,
 	}
 
 	return self.initAndRun(implType, mode, port, cb)
+}
+
+// kcp impl
+func (self *ConnKcpSvr) CreateKcpServer(port int, cb func(conn net.Conn, data []byte)) error {
+	logger.Infof(" -----  CreateKcpServer ---- port =%d", port)
+	if cb == nil || port == 0 {
+		return errors.New("CreateKcpServer args fail ！")
+	}
+
+	return self.initAndRun("0.0.0.0", port, cb)
 }

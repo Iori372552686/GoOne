@@ -7,6 +7,7 @@ import (
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
+	gnet_svr "github.com/Iori372552686/GoOne/lib/net/gnet_server"
 	"github.com/Iori372552686/GoOne/lib/net/tcp_server"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/lib/service/router"
@@ -19,11 +20,8 @@ import (
 )
 
 func (t *ConnTcpSvr) initAndRun(ip string, port int, cb func(conn net.Conn, data []byte)) error {
-	t.uidConnMap = make(map[uint64]*Client)
-	t.connUidMap = make(map[net.Conn]uint64)
-	t.remoteAddrConnMap = make(map[string]net.Conn)
-	t.remoteAddrKickMap = make(map[string]bool)
-	t.handler = cb
+	t.initSessionMaps(cb)
+	t.transport = &t.TcpPacketSvr
 
 	packetInfo := tcp_server.TcpPacketInfo{
 		HeaderLen: sharedstruct.ByteLenOfCSPacketHeader(),
@@ -31,6 +29,29 @@ func (t *ConnTcpSvr) initAndRun(ip string, port int, cb func(conn net.Conn, data
 	}
 
 	return t.TcpPacketSvr.InitAndRun(ip, port, packetInfo, t)
+}
+
+// initAndRunGnet starts the event-driven gnet backend: no per-connection
+// goroutines, framing happens inside the event loop, downlink writes go
+// through AsyncWrite. Session semantics are identical to the gonet backend.
+func (t *ConnTcpSvr) initAndRunGnet(ip string, port int, cb func(conn net.Conn, data []byte)) error {
+	t.initSessionMaps(cb)
+
+	gs := gnet_svr.NewTcpServer(
+		sharedstruct.ByteLenOfCSPacketHeader(),
+		sharedstruct.ByteLenOfCSPacketBody,
+		t,
+	)
+	t.transport = gs
+	return gs.Start(ip, port)
+}
+
+func (t *ConnTcpSvr) initSessionMaps(cb func(conn net.Conn, data []byte)) {
+	t.uidConnMap = make(map[uint64]*Client)
+	t.connUidMap = make(map[net.Conn]uint64)
+	t.remoteAddrConnMap = make(map[string]net.Conn)
+	t.remoteAddrKickMap = make(map[string]bool)
+	t.handler = cb
 }
 
 // 被Listener协程调用，一个TcpSvr对应一个Listener协程
@@ -77,7 +98,7 @@ func (t *ConnTcpSvr) SendByUid(uid uint64, data1 []byte, data2 []byte) error {
 		return fmt.Errorf("uid doesn't exist {uid: %v}", uid)
 	}
 
-	err := t.WriteData(conn.Conn, data1, data2)
+	err := t.transport.WriteData(conn.Conn, data1, data2)
 	if err != nil {
 		conn.Conn.Close()
 		observeGatewayEvent("tcp", "write_error")
@@ -100,7 +121,7 @@ func (t *ConnTcpSvr) BroadcastByZone(zone int32, data1 []byte, data2 []byte) {
 		if zone > 0 && client.Zone != uint32(zone) {
 			continue
 		}
-		err := t.WriteData(client.Conn, data1, data2)
+		err := t.transport.WriteData(client.Conn, data1, data2)
 		if err != nil {
 			client.Conn.Close()
 			observeGatewayEvent("tcp", "write_error")
@@ -164,7 +185,7 @@ func (t *ConnTcpSvr) removeConn(conn net.Conn) uint64 {
 }
 
 func (t *ConnTcpSvr) kick(conn net.Conn, uid uint64, reason g1_protocol.EKickOutReason) {
-	defer t.Close(conn)
+	defer t.transport.Close(conn)
 	observeGatewayEvent("tcp", "kick")
 
 	logger.Infof("Kick out client {uid:%v, reason:%v, ip:%v}", uid, reason, conn.RemoteAddr())
@@ -181,7 +202,9 @@ func (t *ConnTcpSvr) kick(conn net.Conn, uid uint64, reason g1_protocol.EKickOut
 		Cmd:     uint32(g1_protocol.CMD_SC_KICK_OUT),
 		BodyLen: uint32(len(msgData)),
 	}
-	err = t.WriteData(conn, header.ToBytes(), msgData)
+	var headerBuf [28]byte
+	header.To(headerBuf[:])
+	err = t.transport.WriteData(conn, headerBuf[:], msgData)
 	if err != nil {
 		observeGatewayEvent("tcp", "write_error")
 		logger.Errorf("Failed to write data in kick | %v", err)

@@ -106,6 +106,11 @@ type ServiceCommonConfig struct {
 
 type ConnRuntimeConfig struct {
 	ListenPort int `json:"listen_port" yaml:"listen_port"`
+	// TcpImplType 选择 TCP 后端："gonet"/空 = 每连接 goroutine（默认），
+	// "gnet" = epoll/kqueue 事件驱动（万级连接场景）。
+	TcpImplType string `json:"tcp_impl_type" yaml:"tcp_impl_type"`
+	// KcpPort > 0 时额外启动 KCP(UDP) 网关，供弱网/实时性敏感客户端使用。
+	KcpPort int `json:"kcp_port" yaml:"kcp_port"`
 }
 
 type MainCapacityConfig struct {

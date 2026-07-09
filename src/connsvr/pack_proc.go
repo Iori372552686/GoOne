@@ -5,30 +5,33 @@ import (
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
+	"github.com/Iori372552686/GoOne/lib/net/net_mgr"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/connsvr/globals"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
-// proc WebSocket packet
-func onWebSocketPacket(conn net.Conn, data []byte) {
+// handleClientPacket 是三种传输（TCP/WS/KCP）共用的客户端包处理逻辑：
+// 解析 CS 头 → 会话校验/重绑定 → 经 router 转发到后端服务。
+// 在各自读协程/事件循环内同步调用，不得保留 data 引用。
+func handleClientPacket(gw net_mgr.GatewayServer, transport string, conn net.Conn, data []byte) {
 	headerLen := sharedstruct.ByteLenOfCSPacketHeader()
 	if logger.DebugEnabled() {
-		logger.Debugf("onWebSocketPacket: {dataLen: %v, headerLen: %v, remoteAddr: %v}",
-			len(data), headerLen, conn.RemoteAddr().String())
+		logger.Debugf("onClientPacket(%s): {dataLen: %v, headerLen: %v, remoteAddr: %v}",
+			transport, len(data), headerLen, conn.RemoteAddr())
 	}
 
 	packetHeader := sharedstruct.CSPacketHeader{}
 	if len(data) < packetHeader.Size() {
-		logger.Errorf("Received datalen < packetHeader, packet is invalid")
+		logger.Errorf("Received datalen < packetHeader, packet is invalid (%s)", transport)
 		return
 	}
 
 	packetHeader.From(data)
 	packetBody := data[headerLen:]
 	if logger.DebugEnabled() {
-		logger.CmdDebugf(packetHeader.Cmd, "[uid: %d] Received client packet: %#v", packetHeader.Uid, packetHeader)
+		logger.CmdDebugf(packetHeader.Cmd, "[uid: %d] Received client packet(%s): %#v", packetHeader.Uid, transport, packetHeader)
 	}
 
 	if misc.IsInnerCmd(packetHeader.Cmd) {
@@ -39,19 +42,19 @@ func onWebSocketPacket(conn net.Conn, data []byte) {
 	// --- Default path: forward to backend server via router ---
 	uid := packetHeader.Uid
 	if uid == 0 {
-		logger.Errorf("uid==0 and no client packet handler registered for cmd %d", packetHeader.Cmd)
+		logger.Errorf("uid==0 and no client packet handler registered for cmd %d (%s)", packetHeader.Cmd, transport)
 		return
 	}
 
-	client := globals.ConnWsSvr.GetClientByUid(uid)
+	client := gw.GetClientByUid(uid)
 	if client == nil {
-		logger.Errorf("Cannot find conn by uid: %v", uid)
+		logger.Errorf("Cannot find %s conn by uid: %v", transport, uid)
 		return
 	}
 
 	// 前期简单测试，后期改为严谨通过rebind 与账号服验证后更新conn
 	if client.Conn != conn {
-		globals.ConnWsSvr.UpdateClientByUid(conn, uid, client.Zone)
+		gw.UpdateClientByUid(conn, uid, client.Zone)
 	}
 
 	router.SendMsgByConn(uid, uid, client.Zone, packetHeader.Cmd, 0, packetBody, client.Ip, client.Port)
@@ -59,48 +62,17 @@ func onWebSocketPacket(conn net.Conn, data []byte) {
 
 // proc tcp packet
 func onTcpPacket(conn net.Conn, data []byte) {
-	headerLen := sharedstruct.ByteLenOfCSPacketHeader()
-	if logger.DebugEnabled() {
-		logger.Debugf("OnTcpPacket: {dataLen: %v, headerLen: %v, remoteAddr: %v}",
-			len(data), headerLen, conn.RemoteAddr())
-	}
+	handleClientPacket(globals.ConnTcpSvr, "tcp", conn, data)
+}
 
-	packetHeader := sharedstruct.CSPacketHeader{}
-	if len(data) < packetHeader.Size() {
-		logger.Errorf("Received datalen < packetHeader, packet is invalid")
-		return
-	}
+// proc WebSocket packet
+func onWebSocketPacket(conn net.Conn, data []byte) {
+	handleClientPacket(globals.ConnWsSvr, "ws", conn, data)
+}
 
-	packetHeader.From(data)
-	packetBody := data[headerLen:]
-	if logger.DebugEnabled() {
-		logger.CmdDebugf(packetHeader.Cmd, "[uid: %d] Received client packet: %#v", packetHeader.Uid, packetHeader)
-	}
-
-	if misc.IsInnerCmd(packetHeader.Cmd) {
-		logger.Debugf("Received an inner command from client: %#v", packetHeader)
-		return
-	}
-
-	// --- Default path: forward to backend server via router ---
-	uid := packetHeader.Uid
-	if uid == 0 {
-		logger.Errorf("uid==0 and no client packet handler registered for cmd %d (tcp)", packetHeader.Cmd)
-		return
-	}
-
-	client := globals.ConnTcpSvr.GetClientByUid(uid)
-	if client == nil {
-		logger.Errorf("Cannot find conn by uid: %v", uid)
-		return
-	}
-
-	// 前期简单测试，后期改为严谨通过rebind 与账号服验证后更新conn
-	if client.Conn != conn {
-		globals.ConnTcpSvr.UpdateClientByUid(conn, uid, client.Zone)
-	}
-
-	router.SendMsgByConn(uid, uid, client.Zone, packetHeader.Cmd, 0, packetBody, client.Ip, client.Port)
+// proc kcp packet
+func onKcpPacket(conn net.Conn, data []byte) {
+	handleClientPacket(globals.ConnKcpSvr, "kcp", conn, data)
 }
 
 // busMsg proc cb func
@@ -116,12 +88,16 @@ func onRecvSSPacket(packet *sharedstruct.SSPacket) {
 		var headerBuf [28]byte
 		csPacketHeader.To(headerBuf[:])
 
-		// 同一个 uid 只会绑定在一种传输通道上：先尝试 TCP，找不到再尝试 WS。
-		if err := globals.ConnTcpSvr.SendByUid(packet.Header.Uid, headerBuf[:], packet.Body); err != nil {
-			if wsErr := globals.ConnWsSvr.SendByUid(packet.Header.Uid, headerBuf[:], packet.Body); wsErr != nil {
-				logger.Debugf("downstream packet dropped, uid not on tcp/ws {uid:%v, cmd:%v}",
-					packet.Header.Uid, packet.Header.Cmd)
-			}
+		// 同一个 uid 只会绑定在一种传输通道上：按 TCP → WS → KCP 依次回退。
+		if err := globals.ConnTcpSvr.SendByUid(packet.Header.Uid, headerBuf[:], packet.Body); err == nil {
+			return
+		}
+		if err := globals.ConnWsSvr.SendByUid(packet.Header.Uid, headerBuf[:], packet.Body); err == nil {
+			return
+		}
+		if err := globals.ConnKcpSvr.SendByUid(packet.Header.Uid, headerBuf[:], packet.Body); err != nil {
+			logger.Debugf("downstream packet dropped, uid not on tcp/ws/kcp {uid:%v, cmd:%v}",
+				packet.Header.Uid, packet.Header.Cmd)
 		}
 	} else if packet.Header.Cmd == uint32(g1_protocol.CMD_CONN_KICK_OUT_REQ) {
 		//onSSPacketConnKickout(packet)

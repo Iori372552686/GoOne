@@ -61,10 +61,21 @@ func NewApp() *bootstrap.ServiceApp {
 			return nil
 		},
 		StartExtra: func() error {
-			if err := globals.ConnTcpSvr.CreateTcpServer("", gconf.ConnSvrCfg.Runtime.ListenPort+1, onTcpPacket); err != nil {
+			// TCP：tcp_impl_type 可选 gonet（默认，每连接 goroutine）或 gnet（事件驱动）。
+			if err := globals.ConnTcpSvr.CreateTcpServer(gconf.ConnSvrCfg.Runtime.TcpImplType,
+				gconf.ConnSvrCfg.Runtime.ListenPort+1, onTcpPacket); err != nil {
 				return err
 			}
-			return globals.ConnWsSvr.CreateWebSocketServer("gin", "debug", gconf.ConnSvrCfg.Runtime.ListenPort, onWebSocketPacket)
+			if err := globals.ConnWsSvr.CreateWebSocketServer("gin", "debug", gconf.ConnSvrCfg.Runtime.ListenPort, onWebSocketPacket); err != nil {
+				return err
+			}
+			// KCP：配置 kcp_port 后启用（弱网/实时性敏感客户端）。
+			if kcpPort := gconf.ConnSvrCfg.Runtime.KcpPort; kcpPort > 0 {
+				if err := globals.ConnKcpSvr.CreateKcpServer(kcpPort, onKcpPacket); err != nil {
+					return err
+				}
+			}
+			return nil
 		},
 		OnExit: func() {
 			logger.Infof("================== connsvr Stop =========================")

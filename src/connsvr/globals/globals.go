@@ -12,6 +12,7 @@ var (
 	TransMgr               = transaction.NewTransactionMgr()
 	ConnTcpSvr             = net_mgr.NewTcpSvr()
 	ConnWsSvr              = net_mgr.NewWsTcpSvr()
+	ConnKcpSvr             = net_mgr.NewKcpSvr()
 	SignMgr                = http_sign.NewSignMgr()
 	RestMgr                = rest_api.NewRestApiMgr()
 	ClientPacketDispatcher = ssrpc.NewDispatcher()

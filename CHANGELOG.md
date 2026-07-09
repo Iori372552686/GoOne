@@ -19,7 +19,13 @@
 - **bus 驱动插件化**：五个 MQ 实现移入 `bus/driver/<name>`（database/sql 风格 blank import），
   `driver/all` 聚合包；不用 bus 的服务不再链接 MQ SDK（websvr 依赖图 MQ 包 68→0）。
 - `router.Router` 结构体化（`New()/Default()`），包级 API 兼容不变，测试可注入。
-- `net_mgr.GatewayServer` 统一网关接口；半成品（kcp/gnet/beego_ws/rest）移入 `x/` 实验目录。
+- `net_mgr.GatewayServer` 统一网关接口（TCP/WS/KCP 三传输实现）+ `gatewayTransport` 后端抽象。
+- **KCP 网关转正**：流模式 + CSPacket 粘包拆包 + 池化写缓冲 + 完整会话层
+  （绑定/下行/踢人/多地登录/心跳登出），connsvr `runtime.kcp_port` 启用。
+- **gnet 事件驱动 TCP 后端**：epoll/kqueue 无每连接 goroutine，事件循环内拆包，
+  connsvr `runtime.tcp_impl_type: gnet` 切换；下行经 AsyncWrite。
+- connsvr 三传输统一客户端包处理（`handleClientPacket`）与下行回退链 TCP→WS→KCP。
+- 遗留删除：`beego_ws.go`、Beego 风格 `lib/web/rest`（`Cors` 迁至 `web_gin`）。
 - `bootstrap/busapp`：bus 服务标准装配层。
 - 可观测性：`docs/observability/`（Grafana dashboard 模板 + 指标/告警/trace 指南）。
 - legacy 配置字段 Deprecated 标记与启动告警（两个版本后删除）。

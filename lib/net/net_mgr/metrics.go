@@ -72,6 +72,11 @@ func (gatewayConnectionsCollector) Collect(ch chan<- prometheus.Metric) {
 			snapshot.uidSessions += len(src.uidConnMap)
 			snapshot.remoteAddrs += len(src.remoteAddrConnMap)
 			src.lock.RUnlock()
+		case *ConnKcpSvr:
+			src.lock.RLock()
+			snapshot.uidSessions += len(src.uidConnMap)
+			snapshot.remoteAddrs += len(src.remoteAddrConnMap)
+			src.lock.RUnlock()
 		}
 		byTransport[transport] = snapshot
 		return true
