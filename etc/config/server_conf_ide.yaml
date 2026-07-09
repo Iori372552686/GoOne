@@ -47,7 +47,7 @@ base_cfg:
           ip: 43.139.3.228
           port: 3306
           user: g1_game
-          password: gg123456
+          password: go123456
           db_name: g1_game
         slaves: []
         description: test db1
