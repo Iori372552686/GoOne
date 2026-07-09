@@ -7,6 +7,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 	cmd_handler "github.com/Iori372552686/GoOne/lib/api/cmd_handler"
+	"time"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -268,6 +269,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_LOGIN_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_LOGIN_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mainsvr login",
 		},
 		srv.MW,
@@ -280,6 +282,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_LOGOUT_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_LOGOUT_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mainsvr logout (rsp optional, see req.ByServer)",
 		},
 		srv.MW,
@@ -292,6 +295,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_HEARTBEAT_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_HEARTBEAT_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mainsvr heartbeat",
 		},
 		srv.MW,
@@ -304,6 +308,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_CHANGE_NAME_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_CHANGE_NAME_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mainsvr change name",
 		},
 		srv.MW,
@@ -316,6 +321,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_CHANGE_ICON_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_CHANGE_ICON_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mainsvr change icon",
 		},
 		srv.MW,
@@ -328,6 +334,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GM_GET_ROLE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GM_GET_ROLE_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "gm get role",
 		},
 		srv.MW,
@@ -340,6 +347,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GM_SET_ROLE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GM_SET_ROLE_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "gm set role",
 		},
 		srv.MW,
@@ -352,6 +360,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GM_ADD_ITEM_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GM_ADD_ITEM_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "gm add item",
 		},
 		srv.MW,
@@ -364,6 +373,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_MALL_BUY_PACKAGE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_MALL_BUY_PACKAGE_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mall buy package",
 		},
 		srv.MW,
@@ -376,6 +386,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_CREATE_ROOM_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_CREATE_ROOM_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas create room",
 		},
 		srv.MW,
@@ -388,6 +399,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_JOIN_ROOM_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_JOIN_ROOM_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas join room",
 		},
 		srv.MW,
@@ -400,6 +412,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_QUICK_START_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_QUICK_START_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas quick start",
 		},
 		srv.MW,
@@ -412,6 +425,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_ROOM_LIST_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_ROOM_LIST_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas room list",
 		},
 		srv.MW,
@@ -424,6 +438,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_DO_BET_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_DO_BET_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas do bet",
 		},
 		srv.MW,
@@ -436,6 +451,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_FOLD_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_FOLD_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas fold",
 		},
 		srv.MW,
@@ -448,6 +464,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_BUY_IN_DETAIL_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_BUY_IN_DETAIL_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas buy-in detail",
 		},
 		srv.MW,
@@ -460,6 +477,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_GET_LOOKERS_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_GET_LOOKERS_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas get lookers",
 		},
 		srv.MW,
@@ -472,6 +490,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_SIT_DOWN_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_SIT_DOWN_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas sit down",
 		},
 		srv.MW,
@@ -484,6 +503,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_STAND_UP_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_STAND_UP_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas stand up",
 		},
 		srv.MW,
@@ -496,6 +516,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_LEAVE_GAME_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_LEAVE_GAME_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas leave game",
 		},
 		srv.MW,
@@ -509,6 +530,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_BUY_IN_REQ,
 			OneWay: true,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas buy in (one-way, stub)",
 		},
 		srv.MW,
@@ -521,6 +543,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_MILITARY_SUCCESS_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_MILITARY_SUCCESS_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas military success (stub)",
 		},
 		srv.MW,
@@ -533,6 +556,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_GET_GAME_LOG_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_GET_GAME_LOG_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas game log (stub)",
 		},
 		srv.MW,
@@ -545,6 +569,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_GET_TIME_LEFT_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_GET_TIME_LEFT_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas time left (stub)",
 		},
 		srv.MW,
@@ -557,6 +582,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_VOICE_CALL_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_VOICE_CALL_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas voice call (stub)",
 		},
 		srv.MW,
@@ -569,6 +595,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_BUY_THINK_TIME_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_BUY_THINK_TIME_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas buy think time (stub)",
 		},
 		srv.MW,
@@ -581,6 +608,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_AUTO_BUYIN_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_AUTO_BUYIN_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas auto buyin (stub)",
 		},
 		srv.MW,
@@ -593,6 +621,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_INTERACTION_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_INTERACTION_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas interaction (stub)",
 		},
 		srv.MW,
@@ -605,6 +634,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_EMOTICON_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_EMOTICON_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas emoticon (stub)",
 		},
 		srv.MW,
@@ -617,6 +647,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_GET_MILITARY_DIAGRAM_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_GET_MILITARY_DIAGRAM_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas military diagram (stub)",
 		},
 		srv.MW,
@@ -629,6 +660,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_SHOW_CARD_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_SHOW_CARD_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas show card (stub)",
 		},
 		srv.MW,
@@ -641,6 +673,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_GET_ROLE_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_GET_ROLE_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas get player info (stub)",
 		},
 		srv.MW,
@@ -653,6 +686,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_MARK_PLAYER_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_MARK_PLAYER_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas mark player (stub)",
 		},
 		srv.MW,
@@ -665,6 +699,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_INSURANCE_BUY_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_INSURANCE_BUY_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas insurance buy (stub)",
 		},
 		srv.MW,
@@ -677,6 +712,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_ROOM_SET_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_ROOM_SET_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas room set (stub)",
 		},
 		srv.MW,
@@ -689,6 +725,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_SNG_GET_BLIND_LEVEL_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_SNG_GET_BLIND_LEVEL_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas sng blind level (stub)",
 		},
 		srv.MW,
@@ -701,6 +738,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_GET_ROOM_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_GET_ROOM_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas get room info",
 		},
 		srv.MW,
@@ -713,6 +751,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_INSURANCE_THINK_TIME_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_INSURANCE_THINK_TIME_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas insurance think time (stub)",
 		},
 		srv.MW,
@@ -725,6 +764,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_INSURANCE_OP_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_INSURANCE_OP_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas insurance op (stub)",
 		},
 		srv.MW,
@@ -737,6 +777,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_GET_GAME_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_GET_GAME_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas get game info",
 		},
 		srv.MW,
@@ -749,6 +790,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_ADD_TO_FAVORITE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_ADD_TO_FAVORITE_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas add to favorite (stub)",
 		},
 		srv.MW,
@@ -761,6 +803,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_CHANGE_SKIN_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_CHANGE_SKIN_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas change skin (stub)",
 		},
 		srv.MW,
@@ -773,6 +816,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_RABBIT_HUNTING_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_RABBIT_HUNTING_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas rabbit hunting (stub)",
 		},
 		srv.MW,
@@ -785,6 +829,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_EARLY_SETTLE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_EARLY_SETTLE_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas early settle (stub)",
 		},
 		srv.MW,
@@ -797,6 +842,7 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 	mgr.RegisterCmd(g1_protocol.CMD_MAIN_GAME_PREOPERATION_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_PREOPERATION_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas preoperation",
 		},
 		srv.MW,
@@ -817,6 +863,7 @@ func RegisterMainC2SServiceToWS(d *ssrpc.Dispatcher, srv MainC2SServiceSServer) 
 	d.RegisterWS(uint32(g1_protocol.CMD_MAIN_LOGIN_REQ), ssrpc.WrapWS(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_LOGIN_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mainsvr login",
 		},
 		srv.MW,
@@ -837,6 +884,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_LOGIN_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_LOGIN_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mainsvr login",
 		},
 		srv.MW,
@@ -849,6 +897,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_LOGOUT_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_LOGOUT_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mainsvr logout (rsp optional, see req.ByServer)",
 		},
 		srv.MW,
@@ -861,6 +910,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_HEARTBEAT_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_HEARTBEAT_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mainsvr heartbeat",
 		},
 		srv.MW,
@@ -873,6 +923,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_CHANGE_NAME_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_CHANGE_NAME_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mainsvr change name",
 		},
 		srv.MW,
@@ -885,6 +936,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_CHANGE_ICON_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_CHANGE_ICON_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mainsvr change icon",
 		},
 		srv.MW,
@@ -897,6 +949,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GM_GET_ROLE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GM_GET_ROLE_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "gm get role",
 		},
 		srv.MW,
@@ -909,6 +962,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GM_SET_ROLE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GM_SET_ROLE_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "gm set role",
 		},
 		srv.MW,
@@ -921,6 +975,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GM_ADD_ITEM_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GM_ADD_ITEM_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "gm add item",
 		},
 		srv.MW,
@@ -933,6 +988,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_MALL_BUY_PACKAGE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_MALL_BUY_PACKAGE_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mall buy package",
 		},
 		srv.MW,
@@ -945,6 +1001,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_CREATE_ROOM_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_CREATE_ROOM_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas create room",
 		},
 		srv.MW,
@@ -957,6 +1014,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_JOIN_ROOM_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_JOIN_ROOM_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas join room",
 		},
 		srv.MW,
@@ -969,6 +1027,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_QUICK_START_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_QUICK_START_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas quick start",
 		},
 		srv.MW,
@@ -981,6 +1040,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_ROOM_LIST_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_ROOM_LIST_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas room list",
 		},
 		srv.MW,
@@ -993,6 +1053,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_DO_BET_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_DO_BET_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas do bet",
 		},
 		srv.MW,
@@ -1005,6 +1066,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_FOLD_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_FOLD_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas fold",
 		},
 		srv.MW,
@@ -1017,6 +1079,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_BUY_IN_DETAIL_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_BUY_IN_DETAIL_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas buy-in detail",
 		},
 		srv.MW,
@@ -1029,6 +1092,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_GET_LOOKERS_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_GET_LOOKERS_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas get lookers",
 		},
 		srv.MW,
@@ -1041,6 +1105,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_SIT_DOWN_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_SIT_DOWN_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas sit down",
 		},
 		srv.MW,
@@ -1053,6 +1118,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_STAND_UP_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_STAND_UP_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas stand up",
 		},
 		srv.MW,
@@ -1065,6 +1131,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_LEAVE_GAME_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_LEAVE_GAME_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas leave game",
 		},
 		srv.MW,
@@ -1078,6 +1145,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_BUY_IN_REQ,
 			OneWay: true,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas buy in (one-way, stub)",
 		},
 		srv.MW,
@@ -1090,6 +1158,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_MILITARY_SUCCESS_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_MILITARY_SUCCESS_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas military success (stub)",
 		},
 		srv.MW,
@@ -1102,6 +1171,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_GET_GAME_LOG_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_GET_GAME_LOG_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas game log (stub)",
 		},
 		srv.MW,
@@ -1114,6 +1184,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_GET_TIME_LEFT_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_GET_TIME_LEFT_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas time left (stub)",
 		},
 		srv.MW,
@@ -1126,6 +1197,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_VOICE_CALL_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_VOICE_CALL_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas voice call (stub)",
 		},
 		srv.MW,
@@ -1138,6 +1210,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_BUY_THINK_TIME_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_BUY_THINK_TIME_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas buy think time (stub)",
 		},
 		srv.MW,
@@ -1150,6 +1223,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_AUTO_BUYIN_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_AUTO_BUYIN_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas auto buyin (stub)",
 		},
 		srv.MW,
@@ -1162,6 +1236,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_INTERACTION_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_INTERACTION_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas interaction (stub)",
 		},
 		srv.MW,
@@ -1174,6 +1249,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_EMOTICON_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_EMOTICON_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas emoticon (stub)",
 		},
 		srv.MW,
@@ -1186,6 +1262,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_GET_MILITARY_DIAGRAM_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_GET_MILITARY_DIAGRAM_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas military diagram (stub)",
 		},
 		srv.MW,
@@ -1198,6 +1275,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_SHOW_CARD_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_SHOW_CARD_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas show card (stub)",
 		},
 		srv.MW,
@@ -1210,6 +1288,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_GET_ROLE_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_GET_ROLE_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas get player info (stub)",
 		},
 		srv.MW,
@@ -1222,6 +1301,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_MARK_PLAYER_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_MARK_PLAYER_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas mark player (stub)",
 		},
 		srv.MW,
@@ -1234,6 +1314,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_INSURANCE_BUY_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_INSURANCE_BUY_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas insurance buy (stub)",
 		},
 		srv.MW,
@@ -1246,6 +1327,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_ROOM_SET_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_ROOM_SET_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas room set (stub)",
 		},
 		srv.MW,
@@ -1258,6 +1340,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_SNG_GET_BLIND_LEVEL_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_SNG_GET_BLIND_LEVEL_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas sng blind level (stub)",
 		},
 		srv.MW,
@@ -1270,6 +1353,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_GET_ROOM_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_GET_ROOM_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas get room info",
 		},
 		srv.MW,
@@ -1282,6 +1366,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_INSURANCE_THINK_TIME_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_INSURANCE_THINK_TIME_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas insurance think time (stub)",
 		},
 		srv.MW,
@@ -1294,6 +1379,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_INSURANCE_OP_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_INSURANCE_OP_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas insurance op (stub)",
 		},
 		srv.MW,
@@ -1306,6 +1392,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_GET_GAME_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_GET_GAME_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas get game info",
 		},
 		srv.MW,
@@ -1318,6 +1405,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_ADD_TO_FAVORITE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_ADD_TO_FAVORITE_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas add to favorite (stub)",
 		},
 		srv.MW,
@@ -1330,6 +1418,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_CHANGE_SKIN_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_CHANGE_SKIN_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas change skin (stub)",
 		},
 		srv.MW,
@@ -1342,6 +1431,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_RABBIT_HUNTING_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_RABBIT_HUNTING_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas rabbit hunting (stub)",
 		},
 		srv.MW,
@@ -1354,6 +1444,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_EARLY_SETTLE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_EARLY_SETTLE_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas early settle (stub)",
 		},
 		srv.MW,
@@ -1366,6 +1457,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterCmd(g1_protocol.CMD_MAIN_GAME_PREOPERATION_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_GAME_PREOPERATION_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "texas preoperation",
 		},
 		srv.MW,
@@ -1378,6 +1470,7 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 	d.RegisterWS(uint32(g1_protocol.CMD_MAIN_LOGIN_REQ), ssrpc.WrapWS(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MAIN_LOGIN_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mainsvr login",
 		},
 		srv.MW,

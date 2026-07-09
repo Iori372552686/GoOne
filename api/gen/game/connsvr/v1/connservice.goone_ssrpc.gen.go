@@ -7,6 +7,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 	cmd_handler "github.com/Iori372552686/GoOne/lib/api/cmd_handler"
+	"time"
 )
 
 // ConnServiceSS is the ssrpc service interface for ConnService.
@@ -53,6 +54,7 @@ func RegisterConnServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv Co
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_CONN_KICK_OUT_REQ,
 			OneWay: true,
+			Timeout: 5000 * time.Millisecond,
 			Name: "kick websocket session by remote addr",
 		},
 		srv.MW,
@@ -65,6 +67,7 @@ func RegisterConnServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv Co
 	mgr.RegisterCmd(g1_protocol.CMD_CONN_BROADCAST_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_CONN_BROADCAST_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "broadcast CSPacket payload to websocket zone",
 		},
 		srv.MW,
@@ -86,6 +89,7 @@ func RegisterConnServiceToDispatcher(d *ssrpc.Dispatcher, srv ConnServiceSServer
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_CONN_KICK_OUT_REQ,
 			OneWay: true,
+			Timeout: 5000 * time.Millisecond,
 			Name: "kick websocket session by remote addr",
 		},
 		srv.MW,
@@ -98,6 +102,7 @@ func RegisterConnServiceToDispatcher(d *ssrpc.Dispatcher, srv ConnServiceSServer
 	d.RegisterCmd(g1_protocol.CMD_CONN_BROADCAST_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_CONN_BROADCAST_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "broadcast CSPacket payload to websocket zone",
 		},
 		srv.MW,

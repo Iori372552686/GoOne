@@ -191,6 +191,9 @@ docker compose -f etc/env/env_docker.yaml up -d
 ./main.sh build web      # 单独编译 websvr（target 由 build.sh 定义）
 ./main.sh build roomcenter
 ./build.sh list          # 查看当前活跃 target
+
+# 如果配置里使用了 etcd:// 作为服务注册地址，需要带 registry_etcd build tag
+GO_BUILD_TAGS=registry_etcd ./main.sh build conn
 ```
 
 Windows / PowerShell 可直接使用对应构建脚本：
@@ -199,6 +202,9 @@ Windows / PowerShell 可直接使用对应构建脚本：
 .\build.ps1
 .\build.ps1 web
 .\build.ps1 roomcenter
+
+# 如果配置里使用了 etcd:// 作为服务注册地址，需要带 registry_etcd build tag
+$env:GO_BUILD_TAGS = 'registry_etcd'; .\build.ps1 conn
 ```
 
 ### 4.5 本地运行（IDE/调试）

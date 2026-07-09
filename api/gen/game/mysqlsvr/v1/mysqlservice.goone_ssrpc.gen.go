@@ -7,6 +7,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 	cmd_handler "github.com/Iori372552686/GoOne/lib/api/cmd_handler"
+	"time"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -73,6 +74,7 @@ func RegisterMysqlServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv M
 	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mysql update role info",
 		},
 		srv.MW,
@@ -85,6 +87,7 @@ func RegisterMysqlServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv M
 	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_SEARCH_ROLE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MYSQL_INNER_SEARCH_ROLE_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mysql search role",
 		},
 		srv.MW,
@@ -98,6 +101,7 @@ func RegisterMysqlServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv M
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ,
 			OneWay: true,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mysql async update",
 		},
 		srv.MW,
@@ -110,6 +114,7 @@ func RegisterMysqlServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv M
 	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mysql query room info",
 		},
 		srv.MW,
@@ -122,6 +127,7 @@ func RegisterMysqlServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv M
 	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mysql query player info",
 		},
 		srv.MW,
@@ -134,6 +140,7 @@ func RegisterMysqlServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv M
 	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mysql query game info",
 		},
 		srv.MW,
@@ -154,6 +161,7 @@ func RegisterMysqlServiceToDispatcher(d *ssrpc.Dispatcher, srv MysqlServiceSServ
 	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mysql update role info",
 		},
 		srv.MW,
@@ -166,6 +174,7 @@ func RegisterMysqlServiceToDispatcher(d *ssrpc.Dispatcher, srv MysqlServiceSServ
 	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_SEARCH_ROLE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MYSQL_INNER_SEARCH_ROLE_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mysql search role",
 		},
 		srv.MW,
@@ -179,6 +188,7 @@ func RegisterMysqlServiceToDispatcher(d *ssrpc.Dispatcher, srv MysqlServiceSServ
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ,
 			OneWay: true,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mysql async update",
 		},
 		srv.MW,
@@ -191,6 +201,7 @@ func RegisterMysqlServiceToDispatcher(d *ssrpc.Dispatcher, srv MysqlServiceSServ
 	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mysql query room info",
 		},
 		srv.MW,
@@ -203,6 +214,7 @@ func RegisterMysqlServiceToDispatcher(d *ssrpc.Dispatcher, srv MysqlServiceSServ
 	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mysql query player info",
 		},
 		srv.MW,
@@ -215,6 +227,7 @@ func RegisterMysqlServiceToDispatcher(d *ssrpc.Dispatcher, srv MysqlServiceSServ
 	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "mysql query game info",
 		},
 		srv.MW,

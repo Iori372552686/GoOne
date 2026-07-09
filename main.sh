@@ -45,6 +45,7 @@ ${COLOR_BOLD}Usage${COLOR_RESET}
   ./main.sh ${COLOR_CYAN}help${COLOR_RESET}
   ./main.sh ${COLOR_CYAN}doctor${COLOR_RESET}
   ./main.sh ${COLOR_CYAN}check-genproto${COLOR_RESET} [--full]
+  ./main.sh ${COLOR_CYAN}proto${COLOR_RESET} [game|full|help]
   ./main.sh ${COLOR_CYAN}install${COLOR_RESET} ansible [--venv <dir>]
   ./main.sh ${COLOR_CYAN}go${COLOR_RESET} <install|list|current|use|uninstall|check|help> [args...]
   ./main.sh ${COLOR_CYAN}docker${COLOR_RESET} <install|up|restart|down|status|logs> --env <dev> [options...]
@@ -60,6 +61,11 @@ ${COLOR_BOLD}Examples${COLOR_RESET}
   # list
   ./main.sh env list
   ./main.sh role list
+
+  # proto
+  ./main.sh proto
+  ./main.sh proto game
+  ./main.sh proto full
 
   # build
   ./main.sh build
@@ -194,6 +200,50 @@ run_build() {
   log_ok "Build done."
 }
 
+run_proto() {
+  local sub="${1:-game}"
+  print_header
+
+  case "$sub" in
+    game|"")
+      require_cmd go
+      require_file "${ROOT_DIR}/game_protocol/gen_code.sh"
+      log_info "Generating game_protocol/protocol..."
+      (cd "${ROOT_DIR}/game_protocol" && bash ./gen_code.sh)
+      log_ok "game_protocol/protocol generated."
+      ;;
+
+    full)
+      require_file "${ROOT_DIR}/scripts/proto_goone.sh"
+      log_info "Running full proto generation (game_protocol + api/gen)..."
+      (cd "$ROOT_DIR" && ./scripts/proto_goone.sh)
+      log_ok "Full proto generation done."
+      ;;
+
+    help|-h|--help)
+      cat <<EOF
+${COLOR_BOLD}proto${COLOR_RESET} - generate protocol code
+
+${COLOR_BOLD}Usage${COLOR_RESET}
+  ./main.sh ${COLOR_CYAN}proto${COLOR_RESET} [game|full]
+
+${COLOR_BOLD}Subcommands${COLOR_RESET}
+  game  Generate pb.go under ${COLOR_CYAN}game_protocol/protocol${COLOR_RESET} from proto files in ${COLOR_CYAN}game_protocol/proto${COLOR_RESET} (default).
+  full  Run the full pipeline: ${COLOR_CYAN}game_protocol/protocol${COLOR_RESET} plus ${COLOR_CYAN}api/gen${COLOR_RESET} via ${COLOR_CYAN}scripts/proto_goone.sh${COLOR_RESET}.
+
+${COLOR_BOLD}Examples${COLOR_RESET}
+  ./main.sh proto
+  ./main.sh proto game
+  ./main.sh proto full
+EOF
+      ;;
+
+    *)
+      die "Unknown proto subcommand: $sub (supported: game, full, help)"
+      ;;
+  esac
+}
+
 cmd="${1:-help}"
 shift || true
 
@@ -238,6 +288,10 @@ case "$cmd" in
 
   build)
     run_build "${1:-}"
+    ;;
+
+  proto)
+    run_proto "${1:-game}"
     ;;
 
   env)

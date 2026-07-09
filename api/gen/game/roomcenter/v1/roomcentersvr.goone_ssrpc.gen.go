@@ -7,6 +7,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 	cmd_handler "github.com/Iori372552686/GoOne/lib/api/cmd_handler"
+	"time"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -69,6 +70,7 @@ func RegisterRoomCenterInnerServiceToTransactionMgr(mgr transaction.ITransaction
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD(0xB1008),
 			OneWay: true,
+			Timeout: 5000 * time.Millisecond,
 			Name: "roomcentersvr tick (one-way)",
 		},
 		srv.MW,
@@ -81,6 +83,7 @@ func RegisterRoomCenterInnerServiceToTransactionMgr(mgr transaction.ITransaction
 	mgr.RegisterCmd(g1_protocol.CMD_ROOM_CENTER_INNER_ROOM_LIST_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_ROOM_CENTER_INNER_ROOM_LIST_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "room list",
 		},
 		srv.MW,
@@ -93,6 +96,7 @@ func RegisterRoomCenterInnerServiceToTransactionMgr(mgr transaction.ITransaction
 	mgr.RegisterCmd(g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "quick start",
 		},
 		srv.MW,
@@ -106,6 +110,7 @@ func RegisterRoomCenterInnerServiceToTransactionMgr(mgr transaction.ITransaction
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_ROOM_CENTER_INNER_UPDATE_ROOM_INFO_REQ,
 			OneWay: true,
+			Timeout: 5000 * time.Millisecond,
 			Name: "update room info (one-way)",
 		},
 		srv.MW,
@@ -119,6 +124,7 @@ func RegisterRoomCenterInnerServiceToTransactionMgr(mgr transaction.ITransaction
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_ROOM_CENTER_INNER_DEL_ROOM_INFO_REQ,
 			OneWay: true,
+			Timeout: 5000 * time.Millisecond,
 			Name: "delete room info (one-way)",
 		},
 		srv.MW,
@@ -140,6 +146,7 @@ func RegisterRoomCenterInnerServiceToDispatcher(d *ssrpc.Dispatcher, srv RoomCen
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD(0xB1008),
 			OneWay: true,
+			Timeout: 5000 * time.Millisecond,
 			Name: "roomcentersvr tick (one-way)",
 		},
 		srv.MW,
@@ -152,6 +159,7 @@ func RegisterRoomCenterInnerServiceToDispatcher(d *ssrpc.Dispatcher, srv RoomCen
 	d.RegisterCmd(g1_protocol.CMD_ROOM_CENTER_INNER_ROOM_LIST_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_ROOM_CENTER_INNER_ROOM_LIST_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "room list",
 		},
 		srv.MW,
@@ -164,6 +172,7 @@ func RegisterRoomCenterInnerServiceToDispatcher(d *ssrpc.Dispatcher, srv RoomCen
 	d.RegisterCmd(g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "quick start",
 		},
 		srv.MW,
@@ -177,6 +186,7 @@ func RegisterRoomCenterInnerServiceToDispatcher(d *ssrpc.Dispatcher, srv RoomCen
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_ROOM_CENTER_INNER_UPDATE_ROOM_INFO_REQ,
 			OneWay: true,
+			Timeout: 5000 * time.Millisecond,
 			Name: "update room info (one-way)",
 		},
 		srv.MW,
@@ -190,6 +200,7 @@ func RegisterRoomCenterInnerServiceToDispatcher(d *ssrpc.Dispatcher, srv RoomCen
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_ROOM_CENTER_INNER_DEL_ROOM_INFO_REQ,
 			OneWay: true,
+			Timeout: 5000 * time.Millisecond,
 			Name: "delete room info (one-way)",
 		},
 		srv.MW,

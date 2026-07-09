@@ -5,6 +5,7 @@ package websvrv1
 import (
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	gin "github.com/gin-gonic/gin"
+	"time"
 )
 
 // WebApiServiceSS is the ssrpc service interface for WebApiService.
@@ -50,6 +51,7 @@ func RegisterWebApiServiceToGin(r gin.IRoutes, srv WebApiServiceSServer) {
 	r.Handle("GET", "/v1/web/ping", ssrpc.WrapHTTPGin(
 		ssrpc.MethodDesc{
 			Cmd: 0,
+			Timeout: 8000 * time.Millisecond,
 			Name: "web ping",
 		},
 		srv.MW,
@@ -63,6 +65,7 @@ func RegisterWebApiServiceToGin(r gin.IRoutes, srv WebApiServiceSServer) {
 		ssrpc.MethodDesc{
 			Cmd: 0,
 			Sign: true,
+			Timeout: 8000 * time.Millisecond,
 			Name: "msg security check",
 		},
 		srv.MW,
@@ -83,6 +86,7 @@ func RegisterWebApiServiceToDispatcher(d *ssrpc.Dispatcher, srv WebApiServiceSSe
 	d.RegisterHTTP("GET", "/v1/web/ping", ssrpc.WrapHTTPGin(
 		ssrpc.MethodDesc{
 			Cmd: 0,
+			Timeout: 8000 * time.Millisecond,
 			Name: "web ping",
 		},
 		srv.MW,
@@ -96,6 +100,7 @@ func RegisterWebApiServiceToDispatcher(d *ssrpc.Dispatcher, srv WebApiServiceSSe
 		ssrpc.MethodDesc{
 			Cmd: 0,
 			Sign: true,
+			Timeout: 8000 * time.Millisecond,
 			Name: "msg security check",
 		},
 		srv.MW,

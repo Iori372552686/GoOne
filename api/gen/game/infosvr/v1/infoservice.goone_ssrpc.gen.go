@@ -7,6 +7,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 	cmd_handler "github.com/Iori372552686/GoOne/lib/api/cmd_handler"
+	"time"
 )
 
 // InfoServiceSS is the ssrpc service interface for InfoService.
@@ -57,6 +58,7 @@ func RegisterInfoServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv In
 	mgr.RegisterCmd(g1_protocol.CMD_INFO_GET_BRIEF_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_INFO_GET_BRIEF_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "info get brief info",
 		},
 		srv.MW,
@@ -69,6 +71,7 @@ func RegisterInfoServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv In
 	mgr.RegisterCmd(g1_protocol.CMD_INFO_GET_ICON_DESC_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_INFO_GET_ICON_DESC_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "info get icon desc",
 		},
 		srv.MW,
@@ -82,6 +85,7 @@ func RegisterInfoServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv In
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ,
 			OneWay: true,
+			Timeout: 5000 * time.Millisecond,
 			Name: "info set brief info",
 		},
 		srv.MW,
@@ -102,6 +106,7 @@ func RegisterInfoServiceToDispatcher(d *ssrpc.Dispatcher, srv InfoServiceSServer
 	d.RegisterCmd(g1_protocol.CMD_INFO_GET_BRIEF_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_INFO_GET_BRIEF_INFO_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "info get brief info",
 		},
 		srv.MW,
@@ -114,6 +119,7 @@ func RegisterInfoServiceToDispatcher(d *ssrpc.Dispatcher, srv InfoServiceSServer
 	d.RegisterCmd(g1_protocol.CMD_INFO_GET_ICON_DESC_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_INFO_GET_ICON_DESC_REQ,
+			Timeout: 5000 * time.Millisecond,
 			Name: "info get icon desc",
 		},
 		srv.MW,
@@ -127,6 +133,7 @@ func RegisterInfoServiceToDispatcher(d *ssrpc.Dispatcher, srv InfoServiceSServer
 		ssrpc.MethodDesc{
 			Cmd: g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ,
 			OneWay: true,
+			Timeout: 5000 * time.Millisecond,
 			Name: "info set brief info",
 		},
 		srv.MW,
