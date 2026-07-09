@@ -1,4 +1,6 @@
-package bus
+// Package nats provides the NATS bus driver.
+// Import it (usually via driver/all) to enable "nats://" addresses.
+package nats
 
 import (
 	"fmt"
@@ -8,15 +10,17 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/service/bus"
+	"github.com/Iori372552686/GoOne/lib/service/bus/internal/wire"
 	"github.com/nats-io/nats.go"
 )
 
 type BusImplNatsMQ struct {
 	selfBusId uint32
 	timeout   time.Duration
-	chanOut   chan outMsg
+	chanOut   chan wire.OutMsg
 	chanIn    chan []byte
-	onRecv    MsgHandler
+	onRecv    bus.MsgHandler
 
 	url           string
 	subjectPrefix string
@@ -27,7 +31,7 @@ type BusImplNatsMQ struct {
 	closeOnce     sync.Once
 }
 
-func NewBusImplNatsMQ(selfBusId uint32, onRecvMsg MsgHandler, conf NatsConfig) IBus {
+func NewBusImplNatsMQ(selfBusId uint32, onRecvMsg bus.MsgHandler, conf bus.NatsConfig) bus.IBus {
 	prefix := strings.TrimSpace(conf.SubjectPrefix)
 	if prefix == "" {
 		prefix = "bus"
@@ -35,7 +39,7 @@ func NewBusImplNatsMQ(selfBusId uint32, onRecvMsg MsgHandler, conf NatsConfig) I
 	impl := &BusImplNatsMQ{
 		selfBusId:     selfBusId,
 		timeout:       3 * time.Second,
-		chanOut:       make(chan outMsg, 10000),
+		chanOut:       make(chan wire.OutMsg, 10000),
 		chanIn:        make(chan []byte, 10000),
 		onRecv:        onRecvMsg,
 		url:           strings.TrimSpace(conf.URL),
@@ -47,26 +51,26 @@ func NewBusImplNatsMQ(selfBusId uint32, onRecvMsg MsgHandler, conf NatsConfig) I
 	return impl
 }
 
-func (b *BusImplNatsMQ) SelfBusId() uint32                { return b.selfBusId }
-func (b *BusImplNatsMQ) SetReceiver(onRecvMsg MsgHandler) { b.onRecv = onRecvMsg }
-func (b *BusImplNatsMQ) Healthy() bool                    { return b.connected.Load() && !b.closed.Load() }
+func (b *BusImplNatsMQ) SelfBusId() uint32                    { return b.selfBusId }
+func (b *BusImplNatsMQ) SetReceiver(onRecvMsg bus.MsgHandler) { b.onRecv = onRecvMsg }
+func (b *BusImplNatsMQ) Healthy() bool                        { return b.connected.Load() && !b.closed.Load() }
 
 func (b *BusImplNatsMQ) subjectFor(busId uint32) string {
-	return b.subjectPrefix + "." + calcQueueName(busId)
+	return b.subjectPrefix + "." + wire.CalcQueueName(busId)
 }
 
 func (b *BusImplNatsMQ) Send(dstBusId uint32, data1 []byte, data2 []byte) error {
 	if b.closed.Load() {
-		return ErrBusClosed
+		return bus.ErrBusClosed
 	}
-	msg := outMsg{
-		busId:  dstBusId,
-		topics: b.subjectFor(dstBusId),
-		data:   buildFrame(b.SelfBusId(), dstBusId, data1, data2),
+	msg := wire.OutMsg{
+		BusID:  dstBusId,
+		Topics: b.subjectFor(dstBusId),
+		Data:   wire.BuildFrame(b.SelfBusId(), dstBusId, data1, data2),
 	}
 
-	if !sendToMsgChan(b.chanOut, msg, b.timeout) {
-		putFrameBuf(msg.data)
+	if !wire.SendToMsgChan(b.chanOut, msg, b.timeout) {
+		wire.PutFrameBuf(msg.Data)
 		return fmt.Errorf("nats bus.chanOut<-msg time out")
 	}
 	return nil
@@ -143,27 +147,27 @@ func (b *BusImplNatsMQ) process() error {
 			if !ok {
 				return fmt.Errorf("chanOut of bus is closed")
 			}
-			if err := nc.Publish(msgOut.topics, msgOut.data); err != nil {
-				logger.Errorf("Failed to publish nats message {subject:%v, dataLen:%v}| %v", msgOut.topics, len(msgOut.data), err)
+			if err := nc.Publish(msgOut.Topics, msgOut.Data); err != nil {
+				logger.Errorf("Failed to publish nats message {subject:%v, dataLen:%v}| %v", msgOut.Topics, len(msgOut.Data), err)
 			}
-			putFrameBuf(msgOut.data) // Publish 已同步拷入客户端缓冲，可安全回收
+			wire.PutFrameBuf(msgOut.Data) // Publish 已同步拷入客户端缓冲，可安全回收
 		case data, ok := <-b.chanIn:
 			if !ok {
 				return fmt.Errorf("chanIn of bus is closed")
 			}
-			if len(data) < byteLenOfBusPacketHeader() {
+			if len(data) < wire.HeaderLen() {
 				continue
 			}
-			header := busPacketHeader{}
+			header := wire.Header{}
 			header.From(data)
-			if header.passCode != passCode {
+			if header.PassCode != wire.PassCode {
 				logger.Warningf("Received a bus message with wrong pass code: %#v", header)
 				continue
 			}
 			if b.onRecv != nil {
 				// data is our own copy made in the subscribe callback;
 				// hand ownership to onRecv without a second copy.
-				b.onRecv(header.srcBusId, data[byteLenOfBusPacketHeader():])
+				b.onRecv(header.SrcBusID, data[wire.HeaderLen():])
 			}
 		}
 	}
@@ -190,15 +194,15 @@ func (b *BusImplNatsMQ) run() {
 		}
 		logger.Errorf("Error occur in processing bus(nats). Retry later {retryTimes: %v, afterSeconds:%v} | %v",
 			retryCount, retryAfterSeconds, err)
-		if !sleepOrStop(b.stopCh, time.Duration(retryAfterSeconds)*time.Second) {
+		if !wire.SleepOrStop(b.stopCh, time.Duration(retryAfterSeconds)*time.Second) {
 			return
 		}
 	}
 }
 
 func init() {
-	RegisterBus("nats", func(selfBusId uint32, onRecvMsg MsgHandler, conf any) (IBus, error) {
-		cfg, ok := conf.(NatsConfig)
+	bus.RegisterBus("nats", func(selfBusId uint32, onRecvMsg bus.MsgHandler, conf any) (bus.IBus, error) {
+		cfg, ok := conf.(bus.NatsConfig)
 		if !ok {
 			return nil, fmt.Errorf("nats arg must be NatsConfig")
 		}

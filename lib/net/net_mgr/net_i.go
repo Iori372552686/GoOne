@@ -1,13 +1,12 @@
 package net_mgr
 
 import (
-	"github.com/Iori372552686/GoOne/lib/net/kcp_server"
-	"github.com/Iori372552686/GoOne/lib/net/tcp_server"
-	"github.com/Iori372552686/GoOne/lib/net/ws_server"
 	"net"
 	"sync"
 
-	Kcp "github.com/xtaci/kcp-go/v5"
+	"github.com/Iori372552686/GoOne/lib/net/tcp_server"
+	"github.com/Iori372552686/GoOne/lib/net/ws_server"
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
 type Client struct {
@@ -19,6 +18,24 @@ type Client struct {
 	RemoteAddr string
 }
 
+// GatewayServer is the unified session-facing interface every gateway
+// transport must satisfy (modelled after due's network layer). New
+// transports (e.g. a future KCP gateway) must implement it fully before
+// entering the production path.
+type GatewayServer interface {
+	SendByUid(uid uint64, data1 []byte, data2 []byte) error
+	BroadcastByZone(zone int32, data1 []byte, data2 []byte)
+	Kick(uid uint64, reason g1_protocol.EKickOutReason)
+	KickByRemoteAddr(uid uint64, reason g1_protocol.EKickOutReason, remoteAddr string)
+	GetClientByUid(uid uint64) *Client
+	UpdateClientByUid(conn net.Conn, uid uint64, zone uint32) *Client
+}
+
+var (
+	_ GatewayServer = (*ConnTcpSvr)(nil)
+	_ GatewayServer = (*ConnWsTcpSvr)(nil)
+)
+
 // 必须实现 tcpserver.ITcpPacketSvrEventHandler
 type ConnTcpSvr struct {
 	tcp_server.TcpPacketSvr
@@ -29,17 +46,6 @@ type ConnTcpSvr struct {
 	remoteAddrKickMap map[string]bool
 	lock              sync.RWMutex
 	handler           func(conn net.Conn, data []byte)
-}
-
-type ConnKcpSvr struct {
-	kcp_server.KcpSvr
-
-	uidConnMap        map[uint64]*Kcp.UDPSession
-	connUidMap        map[*Kcp.UDPSession]uint64
-	remoteAddrConnMap map[string]*Kcp.UDPSession
-	remoteAddrKickMap map[string]bool
-	lock              sync.RWMutex
-	handler           func(conn *Kcp.UDPSession, data []byte)
 }
 
 type ConnWsTcpSvr struct {
@@ -56,12 +62,6 @@ type ConnWsTcpSvr struct {
 func NewTcpSvr() *ConnTcpSvr {
 	svr := &ConnTcpSvr{}
 	registerGatewaySource("tcp", svr)
-	return svr
-}
-
-func NewKcpSvr() *ConnKcpSvr {
-	svr := &ConnKcpSvr{}
-	registerGatewaySource("kcp", svr)
 	return svr
 }
 

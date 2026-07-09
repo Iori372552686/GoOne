@@ -17,6 +17,10 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	"github.com/Iori372552686/GoOne/module/misc"
+
+	// 默认引入全部 bus 驱动（database/sql 风格）。需要裁剪二进制体积的
+	// 服务可以不经 busapp 自行装配，并只 blank-import 所需驱动。
+	_ "github.com/Iori372552686/GoOne/lib/service/bus/driver/all"
 )
 
 // Common carries the config sections shared by every bus service.

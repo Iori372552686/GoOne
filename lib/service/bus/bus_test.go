@@ -1,10 +1,13 @@
-package bus
+package bus_test
 
 import (
 	"log"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/Iori372552686/GoOne/lib/service/bus"
+	_ "github.com/Iori372552686/GoOne/lib/service/bus/driver/all"
 )
 
 func onRecvMsg(srcBusID uint32, data []byte) error {
@@ -13,108 +16,83 @@ func onRecvMsg(srcBusID uint32, data []byte) error {
 	return nil
 }
 
-func TestRabbitMQBus(t *testing.T) {
+// requireBusITest skips unless BUS_ITEST=1 (integration tests need local MQ).
+func requireBusITest(t *testing.T) {
+	t.Helper()
 	if os.Getenv("BUS_ITEST") != "1" {
 		t.Skip("set BUS_ITEST=1 to run bus integration tests")
 	}
-	impl, err := CreateBus(IpStringToInt("1.1.2.2"), onRecvMsg, "amqp://guest:guest@127.0.0.1:5672/")
+}
+
+func runBusSmoke(t *testing.T, addr string) {
+	t.Helper()
+	impl, err := bus.CreateBus(bus.IpStringToInt("1.1.2.2"), onRecvMsg, addr)
 	if err != nil || impl == nil {
-		t.Skip("rabbitmq bus not available or CreateBus returned nil")
+		t.Skipf("bus not available for %q: %v", addr, err)
 	}
 
 	if err := impl.Send(impl.SelfBusId(), []byte("abc"), nil); err != nil {
-		t.Logf("rabbitmq Send error: %v", err)
+		t.Logf("Send error: %v", err)
 	}
 
 	time.Sleep(2 * time.Second)
+	_ = impl.Close()
+}
+
+func TestRabbitMQBus(t *testing.T) {
+	requireBusITest(t)
+	runBusSmoke(t, "amqp://guest:guest@127.0.0.1:5672/")
 }
 
 func TestNSQBus(t *testing.T) {
-	if os.Getenv("BUS_ITEST") != "1" {
-		t.Skip("set BUS_ITEST=1 to run bus integration tests")
-	}
-	conf := NSQConfig{
-		LookupAddrs: []string{"127.0.0.1:4161"},
-		NsqdAddr:    "127.0.0.1:4150",
-		TopicPrefix: "test",
-		Channel:     "ch",
-		Concurrency: 1,
-	}
-
-	impl := NewBusImplNsqMQ(1, onRecvMsg, conf)
-	if impl == nil {
-		t.Skip("nsq bus not available or NewBusImplNsqMQ returned nil")
-	}
-
-	if err := impl.SendTo("test", []byte("abc"), []byte("123")); err != nil {
-		t.Logf("nsq SendTo error: %v", err)
-	}
-
-	time.Sleep(2 * time.Second)
+	requireBusITest(t)
+	runBusSmoke(t, "nsq://127.0.0.1:4150?lookup=127.0.0.1:4161&topics=test&chan=ch&concurrency=1")
 }
 
 func TestNatsBus(t *testing.T) {
-	if os.Getenv("BUS_ITEST") != "1" {
-		t.Skip("set BUS_ITEST=1 to run bus integration tests")
-	}
-	conf := NatsConfig{
-		URL:           "nats://127.0.0.1:4222",
-		SubjectPrefix: "testbus",
-		QueueGroup:    "test-group",
-	}
-	implAny, err := createBusByTypeE("nats", 1, onRecvMsg, conf)
-	if err != nil || implAny == nil {
-		t.Skipf("nats bus not available: %v", err)
-	}
-
-	impl := implAny
-	if err := impl.Send(impl.SelfBusId(), []byte("abc"), nil); err != nil {
-		t.Logf("nats Send error: %v", err)
-	}
-
-	time.Sleep(2 * time.Second)
+	requireBusITest(t)
+	runBusSmoke(t, "nats://127.0.0.1:4222?subject_prefix=testbus&queue_group=test-group")
 }
 
 func TestKafkaBus(t *testing.T) {
-	if os.Getenv("BUS_ITEST") != "1" {
-		t.Skip("set BUS_ITEST=1 to run bus integration tests")
-	}
-	conf := KafkaConfig{
-		Brokers:       []string{"127.0.0.1:9092"},
-		TopicPrefix:   "testbus",
-		GroupIDPrefix: "testgroup",
-	}
-	implAny, err := createBusByTypeE("kafka", 1, onRecvMsg, conf)
-	if err != nil || implAny == nil {
-		t.Skipf("kafka bus not available: %v", err)
-	}
-
-	impl := implAny
-	if err := impl.Send(impl.SelfBusId(), []byte("abc"), nil); err != nil {
-		t.Logf("kafka Send error: %v", err)
-	}
-
-	time.Sleep(2 * time.Second)
+	requireBusITest(t)
+	runBusSmoke(t, "kafka://127.0.0.1:9092?topic_prefix=testbus&group_id_prefix=testgroup")
 }
 
 func TestRocketMQBus(t *testing.T) {
-	if os.Getenv("BUS_ITEST") != "1" {
-		t.Skip("set BUS_ITEST=1 to run bus integration tests")
+	requireBusITest(t)
+	runBusSmoke(t, "rocketmq://127.0.0.1:9876?topic=testbus&consumer_group=testbus_group")
+}
+
+func TestParseAddr(t *testing.T) {
+	cases := []struct {
+		addr     string
+		wantType string
+	}{
+		{"amqp://guest:guest@127.0.0.1:5672/", "rabbitmq"},
+		{"rabbitmq://?addr=amqp://guest:guest@127.0.0.1:5672/", "rabbitmq"},
+		{"nats://127.0.0.1:4222?subject_prefix=bus", "nats"},
+		{"kafka://127.0.0.1:9092,127.0.0.2:9092?topic_prefix=bus", "kafka"},
+		{"rocketmq://127.0.0.1:9876?topic=goone_bus", "rocketmq"},
+		{"nsq://127.0.0.1:4150?lookup=127.0.0.1:4161", "nsq"},
 	}
-	conf := RocketMQConfig{
-		NameServers:   []string{"127.0.0.1:9876"},
-		Topic:         "testbus",
-		ConsumerGroup: "testbus_group",
-	}
-	implAny, err := createBusByTypeE("rocketmq", 1, onRecvMsg, conf)
-	if err != nil || implAny == nil {
-		t.Skipf("rocketmq bus not available: %v", err)
+	for _, c := range cases {
+		implType, cfg, err := bus.ParseAddr(c.addr)
+		if err != nil {
+			t.Fatalf("ParseAddr(%q) error: %v", c.addr, err)
+		}
+		if implType != c.wantType {
+			t.Fatalf("ParseAddr(%q) type = %q, want %q", c.addr, implType, c.wantType)
+		}
+		if cfg == nil {
+			t.Fatalf("ParseAddr(%q) returned nil config", c.addr)
+		}
 	}
 
-	impl := implAny
-	if err := impl.Send(impl.SelfBusId(), []byte("abc"), nil); err != nil {
-		t.Logf("rocketmq Send error: %v", err)
+	if _, _, err := bus.ParseAddr(""); err == nil {
+		t.Fatal("expected error for empty addr")
 	}
-
-	time.Sleep(2 * time.Second)
+	if _, _, err := bus.ParseAddr("unknown://x"); err == nil {
+		t.Fatal("expected error for unknown scheme")
+	}
 }

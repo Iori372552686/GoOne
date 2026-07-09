@@ -1,4 +1,6 @@
-package bus
+// Package rocketmq provides the RocketMQ bus driver.
+// Import it (usually via driver/all) to enable "rocketmq://" addresses.
+package rocketmq
 
 import (
 	"context"
@@ -9,6 +11,8 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/service/bus"
+	"github.com/Iori372552686/GoOne/lib/service/bus/internal/wire"
 
 	rmq "github.com/apache/rocketmq-client-go/v2"
 	"github.com/apache/rocketmq-client-go/v2/consumer"
@@ -19,9 +23,9 @@ import (
 type BusImplRocketMQ struct {
 	selfBusId uint32
 	timeout   time.Duration
-	chanOut   chan outMsg
+	chanOut   chan wire.OutMsg
 	chanIn    chan []byte
-	onRecv    MsgHandler
+	onRecv    bus.MsgHandler
 
 	nameServers   []string
 	topic         string
@@ -32,7 +36,7 @@ type BusImplRocketMQ struct {
 	closeOnce     sync.Once
 }
 
-func NewBusImplRocketMQ(selfBusId uint32, onRecvMsg MsgHandler, conf RocketMQConfig) IBus {
+func NewBusImplRocketMQ(selfBusId uint32, onRecvMsg bus.MsgHandler, conf bus.RocketMQConfig) bus.IBus {
 	topic := strings.TrimSpace(conf.Topic)
 	if topic == "" {
 		topic = "goone_bus"
@@ -44,7 +48,7 @@ func NewBusImplRocketMQ(selfBusId uint32, onRecvMsg MsgHandler, conf RocketMQCon
 	impl := &BusImplRocketMQ{
 		selfBusId:     selfBusId,
 		timeout:       3 * time.Second,
-		chanOut:       make(chan outMsg, 10000),
+		chanOut:       make(chan wire.OutMsg, 10000),
 		chanIn:        make(chan []byte, 10000),
 		onRecv:        onRecvMsg,
 		nameServers:   conf.NameServers,
@@ -56,26 +60,26 @@ func NewBusImplRocketMQ(selfBusId uint32, onRecvMsg MsgHandler, conf RocketMQCon
 	return impl
 }
 
-func (b *BusImplRocketMQ) SelfBusId() uint32                { return b.selfBusId }
-func (b *BusImplRocketMQ) SetReceiver(onRecvMsg MsgHandler) { b.onRecv = onRecvMsg }
-func (b *BusImplRocketMQ) Healthy() bool                    { return b.connected.Load() && !b.closed.Load() }
+func (b *BusImplRocketMQ) SelfBusId() uint32                    { return b.selfBusId }
+func (b *BusImplRocketMQ) SetReceiver(onRecvMsg bus.MsgHandler) { b.onRecv = onRecvMsg }
+func (b *BusImplRocketMQ) Healthy() bool                        { return b.connected.Load() && !b.closed.Load() }
 
 func (b *BusImplRocketMQ) tagFor(busId uint32) string {
-	return calcQueueName(busId)
+	return wire.CalcQueueName(busId)
 }
 
 func (b *BusImplRocketMQ) Send(dstBusId uint32, data1 []byte, data2 []byte) error {
 	if b.closed.Load() {
-		return ErrBusClosed
+		return bus.ErrBusClosed
 	}
-	msg := outMsg{
-		busId:  dstBusId,
-		topics: b.tagFor(dstBusId), // tag
-		data:   buildFrame(b.SelfBusId(), dstBusId, data1, data2),
+	msg := wire.OutMsg{
+		BusID:  dstBusId,
+		Topics: b.tagFor(dstBusId), // tag
+		Data:   wire.BuildFrame(b.SelfBusId(), dstBusId, data1, data2),
 	}
 
-	if !sendToMsgChan(b.chanOut, msg, b.timeout) {
-		putFrameBuf(msg.data)
+	if !wire.SendToMsgChan(b.chanOut, msg, b.timeout) {
+		wire.PutFrameBuf(msg.Data)
 		return fmt.Errorf("rocketmq bus.chanOut<-msg time out")
 	}
 	return nil
@@ -106,7 +110,7 @@ func (b *BusImplRocketMQ) process() error {
 
 	c, err := rmq.NewPushConsumer(
 		consumer.WithNameServer(b.nameServers),
-		consumer.WithGroupName(b.consumerGroup+"."+calcQueueName(b.selfBusId)),
+		consumer.WithGroupName(b.consumerGroup+"."+wire.CalcQueueName(b.selfBusId)),
 	)
 	if err != nil {
 		return err
@@ -149,29 +153,29 @@ func (b *BusImplRocketMQ) process() error {
 			if !ok {
 				return fmt.Errorf("chanOut of bus is closed")
 			}
-			_, err := p.SendSync(ctx, primitive.NewMessage(b.topic, msgOut.data).WithTag(msgOut.topics))
+			_, err := p.SendSync(ctx, primitive.NewMessage(b.topic, msgOut.Data).WithTag(msgOut.Topics))
 			if err != nil {
 				logger.Errorf("Failed to publish rocketmq message {topic:%v, tag:%v, dataLen:%v}| %v",
-					b.topic, msgOut.topics, len(msgOut.data), err)
+					b.topic, msgOut.Topics, len(msgOut.Data), err)
 			}
-			putFrameBuf(msgOut.data) // SendSync 已同步完成，可安全回收
+			wire.PutFrameBuf(msgOut.Data) // SendSync 已同步完成，可安全回收
 		case data, ok := <-b.chanIn:
 			if !ok {
 				return fmt.Errorf("chanIn of bus is closed")
 			}
-			if len(data) < byteLenOfBusPacketHeader() {
+			if len(data) < wire.HeaderLen() {
 				continue
 			}
-			header := busPacketHeader{}
+			header := wire.Header{}
 			header.From(data)
-			if header.passCode != passCode {
+			if header.PassCode != wire.PassCode {
 				logger.Warningf("Received a bus message with wrong pass code: %#v", header)
 				continue
 			}
 			if b.onRecv != nil {
-				recvData := make([]byte, len(data)-byteLenOfBusPacketHeader())
-				copy(recvData, data[byteLenOfBusPacketHeader():])
-				b.onRecv(header.srcBusId, recvData)
+				recvData := make([]byte, len(data)-wire.HeaderLen())
+				copy(recvData, data[wire.HeaderLen():])
+				b.onRecv(header.SrcBusID, recvData)
 			}
 		}
 	}
@@ -198,15 +202,15 @@ func (b *BusImplRocketMQ) run() {
 		}
 		logger.Errorf("Error occur in processing bus(rocketmq). Retry later {retryTimes: %v, afterSeconds:%v} | %v",
 			retryCount, retryAfterSeconds, err)
-		if !sleepOrStop(b.stopCh, time.Duration(retryAfterSeconds)*time.Second) {
+		if !wire.SleepOrStop(b.stopCh, time.Duration(retryAfterSeconds)*time.Second) {
 			return
 		}
 	}
 }
 
 func init() {
-	RegisterBus("rocketmq", func(selfBusId uint32, onRecvMsg MsgHandler, conf any) (IBus, error) {
-		cfg, ok := conf.(RocketMQConfig)
+	bus.RegisterBus("rocketmq", func(selfBusId uint32, onRecvMsg bus.MsgHandler, conf any) (bus.IBus, error) {
+		cfg, ok := conf.(bus.RocketMQConfig)
 		if !ok {
 			return nil, fmt.Errorf("rocketmq arg must be RocketMQConfig")
 		}

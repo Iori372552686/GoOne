@@ -332,6 +332,16 @@ func (s *transactionShard) processSSPacket(packet *sharedstruct.SSPacket) int32 
 		return 0
 	}
 
+	// 级联超时：请求携带的截止时间已过则直接丢弃，不再浪费下游算力
+	// （调用方早已超时返回，处理结果也无人消费）。
+	if packet.Header.DeadlineExceeded(time.Now().UnixMilli()) {
+		s.mgr.onPacketDropped()
+		observeTransactionPacket("request", cmd, "dropped_deadline_exceeded")
+		logger.Warningf("Drop an expired request {uid:%d, rid:%d, cmd:%d, deadlineMs:%d}",
+			uid, rid, cmd, packet.Header.DeadlineUnixMs)
+		return -6
+	}
+
 	serialKey, hasSerialKey := s.mgr.serialKeyFromHeader(packet.Header)
 	if hasSerialKey && s.keyInProcess[serialKey] {
 		packets := s.pendingPackets[serialKey]

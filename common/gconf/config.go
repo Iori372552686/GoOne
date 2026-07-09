@@ -9,6 +9,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/web/web_gin"
 
 	"github.com/Iori372552686/GoOne/lib/api/http_sign"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
 	"github.com/Iori372552686/GoOne/lib/api/rest_api"
 	"github.com/Iori372552686/GoOne/lib/db/redis"
@@ -60,18 +61,22 @@ type BaseCfg struct {
 	Dependencies  BaseDependenciesConfig `json:"dependencies" yaml:"dependencies"`
 	CommonDebug   BaseDebugConfig        `json:"debug" yaml:"debug"`
 
-	// Legacy flat fields stay readable during the migration to grouped config.
-	RegisterAddr       string             `json:"register_addr" yaml:"register_addr"`
-	BusMQAddr          string             `json:"bus_mq_addr" yaml:"bus_mq_addr"`
-	GameDataDir        string             `json:"game_data_dir" yaml:"game_data_dir"`
-	SensitiveWordsFile string             `json:"sensitive_words_file" yaml:"sensitive_words_file"`
-	NacosConf          net_conf.NacosConf `json:"nacos_conf" yaml:"nacos_conf"`
-	OrmConf            []orm.Config       `json:"orm_instances" yaml:"orm_instances"`
-	HTTPSigns          []http_sign.Config `json:"http_sign" yaml:"http_sign"`
-	RestApiConf        []rest_api.Config  `json:"rest_api_config" yaml:"rest_api_config"`
-	DbInstances        []redis.Config     `json:"db_instances" yaml:"db_instances"`
-	Pprof              bool               `json:"pprof" yaml:"pprof"`
-	AdminServer        AdminServerConfig  `json:"admin_server" yaml:"admin_server"`
+	// Deprecated: legacy flat fields, readable only for migration to the
+	// grouped layout (runtime/dependencies/debug). Using them logs a startup
+	// warning; they will be removed after two release cycles.
+	// 迁移指引：base_cfg.register_addr → base_cfg.runtime.register_addr，
+	// base_cfg.db_instances → base_cfg.dependencies.db_instances，以此类推。
+	RegisterAddr       string               `json:"register_addr" yaml:"register_addr"`
+	BusMQAddr          string               `json:"bus_mq_addr" yaml:"bus_mq_addr"`
+	GameDataDir        string               `json:"game_data_dir" yaml:"game_data_dir"`
+	SensitiveWordsFile string               `json:"sensitive_words_file" yaml:"sensitive_words_file"`
+	NacosConf          net_conf.NacosConf   `json:"nacos_conf" yaml:"nacos_conf"`
+	OrmConf            []orm.Config         `json:"orm_instances" yaml:"orm_instances"`
+	HTTPSigns          []http_sign.Config   `json:"http_sign" yaml:"http_sign"`
+	RestApiConf        []rest_api.Config    `json:"rest_api_config" yaml:"rest_api_config"`
+	DbInstances        []redis.Config       `json:"db_instances" yaml:"db_instances"`
+	Pprof              bool                 `json:"pprof" yaml:"pprof"`
+	AdminServer        AdminServerConfig    `json:"admin_server" yaml:"admin_server"`
 	Tracing            RuntimeTracingConfig `json:"tracing" yaml:"tracing"`
 }
 
@@ -254,6 +259,8 @@ func loadConfig(file string, cfg configDocument) error {
 }
 
 func (c *BaseCfg) normalize() {
+	c.warnLegacyFields()
+
 	c.CommonRuntime.RegisterAddr = coalesceString(c.CommonRuntime.RegisterAddr, c.RegisterAddr)
 	c.CommonRuntime.BusMQAddr = coalesceString(c.CommonRuntime.BusMQAddr, c.BusMQAddr)
 	c.CommonRuntime.AdminServer = mergeAdminServer(c.CommonRuntime.AdminServer, c.AdminServer)
@@ -282,6 +289,34 @@ func (c *BaseCfg) normalize() {
 	c.RestApiConf = c.Dependencies.RestApiConf
 	c.DbInstances = c.Dependencies.DbInstances
 	c.Pprof = c.CommonDebug.Pprof
+}
+
+// warnLegacyFields logs a deprecation warning for every legacy flat field
+// that is still populated while its grouped counterpart is empty — i.e. the
+// yaml is actually relying on the deprecated layout. Legacy fields will be
+// removed after two release cycles (see docs/optimization_roadmap.md 3.5).
+func (c *BaseCfg) warnLegacyFields() {
+	type legacyUse struct {
+		used bool
+		old  string
+		new  string
+	}
+	checks := []legacyUse{
+		{c.RegisterAddr != "" && c.CommonRuntime.RegisterAddr == "", "base_cfg.register_addr", "base_cfg.runtime.register_addr"},
+		{c.BusMQAddr != "" && c.CommonRuntime.BusMQAddr == "", "base_cfg.bus_mq_addr", "base_cfg.runtime.bus_mq_addr"},
+		{c.GameDataDir != "" && c.Dependencies.GameDataDir == "", "base_cfg.game_data_dir", "base_cfg.dependencies.game_data_dir"},
+		{c.SensitiveWordsFile != "" && c.Dependencies.SensitiveWordsFile == "", "base_cfg.sensitive_words_file", "base_cfg.dependencies.sensitive_words_file"},
+		{len(c.OrmConf) > 0 && len(c.Dependencies.OrmConf) == 0, "base_cfg.orm_instances", "base_cfg.dependencies.orm_instances"},
+		{len(c.HTTPSigns) > 0 && len(c.Dependencies.HTTPSigns) == 0, "base_cfg.http_sign", "base_cfg.dependencies.http_sign"},
+		{len(c.RestApiConf) > 0 && len(c.Dependencies.RestApiConf) == 0, "base_cfg.rest_api_config", "base_cfg.dependencies.rest_api_config"},
+		{len(c.DbInstances) > 0 && len(c.Dependencies.DbInstances) == 0, "base_cfg.db_instances", "base_cfg.dependencies.db_instances"},
+		{c.Pprof && !c.CommonDebug.Pprof, "base_cfg.pprof", "base_cfg.debug.pprof"},
+	}
+	for _, chk := range checks {
+		if chk.used {
+			logger.Warningf("[config] DEPRECATED: %s is legacy and will be removed; move it to %s", chk.old, chk.new)
+		}
+	}
 }
 
 func (c *BaseCfg) validate() error {

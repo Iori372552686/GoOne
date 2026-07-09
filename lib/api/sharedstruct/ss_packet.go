@@ -12,6 +12,10 @@ type SSPacket struct {
 }
 
 // 经过测试，结构体是以8字节为单位对齐的，要注意一下
+//
+// v2 起头部追加 trace/deadline 透传字段（TraceID/SpanID/DeadlineUnixMs）。
+// 这是集群内部协议的破坏性变更：新旧节点头长不一致（86 vs 54），
+// 需要整组同时发版，不支持滚动混布。
 type SSPacketHeader struct {
 	SrcBusID uint32
 	DstBusID uint32
@@ -31,10 +35,29 @@ type SSPacketHeader struct {
 
 	BodyLen uint32
 	CmdSeq  uint16 // Request时+1，Response时不变。用以标识收到的Response是对应哪个发出的Request
+
+	// TraceID/SpanID 跨进程透传调用链标识；全零表示未启用。
+	// 响应包通过复制请求头自然继承 trace（见 router.SendMsgBack）。
+	TraceID [16]byte
+	SpanID  [8]byte
+	// DeadlineUnixMs 是本次请求的绝对截止时间（Unix 毫秒），0 表示无截止。
+	// 接收端可据此丢弃已超期的请求，实现级联超时。
+	DeadlineUnixMs int64
 }
 
+// ByteLenOfSSPacketHeader is the v2 wire size (54 legacy + 32 trace ext).
 func ByteLenOfSSPacketHeader() int {
-	return 54
+	return 86
+}
+
+// HasTrace reports whether the header carries a propagated trace id.
+func (h *SSPacketHeader) HasTrace() bool {
+	for _, b := range h.TraceID {
+		if b != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *SSPacketHeader) To(b []byte) error {
@@ -67,6 +90,12 @@ func (h *SSPacketHeader) To(b []byte) error {
 	pos += 4
 	binary.BigEndian.PutUint16(b[pos:], h.CmdSeq)
 	pos += 2
+	copy(b[pos:], h.TraceID[:])
+	pos += 16
+	copy(b[pos:], h.SpanID[:])
+	pos += 8
+	binary.BigEndian.PutUint64(b[pos:], uint64(h.DeadlineUnixMs))
+	pos += 8
 
 	return nil
 }
@@ -101,6 +130,12 @@ func (h *SSPacketHeader) From(b []byte) error {
 	pos += 4
 	h.CmdSeq = binary.BigEndian.Uint16(b[pos:])
 	pos += 2
+	copy(h.TraceID[:], b[pos:pos+16])
+	pos += 16
+	copy(h.SpanID[:], b[pos:pos+8])
+	pos += 8
+	h.DeadlineUnixMs = int64(binary.BigEndian.Uint64(b[pos:]))
+	pos += 8
 
 	return nil
 }

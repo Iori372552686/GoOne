@@ -8,7 +8,6 @@ import (
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	logzap "github.com/Iori372552686/GoOne/lib/api/logger/zap"
-	"github.com/Iori372552686/GoOne/lib/web/rest"
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 )
@@ -58,7 +57,7 @@ func NewServer(conf Config, loadRouters func(router *gin.Engine)) (*http.Server,
 	}
 
 	router := gin.New()
-	router.Use(rest.Cors())
+	router.Use(Cors())
 	router.Use(
 		ginzap.Ginzap(logzap.ZapLogger, time.RFC3339, true), // 使用 Zap 替换默认日志中间件
 		ginzap.RecoveryWithZap(logzap.ZapLogger, true),      // 替换 gin.Recovery()

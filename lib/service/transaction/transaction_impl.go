@@ -38,19 +38,69 @@ func newTransaction(transID uint32, oriPacketHeader sharedstruct.SSPacketHeader,
 	return t
 }
 
-// Context lazily builds the trace context: the sha256/hex/WithValue chain
-// costs several allocations, so it is only paid when a middleware or handler
+// Context lazily builds the trace context: the hex/WithValue chain costs
+// several allocations, so it is only paid when a middleware or handler
 // actually asks for it. A Transaction is driven by a single goroutine, so the
 // unsynchronized memoization is safe.
+//
+// Trace identity resolution order:
+//  1. propagated TraceID/SpanID from the request header (cross-process trace);
+//  2. legacy synthesized ids from (SrcBusID, SrcTransID, CmdSeq, Cmd).
 func (t *Transaction) Context() context.Context {
 	if t == nil {
 		return context.Background()
 	}
 	if t.traceCtx == nil {
-		t.traceCtx = contextForSSPacketTrace(t.OriPacketHeader.SrcBusID, t.OriPacketHeader.SrcTransID, t.OriPacketHeader.CmdSeq, t.OriPacketHeader.Cmd)
+		if t.OriPacketHeader.HasTrace() {
+			ctx := context.Background()
+			ctx = context.WithValue(ctx, "goone.ssrpc.trace_id", t.OriPacketHeader.TraceIDHex())
+			ctx = context.WithValue(ctx, "goone.ssrpc.span_id", t.OriPacketHeader.SpanIDHex())
+			t.traceCtx = ctx
+		} else {
+			t.traceCtx = contextForSSPacketTrace(t.OriPacketHeader.SrcBusID, t.OriPacketHeader.SrcTransID, t.OriPacketHeader.CmdSeq, t.OriPacketHeader.Cmd)
+		}
 	}
 	return t.traceCtx
 }
+
+// Deadline returns the propagated request deadline, if any.
+func (t *Transaction) Deadline() (time.Time, bool) {
+	return t.OriPacketHeader.Deadline()
+}
+
+// traceCarrier builds the trace context stamped onto an outbound downstream
+// request: the trace id is inherited from the original request (or created
+// here when this transaction is the root), a fresh span id is generated, and
+// the downstream deadline is the smaller of the caller's remaining budget
+// and the local per-hop timeout — cascading timeouts across hops.
+func (t *Transaction) traceCarrier(hopTimeout time.Duration) (sharedstruct.TraceContext, time.Duration) {
+	tc := sharedstruct.TraceContext{
+		TraceID: t.OriPacketHeader.TraceID,
+		SpanID:  sharedstruct.NewSpanID(),
+	}
+	if !t.OriPacketHeader.HasTrace() {
+		tc.TraceID = sharedstruct.NewTraceID()
+	}
+
+	effective := hopTimeout
+	if deadline, ok := t.OriPacketHeader.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if remaining < effective {
+			effective = remaining
+		}
+		if effective < minRPCTimeout {
+			effective = minRPCTimeout
+		}
+	}
+	tc.DeadlineUnixMs = time.Now().Add(effective).UnixMilli()
+	return tc, effective
+}
+
+const (
+	defaultRPCTimeout = 3 * time.Second
+	// minRPCTimeout 防止级联剩余预算过小导致必然失败的抖动请求。
+	minRPCTimeout = 50 * time.Millisecond
+)
 
 func (t *Transaction) Errorf(format string, args ...interface{}) {
 	f := fmt.Sprintf("[%v|%v|%v] %v", t.Uid(), t.Rid(), t.TransID(), format)
@@ -157,13 +207,14 @@ func (t *Transaction) CallOtherMsgBySvrType(svrType uint32, routerId, uid uint64
 	t.Debugf("CallMsgBySvrType {dstSvrType:%v, routerId:%v, uid:%v, zone:%v, cmd:%v, reqType:%s}",
 		svrType, routerId, uid, zone, uint32(cmd), protoMessageType(req))
 	t.sendSeq += 1
-	err := router.SendPbMsgBySvrType(svrType, routerId, uid, zone, cmd, t.sendSeq, t.TransID(), req)
+	tc, timeout := t.traceCarrier(defaultRPCTimeout)
+	err := router.SendPbMsgBySvrTypeTraced(tc, svrType, routerId, uid, zone, cmd, t.sendSeq, t.TransID(), req)
 	if err != nil {
 		logger.Error(err)
 		return err
 	}
 
-	return t.waitRsp(svrType, 0, cmd, time.Second*3, req, rsp)
+	return t.waitRsp(svrType, 0, cmd, timeout, req, rsp)
 }
 
 func (t *Transaction) SendMsgByServerType(svrType uint32, cmd g1_protocol.CMD, req proto.Message) error {
@@ -199,13 +250,14 @@ func (t *Transaction) BroadcastByServerType(svrType uint32, cmd g1_protocol.CMD,
 func (t *Transaction) CallMsgByBusId(busId uint32, cmd g1_protocol.CMD, req proto.Message, rsp proto.Message) error {
 	t.Debugf("CallMsgByBusId {dstBusId:%v, cmd:%v, reqType:%s}", busId, uint32(cmd), protoMessageType(req))
 	t.sendSeq += 1
-	err := router.SendPbMsgByBusId(busId, t.Uid(), t.Zone(), cmd, t.sendSeq, t.TransID(), req)
+	tc, timeout := t.traceCarrier(defaultRPCTimeout)
+	err := router.SendPbMsgByBusIdTraced(tc, busId, t.Uid(), t.Zone(), cmd, t.sendSeq, t.TransID(), req)
 	if err != nil {
 		logger.Error(err)
 		return err
 	}
 
-	return t.waitRsp(0, busId, cmd, time.Second*3, req, rsp)
+	return t.waitRsp(0, busId, cmd, timeout, req, rsp)
 }
 
 func contextForSSPacketTrace(srcBusID uint32, srcTransID uint32, cmdSeq uint16, cmd uint32) context.Context {

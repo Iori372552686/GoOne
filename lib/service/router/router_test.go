@@ -2,7 +2,6 @@ package router
 
 import (
 	"bytes"
-	"sync"
 	"testing"
 
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
@@ -12,11 +11,11 @@ import (
 type fakeBus struct {
 	selfBusID uint32
 
-	sendCalls int
+	sendCalls  int
 	closeCalls int
-	lastDst   uint32
-	lastData1 []byte
-	lastData2 []byte
+	lastDst    uint32
+	lastData1  []byte
+	lastData2  []byte
 }
 
 func (b *fakeBus) SelfBusId() uint32 {
@@ -40,51 +39,62 @@ func (b *fakeBus) Close() error {
 	return nil
 }
 
+// newTestRouter builds an isolated Router with a fake bus injected,
+// demonstrating the struct-based API for tests (no global state involved).
+func newTestRouter(fb *fakeBus, cb CbOnRecvSSPacket) *Router {
+	r := New()
+	r.busImpl = fb
+	r.cbOnRecvSSPacket = cb
+	return r
+}
+
 func TestRouterCloseClosesBusAndClearsState(t *testing.T) {
-	oldBus := router.busImpl
-	oldCb := router.cbOnRecvSSPacket
-	t.Cleanup(func() {
-		router.busImpl = oldBus
-		router.cbOnRecvSSPacket = oldCb
-		router.beginShutdownOnce = sync.Once{}
-		router.closeOnce = sync.Once{}
-	})
-
 	fb := &fakeBus{selfBusID: 0x01020304}
-	router.busImpl = fb
-	router.cbOnRecvSSPacket = func(packet *sharedstruct.SSPacket) {}
-	router.beginShutdownOnce = sync.Once{}
-	router.closeOnce = sync.Once{}
+	r := newTestRouter(fb, func(packet *sharedstruct.SSPacket) {})
 
-	if err := Close(); err != nil {
+	if err := r.Close(); err != nil {
 		t.Fatalf("Close returned error: %v", err)
 	}
 	if fb.closeCalls != 1 {
 		t.Fatalf("expected bus Close to be called once, got %d", fb.closeCalls)
 	}
-	if router.busImpl != nil {
+	if r.busImpl != nil {
 		t.Fatal("expected router busImpl to be cleared")
 	}
-	if router.cbOnRecvSSPacket != nil {
+	if r.cbOnRecvSSPacket != nil {
 		t.Fatal("expected router callback to be cleared")
+	}
+
+	// Close is idempotent.
+	if err := r.Close(); err != nil {
+		t.Fatalf("second Close returned error: %v", err)
+	}
+	if fb.closeCalls != 1 {
+		t.Fatalf("expected bus Close to remain 1, got %d", fb.closeCalls)
+	}
+}
+
+func TestRouterReadyCheck(t *testing.T) {
+	fb := &fakeBus{selfBusID: 0x01020304}
+	r := newTestRouter(fb, nil)
+
+	if err := r.ReadyCheck(); err != nil {
+		t.Fatalf("expected ready with healthy bus, got %v", err)
+	}
+
+	r.BeginShutdown()
+	if err := r.ReadyCheck(); err == nil {
+		t.Fatal("expected not-ready while shutting down")
 	}
 }
 
 func TestSendMsg_LocalBusShortCircuits(t *testing.T) {
-	oldBus := router.busImpl
-	oldCb := router.cbOnRecvSSPacket
-	t.Cleanup(func() {
-		router.busImpl = oldBus
-		router.cbOnRecvSSPacket = oldCb
-	})
-
 	fb := &fakeBus{selfBusID: 0x01020304}
-	router.busImpl = fb
 
 	var gotPacket *sharedstruct.SSPacket
-	router.cbOnRecvSSPacket = func(packet *sharedstruct.SSPacket) {
+	r := newTestRouter(fb, func(packet *sharedstruct.SSPacket) {
 		gotPacket = packet
-	}
+	})
 
 	header := &sharedstruct.SSPacketHeader{
 		SrcBusID: fb.selfBusID,
@@ -96,7 +106,7 @@ func TestSendMsg_LocalBusShortCircuits(t *testing.T) {
 	}
 	body := []byte{1, 2, 3}
 
-	if err := SendMsg(header, body); err != nil {
+	if err := r.SendMsg(header, body); err != nil {
 		t.Fatalf("SendMsg returned error: %v", err)
 	}
 	if fb.sendCalls != 0 {
@@ -123,20 +133,12 @@ func TestSendMsg_LocalBusShortCircuits(t *testing.T) {
 }
 
 func TestSendMsg_RemoteBusUsesBusImpl(t *testing.T) {
-	oldBus := router.busImpl
-	oldCb := router.cbOnRecvSSPacket
-	t.Cleanup(func() {
-		router.busImpl = oldBus
-		router.cbOnRecvSSPacket = oldCb
-	})
-
 	fb := &fakeBus{selfBusID: 0x01020304}
-	router.busImpl = fb
 
 	callbackCalled := false
-	router.cbOnRecvSSPacket = func(packet *sharedstruct.SSPacket) {
+	r := newTestRouter(fb, func(packet *sharedstruct.SSPacket) {
 		callbackCalled = true
-	}
+	})
 
 	header := &sharedstruct.SSPacketHeader{
 		SrcBusID: fb.selfBusID,
@@ -148,7 +150,7 @@ func TestSendMsg_RemoteBusUsesBusImpl(t *testing.T) {
 	}
 	body := []byte{4, 5}
 
-	if err := SendMsg(header, body); err != nil {
+	if err := r.SendMsg(header, body); err != nil {
 		t.Fatalf("SendMsg returned error: %v", err)
 	}
 	if callbackCalled {
@@ -165,5 +167,37 @@ func TestSendMsg_RemoteBusUsesBusImpl(t *testing.T) {
 	}
 	if !bytes.Equal(fb.lastData2, body) {
 		t.Fatalf("unexpected body payload sent to bus: %v", fb.lastData2)
+	}
+}
+
+func TestSendMsgByBusId_RejectsZeroBusId(t *testing.T) {
+	fb := &fakeBus{selfBusID: 0x01020304}
+	r := newTestRouter(fb, nil)
+
+	if err := r.SendMsgByBusId(0, 0, 1, 1, 0, 0, 0, nil); err == nil {
+		t.Fatal("expected error for zero bus id")
+	}
+	if fb.sendCalls != 0 {
+		t.Fatalf("expected no bus send, got %d", fb.sendCalls)
+	}
+}
+
+func TestPackageLevelAPIUsesDefaultRouter(t *testing.T) {
+	// Package-level helpers must operate on Default(). Swap in a fake bus
+	// and restore afterwards.
+	old := defaultRouter
+	t.Cleanup(func() { defaultRouter = old })
+
+	fb := &fakeBus{selfBusID: 0x01020304}
+	defaultRouter = newTestRouter(fb, nil)
+
+	if got := SelfBusId(); got != fb.selfBusID {
+		t.Fatalf("SelfBusId = %#x, want %#x", got, fb.selfBusID)
+	}
+	if Default() != defaultRouter {
+		t.Fatal("Default() must return the package default instance")
+	}
+	if err := ReadyCheck(); err != nil {
+		t.Fatalf("ReadyCheck via package API failed: %v", err)
 	}
 }

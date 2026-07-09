@@ -1,4 +1,6 @@
-package bus
+// Package kafka provides the Kafka bus driver.
+// Import it (usually via driver/all) to enable "kafka://" addresses.
+package kafka
 
 import (
 	"context"
@@ -9,15 +11,17 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/service/bus"
+	"github.com/Iori372552686/GoOne/lib/service/bus/internal/wire"
 	"github.com/segmentio/kafka-go"
 )
 
 type BusImplKafkaMQ struct {
 	selfBusId uint32
 	timeout   time.Duration
-	chanOut   chan outMsg
+	chanOut   chan wire.OutMsg
 	chanIn    chan []byte
-	onRecv    MsgHandler
+	onRecv    bus.MsgHandler
 
 	brokers       []string
 	topicPrefix   string
@@ -28,7 +32,7 @@ type BusImplKafkaMQ struct {
 	closeOnce     sync.Once
 }
 
-func NewBusImplKafkaMQ(selfBusId uint32, onRecvMsg MsgHandler, conf KafkaConfig) IBus {
+func NewBusImplKafkaMQ(selfBusId uint32, onRecvMsg bus.MsgHandler, conf bus.KafkaConfig) bus.IBus {
 	topicPrefix := strings.TrimSpace(conf.TopicPrefix)
 	if topicPrefix == "" {
 		topicPrefix = "bus"
@@ -40,7 +44,7 @@ func NewBusImplKafkaMQ(selfBusId uint32, onRecvMsg MsgHandler, conf KafkaConfig)
 	impl := &BusImplKafkaMQ{
 		selfBusId:     selfBusId,
 		timeout:       3 * time.Second,
-		chanOut:       make(chan outMsg, 10000),
+		chanOut:       make(chan wire.OutMsg, 10000),
 		chanIn:        make(chan []byte, 10000),
 		onRecv:        onRecvMsg,
 		brokers:       conf.Brokers,
@@ -52,30 +56,30 @@ func NewBusImplKafkaMQ(selfBusId uint32, onRecvMsg MsgHandler, conf KafkaConfig)
 	return impl
 }
 
-func (b *BusImplKafkaMQ) SelfBusId() uint32                { return b.selfBusId }
-func (b *BusImplKafkaMQ) SetReceiver(onRecvMsg MsgHandler) { b.onRecv = onRecvMsg }
-func (b *BusImplKafkaMQ) Healthy() bool                    { return b.connected.Load() && !b.closed.Load() }
+func (b *BusImplKafkaMQ) SelfBusId() uint32                    { return b.selfBusId }
+func (b *BusImplKafkaMQ) SetReceiver(onRecvMsg bus.MsgHandler) { b.onRecv = onRecvMsg }
+func (b *BusImplKafkaMQ) Healthy() bool                        { return b.connected.Load() && !b.closed.Load() }
 
 func (b *BusImplKafkaMQ) topicFor(busId uint32) string {
-	return b.topicPrefix + "." + calcQueueName(busId)
+	return b.topicPrefix + "." + wire.CalcQueueName(busId)
 }
 
 func (b *BusImplKafkaMQ) groupFor(busId uint32) string {
-	return b.groupIDPrefix + "." + calcQueueName(busId)
+	return b.groupIDPrefix + "." + wire.CalcQueueName(busId)
 }
 
 func (b *BusImplKafkaMQ) Send(dstBusId uint32, data1 []byte, data2 []byte) error {
 	if b.closed.Load() {
-		return ErrBusClosed
+		return bus.ErrBusClosed
 	}
-	msg := outMsg{
-		busId:  dstBusId,
-		topics: b.topicFor(dstBusId),
-		data:   buildFrame(b.SelfBusId(), dstBusId, data1, data2),
+	msg := wire.OutMsg{
+		BusID:  dstBusId,
+		Topics: b.topicFor(dstBusId),
+		Data:   wire.BuildFrame(b.SelfBusId(), dstBusId, data1, data2),
 	}
 
-	if !sendToMsgChan(b.chanOut, msg, b.timeout) {
-		putFrameBuf(msg.data)
+	if !wire.SendToMsgChan(b.chanOut, msg, b.timeout) {
+		wire.PutFrameBuf(msg.Data)
 		return fmt.Errorf("kafka bus.chanOut<-msg time out")
 	}
 	return nil
@@ -153,29 +157,29 @@ func (b *BusImplKafkaMQ) process() error {
 				return fmt.Errorf("chanOut of bus is closed")
 			}
 			if err := w.WriteMessages(ctx, kafka.Message{
-				Topic: msgOut.topics,
-				Value: msgOut.data,
+				Topic: msgOut.Topics,
+				Value: msgOut.Data,
 			}); err != nil {
-				logger.Errorf("Failed to publish kafka message {topic:%v, dataLen:%v}| %v", msgOut.topics, len(msgOut.data), err)
+				logger.Errorf("Failed to publish kafka message {topic:%v, dataLen:%v}| %v", msgOut.Topics, len(msgOut.Data), err)
 			}
-			putFrameBuf(msgOut.data) // 同步 writer（Async:false），返回即写完，可安全回收
+			wire.PutFrameBuf(msgOut.Data) // 同步 writer（Async:false），返回即写完，可安全回收
 		case data, ok := <-b.chanIn:
 			if !ok {
 				return fmt.Errorf("chanIn of bus is closed")
 			}
-			if len(data) < byteLenOfBusPacketHeader() {
+			if len(data) < wire.HeaderLen() {
 				continue
 			}
-			header := busPacketHeader{}
+			header := wire.Header{}
 			header.From(data)
-			if header.passCode != passCode {
+			if header.PassCode != wire.PassCode {
 				logger.Warningf("Received a bus message with wrong pass code: %#v", header)
 				continue
 			}
 			if b.onRecv != nil {
 				// data ownership is ours (allocated by the reader goroutine);
 				// hand it to onRecv without a second copy.
-				b.onRecv(header.srcBusId, data[byteLenOfBusPacketHeader():])
+				b.onRecv(header.SrcBusID, data[wire.HeaderLen():])
 			}
 		}
 	}
@@ -202,15 +206,15 @@ func (b *BusImplKafkaMQ) run() {
 		}
 		logger.Errorf("Error occur in processing bus(kafka). Retry later {retryTimes: %v, afterSeconds:%v} | %v",
 			retryCount, retryAfterSeconds, err)
-		if !sleepOrStop(b.stopCh, time.Duration(retryAfterSeconds)*time.Second) {
+		if !wire.SleepOrStop(b.stopCh, time.Duration(retryAfterSeconds)*time.Second) {
 			return
 		}
 	}
 }
 
 func init() {
-	RegisterBus("kafka", func(selfBusId uint32, onRecvMsg MsgHandler, conf any) (IBus, error) {
-		cfg, ok := conf.(KafkaConfig)
+	bus.RegisterBus("kafka", func(selfBusId uint32, onRecvMsg bus.MsgHandler, conf any) (bus.IBus, error) {
+		cfg, ok := conf.(bus.KafkaConfig)
 		if !ok {
 			return nil, fmt.Errorf("kafka arg must be KafkaConfig")
 		}

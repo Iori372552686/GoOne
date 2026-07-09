@@ -5,9 +5,25 @@
 
 ## [Unreleased]
 
+### ⚠️ Breaking
+
+- **SS 协议头升级 v2（54B → 86B）**：追加 `TraceID(16B)/SpanID(8B)/DeadlineUnixMs(8B)`
+  实现全链路 trace 透传与级联超时。新旧节点头长不一致，**集群必须整组发版，
+  不支持滚动混布**。
+
 ### Added
 
 - `lib/api/gerr`：统一框架错误模型（Code + Reason + Message + 错误链），`ssrpc.ToErrorCode` 已对接。
+- **全链路 trace 与级联超时**：connsvr 生成 root trace，`Transaction.Call*` 自动透传 trace/
+  收缩 deadline，接收端丢弃超期请求（`dropped_deadline_exceeded`），ssrpc 日志自动带 trace_id。
+- **bus 驱动插件化**：五个 MQ 实现移入 `bus/driver/<name>`（database/sql 风格 blank import），
+  `driver/all` 聚合包；不用 bus 的服务不再链接 MQ SDK（websvr 依赖图 MQ 包 68→0）。
+- `router.Router` 结构体化（`New()/Default()`），包级 API 兼容不变，测试可注入。
+- `net_mgr.GatewayServer` 统一网关接口；半成品（kcp/gnet/beego_ws/rest）移入 `x/` 实验目录。
+- `bootstrap/busapp`：bus 服务标准装配层。
+- 可观测性：`docs/observability/`（Grafana dashboard 模板 + 指标/告警/trace 指南）。
+- legacy 配置字段 Deprecated 标记与启动告警（两个版本后删除）。
+- 风格与工程：`docs/STYLE.md`、`CONTRIBUTING.md`、PascalCase 文件重命名、拼写修正。
 - `lib/service/bootstrap/busapp`：bus 服务标准装配层，五个 bus 服务 app.go 迁移为声明式 Options。
 - `lib/util/bufpool`：通用字节缓冲池，覆盖网关写路径与 bus 发送帧。
 - `IBus.Healthy()` 与 `router.ReadyCheck()`：MQ 断连期间 `/readyz` 返回 503 自动摘流。
