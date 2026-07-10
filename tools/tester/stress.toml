@@ -1,0 +1,95 @@
+# 压测配置示例：50 玩家循环执行房间快速开始/离开。
+# 本文件所有字段均可通过环境变量覆盖，详见下方注释。
+
+[run]
+# 运行模式：
+#   "regression" - 回归/单元测试：执行完整用例，输出 PASS/FAIL 汇总
+#   "stress"     - 压力测试：循环模拟玩家操作，输出压测报告
+# 环境变量覆盖：GOONE_TESTER_MODE
+mode = "stress"
+
+[server]
+# 被测网关地址
+host = "127.0.0.1"
+
+# TCP 网关端口（transport = "tcp" 时使用）
+tcp_port = 11002
+
+# WebSocket 网关端口（transport = "ws" 时使用）
+ws_port = 11001
+
+# WebSocket 路径，必须以 "/" 开头，空值等价于 "/"
+ws_path = "/"
+
+# 服务端 pprof HTTP 端口，用于采集 CPU/内存/协程等指标
+pprof_port = 6060
+
+# 客户端传输协议：
+#   "tcp" - 使用 TCP 二进制协议（CSPacketHeader + protobuf body）
+#   "ws"  - 使用 WebSocket 文本/二进制帧
+# 环境变量覆盖：GOONE_TESTER_TRANSPORT
+transport = "tcp"
+
+[player]
+# 模拟玩家总数，必须 > 0
+# 环境变量覆盖：GOONE_TESTER_PLAYERS
+players = 50
+
+# 首个玩家的 uid，后续玩家依次递增：start_uid, start_uid+1, ...
+# 环境变量覆盖：GOONE_TESTER_START_UID
+start_uid = 200001
+
+# 渠道标识，会随登录请求上报
+channel = "tester"
+
+# 账号前缀；最终账号为 "{account_prefix}_{uid}"
+# 环境变量覆盖：GOONE_TESTER_ACCOUNT_PREFIX
+account_prefix = "stress_acc"
+
+# 设备前缀；最终设备号为 "{device_prefix}_{uid}"
+# 环境变量覆盖：GOONE_TESTER_DEVICE_PREFIX
+device_prefix = "stress_device"
+
+# 登录 token；服务端未校验时可留空
+token = ""
+
+[stress]
+# 业务流调度方式：
+#   "random"      - 按模块 weight 随机挑选模块执行
+#   "sequential"  - 按模块 order 值固定轮转执行
+flow = "random"
+
+# 是否循环执行：
+#   true  - 循环执行，直到达到 duration 或收到 stop 命令
+#   false - 每个玩家执行一轮后结束
+loop = true
+
+# 压测总时长，使用 Go duration 格式，如 "10m", "1h", "30s"。
+# "0" 表示无限时长，需手动输入 stop 或 Ctrl+C 结束。
+duration = "10m"
+
+# 每秒上线的玩家数；0 表示一次性全部上线
+ramp_up_per_sec = 20
+
+# 每个玩家每轮业务操作之间的思考时间（毫秒）
+think_time_ms = 200
+
+# 业务模块开关；压测要求至少启用一个模块，否则启动失败。
+# 通用字段：
+#   enabled - 是否启用该模块
+#   weight  - flow = "random" 时使用，权重 <= 0 视为 1
+#   order   - flow = "sequential" 时使用，数值小的先执行
+[modules.room]
+enabled = true
+weight = 1
+
+[collect]
+# 控制台/统计采样间隔，如 "5s", "10s"
+sample_interval = "5s"
+
+# pprof 快照采集间隔，如 "30s", "1m"。
+# "0" 表示关闭 pprof 文件存档（仍可通过 pprof_port 实时查看）
+profile_interval = "30s"
+
+# 压测报告输出目录，运行结束时会生成 Markdown 报告
+report_dir = "./report"

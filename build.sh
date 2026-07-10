@@ -15,12 +15,14 @@ Usage:
   ./build.sh <target>
 
 Targets:
-  conn        -> cmd/connsvr       -> build/connsvr
-  main        -> cmd/mainsvr       -> build/mainsvr
-  info        -> cmd/infosvr       -> build/infosvr
-  mysql       -> cmd/mysqlsvr      -> build/mysqlsvr
-  roomcenter  -> cmd/roomcentersvr -> build/roomcentersvr
-  web         -> cmd/web_svr       -> build/websvr
+  conn        -> cmd/connsvr          -> build/connsvr
+  main        -> cmd/mainsvr          -> build/mainsvr
+  info        -> cmd/infosvr          -> build/infosvr
+  mysql       -> cmd/mysqlsvr         -> build/mysqlsvr
+  roomcenter  -> cmd/roomcentersvr    -> build/roomcentersvr
+  web         -> cmd/web_svr          -> build/websvr
+  tester      -> tools/tester/cmd/tester -> build/tester
+  stress      -> tools/tester/cmd/stress -> build/stress
 
 Aliases:
   connsvr, mainsvr, infosvr, mysqlsvr, room, roomcentersvr, websvr, web_svr
@@ -40,6 +42,8 @@ infosvr() { build_one "cmd/infosvr" "infosvr"; }
 mysqlsvr() { build_one "cmd/mysqlsvr" "mysqlsvr"; }
 roomcentersvr() { build_one "cmd/roomcentersvr" "roomcentersvr"; }
 websvr() { build_one "cmd/web_svr" "websvr"; }
+tester() { build_one "tools/tester/cmd/tester" "tester"; }
+stress() { build_one "tools/tester/cmd/stress" "stress"; }
 
 run_all() {
   connsvr
@@ -48,6 +52,8 @@ run_all() {
   infosvr
   roomcentersvr
   websvr
+  tester
+  stress
 }
 
 case "${target}" in
@@ -55,7 +61,7 @@ case "${target}" in
     usage
     ;;
   list)
-    printf '%s\n' conn main info mysql roomcenter web
+    printf '%s\n' conn main info mysql roomcenter web tester stress
     ;;
   all|"")
     run_all
@@ -77,6 +83,12 @@ case "${target}" in
     ;;
   web|websvr|web_svr)
     websvr
+    ;;
+  tester)
+    tester
+    ;;
+  stress)
+    stress
     ;;
   *)
     echo "Unsupported build target: ${target}" >&2

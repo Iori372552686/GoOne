@@ -12,3 +12,4 @@ deploy/hosts/host_dev.txt
 /tools/cfgtool/gen
 /plan
 /plan
+/report

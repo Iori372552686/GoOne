@@ -5,12 +5,14 @@ $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BuildDir = Join-Path $RepoRoot 'build'
 
 $Targets = [ordered]@{
-    conn       = @{ Source = 'cmd/connsvr';       Binary = 'connsvr.exe' }
-    main       = @{ Source = 'cmd/mainsvr';       Binary = 'mainsvr.exe' }
-    info       = @{ Source = 'cmd/infosvr';       Binary = 'infosvr.exe' }
-    mysql      = @{ Source = 'cmd/mysqlsvr';      Binary = 'mysqlsvr.exe' }
-    roomcenter = @{ Source = 'cmd/roomcentersvr'; Binary = 'roomcentersvr.exe' }
-    web        = @{ Source = 'cmd/web_svr';       Binary = 'websvr.exe' }
+    conn       = @{ Source = 'cmd/connsvr';             Binary = 'connsvr.exe' }
+    main       = @{ Source = 'cmd/mainsvr';             Binary = 'mainsvr.exe' }
+    info       = @{ Source = 'cmd/infosvr';             Binary = 'infosvr.exe' }
+    mysql      = @{ Source = 'cmd/mysqlsvr';            Binary = 'mysqlsvr.exe' }
+    roomcenter = @{ Source = 'cmd/roomcentersvr';       Binary = 'roomcentersvr.exe' }
+    web        = @{ Source = 'cmd/web_svr';             Binary = 'websvr.exe' }
+    tester     = @{ Source = 'tools/tester/cmd/tester'; Binary = 'tester.exe' }
+    stress     = @{ Source = 'tools/tester/cmd/stress'; Binary = 'stress.exe' }
 }
 
 $Aliases = @{
@@ -36,12 +38,14 @@ Usage:
   .\build.ps1 <target> [target...]
 
 Targets:
-  conn        -> cmd/connsvr        -> build/connsvr.exe
-  main        -> cmd/mainsvr        -> build/mainsvr.exe
-  info        -> cmd/infosvr        -> build/infosvr.exe
-  mysql       -> cmd/mysqlsvr       -> build/mysqlsvr.exe
-  roomcenter  -> cmd/roomcentersvr  -> build/roomcentersvr.exe
-  web         -> cmd/web_svr        -> build/websvr.exe
+  conn        -> cmd/connsvr             -> build/connsvr.exe
+  main        -> cmd/mainsvr             -> build/mainsvr.exe
+  info        -> cmd/infosvr             -> build/infosvr.exe
+  mysql       -> cmd/mysqlsvr            -> build/mysqlsvr.exe
+  roomcenter  -> cmd/roomcentersvr       -> build/roomcentersvr.exe
+  web         -> cmd/web_svr             -> build/websvr.exe
+  tester      -> tools/tester/cmd/tester -> build/tester.exe
+  stress      -> tools/tester/cmd/stress -> build/stress.exe
 
 Aliases:
   connsvr, mainsvr, infosvr, mysqlsvr, roomcentersvr, room, websvr, web_svr

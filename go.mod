@@ -3,6 +3,7 @@ module github.com/Iori372552686/GoOne
 go 1.25.4
 
 require (
+	github.com/BurntSushi/toml v1.6.0
 	github.com/Iori372552686/game_protocol v0.0.0-20250427031738-c3072b032cc4
 	github.com/apache/rocketmq-client-go/v2 v2.1.2
 	github.com/apolloconfig/agollo/v4 v4.4.0
@@ -37,7 +38,6 @@ require (
 	github.com/spf13/cast v1.10.0
 	github.com/streadway/amqp v1.1.0
 	github.com/stretchr/testify v1.11.1
-	github.com/tommy351/gin-sessions v0.0.0-20150617141853-353060947eb6
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xtaci/kcp-go/v5 v5.6.57
 	github.com/xuri/excelize/v2 v2.10.0
@@ -112,9 +112,6 @@ require (
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/gorilla/context v1.1.1 // indirect
-	github.com/gorilla/securecookie v1.1.2 // indirect
-	github.com/gorilla/sessions v1.4.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect

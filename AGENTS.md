@@ -52,11 +52,20 @@ Prefer code over README or older docs when they disagree.
 - Preferred top-level entrypoint is `main.sh`.
 - Start with `./main.sh doctor` when checking a local environment.
 - Common builds are `./main.sh build`, `./main.sh build web`, and `./main.sh build roomcenter`.
-- `build.sh` is the repository build helper for the active `src/` services only: `connsvr`, `mainsvr`, `infosvr`, `mysqlsvr`, `roomcentersvr`, and `web_svr` (output binary `websvr`).
+- `build.sh` is the repository build helper for the active `src/` services plus the tester tools: `connsvr`, `mainsvr`, `infosvr`, `mysqlsvr`, `roomcentersvr`, `web_svr` (output binary `websvr`), `tester`, and `stress`.
 - On Windows, use `./build.ps1` for local builds; use PowerShell proto helpers such as `.\scripts\check_genproto.ps1 -Full`, and prefer WSL or Git-Bash for `main.sh`.
 - Validate generated code with `./main.sh check-genproto`.
 - Use `./main.sh check-genproto --full` when `game_protocol` output also needs verification.
 - Local middleware dependencies are defined under `etc/env/env_docker.yaml`.
+- Tester builds: `./build.sh tester stress` (or `.uild.ps1 tester stress` on Windows).
+
+## Tester And Stress Client
+- `tools/tester/` is the standalone client testing framework, ported from `seed-tester` and adapted to GoOne's `CSPacketHeader` + protobuf wire protocol.
+- It supports two modes driven by `tools/tester/tester.toml` / `tools/tester/stress.toml`:
+  - `regression`: `go run ./tools/tester/cmd/tester -config ./tools/tester/tester.toml`
+  - `stress`: `go run ./tools/tester/cmd/stress -config ./tools/tester/stress.toml`
+- New business test components go under `tools/tester/app/component/<name>/`, register via `component.Register(...)`, and implement `TesterComponent`; add `StressRunner` for pressure-test loops.
+- The client speaks TCP by default (`transport = "tcp"`); set `transport = "ws"` to use WebSocket.
 
 ## Where To Look First
 - For service startup and dependency wiring, inspect `src/<service>/app.go`.
@@ -64,5 +73,6 @@ Prefer code over README or older docs when they disagree.
 - For config changes, inspect `common/gconf/config.go`.
 - For routing or service discovery issues, inspect `lib/service/router/`, `lib/service/svrinstmgr/`, `lib/service/bus/`, and `module/misc/`.
 - For web changes, inspect `src/web_svr/controller/` before touching bus-side handlers.
+- For tester changes, inspect `tools/tester/internal/session/` (network/session layer) and `tools/tester/app/component/` (business components).
 - For deployment behavior, inspect `deploy/README.md`, `deploy/deploy.sh`, and `deploy/scripts/server.sh`.
 
