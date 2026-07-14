@@ -13,10 +13,10 @@ mode = "regression"
 host = "127.0.0.1"
 
 # TCP 网关端口（transport = "tcp" 时使用）
-tcp_port = 11002
+tcp_port = 11001
 
 # WebSocket 网关端口（transport = "ws" 时使用）
-ws_port = 11001
+ws_port = 11000
 
 # WebSocket 路径，必须以 "/" 开头，空值等价于 "/"
 ws_path = "/"

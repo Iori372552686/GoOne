@@ -13,6 +13,7 @@ package testcfg
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"sort"
 	"strconv"
@@ -67,6 +68,41 @@ func (s *ServerConfig) WsURL() string {
 // PprofBaseURL pprof HTTP 根地址，如 http://127.0.0.1:6060。
 func (s *ServerConfig) PprofBaseURL() string {
 	return fmt.Sprintf("http://%s:%d", s.Host, s.PprofPort)
+}
+
+// GatewayHostPort 返回网关的 host:port（按 transport 取 TCP/WS 端口）。
+// 两种传输都先建立 TCP 连接，因此 TCP 层可达即可作为网关在线的初步判定。
+func (s *ServerConfig) GatewayHostPort() string {
+	port := s.TcpPort
+	if s.Transport == "ws" {
+		port = s.WsPort
+	}
+	return fmt.Sprintf("%s:%d", s.Host, port)
+}
+
+// GatewayReachable 探测网关 TCP 端口是否在监听。
+// 用于 CI 场景：若被测服务器未启动，端到端流程应快速跳过而非阻塞/panic。
+// timeout<=0 时使用默认 2s。
+func (s *ServerConfig) GatewayReachable(timeout time.Duration) bool {
+	if timeout <= 0 {
+		timeout = 2 * time.Second
+	}
+	conn, err := net.DialTimeout("tcp", s.GatewayHostPort(), timeout)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
+
+// SkipE2EFromEnv 读取 TESTER_SKIP_E2E 环境变量；值为 "1"/"true"/"yes" 时
+// 表示 CI 等环境强制跳过端到端流程。
+func SkipE2EFromEnv() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("TESTER_SKIP_E2E"))) {
+	case "1", "true", "yes":
+		return true
+	}
+	return false
 }
 
 type PlayerConfig struct {

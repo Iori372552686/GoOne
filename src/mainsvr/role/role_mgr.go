@@ -11,9 +11,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/src/mainsvr/globals/rds"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
-	"github.com/golang/protobuf/proto"
 )
 
 type RoleMgr struct {
@@ -84,30 +82,21 @@ func loadRole(uid uint64, trans cmd_handler.IContext) (error, *Role) {
 		return errors.New("inconsistent uid"), nil
 	}
 
-	dbType := uint32(g1_protocol.DBType_DB_TYPE_ROLE)
 	key := fmt.Sprintf("%s:%d", g1_protocol.DBType_DB_TYPE_ROLE.String(), uid)
-	logger.Debugf("get redis for uid {key=%s}", key)
-	result, err := rds.RedisMgr.GetBytes(dbType, key)
+	info, err := loadRoleHash(uid)
 	if err != nil {
-		logger.Errorf("get redis error {err:%v, dbType:%v, uid:%v}", err, dbType, uid)
+		logger.Errorf("get redis error {err:%v, uid:%v}", err, uid)
 		return err, nil
 	}
-
-	if result == nil {
+	if info == nil {
 		logger.Debugf("get role redis nil {key=%v}", key)
 		return nil, nil
 	}
 
 	role := Role{}
-	role.PbRole = new(g1_protocol.RoleInfo)
-	err = proto.Unmarshal(result, role.PbRole)
-	if err != nil {
-		logger.Error(err)
-		return err, nil
-	}
-
+	role.PbRole = info
 	// 这里主要是老的数据添加新增的数据段，不然新数据段就是nil
-	role.RoleInitField(role.PbRole.RegisterInfo.Uid)
+	role.RoleInitField(info.RegisterInfo.Uid)
 	return nil, &role
 }
 

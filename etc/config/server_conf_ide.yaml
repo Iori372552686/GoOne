@@ -40,6 +40,12 @@ base_cfg:
         password: go123456
         is_cluster: false
         description: brief info data
+      - instance_id: 10
+        ip: 43.139.3.228
+        port: 6379
+        password: go123456
+        is_cluster: false
+        description: texas room snapshot data
 
     orm_instances:
       - index_name: default
@@ -81,7 +87,7 @@ base_cfg:
 
 connsvr:
   identity:
-    self_bus_id: 1.1.1.251
+    self_bus_id: 2.1.1.251
   runtime:
     listen_port: 11000
   debug:
@@ -90,14 +96,14 @@ connsvr:
 
 infosvr:
   identity:
-    self_bus_id: 1.1.3.251
+    self_bus_id: 2.1.3.251
   debug:
     log_dir: ../logs
     log_level: debug
 
 mainsvr:
   identity:
-    self_bus_id: 1.1.2.251
+    self_bus_id: 2.1.2.251
   debug:
     log_dir: ../logs
     log_level: debug
@@ -106,14 +112,14 @@ mainsvr:
 
 mysqlsvr:
   identity:
-    self_bus_id: 1.1.4.251
+    self_bus_id: 2.1.4.251
   debug:
     log_dir: ../logs
     log_level: debug
 
 websvr:
   identity:
-    self_bus_id: 1.1.12.251
+    self_bus_id: 2.1.12.251
   debug:
     log_dir: ../logs
     log_level: debug
@@ -130,7 +136,7 @@ websvr:
 
 roomcentersvr:
   identity:
-    self_bus_id: 1.1.11.251
+    self_bus_id: 2.1.11.251
   debug:
     log_dir: ../logs
     log_level: debug

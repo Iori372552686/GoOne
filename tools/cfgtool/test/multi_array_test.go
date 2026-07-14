@@ -67,6 +67,8 @@ func TestGenDataSupportsMultiDimensionalArrays(t *testing.T) {
 	domain.PkgName = ""
 	domain.PbPath = ""
 
+	resetGlobals(t)
+
 	if err := parser.ParseFiles(xlsxPath); err != nil {
 		t.Fatalf("parse xlsx: %v", err)
 	}

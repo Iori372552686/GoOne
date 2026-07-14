@@ -148,10 +148,12 @@ func (b *BusImplRabbitMQ) process(rabbitmqAddr string, myQueueName string) error
 			}
 
 			if b.onRecv != nil {
-				recvData := make([]byte, len(delivery.Body)-wire.HeaderLen())
-				copy(recvData, delivery.Body[wire.HeaderLen():])
-				// Todo:不确定delivery.Body的生命周期，保险起见，这里还是先拷贝了一份。
-				b.onRecv(header.SrcBusID, recvData)
+				// streadway/amqp 的 delivery.Body 由 channel 在 recvContent 中以
+				// append(ch.body, frame.Body...) 累积，下一帧到来时 ch.body 被
+				// make([]byte,0) 新分配重置（非复用旧底层数组），因此 delivery.Body
+				// 在 dispatch 后可被安全持有。这里直接切片共享，无需防御性 copy。
+				// 上游 router.onRecvBusMsg 对 body 仅做切片引用。
+				b.onRecv(header.SrcBusID, delivery.Body[wire.HeaderLen():])
 			}
 		}
 	}

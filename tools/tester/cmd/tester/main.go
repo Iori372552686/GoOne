@@ -35,6 +35,17 @@ func main() {
 		log.Printf("[Tester] warning: [run].mode = %q, 本入口强制以 regression 模式运行", cfg.Run.Mode)
 	}
 
+	// 可达性探测：若网关不可达（CI 未起服务器等场景），优雅跳过而非阻塞/panic。
+	// 可用环境变量 TESTER_SKIP_E2E=1 强制跳过。
+	if testcfg.SkipE2EFromEnv() {
+		log.Printf("[Tester] TESTER_SKIP_E2E=1，跳过端到端回归")
+		os.Exit(0)
+	}
+	if !cfg.Server.GatewayReachable(0) {
+		log.Printf("[Tester] 网关 %s 不可达，跳过端到端回归（需先启动 connsvr）", cfg.Server.GatewayHostPort())
+		os.Exit(0)
+	}
+
 	modules := cfg.EnabledModules()
 	eng := engine.NewEngine(cfg, modules, nil, 1)
 

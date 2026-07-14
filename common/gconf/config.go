@@ -199,6 +199,7 @@ type MainSvrConfig struct {
 
 var MainSvrCfg MainSvrConfig
 
+
 // mysqlsvr配置
 type MySqlSvrConfig struct {
 	BaseCfg  `json:"base_cfg" yaml:"base_cfg"`

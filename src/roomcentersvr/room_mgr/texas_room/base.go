@@ -62,7 +62,7 @@ func (impl *TexasRoomCenterMgr) Tick(nowMs int64) {
 }
 
 func (impl *TexasRoomCenterMgr) Exit() {
-	impl.saveRoomDataToDB()
+	impl.SaveRoomDataToDB()
 	logger.Debugf("room center exit Done!")
 }
 

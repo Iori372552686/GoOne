@@ -173,9 +173,9 @@ func (b *BusImplRocketMQ) process() error {
 				continue
 			}
 			if b.onRecv != nil {
-				recvData := make([]byte, len(data)-wire.HeaderLen())
-				copy(recvData, data[wire.HeaderLen():])
-				b.onRecv(header.SrcBusID, recvData)
+				// data 来自 chanIn，入队时已独立 make+copy（SDK 回调的 m.Body 生命周期
+				// 不确定），取出后仅当前 goroutine 持有，可直接切片共享，无需再 copy。
+				b.onRecv(header.SrcBusID, data[wire.HeaderLen():])
 			}
 		}
 	}

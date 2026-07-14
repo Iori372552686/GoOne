@@ -15,6 +15,7 @@ import (
 	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/globals"
 	id "github.com/Iori372552686/GoOne/src/roomcentersvr/globals/idgen"
+	rds "github.com/Iori372552686/GoOne/src/roomcentersvr/globals/rds"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/room_ai"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/service"
 	pb "github.com/Iori372552686/game_protocol/protocol"
@@ -77,6 +78,13 @@ func NewApp() *bootstrap.ServiceApp {
 				return err
 			}
 			id.IDGen = idGen
+			// 初始化 Redis（房间快照持久化用）。无配置时跳过，保持向后兼容。
+			if len(gconf.RoomCenterSvrCfg.Dependencies.DbInstances) > 0 {
+				if err := rds.RedisMgr.InitAndRun(gconf.RoomCenterSvrCfg.Dependencies.DbInstances); err != nil {
+					return err
+				}
+				logger.Infof("roomcentersvr redis initialized for room snapshot persistence")
+			}
 			if gconf.RoomCenterSvrCfg.Dependencies.NacosConf.IPAddr != "" {
 				logger.Infof("Loading remote gameconf by Nacos group: %v ", gconf.RoomCenterSvrCfg.Dependencies.NacosConf.GroupName)
 				if err := gamedata.InitNet(net_conf.NewNacosConfigClient(gconf.RoomCenterSvrCfg.Dependencies.NacosConf), gconf.RoomCenterSvrCfg.Dependencies.NacosConf.GroupName); err != nil {
@@ -97,6 +105,8 @@ func NewApp() *bootstrap.ServiceApp {
 			if err := globals.RoomListMgr.Init(); err != nil {
 				return err
 			}
+			// 启动时从 Redis 恢复房间快照（任务 2.5）。
+			globals.RoomListMgr.LoadAllFromDB()
 			safego.Go(func() {
 				room_ai.OnAiInitRoom()
 			})
@@ -106,9 +116,16 @@ func NewApp() *bootstrap.ServiceApp {
 			safego.Go(func() {
 				globals.RoomListMgr.Tick(nowMs)
 			})
+			// 周期持久化变更的房间快照（与 tick 节流分离，独立节拍）。
+			safego.Go(func() {
+				globals.RoomListMgr.TickPersist(nowMs)
+			})
 		},
 		OnExit: func() {
 			logger.Infof("================== roomcentersvr Stop =========================")
+			// 停机前强制全量写所有房间，避免数据丢失。
+			saved, failed := globals.RoomListMgr.FlushAllToDB()
+			logger.Infof("roomcentersvr flush rooms on exit {saved:%d, failed:%d}", saved, failed)
 		},
 	})
 }

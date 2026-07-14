@@ -233,9 +233,10 @@ func (b *BusImplNsqMQ) process() error {
 				continue
 			}
 			if b.onRecv != nil {
-				recvData := make([]byte, len(data)-wire.HeaderLen())
-				copy(recvData, data[wire.HeaderLen():])
-				b.onRecv(header.SrcBusID, recvData)
+				// data 来自 chanIn，入队时已独立 make+copy（消费回调持有的 msg.Body
+				// 生命周期不确定），取出后仅当前 goroutine 持有，可直接切片共享，
+				// 无需再 copy 一份。上游 router.onRecvBusMsg 对 body 仅做切片引用。
+				b.onRecv(header.SrcBusID, data[wire.HeaderLen():])
 			}
 		}
 	}

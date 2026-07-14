@@ -18,11 +18,28 @@ var (
 	descMap      = make(map[string]*desc.FileDescriptor)
 )
 
+// Clear resets every manager-global container so that sequential test cases
+// (or repeated runs) start from a clean slate. Maps are re-initialized to empty
+// (not nil) because the various Add* helpers write to them without a nil check.
+//
+// 注意：convertMgr 不在此清理之列——它由 init() 注册基础标量类型
+// （int32/string/bool 等）的转换器，是静态表而非累积状态，清空会导致
+// 所有基础类型被识别为"未识别的类型"。
 func Clear() {
-	referenceMgr = nil
-	protoMgr = nil
+	// proto_mgr
+	referenceMgr = make(map[string][]string)
+	protoMgr = make(map[string]string)
 	protoList = nil
-	descMap = nil
+	descMap = make(map[string]*desc.FileDescriptor)
+
+	// table_mgr
+	tableMgr = make(map[string]*base.Table)
+	groupMgr = make(map[int][]*base.Table)
+
+	// type_mgr
+	configMgr = make(map[string]*base.Config)
+	structMgr = make(map[string]*base.Struct)
+	enumMgr = make(map[string]*base.Enum)
 }
 
 func AddRef(filename string, reference map[string]struct{}) {

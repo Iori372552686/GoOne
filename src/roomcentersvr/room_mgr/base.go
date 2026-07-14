@@ -58,6 +58,22 @@ func (impl *RoomMgr) Tick(nowMs int64) {
 	}
 }
 
+// persistTickSec 持久化节流间隔（秒）。房间快照变更后最多 lag 这么久落盘。
+const persistIntervalMs = 10 * datetime.MS_PER_SECOND
+
+// TickPersist 周期持久化变更的房间快照，与 Tick 解耦独立节拍。
+// 由 app.OnTick 驱动；无 Redis 配置时 SaveDirtyToDB 内部跳过。
+func (impl *RoomMgr) TickPersist(nowMs int64) {
+	if !impl.checkOpen() {
+		return
+	}
+	if nowMs-impl.eventTick < persistIntervalMs {
+		return
+	}
+	impl.eventTick = nowMs
+	impl.SaveDirtyToDB()
+}
+
 // onExit, save data
 func (impl *RoomMgr) Exit() {
 	if !impl.checkOpen() {
@@ -66,6 +82,54 @@ func (impl *RoomMgr) Exit() {
 
 	for _, zone := range impl.TexasMgr {
 		zone.Exit()
+	}
+}
+
+// LoadAllFromDB 启动时从 Redis 恢复所有 zone 的房间快照。
+func (impl *RoomMgr) LoadAllFromDB() {
+	impl.RLock()
+	zones := make([]*texas_room.TexasRoomCenterMgr, 0, len(impl.TexasMgr))
+	for _, zone := range impl.TexasMgr {
+		zones = append(zones, zone)
+	}
+	impl.RUnlock()
+
+	for _, zone := range zones {
+		if err := zone.LoadRoomDataFromDB(); err != nil {
+			// room_mgr 日志在 zone 层打印，这里仅避免中断其它 zone
+			continue
+		}
+	}
+}
+
+// FlushAllToDB 强制全量写所有 zone 的房间快照（停机用）。
+func (impl *RoomMgr) FlushAllToDB() (totalSaved, totalFailed int) {
+	impl.RLock()
+	zones := make([]*texas_room.TexasRoomCenterMgr, 0, len(impl.TexasMgr))
+	for _, zone := range impl.TexasMgr {
+		zones = append(zones, zone)
+	}
+	impl.RUnlock()
+
+	for _, zone := range zones {
+		s, f := zone.FlushAllRoomsToDB()
+		totalSaved += s
+		totalFailed += f
+	}
+	return totalSaved, totalFailed
+}
+
+// SaveDirtyToDB 周期持久化所有 zone 中变更的房间（OnTick 调用）。
+func (impl *RoomMgr) SaveDirtyToDB() {
+	impl.RLock()
+	zones := make([]*texas_room.TexasRoomCenterMgr, 0, len(impl.TexasMgr))
+	for _, zone := range impl.TexasMgr {
+		zones = append(zones, zone)
+	}
+	impl.RUnlock()
+
+	for _, zone := range zones {
+		_ = zone.SaveRoomDataToDB()
 	}
 }
 

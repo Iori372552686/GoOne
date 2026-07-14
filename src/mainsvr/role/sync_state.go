@@ -168,32 +168,32 @@ func (r *Role) MarkFullSync(flag g1_protocol.ERoleSectionFlag) {
 
 func (r *Role) TouchBasicInfo(reason string) {
 	r.MarkFullSync(g1_protocol.ERoleSectionFlag_BASIC_INFO)
-	r.MarkPersistDirty(reason)
+	r.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_BASIC_INFO, reason)
 }
 
 func (r *Role) TouchGameInfo(reason string) {
 	r.MarkFullSync(g1_protocol.ERoleSectionFlag_GAME_INFO)
-	r.MarkPersistDirty(reason)
+	r.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_GAME_INFO, reason)
 }
 
 func (r *Role) TouchGuideInfo(reason string) {
 	r.MarkFullSync(g1_protocol.ERoleSectionFlag_GUIDE_INFO)
-	r.MarkPersistDirty(reason)
+	r.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_GUIDE_INFO, reason)
 }
 
 func (r *Role) TouchOpenFuncInfo(reason string) {
 	r.MarkFullSync(g1_protocol.ERoleSectionFlag_OPEN_FUNC_INFO)
-	r.MarkPersistDirty(reason)
+	r.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_OPEN_FUNC_INFO, reason)
 }
 
 func (r *Role) TouchMainTaskInfo(reason string) {
 	r.MarkFullSync(g1_protocol.ERoleSectionFlag_MAIN_TASK_INFO)
-	r.MarkPersistDirty(reason)
+	r.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_MAIN_TASK_INFO, reason)
 }
 
 func (r *Role) TouchActvityTaskInfo(reason string) {
 	r.markPatchSection(g1_protocol.ERoleSectionFlag_ACTVITY_TASK_INFO)
-	r.MarkPersistDirty(reason)
+	r.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_ACTVITY_TASK_INFO, reason)
 }
 
 func (r *Role) markPatchSection(flag g1_protocol.ERoleSectionFlag) {
@@ -215,7 +215,7 @@ func (r *Role) MarkInventoryDirty(itemID int32, deleted bool) {
 		delInt32Value(&r.inventoryDeletes, itemID)
 		setInt32Value(&r.inventoryUpserts, itemID)
 	}
-	r.MarkPersistDirty("inventory")
+	r.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_INVENTORY_INFO, "inventory")
 }
 
 func (r *Role) MarkMallDirty(confID int32, deleted bool) {
@@ -227,7 +227,7 @@ func (r *Role) MarkMallDirty(confID int32, deleted bool) {
 		delInt32Value(&r.mallDeletes, confID)
 		setInt32Value(&r.mallUpserts, confID)
 	}
-	r.MarkPersistDirty("mall")
+	r.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_MALL_INFO, "mall")
 }
 
 func (r *Role) MarkIconDirty(iconID int32, deleted bool) {
@@ -239,7 +239,7 @@ func (r *Role) MarkIconDirty(iconID int32, deleted bool) {
 		delInt32Value(&r.iconDeletes, iconID)
 		setInt32Value(&r.iconUpserts, iconID)
 	}
-	r.MarkPersistDirty("icon")
+	r.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_ICON_INFO, "icon")
 }
 
 func (r *Role) MarkFrameDirty(frameID int32, deleted bool) {
@@ -251,13 +251,13 @@ func (r *Role) MarkFrameDirty(frameID int32, deleted bool) {
 		delInt32Value(&r.frameDeletes, frameID)
 		setInt32Value(&r.frameUpserts, frameID)
 	}
-	r.MarkPersistDirty("icon")
+	r.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_ICON_INFO, "icon")
 }
 
 func (r *Role) MarkIconEquipDirty() {
 	r.markPatchSection(g1_protocol.ERoleSectionFlag_ICON_INFO)
 	r.iconEquipDirty = true
-	r.MarkPersistDirty("icon")
+	r.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_ICON_INFO, "icon")
 }
 
 func (r *Role) MarkActvityTaskDirty(taskID int32, deleted bool) {
@@ -269,7 +269,7 @@ func (r *Role) MarkActvityTaskDirty(taskID int32, deleted bool) {
 		delInt32Value(&r.actTaskDeletes, taskID)
 		setInt32Value(&r.actTaskUpserts, taskID)
 	}
-	r.MarkPersistDirty("activity_task")
+	r.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_ACTVITY_TASK_INFO, "activity_task")
 }
 
 func (r *Role) MarkPersistDirty(reason string) {
@@ -278,6 +278,15 @@ func (r *Role) MarkPersistDirty(reason string) {
 	}
 	r.needPersist = true
 	setStringValue(&r.persistReasons, reason)
+}
+
+// markPersistSectionDirty 在 MarkPersistDirty 基础上把 flag 并入 persistDirtyMask，
+// 供 hash 模式按模块增量落盘。各 Touch* 方法在已知变更模块时调用此版本。
+func (r *Role) markPersistSectionDirty(flag g1_protocol.ERoleSectionFlag, reason string) {
+	if flag != 0 {
+		r.persistDirtyMask |= flag
+	}
+	r.MarkPersistDirty(reason)
 }
 
 func (r *Role) persistDebounceSec() int32 {

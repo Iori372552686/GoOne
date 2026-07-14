@@ -6,11 +6,8 @@ import (
 
 	infosvrv1 "github.com/Iori372552686/GoOne/api/gen/game/infosvr/v1"
 	mysqlsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/mysqlsvr/v1"
-	"github.com/Iori372552686/GoOne/src/mainsvr/globals/rds"
 
 	"sync"
-
-	"google.golang.org/protobuf/proto"
 
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
@@ -46,6 +43,9 @@ type Role struct {
 	persistDirtySince int32
 	lastPersistAt     int32
 	persistReasons    stringSet
+	// persistDirtyMask 记录自上次成功落盘后哪些模块变更过，供 hash 模式增量写。
+	// full 模式不读取此字段。落盘成功后清零。
+	persistDirtyMask g1_protocol.ERoleSectionFlag
 }
 
 func NewRole(uid uint64) *Role {
@@ -159,19 +159,12 @@ func (r *Role) SaveToDB(trans cmd_handler.IContext) error {
 		return errors.New("inconsistent uid")
 	}
 
-	data, err := proto.Marshal(r.PbRole)
-	if err != nil {
-		r.Errorf("role marshal error {uid:%v, reasons:%v} | %v", r.Uid(), sortedStringValues(r.persistReasons), err)
+	// 按模块增量写 Redis hash（落盘格式详见 persist_hash.go）。
+	if err := saveRoleHash(r, false); err != nil {
 		return err
 	}
-
-	err = rds.RedisMgr.SetBytes(uint32(g1_protocol.DBType_DB_TYPE_ROLE), fmt.Sprintf("%s:%d", g1_protocol.DBType_DB_TYPE_ROLE.String(), r.Uid()), data)
-	if err != nil {
-		logger.Errorf("role SaveToDB set redis error | %v", err)
-		return errors.New("role SaveToDB set redis error")
-	}
-
-	r.Debugf("role SaveToDB set redis success | uid:%v", r.Uid())
+	r.clearPersistDirtyMask()
+	r.Debugf("role SaveToDB(hash) success | uid:%v", r.Uid())
 	return nil
 }
 
@@ -197,23 +190,15 @@ func (r *Role) SaveToMysql(trans cmd_handler.IContext) error {
 }
 
 // SaveToDBSync 同步持久化角色数据到 redis，不依赖事务上下文。
-// 用于优雅停机等没有 transaction 可用的场景。
+// 用于优雅停机等没有 transaction 可用的场景。force=true 全量写所有模块。
 func (r *Role) SaveToDBSync() error {
-	data, err := proto.Marshal(r.PbRole)
-	if err != nil {
-		r.Errorf("role marshal error {uid:%v, reasons:%v} | %v", r.Uid(), sortedStringValues(r.persistReasons), err)
+	if err := saveRoleHash(r, true); err != nil {
 		return err
 	}
-
-	err = rds.RedisMgr.SetBytes(uint32(g1_protocol.DBType_DB_TYPE_ROLE), fmt.Sprintf("%s:%d", g1_protocol.DBType_DB_TYPE_ROLE.String(), r.Uid()), data)
-	if err != nil {
-		logger.Errorf("role SaveToDBSync set redis error {uid:%v} | %v", r.Uid(), err)
-		return err
-	}
-
 	r.needPersist = false
 	r.persistDirtySince = 0
 	r.persistReasons = nil
+	r.clearPersistDirtyMask()
 	return nil
 }
 

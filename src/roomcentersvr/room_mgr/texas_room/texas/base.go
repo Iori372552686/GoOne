@@ -37,23 +37,21 @@ func (impl *TexasRoom) Save() {
 	impl.isChange = true
 }
 
+// MarkSaved 标记房间数据已持久化（清 dirty）。
+// 由 data_proc.go 的 saveRoomDataToDB / FlushAllRoomsToDB 在写入成功后调用。
+func (impl *TexasRoom) MarkSaved() {
+	impl.isChange = false
+}
+
 func (impl *TexasRoom) CheckChange() bool {
 	return impl.isChange
 }
 
 func (impl *TexasRoom) Update() (err error) {
-	data := impl.Get()
-	if data == nil {
-		return
-	}
-
-	//err = global.GlobalDB.SetDBGuildInstanceData(ctx, data)
-	if err != nil {
-		return
-	}
-
+	// 持久化逻辑已迁移至 texas_room/data_proc.go（saveRoomDataToDB）。
+	// 此处仅保留方法签名以兼容历史调用，dirty 由 MarkSaved 管理。
 	impl.isChange = false
-	return
+	return nil
 }
 
 func (impl *TexasRoom) Set(data *pb.DBTexasRoomCenterInfo) error {

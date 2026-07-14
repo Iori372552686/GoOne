@@ -44,6 +44,17 @@ func main() {
 		log.Printf("[Stress] warning: [run].mode = %q, 本入口强制以 stress 模式运行", cfg.Run.Mode)
 	}
 
+	// 可达性探测：若网关不可达（CI 未起服务器等场景），优雅跳过而非阻塞/panic。
+	// 可用环境变量 TESTER_SKIP_E2E=1 强制跳过。
+	if testcfg.SkipE2EFromEnv() {
+		log.Printf("[Stress] TESTER_SKIP_E2E=1，跳过压测")
+		os.Exit(0)
+	}
+	if !cfg.Server.GatewayReachable(0) {
+		log.Printf("[Stress] 网关 %s 不可达，跳过压测（需先启动 connsvr）", cfg.Server.GatewayHostPort())
+		os.Exit(0)
+	}
+
 	collector := stats.NewCollector()
 
 	ctl, err := stress.NewController(cfg, collector)
