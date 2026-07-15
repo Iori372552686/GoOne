@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/tools/tester/app/component"
+	"github.com/Iori372552686/GoOne/tools/tester/internal/session"
 	"github.com/Iori372552686/GoOne/tools/tester/internal/testcfg"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
@@ -91,6 +92,13 @@ func (c *LoginComponent) OnMessage(cmd uint32, data []byte) bool {
 	return false
 }
 
+// RunStress 压测正常路径：发送一次心跳（在线玩家最高频的操作）。
+// 登录在会话建立时已由 session.Login 自动完成，循环里只做保持在线的轻量请求，
+// 与 room 组件的快速开始/离开互补，共同构成压测负载。
+func (c *LoginComponent) RunStress(ctx context.Context) error {
+	return c.testHeartbeat(ctx)
+}
+
 // testLoginExisting 使用已有账号再次登录应稳定返回。
 func (c *LoginComponent) testLoginExisting(ctx context.Context) error {
 	req := &g1_protocol.LoginReq{
@@ -107,7 +115,7 @@ func (c *LoginComponent) testLoginExisting(ctx context.Context) error {
 	if err := c.requester.RequestProto(ctx, uint32(g1_protocol.CMD_MAIN_LOGIN_REQ), req, resp, 15*time.Second); err != nil {
 		return err
 	}
-	if resp.Ret != nil && resp.Ret.Code != 0 {
+	if resp.Ret != nil && session.IsErrCode(int32(resp.Ret.Code)) {
 		return fmt.Errorf("login failed: code=%d msg=%s", resp.Ret.Code, resp.Ret.Msg)
 	}
 	if resp.RoleInfo == nil || resp.RoleInfo.RegisterInfo == nil {
@@ -134,7 +142,7 @@ func (c *LoginComponent) testLoginWithToken(ctx context.Context) error {
 	if err := c.requester.RequestProto(ctx, uint32(g1_protocol.CMD_MAIN_LOGIN_REQ), req, resp, 15*time.Second); err != nil {
 		return err
 	}
-	if resp.Ret != nil && resp.Ret.Code != 0 {
+	if resp.Ret != nil && session.IsErrCode(int32(resp.Ret.Code)) {
 		return fmt.Errorf("token login failed: code=%d msg=%s", resp.Ret.Code, resp.Ret.Msg)
 	}
 	log.Printf("[Actor %d][Login] T02: Token login OK", c.actorID)
@@ -148,7 +156,7 @@ func (c *LoginComponent) testHeartbeat(ctx context.Context) error {
 	if err := c.requester.RequestProto(ctx, uint32(g1_protocol.CMD_MAIN_HEARTBEAT_REQ), req, resp, 10*time.Second); err != nil {
 		return err
 	}
-	if resp.Ret != nil && resp.Ret.Code != 0 {
+	if resp.Ret != nil && session.IsErrCode(int32(resp.Ret.Code)) {
 		return fmt.Errorf("heartbeat failed: code=%d msg=%s", resp.Ret.Code, resp.Ret.Msg)
 	}
 	log.Printf("[Actor %d][Login] T03: Heartbeat OK", c.actorID)

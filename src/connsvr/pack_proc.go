@@ -48,12 +48,16 @@ func handleClientPacket(gw net_mgr.GatewayServer, transport string, conn net.Con
 
 	client := gw.GetClientByUid(uid)
 	if client == nil {
-		logger.Errorf("Cannot find %s conn by uid: %v", transport, uid)
-		return
-	}
-
-	// 前期简单测试，后期改为严谨通过rebind 与账号服验证后更新conn
-	if client.Conn != conn {
+		// 首次登录：该 uid 的会话尚未绑定到当前连接，先建立绑定。
+		// （GoOne 登录模型：uid 由外部预分配，客户端首包即携带 uid，
+		// connsvr 据此建立 uid↔conn 映射，后续请求才能路由与回包。）
+		client = gw.UpdateClientByUid(conn, uid, packetHeader.AppVersion)
+		if client == nil {
+			logger.Errorf("Failed to bind %s conn for uid: %v", transport, uid)
+			return
+		}
+	} else if client.Conn != conn {
+		// uid 已绑定到其它连接（重连/多地登录）：更新到当前连接。
 		gw.UpdateClientByUid(conn, uid, client.Zone)
 	}
 

@@ -79,7 +79,13 @@ think_time_ms = 200
 #   enabled - 是否启用该模块
 #   weight  - flow = "random" 时使用，权重 <= 0 视为 1
 #   order   - flow = "sequential" 时使用，数值小的先执行
+[modules.login]
+# 登录/心跳压测：每轮发一次心跳（在线玩家最高频操作），weight 设高以模拟真实负载
+enabled = true
+weight = 3
+
 [modules.room]
+# 房间压测：每轮快速开始→离开房间
 enabled = true
 weight = 1
 

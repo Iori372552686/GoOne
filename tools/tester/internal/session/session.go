@@ -360,11 +360,14 @@ func (s *Session) removeWaiter(key stats.ProtoKey, w *waiter) {
 
 // Request 同步请求-响应，返回原始响应字节。
 //   - req 为 nil 时表示只等待下一条 cmd 消息（等推送），不发送、不统计。
+//
+// GoOne 约定响应 cmd = 请求 cmd + 1（REQ/RSP 配对，见 ssrpc sendback 的 cmd+1 convention）。
+// waiter 以响应 cmd 为 key 注册，与 handleMessage 收到的响应包 header.Cmd 匹配。
 func (s *Session) Request(ctx context.Context, cmd uint32, req proto.Message, timeout time.Duration) ([]byte, error) {
 	if timeout <= 0 {
 		timeout = DefaultRequestTimeout
 	}
-	key := stats.ProtoKey{Cmd: cmd}
+	key := stats.ProtoKey{Cmd: rspCmdOf(cmd)}
 	w := s.registerWaiter(key)
 
 	start := time.Now()
@@ -400,7 +403,7 @@ func (s *Session) RequestProto(ctx context.Context, cmd uint32, req, rsp proto.M
 	if timeout <= 0 {
 		timeout = DefaultRequestTimeout
 	}
-	key := stats.ProtoKey{Cmd: cmd}
+	key := stats.ProtoKey{Cmd: rspCmdOf(cmd)}
 	w := s.registerWaiter(key)
 
 	start := time.Now()
@@ -422,7 +425,7 @@ func (s *Session) RequestProto(ctx context.Context, cmd uint32, req, rsp proto.M
 			}
 		}
 		code := ExtractErrCode(rsp)
-		if code != 0 {
+		if IsErrCode(code) {
 			s.record(key, req, rtt, stats.OutcomeBizError, code)
 		} else {
 			s.record(key, req, rtt, stats.OutcomeSuccess, 0)
@@ -457,4 +460,14 @@ func protoName(req proto.Message) string {
 		}
 	}
 	return name
+}
+
+// rspCmdOf 按 GoOne 的 cmd+1 约定返回响应 cmd。
+// 请求/响应在 cmd 枚举里成对定义（REQ=偶数, RSP=REQ+1），服务端回包 header.Cmd 即此值。
+// 对已经是响应 cmd（奇数）的入参保持不变，避免重复 +1。
+func rspCmdOf(reqCmd uint32) uint32 {
+	if reqCmd&1 == 1 {
+		return reqCmd // 已是响应 cmd（奇数），直接用
+	}
+	return reqCmd + 1
 }

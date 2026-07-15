@@ -3,8 +3,22 @@ package session
 import (
 	"reflect"
 
+	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 	"github.com/golang/protobuf/proto"
 )
+
+// GoOne 有两种成功码：
+//   ErrorCode_ERR_SUCESS = 0   （新 pb 缺省 nil）
+//   ErrorCode_ERR_OK     = 200 （兼容 http 状态码，服务端常用）
+// IsSuccessCode 判定业务码是否为成功（0 或 200）。接受 ErrorCode 或 int32 实参。
+func IsSuccessCode(code int32) bool {
+	return code == 0 || code == int32(g1_protocol.ErrorCode_ERR_OK)
+}
+
+// IsErrCode 反义：非成功即错误。
+func IsErrCode(code int32) bool {
+	return !IsSuccessCode(code)
+}
 
 // ExtractErrCode 从响应消息中提取业务错误码（按协议规范约定的常见形态）：
 //  1. 字段 Ret *Ret{Code,Msg} —— 取 Code

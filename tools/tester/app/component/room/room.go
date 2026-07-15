@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/tools/tester/app/component"
+	"github.com/Iori372552686/GoOne/tools/tester/internal/session"
 	"github.com/Iori372552686/GoOne/tools/tester/internal/testcfg"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
@@ -118,7 +119,7 @@ func (r *RoomComponent) testRoomList(ctx context.Context) error {
 	if err := r.requester.RequestProto(ctx, uint32(g1_protocol.CMD_MAIN_GAME_ROOM_LIST_REQ), req, resp, 15*time.Second); err != nil {
 		return err
 	}
-	if resp.Ret != nil && resp.Ret.Code != 0 {
+	if resp.Ret != nil && session.IsErrCode(int32(resp.Ret.Code)) {
 		return fmt.Errorf("room list failed: code=%d msg=%s", resp.Ret.Code, resp.Ret.Msg)
 	}
 	log.Printf("[Actor %d][Room] T01: Room list OK, count=%d", r.actorID, len(resp.RoomList))
@@ -144,7 +145,7 @@ func (r *RoomComponent) quickStart(ctx context.Context) error {
 	if err := r.requester.RequestProto(ctx, uint32(g1_protocol.CMD_MAIN_GAME_QUICK_START_REQ), req, resp, 30*time.Second); err != nil {
 		return err
 	}
-	if resp.Ret != nil && resp.Ret.Code != 0 {
+	if resp.Ret != nil && session.IsErrCode(int32(resp.Ret.Code)) {
 		return fmt.Errorf("quick start failed: code=%d msg=%s", resp.Ret.Code, resp.Ret.Msg)
 	}
 	if resp.RoomInfo != nil && resp.RoomInfo.RoomId != 0 {
@@ -167,7 +168,7 @@ func (r *RoomComponent) leaveRoom(ctx context.Context) error {
 	if err := r.requester.RequestProto(ctx, uint32(g1_protocol.CMD_MAIN_GAME_LEAVE_GAME_REQ), req, resp, 15*time.Second); err != nil {
 		return err
 	}
-	if resp.Ret != nil && resp.Ret.Code != 0 {
+	if resp.Ret != nil && session.IsErrCode(int32(resp.Ret.Code)) {
 		return fmt.Errorf("leave room failed: code=%d msg=%s", resp.Ret.Code, resp.Ret.Msg)
 	}
 	r.roomID = 0
