@@ -2,7 +2,7 @@
 * 本代码由xlsx工具生成，请勿手动修改
  */
 
-package drop_item_confing
+package drop_item_config
 
 import (
 	"sync/atomic"
@@ -14,54 +14,54 @@ import (
 
 var obj = atomic.Value{}
 
-type DropItemConfingData struct {
-	_List       []*protocol.DropItemConfing
-	_DropItemId map[int32]*protocol.DropItemConfing
+type DropItemConfigData struct {
+	_List       []*protocol.DropItemConfig
+	_DropItemId map[int32]*protocol.DropItemConfig
 }
 
 // 注册函数
 func init() {
-	gamedata.Register("DropItemConfing", parse)
+	gamedata.Register("DropItemConfig", parse)
 }
 
 func parse(buf string) error {
-	data := &protocol.DropItemConfingAry{}
+	data := &protocol.DropItemConfigAry{}
 	if err := proto.UnmarshalText(buf, data); err != nil {
 		return err
 	}
 
-	_DropItemId := make(map[int32]*protocol.DropItemConfing)
+	_DropItemId := make(map[int32]*protocol.DropItemConfig)
 	for _, item := range data.Ary {
 		_DropItemId[item.DropItemId] = item
 	}
 
-	obj.Store(&DropItemConfingData{
+	obj.Store(&DropItemConfigData{
 		_List:       data.Ary,
 		_DropItemId: _DropItemId,
 	})
 	return nil
 }
 
-func GetHead() *protocol.DropItemConfing {
-	obj, ok := obj.Load().(*DropItemConfingData)
+func GetHead() *protocol.DropItemConfig {
+	obj, ok := obj.Load().(*DropItemConfigData)
 	if !ok {
 		return nil
 	}
 	return obj._List[0]
 }
 
-func GetAll() (rets []*protocol.DropItemConfing) {
-	obj, ok := obj.Load().(*DropItemConfingData)
+func GetAll() (rets []*protocol.DropItemConfig) {
+	obj, ok := obj.Load().(*DropItemConfigData)
 	if !ok {
 		return
 	}
-	rets = make([]*protocol.DropItemConfing, len(obj._List))
+	rets = make([]*protocol.DropItemConfig, len(obj._List))
 	copy(rets, obj._List)
 	return
 }
 
-func Range(f func(*protocol.DropItemConfing) bool) {
-	obj, ok := obj.Load().(*DropItemConfingData)
+func Range(f func(*protocol.DropItemConfig) bool) {
+	obj, ok := obj.Load().(*DropItemConfigData)
 	if !ok {
 		return
 	}
@@ -72,8 +72,8 @@ func Range(f func(*protocol.DropItemConfing) bool) {
 	}
 }
 
-func GetByDropItemId(DropItemId int32) *protocol.DropItemConfing {
-	obj, ok := obj.Load().(*DropItemConfingData)
+func GetByDropItemId(DropItemId int32) *protocol.DropItemConfig {
+	obj, ok := obj.Load().(*DropItemConfigData)
 	if !ok {
 		return nil
 	}

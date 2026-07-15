@@ -55,9 +55,21 @@ func (ch *ConsumerHandler) HandleMessage(msg *nsq.Message) error {
 * @Date: 2022-04-25 14:24:32
 **/
 func NewConsumer(topic, channel, addr string, lookupAddr []string, concurrency int, cb MsgHandler) (*nsq.Consumer, error) {
+	return NewConsumerWithOpts(topic, channel, addr, lookupAddr, concurrency, 0, 0, cb)
+}
+
+// NewConsumerWithOpts 创建消费者实例，支持配置 MaxInFlight 和 LookupdPollInterval。
+// maxInFlight<=0 时用默认值 2；lookupdPollInterval<=0 时用默认值 3s。
+func NewConsumerWithOpts(topic, channel, addr string, lookupAddr []string, concurrency, maxInFlight int, lookupdPollInterval time.Duration, cb MsgHandler) (*nsq.Consumer, error) {
 	cfg := nsq.NewConfig()
 	cfg.LookupdPollInterval = 3 * time.Second
+	if lookupdPollInterval > 0 {
+		cfg.LookupdPollInterval = lookupdPollInterval
+	}
 	cfg.MaxInFlight = 2
+	if maxInFlight > 0 {
+		cfg.MaxInFlight = maxInFlight
+	}
 
 	c, err := nsq.NewConsumer(topic, channel, cfg)
 	if err != nil {

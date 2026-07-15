@@ -5,7 +5,7 @@ package role
 import (
 	"math/rand"
 
-	"github.com/Iori372552686/GoOne/common/gamedata/repository/drop_item_confing"
+	"github.com/Iori372552686/GoOne/common/gamedata/repository/drop_item_config"
 	"github.com/Iori372552686/GoOne/module/drop"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
@@ -18,9 +18,9 @@ func (r *Role) DropGetItemByDropID(dropID int32) *[]*g1_protocol.PbItem {
 	items := make([]*g1_protocol.PbItem, 0)
 
 	r.Debugf("DROP|get drop: %d", dropID)
-	dropByWeight := make([]*g1_protocol.DropItemConfing, 0)
+	dropByWeight := make([]*g1_protocol.DropItemConfig, 0)
 	weightList := make([]int32, 0)
-	drop_item_confing.Range(func(v *g1_protocol.DropItemConfing) bool {
+	drop_item_config.Range(func(v *g1_protocol.DropItemConfig) bool {
 		if v.DropId != dropID {
 			return true
 		}

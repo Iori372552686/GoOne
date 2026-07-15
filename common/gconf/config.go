@@ -3,13 +3,11 @@ package gconf
 import (
 	"flag"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/Iori372552686/GoOne/lib/web/web_gin"
 
 	"github.com/Iori372552686/GoOne/lib/api/http_sign"
-	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
 	"github.com/Iori372552686/GoOne/lib/api/rest_api"
 	"github.com/Iori372552686/GoOne/lib/db/redis"
@@ -60,24 +58,6 @@ type BaseCfg struct {
 	CommonRuntime BaseRuntimeConfig      `json:"runtime" yaml:"runtime"`
 	Dependencies  BaseDependenciesConfig `json:"dependencies" yaml:"dependencies"`
 	CommonDebug   BaseDebugConfig        `json:"debug" yaml:"debug"`
-
-	// Deprecated: legacy flat fields, readable only for migration to the
-	// grouped layout (runtime/dependencies/debug). Using them logs a startup
-	// warning; they will be removed after two release cycles.
-	// 迁移指引：base_cfg.register_addr → base_cfg.runtime.register_addr，
-	// base_cfg.db_instances → base_cfg.dependencies.db_instances，以此类推。
-	RegisterAddr       string               `json:"register_addr" yaml:"register_addr"`
-	BusMQAddr          string               `json:"bus_mq_addr" yaml:"bus_mq_addr"`
-	GameDataDir        string               `json:"game_data_dir" yaml:"game_data_dir"`
-	SensitiveWordsFile string               `json:"sensitive_words_file" yaml:"sensitive_words_file"`
-	NacosConf          net_conf.NacosConf   `json:"nacos_conf" yaml:"nacos_conf"`
-	OrmConf            []orm.Config         `json:"orm_instances" yaml:"orm_instances"`
-	HTTPSigns          []http_sign.Config   `json:"http_sign" yaml:"http_sign"`
-	RestApiConf        []rest_api.Config    `json:"rest_api_config" yaml:"rest_api_config"`
-	DbInstances        []redis.Config       `json:"db_instances" yaml:"db_instances"`
-	Pprof              bool                 `json:"pprof" yaml:"pprof"`
-	AdminServer        AdminServerConfig    `json:"admin_server" yaml:"admin_server"`
-	Tracing            RuntimeTracingConfig `json:"tracing" yaml:"tracing"`
 }
 
 type AdminServerConfig struct {
@@ -98,10 +78,6 @@ type ServiceDebugConfig struct {
 type ServiceCommonConfig struct {
 	Identity ServiceIdentityConfig `json:"identity" yaml:"identity"`
 	Debug    ServiceDebugConfig    `json:"debug" yaml:"debug"`
-
-	SelfBusId string `json:"self_bus_id" yaml:"self_bus_id"`
-	LogDir    string `json:"log_dir" yaml:"log_dir"`
-	LogLevel  string `json:"log_level" yaml:"log_level"`
 }
 
 type ConnRuntimeConfig struct {
@@ -132,8 +108,6 @@ type WebRuntimeConfig struct {
 type ConnSvr struct {
 	ServiceCommonConfig `yaml:",inline"`
 	Runtime             ConnRuntimeConfig `json:"runtime" yaml:"runtime"`
-
-	ListenPort int `json:"listen_port" yaml:"listen_port"`
 }
 
 type InfoSvr struct {
@@ -143,11 +117,6 @@ type InfoSvr struct {
 type MainSvr struct {
 	ServiceCommonConfig `yaml:",inline"`
 	Capacity            MainCapacityConfig `json:"capacity" yaml:"capacity"`
-
-	TransShardCount        int      `json:"trans_shard_count" yaml:"trans_shard_count"`
-	RoleSyncPatchEnabled   bool     `json:"role_sync_patch_enabled" yaml:"role_sync_patch_enabled"`
-	RoleSyncPatchAllowUids []uint64 `json:"role_sync_patch_allow_uids" yaml:"role_sync_patch_allow_uids"`
-	RolePersistDebounceSec int      `json:"role_persist_debounce_sec" yaml:"role_persist_debounce_sec"`
 }
 
 type MySqlSvr struct {
@@ -157,16 +126,11 @@ type MySqlSvr struct {
 type RoomCenterSvr struct {
 	ServiceCommonConfig `yaml:",inline"`
 	Capacity            RoomCenterCapacityConfig `json:"capacity" yaml:"capacity"`
-
-	TransShardCount int `json:"trans_shard_count" yaml:"trans_shard_count"`
 }
 
 type WebSvr struct {
 	ServiceCommonConfig `yaml:",inline"`
 	Runtime             WebRuntimeConfig `json:"runtime" yaml:"runtime"`
-
-	HttpServer web_gin.Config   `json:"http_server" yaml:"http_server"`
-	GRPCServer GRPCServerConfig `json:"grpc_server" yaml:"grpc_server"`
 }
 
 type GRPCServerConfig struct {
@@ -265,64 +229,7 @@ func loadConfig(file string, cfg configDocument) error {
 }
 
 func (c *BaseCfg) normalize() {
-	c.warnLegacyFields()
-
-	c.CommonRuntime.RegisterAddr = coalesceString(c.CommonRuntime.RegisterAddr, c.RegisterAddr)
-	c.CommonRuntime.BusMQAddr = coalesceString(c.CommonRuntime.BusMQAddr, c.BusMQAddr)
-	c.CommonRuntime.AdminServer = mergeAdminServer(c.CommonRuntime.AdminServer, c.AdminServer)
-	c.CommonRuntime.Tracing = coalesceStruct(c.CommonRuntime.Tracing, c.Tracing)
-
-	c.Dependencies.GameDataDir = coalesceString(c.Dependencies.GameDataDir, c.GameDataDir)
-	c.Dependencies.SensitiveWordsFile = coalesceString(c.Dependencies.SensitiveWordsFile, c.SensitiveWordsFile)
-	c.Dependencies.NacosConf = coalesceStruct(c.Dependencies.NacosConf, c.NacosConf)
-	c.Dependencies.OrmConf = coalesceSlice(c.Dependencies.OrmConf, c.OrmConf)
-	c.Dependencies.HTTPSigns = coalesceSlice(c.Dependencies.HTTPSigns, c.HTTPSigns)
-	c.Dependencies.RestApiConf = coalesceSlice(c.Dependencies.RestApiConf, c.RestApiConf)
-	c.Dependencies.DbInstances = coalesceSlice(c.Dependencies.DbInstances, c.DbInstances)
-
-	c.CommonDebug.Pprof = coalesceBool(c.CommonDebug.Pprof, c.Pprof)
-
-	c.RegisterAddr = c.CommonRuntime.RegisterAddr
-	c.BusMQAddr = c.CommonRuntime.BusMQAddr
-	c.AdminServer = c.CommonRuntime.AdminServer
-	c.Tracing = c.CommonRuntime.Tracing
-
-	c.GameDataDir = c.Dependencies.GameDataDir
-	c.SensitiveWordsFile = c.Dependencies.SensitiveWordsFile
-	c.NacosConf = c.Dependencies.NacosConf
-	c.OrmConf = c.Dependencies.OrmConf
-	c.HTTPSigns = c.Dependencies.HTTPSigns
-	c.RestApiConf = c.Dependencies.RestApiConf
-	c.DbInstances = c.Dependencies.DbInstances
-	c.Pprof = c.CommonDebug.Pprof
-}
-
-// warnLegacyFields logs a deprecation warning for every legacy flat field
-// that is still populated while its grouped counterpart is empty — i.e. the
-// yaml is actually relying on the deprecated layout. Legacy fields will be
-// removed after two release cycles (see docs/optimization_roadmap.md 3.5).
-func (c *BaseCfg) warnLegacyFields() {
-	type legacyUse struct {
-		used bool
-		old  string
-		new  string
-	}
-	checks := []legacyUse{
-		{c.RegisterAddr != "" && c.CommonRuntime.RegisterAddr == "", "base_cfg.register_addr", "base_cfg.runtime.register_addr"},
-		{c.BusMQAddr != "" && c.CommonRuntime.BusMQAddr == "", "base_cfg.bus_mq_addr", "base_cfg.runtime.bus_mq_addr"},
-		{c.GameDataDir != "" && c.Dependencies.GameDataDir == "", "base_cfg.game_data_dir", "base_cfg.dependencies.game_data_dir"},
-		{c.SensitiveWordsFile != "" && c.Dependencies.SensitiveWordsFile == "", "base_cfg.sensitive_words_file", "base_cfg.dependencies.sensitive_words_file"},
-		{len(c.OrmConf) > 0 && len(c.Dependencies.OrmConf) == 0, "base_cfg.orm_instances", "base_cfg.dependencies.orm_instances"},
-		{len(c.HTTPSigns) > 0 && len(c.Dependencies.HTTPSigns) == 0, "base_cfg.http_sign", "base_cfg.dependencies.http_sign"},
-		{len(c.RestApiConf) > 0 && len(c.Dependencies.RestApiConf) == 0, "base_cfg.rest_api_config", "base_cfg.dependencies.rest_api_config"},
-		{len(c.DbInstances) > 0 && len(c.Dependencies.DbInstances) == 0, "base_cfg.db_instances", "base_cfg.dependencies.db_instances"},
-		{c.Pprof && !c.CommonDebug.Pprof, "base_cfg.pprof", "base_cfg.debug.pprof"},
-	}
-	for _, chk := range checks {
-		if chk.used {
-			logger.Warningf("[config] DEPRECATED: %s is legacy and will be removed; move it to %s", chk.old, chk.new)
-		}
-	}
+	// legacy flat 字段已删除，无需合并；保留函数供 loadConfig 调用链兼容。
 }
 
 func (c *BaseCfg) validate() error {
@@ -346,13 +253,7 @@ func (c *BaseCfg) validateBusRuntime(service string) error {
 }
 
 func (c *ServiceCommonConfig) normalize() {
-	c.Identity.SelfBusId = coalesceString(c.Identity.SelfBusId, c.SelfBusId)
-	c.Debug.LogDir = coalesceString(c.Debug.LogDir, c.LogDir)
-	c.Debug.LogLevel = coalesceString(c.Debug.LogLevel, c.LogLevel)
-
-	c.SelfBusId = c.Identity.SelfBusId
-	c.LogDir = c.Debug.LogDir
-	c.LogLevel = c.Debug.LogLevel
+	// legacy flat 字段已删除，无需合并。
 }
 
 func (c *ServiceCommonConfig) validate(service string) error {
@@ -364,8 +265,6 @@ func (c *ServiceCommonConfig) validate(service string) error {
 
 func (c *ConnSvr) normalize() {
 	c.ServiceCommonConfig.normalize()
-	c.Runtime.ListenPort = coalesceInt(c.Runtime.ListenPort, c.ListenPort)
-	c.ListenPort = c.Runtime.ListenPort
 }
 
 func (c *ConnSvr) validate() error {
@@ -388,15 +287,6 @@ func (c *InfoSvr) validate() error {
 
 func (c *MainSvr) normalize() {
 	c.ServiceCommonConfig.normalize()
-	c.Capacity.TransShardCount = coalesceInt(c.Capacity.TransShardCount, c.TransShardCount)
-	c.Capacity.RoleSyncPatchEnabled = coalesceBool(c.Capacity.RoleSyncPatchEnabled, c.RoleSyncPatchEnabled)
-	c.Capacity.RoleSyncPatchAllowUids = coalesceSlice(c.Capacity.RoleSyncPatchAllowUids, c.RoleSyncPatchAllowUids)
-	c.Capacity.RolePersistDebounceSec = coalesceInt(c.Capacity.RolePersistDebounceSec, c.RolePersistDebounceSec)
-
-	c.TransShardCount = c.Capacity.TransShardCount
-	c.RoleSyncPatchEnabled = c.Capacity.RoleSyncPatchEnabled
-	c.RoleSyncPatchAllowUids = c.Capacity.RoleSyncPatchAllowUids
-	c.RolePersistDebounceSec = c.Capacity.RolePersistDebounceSec
 }
 
 func (c *MainSvr) validate() error {
@@ -422,8 +312,6 @@ func (c *MySqlSvr) validate() error {
 
 func (c *RoomCenterSvr) normalize() {
 	c.ServiceCommonConfig.normalize()
-	c.Capacity.TransShardCount = coalesceInt(c.Capacity.TransShardCount, c.TransShardCount)
-	c.TransShardCount = c.Capacity.TransShardCount
 }
 
 func (c *RoomCenterSvr) validate() error {
@@ -438,11 +326,6 @@ func (c *RoomCenterSvr) validate() error {
 
 func (c *WebSvr) normalize() {
 	c.ServiceCommonConfig.normalize()
-	c.Runtime.HttpServer = coalesceStruct(c.Runtime.HttpServer, c.HttpServer)
-	c.Runtime.GRPCServer = coalesceStruct(c.Runtime.GRPCServer, c.GRPCServer)
-
-	c.HttpServer = c.Runtime.HttpServer
-	c.GRPCServer = c.Runtime.GRPCServer
 }
 
 func (c *WebSvr) validate() error {
@@ -570,41 +453,3 @@ func (c *webSvrConfig) validate() error {
 }
 
 
-func coalesceString(current, legacy string) string {
-	if strings.TrimSpace(current) != "" {
-		return current
-	}
-	return legacy
-}
-
-func coalesceInt(current, legacy int) int {
-	if current != 0 {
-		return current
-	}
-	return legacy
-}
-
-func coalesceBool(current, legacy bool) bool {
-	return current || legacy
-}
-
-func coalesceSlice[T any](current, legacy []T) []T {
-	if len(current) > 0 {
-		return current
-	}
-	return legacy
-}
-
-func coalesceStruct[T any](current, legacy T) T {
-	if !reflect.ValueOf(current).IsZero() {
-		return current
-	}
-	return legacy
-}
-
-func mergeAdminServer(current, legacy AdminServerConfig) AdminServerConfig {
-	current.Enabled = coalesceBool(current.Enabled, legacy.Enabled)
-	current.IP = coalesceString(current.IP, legacy.IP)
-	current.Port = coalesceInt(current.Port, legacy.Port)
-	return current
-}

@@ -3,6 +3,7 @@ package ssrpc
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/Iori372552686/GoOne/lib/api/gerr"
@@ -67,6 +68,68 @@ func ToErrorCode(err error) g1_protocol.ErrorCode {
 	// Framework errors (gerr) carry their own wire code; this also handles
 	// plain errors by mapping them to ERR_INTERNAL.
 	return gerr.Code(err)
+}
+
+// ApplyErrCode 把错误码写入响应消息的业务码字段（reflect，ExtractErrCode 的逆操作）。
+// 支持 GoOne 响应消息的三种常见形态：
+//  1. 嵌套 Ret *Ret{Code,...} —— 最常见，自动创建 Ret 并设 Code
+//  2. 平铺 ErrorCode int32
+//  3. 消息本身即 Ret{Code,...}
+//
+// 用于 WrapUnary：handler 返回 (rsp, err) 时把 err 的码写进 rsp 再回包，
+// 使业务可统一 return rsp, gerr.New(...) 而无需手动写 rsp.Ret.Code。
+// 无法识别的形态静默跳过（不影响回包本身）。
+func ApplyErrCode(rsp any, code g1_protocol.ErrorCode) {
+	if rsp == nil {
+		return
+	}
+	applyErrCodeReflect(rsp, code)
+}
+
+// applyErrCodeReflect 用 reflect 把 code 写入 rsp 的业务码字段。
+func applyErrCodeReflect(rsp any, code g1_protocol.ErrorCode) {
+	v := reflect.ValueOf(rsp)
+	if v.Kind() != reflect.Ptr || v.IsNil() {
+		return
+	}
+	v = v.Elem()
+	if v.Kind() != reflect.Struct {
+		return
+	}
+
+	// 形态 1：嵌套 Ret *Ret{Code,...}
+	if f := v.FieldByName("Ret"); f.IsValid() && f.Kind() == reflect.Ptr {
+		if f.IsNil() {
+			// 自动创建 Ret 实例
+			newRet := reflect.New(f.Type().Elem())
+			f.Set(newRet)
+		}
+		inner := f.Elem()
+		if setInt32Field(inner, "Code", int32(code)) {
+			return
+		}
+	}
+
+	// 形态 2：平铺 ErrorCode int32
+	if setInt32Field(v, "ErrorCode", int32(code)) {
+		return
+	}
+
+	// 形态 3：消息本身是 Ret{Code,Msg}
+	setInt32Field(v, "Code", int32(code))
+}
+
+// setInt32Field 在 struct v 上找到名为 name 的 int32 字段并赋值；成功返回 true。
+func setInt32Field(v reflect.Value, name string, val int32) bool {
+	f := v.FieldByName(name)
+	if !f.IsValid() || !f.CanSet() {
+		return false
+	}
+	if f.Kind() == reflect.Int32 {
+		f.SetInt(int64(val))
+		return true
+	}
+	return false
 }
 
 

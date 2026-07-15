@@ -13,6 +13,7 @@ linters:
     - ineffassign
     - misspell
     - unused
+    - forbidigo
   settings:
     govet:
       disable:
@@ -24,6 +25,14 @@ linters:
       # dangerous ones and tighten gradually.
       check-type-assertions: false
       check-blank: false
+    forbidigo:
+      # 禁止 ssrpc handler 直接写 rsp.Ret.Code = —— 应改用 return rsp, gerr.New(...)
+      # 框架 WrapUnary 会自动把 gerr 错误码写进 Ret.Code 并回包。
+      # 辅助函数（room/create.go, room/join.go, roomcentersvr/logic）仍允许，
+      # 它们返回 *Rsp 而非 (rsp, error)，不直接对接框架 error 回包机制。
+      forbid:
+        - '\.Ret\.Code\s*='
+      exclude-godoc-examples: true
 
 issues:
   # Freeze legacy debt: only lint findings introduced by new changes fail CI.
@@ -37,3 +46,7 @@ exclusions:
     - api/gen
     - game_protocol/protocol
     - common/gamedata/repository
+    # 辅助函数返回 *Rsp（非 ssrpc handler），保留 rsp.Ret.Code 写法
+    - src/mainsvr/room/create\.go
+    - src/mainsvr/room/join\.go
+    - src/roomcentersvr/logic

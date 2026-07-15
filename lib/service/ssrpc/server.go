@@ -119,7 +119,19 @@ func WrapUnary(desc MethodDesc, mws []Middleware, newReq func() any, invoke func
 
 		rsp, err := h(ctx, req)
 		if err != nil {
-			return ToErrorCode(err)
+			code := ToErrorCode(err)
+			// 业务 handler 返回 (rsp, err) 时：把 err 的错误码写进 rsp 并回包，
+			// 使业务可统一 return rsp, gerr.New(...) —— 框架自动设码 + 回包。
+			// rsp==nil（系统级错误）时不回包，只返回码给框架记账。
+			if !desc.OneWay && rsp != nil {
+				ApplyErrCode(rsp, code)
+				cmdResp := desc.CmdResp
+				if cmdResp == 0 {
+					cmdResp = g1_protocol.CMD(uint32(desc.Cmd) + 1)
+				}
+				SendMsgBackWithCmd(ctx, cmdResp, rsp)
+			}
+			return code
 		}
 		if desc.OneWay {
 			return g1_protocol.ErrorCode_ERR_OK

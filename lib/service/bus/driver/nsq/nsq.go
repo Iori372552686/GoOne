@@ -25,6 +25,8 @@ type BusImplNsqMQ struct {
 	topicPrefix string
 	chanName    string
 	concurrency int
+	maxInFlight          int
+	lookupdPollInterval  time.Duration
 
 	timeout   time.Duration
 	chanOut   chan wire.OutMsg
@@ -62,6 +64,14 @@ func NewBusImplNsqMQ(selfBusId uint32, onRecvMsg bus.MsgHandler, conf bus.NSQCon
 	impl.chanIn = make(chan []byte, 10000)
 	impl.onRecv = onRecvMsg
 	impl.concurrency = conf.Concurrency
+	impl.maxInFlight = conf.MaxInFlight
+	// 解析 lookupd_poll_interval，默认 3s
+	impl.lookupdPollInterval = 3 * time.Second
+	if conf.LookupdPollInterval != "" {
+		if d, err := time.ParseDuration(conf.LookupdPollInterval); err == nil && d > 0 {
+			impl.lookupdPollInterval = d
+		}
+	}
 	impl.stopCh = make(chan struct{})
 
 	go impl.run()
@@ -172,7 +182,8 @@ func (b *BusImplNsqMQ) topicFor(busId uint32) string {
 **/
 func (b *BusImplNsqMQ) process() error {
 	//new Consumer
-	consumer, err := nsqhelper.NewConsumer(b.topicFor(b.selfBusId), b.chanName, b.NsqdAddr, b.lookupAddr, b.concurrency,
+	consumer, err := nsqhelper.NewConsumerWithOpts(b.topicFor(b.selfBusId), b.chanName, b.NsqdAddr, b.lookupAddr, b.concurrency,
+		b.maxInFlight, b.lookupdPollInterval,
 		func(_ uint32, data []byte) error {
 			// consumer callback may be concurrent; keep bus receiver single-thread by enqueueing only.
 			if data == nil || len(data) == 0 {

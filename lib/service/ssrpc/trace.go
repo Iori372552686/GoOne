@@ -12,6 +12,14 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -30,6 +38,8 @@ const (
 var (
 	globalTraceProviderMu sync.RWMutex
 	globalTraceProvider   TraceProvider
+	// otelShutdown 存储 OTel SDK TracerProvider 的 shutdown 函数（otlphttp 模式）。
+	otelShutdown func(context.Context) error
 )
 
 // TraceProvider is a pluggable tracing hook.
@@ -86,6 +96,17 @@ func InitTracing(serviceName string, cfg TracingConfig) error {
 	if cfg.SamplerRatio == 0 {
 		cfg.SamplerRatio = 1
 	}
+
+	if exporter == "otlphttp" {
+		tp, err := newOtelTraceProvider(serviceName, cfg)
+		if err != nil {
+			return fmt.Errorf("init otlphttp trace exporter: %w", err)
+		}
+		SetGlobalTraceProvider(tp)
+		return nil
+	}
+
+	// stdout 模式：保持原有轻量 provider
 	SetGlobalTraceProvider(&minimalTraceProvider{
 		serviceName:  serviceName,
 		exporter:     exporter,
@@ -94,8 +115,15 @@ func InitTracing(serviceName string, cfg TracingConfig) error {
 	return nil
 }
 
-func ShutdownTracing(context.Context) error {
+func ShutdownTracing(ctx context.Context) error {
 	SetGlobalTraceProvider(nil)
+	globalTraceProviderMu.Lock()
+	shutdown := otelShutdown
+	otelShutdown = nil
+	globalTraceProviderMu.Unlock()
+	if shutdown != nil {
+		return shutdown(ctx)
+	}
 	return nil
 }
 
@@ -408,4 +436,96 @@ func TraceWith(tp TraceProvider) Middleware {
 // Trace keeps backward-compatibility and stays a no-op by default.
 func Trace() Middleware {
 	return TraceWith(nil)
+}
+
+// ---------------- OTLP HTTP exporter (otlphttp) ----------------
+
+// newOtelTraceProvider 创建基于 OTel SDK 的 TracerProvider，通过 OTLP HTTP 导出 span 到 collector。
+// endpoint 形如 "localhost:4318"（不含 scheme）；insecure=true 用 HTTP，否则 HTTPS。
+func newOtelTraceProvider(serviceName string, cfg TracingConfig) (TraceProvider, error) {
+	endpoint := strings.TrimSpace(cfg.Endpoint)
+	if endpoint == "" {
+		return nil, fmt.Errorf("tracing.endpoint is required for otlphttp exporter")
+	}
+
+	opts := []otlptracehttp.Option{otlptracehttp.WithEndpoint(endpoint)}
+	if cfg.Insecure {
+		opts = append(opts, otlptracehttp.WithInsecure())
+	}
+	if len(cfg.Headers) > 0 {
+		opts = append(opts, otlptracehttp.WithHeaders(cfg.Headers))
+	}
+
+	exp, err := otlptracehttp.New(context.Background(), opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := resource.New(context.Background(),
+		resource.WithAttributes(semconv.ServiceNameKey.String(serviceName)),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	ratio := cfg.SamplerRatio
+	if ratio <= 0 {
+		ratio = 1
+	}
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exp),
+		sdktrace.WithResource(res),
+		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(ratio)),
+	)
+	otel.SetTracerProvider(tp)
+
+	globalTraceProviderMu.Lock()
+	otelShutdown = tp.Shutdown
+	globalTraceProviderMu.Unlock()
+
+	return &otelTraceProvider{tracer: tp.Tracer("goone.ssrpc")}, nil
+}
+
+// otelTraceProvider 用 OTel SDK API 创建 span，经 BatchSpanProcessor 异步导出到 collector。
+type otelTraceProvider struct {
+	tracer oteltrace.Tracer
+}
+
+func (p *otelTraceProvider) Start(ctx *Context, tags map[string]string) func(err error) {
+	if p == nil || ctx == nil {
+		return nil
+	}
+	base := ctx.Context
+	if base == nil {
+		base = context.Background()
+	}
+
+	spanName := strings.TrimSpace(tags["span.name"])
+	if spanName == "" {
+		spanName = strings.TrimSpace(ctx.Method)
+	}
+	if spanName == "" {
+		spanName = fmt.Sprintf("ssrpc.%s.%d", ctx.Transport, uint32(ctx.Cmd))
+	}
+
+	attrs := make([]attribute.KeyValue, 0, len(tags))
+	for k, v := range tags {
+		if k == "span.name" || k == "span.kind" {
+			continue
+		}
+		attrs = append(attrs, attribute.String(k, v))
+	}
+
+	otelCtx, span := p.tracer.Start(base, spanName, oteltrace.WithAttributes(attrs...))
+	ctx.Context = otelCtx
+
+	return func(err error) {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+		} else {
+			span.SetStatus(codes.Ok, "")
+		}
+		span.End()
+	}
 }

@@ -2,6 +2,7 @@ package service
 
 import (
 	infosvrv1 "github.com/Iori372552686/GoOne/api/gen/game/infosvr/v1"
+	"github.com/Iori372552686/GoOne/lib/api/gerr"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/infosvr/globals"
@@ -18,8 +19,7 @@ func (s *InfoServiceImpl) GetBriefInfo(ctx *ssrpc.Context, req *g1_protocol.Info
 
 	res, ret := globals.InfoMgr.GetInfo(&req.UidList)
 	if ret != 0 {
-		rsp.Ret.Code = g1_protocol.ErrorCode(ret)
-		return rsp, nil
+		return rsp, gerr.New(g1_protocol.ErrorCode(ret), "get_info", "")
 	}
 	if res != nil {
 		rsp.InfoList = *res
@@ -32,8 +32,7 @@ func (s *InfoServiceImpl) GetIconDesc(ctx *ssrpc.Context, req *g1_protocol.InfoG
 
 	res, ret := globals.InfoMgr.GetInfo(&req.UidList)
 	if ret != 0 {
-		rsp.Ret.Code = g1_protocol.ErrorCode(ret)
-		return rsp, nil
+		return rsp, gerr.New(g1_protocol.ErrorCode(ret), "get_info", "")
 	}
 
 	iconList := make([]*g1_protocol.PbIconDesc, 0)

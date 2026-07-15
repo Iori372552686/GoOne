@@ -19,6 +19,10 @@ type NSQConfig struct {
 	TopicPrefix string   `json:"topic_prefix" yaml:"topic_prefix"`
 	Channel     string   `json:"channel" yaml:"channel"`
 	Concurrency int      `json:"concurrency" yaml:"concurrency"`
+	// MaxInFlight 最大在途消息数（<=0 时用默认值 2）。
+	MaxInFlight int `json:"max_in_flight" yaml:"max_in_flight"`
+	// LookupdPollInterval nsqlookupd 轮询间隔，格式如 "3s"（空时用默认 3s）。
+	LookupdPollInterval string `json:"lookupd_poll_interval" yaml:"lookupd_poll_interval"`
 }
 
 // NatsConfig for NATS bus backend.
@@ -117,12 +121,20 @@ func ParseAddr(addr string) (implType string, cfg any, err error) {
 				concurrency = n
 			}
 		}
+		maxInFlight := 0
+		if v := strings.TrimSpace(q.Get("max_in_flight")); v != "" {
+			if n, err := strconv.Atoi(v); err == nil {
+				maxInFlight = n
+			}
+		}
 		return "nsq", NSQConfig{
-			NsqdAddr:    host,
-			LookupAddrs: splitCSV(q.Get("lookup")),
-			TopicPrefix: strings.TrimSpace(q.Get("topics")),
-			Channel:     strings.TrimSpace(q.Get("chan")),
-			Concurrency: concurrency,
+			NsqdAddr:            host,
+			LookupAddrs:         splitCSV(q.Get("lookup")),
+			TopicPrefix:         strings.TrimSpace(q.Get("topics")),
+			Channel:             strings.TrimSpace(q.Get("chan")),
+			Concurrency:         concurrency,
+			MaxInFlight:         maxInFlight,
+			LookupdPollInterval: strings.TrimSpace(q.Get("lookupd_poll_interval")),
 		}, nil
 
 	default:

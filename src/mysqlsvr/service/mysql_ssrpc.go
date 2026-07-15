@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/Iori372552686/GoOne/api/gen/game/mysqlsvr/v1"
+	"github.com/Iori372552686/GoOne/lib/api/gerr"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/globals"
@@ -21,21 +22,19 @@ var _ mysqlsvrv1.MysqlServiceSS = (*MysqlServiceImpl)(nil)
 func (s *MysqlServiceImpl) UpdateRoleInfo(ctx *ssrpc.Context, req *g1_protocol.MysqlInnerUpdateRoleInfoReq) (*g1_protocol.MysqlInnerUpdateRoleInfoRsp, error) {
 	rsp := &g1_protocol.MysqlInnerUpdateRoleInfoRsp{Ret: &g1_protocol.Ret{Code: g1_protocol.ErrorCode_ERR_OK}}
 	if ctx == nil {
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_INTERNAL
-		return rsp, nil
+		return rsp, gerr.New(g1_protocol.ErrorCode_ERR_INTERNAL, "biz_error", "")
 	}
 
 	engine := globals.OrmMgr.GetOrmEngine()
 	if engine == nil {
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_INTERNAL
-		return rsp, nil
+		return rsp, gerr.New(g1_protocol.ErrorCode_ERR_INTERNAL, "biz_error", "")
 	}
 
 	if mysqlRoleExists(ctx) {
 		ctx.Infof("role exist")
 		if _, err := engine.Exec("UPDATE role_info SET name = ? WHERE uid = ?", req.GetName(), ctx.Uid()); err != nil {
 			logger.Errorf("failed to update role info | %v", err)
-			rsp.Ret.Code = g1_protocol.ErrorCode_ERR_FAIL
+			return rsp, gerr.Wrap(g1_protocol.ErrorCode_ERR_FAIL, "update_role", err)
 		}
 		return rsp, nil
 	}
@@ -43,7 +42,7 @@ func (s *MysqlServiceImpl) UpdateRoleInfo(ctx *ssrpc.Context, req *g1_protocol.M
 	ctx.Infof("role not exist")
 	if _, err := engine.Exec("INSERT INTO role_info VALUES (?, ?)", ctx.Uid(), req.GetName()); err != nil {
 		logger.Errorf("failed to insert role info | %v", err)
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_FAIL
+		return rsp, gerr.Wrap(g1_protocol.ErrorCode_ERR_FAIL, "insert_role", err)
 	}
 	return rsp, nil
 }
@@ -53,15 +52,13 @@ func (s *MysqlServiceImpl) SearchRole(ctx *ssrpc.Context, req *g1_protocol.Mysql
 
 	engine := globals.OrmMgr.GetOrmEngine()
 	if engine == nil {
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_INTERNAL
-		return rsp, nil
+		return rsp, gerr.New(g1_protocol.ErrorCode_ERR_INTERNAL, "biz_error", "")
 	}
 
 	results, err := engine.QueryString("SELECT uid FROM role_info WHERE name = ?", req.GetSearchString())
 	if err != nil {
 		logger.Errorf("failed to select role info: %v", err)
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_FAIL
-		return rsp, nil
+		return rsp, gerr.New(g1_protocol.ErrorCode_ERR_FAIL, "biz_error", "")
 	}
 
 	for _, row := range results {

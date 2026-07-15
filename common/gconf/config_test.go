@@ -54,44 +54,42 @@ mainsvr:
 	if MainSvrCfg.CommonRuntime.RegisterAddr != "zk://127.0.0.1:2181?service=goone" {
 		t.Fatalf("unexpected grouped register_addr: %q", MainSvrCfg.CommonRuntime.RegisterAddr)
 	}
-	if MainSvrCfg.RegisterAddr != MainSvrCfg.CommonRuntime.RegisterAddr {
-		t.Fatalf("legacy register_addr not normalized: %q vs %q", MainSvrCfg.RegisterAddr, MainSvrCfg.CommonRuntime.RegisterAddr)
+	if MainSvrCfg.Debug.LogLevel != "info" {
+		t.Fatalf("debug log level = %q, want info", MainSvrCfg.Debug.LogLevel)
 	}
-	if MainSvrCfg.Debug.LogLevel != "info" || MainSvrCfg.LogLevel != "info" {
-		t.Fatalf("debug log level not normalized, grouped=%q legacy=%q", MainSvrCfg.Debug.LogLevel, MainSvrCfg.LogLevel)
+	if MainSvrCfg.Capacity.TransShardCount != 8 {
+		t.Fatalf("capacity trans_shard_count = %d, want 8", MainSvrCfg.Capacity.TransShardCount)
 	}
-	if MainSvrCfg.Capacity.TransShardCount != 8 || MainSvrCfg.TransShardCount != 8 {
-		t.Fatalf("capacity trans_shard_count not normalized, grouped=%d legacy=%d", MainSvrCfg.Capacity.TransShardCount, MainSvrCfg.TransShardCount)
+	if !MainSvrCfg.Capacity.RoleSyncPatchEnabled {
+		t.Fatalf("role_sync_patch_enabled should be true")
 	}
-	if !MainSvrCfg.Capacity.RoleSyncPatchEnabled || !MainSvrCfg.RoleSyncPatchEnabled {
-		t.Fatalf("role_sync_patch_enabled not normalized")
+	if MainSvrCfg.Capacity.RolePersistDebounceSec != 15 {
+		t.Fatalf("role_persist_debounce_sec = %d, want 15", MainSvrCfg.Capacity.RolePersistDebounceSec)
 	}
-	if MainSvrCfg.Capacity.RolePersistDebounceSec != 15 || MainSvrCfg.RolePersistDebounceSec != 15 {
-		t.Fatalf("role_persist_debounce_sec not normalized, grouped=%d legacy=%d", MainSvrCfg.Capacity.RolePersistDebounceSec, MainSvrCfg.RolePersistDebounceSec)
-	}
-	if !MainSvrCfg.CommonDebug.Pprof || !MainSvrCfg.Pprof {
-		t.Fatalf("pprof flag not normalized")
+	if !MainSvrCfg.CommonDebug.Pprof {
+		t.Fatalf("pprof flag should be true")
 	}
 	if got := len(MainSvrCfg.Dependencies.DbInstances); got != 1 {
 		t.Fatalf("expected 1 db instance, got %d", got)
 	}
 }
 
-func TestLoadConnConfigSupportsLegacyFields(t *testing.T) {
+func TestLoadConnConfigSupportsGroupedFields(t *testing.T) {
 	path := writeTempConfig(t, `
 base_cfg:
-  register_addr: "zk://127.0.0.1:2181?service=goone"
-  bus_mq_addr: "amqp://guest:guest@127.0.0.1:5672/"
-  pprof: true
-  admin_server:
-    enabled: true
-    ip: ""
-    port: 8112
+  runtime:
+    register_addr: "zk://127.0.0.1:2181?service=goone"
+    bus_mq_addr: "amqp://guest:guest@127.0.0.1:5672/"
+  debug:
+    pprof: true
 connsvr:
-  self_bus_id: "1.1.1.1"
-  listen_port: 11000
-  log_dir: "./logs"
-  log_level: "debug"
+  identity:
+    self_bus_id: "1.1.1.1"
+  debug:
+    log_dir: "./logs"
+    log_level: "debug"
+  runtime:
+    listen_port: 11000
 `)
 
 	if err := LoadConnConfig(path); err != nil {
@@ -101,17 +99,17 @@ connsvr:
 	if ConnSvrCfg.CommonRuntime.BusMQAddr != "amqp://guest:guest@127.0.0.1:5672/" {
 		t.Fatalf("unexpected grouped bus_mq_addr: %q", ConnSvrCfg.CommonRuntime.BusMQAddr)
 	}
-	if ConnSvrCfg.Identity.SelfBusId != "1.1.1.1" || ConnSvrCfg.SelfBusId != "1.1.1.1" {
-		t.Fatalf("self_bus_id not normalized, grouped=%q legacy=%q", ConnSvrCfg.Identity.SelfBusId, ConnSvrCfg.SelfBusId)
+	if ConnSvrCfg.Identity.SelfBusId != "1.1.1.1" {
+		t.Fatalf("self_bus_id = %q, want 1.1.1.1", ConnSvrCfg.Identity.SelfBusId)
 	}
-	if ConnSvrCfg.Runtime.ListenPort != 11000 || ConnSvrCfg.ListenPort != 11000 {
-		t.Fatalf("listen_port not normalized, grouped=%d legacy=%d", ConnSvrCfg.Runtime.ListenPort, ConnSvrCfg.ListenPort)
+	if ConnSvrCfg.Runtime.ListenPort != 11000 {
+		t.Fatalf("listen_port = %d, want 11000", ConnSvrCfg.Runtime.ListenPort)
 	}
-	if ConnSvrCfg.Debug.LogDir != "./logs" || ConnSvrCfg.LogDir != "./logs" {
-		t.Fatalf("log_dir not normalized, grouped=%q legacy=%q", ConnSvrCfg.Debug.LogDir, ConnSvrCfg.LogDir)
+	if ConnSvrCfg.Debug.LogDir != "./logs" {
+		t.Fatalf("log_dir = %q, want ./logs", ConnSvrCfg.Debug.LogDir)
 	}
-	if !ConnSvrCfg.CommonDebug.Pprof || !ConnSvrCfg.Pprof {
-		t.Fatalf("pprof flag not normalized")
+	if !ConnSvrCfg.CommonDebug.Pprof {
+		t.Fatalf("pprof flag should be true")
 	}
 }
 

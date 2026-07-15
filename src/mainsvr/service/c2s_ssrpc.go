@@ -1,11 +1,11 @@
 ﻿package service
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/Iori372552686/GoOne/common/gamedata/repository/mall_config"
 	"github.com/Iori372552686/GoOne/common/gamedata/repository/texas_config"
+	"github.com/Iori372552686/GoOne/lib/api/gerr"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
@@ -31,8 +31,7 @@ func (s *MainC2SServiceImpl) Login(ctx *ssrpc.Context, req *g1_protocol.LoginReq
 	myRole := globals.RoleMgr.GetOrLoadOrCreateRole(ctx.Uid(), ctx)
 	if myRole == nil {
 		ctx.Errorf("Failed to get role. {req:%v}", req)
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_NOT_EXIST_PLAYER
-		return rsp, nil
+		return rsp, gerr.New(g1_protocol.ErrorCode_ERR_NOT_EXIST_PLAYER, "biz_error", "")
 	}
 
 	processConnSvrInfo(ctx, myRole)
@@ -109,15 +108,13 @@ func (s *MainC2SServiceImpl) ChangeName(ctx *ssrpc.Context, req *g1_protocol.Cha
 	free := myRole.PbRole.BasicInfo.GetFreeCnt()
 	_, hasCoin := myRole.ItemCheckReduce(int32(g1_protocol.EItemID_GOLD), 100)
 	if hasCoin != 0 && free <= 0 {
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_DIAMOND_NOT_ENOUGH
-		return rsp, nil
+		return rsp, gerr.New(g1_protocol.ErrorCode_ERR_DIAMOND_NOT_ENOUGH, "biz_error", "")
 	}
 
 	// 检查敏感字
 	hasSensitiveWord, _ := sensitive_words.ChangeSensitiveWords(req.GetName())
 	if hasSensitiveWord {
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_INVALID_NAME
-		return rsp, nil
+		return rsp, gerr.New(g1_protocol.ErrorCode_ERR_INVALID_NAME, "biz_error", "")
 	}
 
 	// 同步数据
@@ -136,21 +133,21 @@ func (s *MainC2SServiceImpl) ChangeIcon(ctx *ssrpc.Context, req *g1_protocol.Cha
 	rsp := &g1_protocol.ChangeIconRsp{Ret: &g1_protocol.Ret{Code: g1_protocol.ErrorCode_ERR_OK}}
 
 	if req.GetIconId() > 0 {
-		rsp.Ret.Code = myRole.IconChange(req.GetIconId())
-		if rsp.Ret.Code != g1_protocol.ErrorCode_ERR_OK {
-			return rsp, nil
+		code := myRole.IconChange(req.GetIconId())
+		if code != g1_protocol.ErrorCode_ERR_OK {
+			return rsp, gerr.New(code, "icon_change", "")
 		}
 	}
 	if req.GetFrameId() > 0 {
-		rsp.Ret.Code = myRole.FrameChange(req.GetFrameId())
-		if rsp.Ret.Code != g1_protocol.ErrorCode_ERR_OK {
-			return rsp, nil
+		code := myRole.FrameChange(req.GetFrameId())
+		if code != g1_protocol.ErrorCode_ERR_OK {
+			return rsp, gerr.New(code, "frame_change", "")
 		}
 	}
 	if req.GetImageId() > 0 {
-		rsp.Ret.Code = myRole.ImageChange(req.GetImageId())
-		if rsp.Ret.Code != g1_protocol.ErrorCode_ERR_OK {
-			return rsp, nil
+		code := myRole.ImageChange(req.GetImageId())
+		if code != g1_protocol.ErrorCode_ERR_OK {
+			return rsp, gerr.New(code, "image_change", "")
 		}
 	}
 
@@ -227,30 +224,29 @@ func (s *MainC2SServiceImpl) MallBuyPackage(ctx *ssrpc.Context, req *g1_protocol
 
 	rsp := &g1_protocol.MallBuyPackageRsp{Ret: &g1_protocol.Ret{Code: g1_protocol.ErrorCode_ERR_OK}}
 
-	rsp.Ret.Code = myRole.MallCheckBuyCondition(req.GetConfId())
-	if rsp.Ret.Code != g1_protocol.ErrorCode_ERR_OK {
-		return rsp, nil
+	code := myRole.MallCheckBuyCondition(req.GetConfId())
+	if code != g1_protocol.ErrorCode_ERR_OK {
+		return rsp, gerr.New(code, "mall_check", "")
 	}
 
 	conf := mall_config.GetById(req.GetConfId())
 	if conf == nil {
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_CONF
-		return rsp, nil
+		return rsp, gerr.New(g1_protocol.ErrorCode_ERR_CONF, "conf_not_found", "")
 	}
 
-	_, rsp.Ret.Code = myRole.ItemCheckReduce(conf.CostItemID, int64(conf.CostItemCnt))
-	if rsp.Ret.Code != g1_protocol.ErrorCode_ERR_OK {
-		return rsp, nil
+	_, code = myRole.ItemCheckReduce(conf.CostItemID, int64(conf.CostItemCnt))
+	if code != g1_protocol.ErrorCode_ERR_OK {
+		return rsp, gerr.New(code, "item_check_reduce", "")
 	}
 
 	// 如果是充值购买的礼包就走充值（暂未实现，保持旧逻辑）
 	if int32(g1_protocol.EItemID_ACECOIN) == conf.CostItemID {
 		// ret = RechargeAdd(conf.Rmb, myRole)
 	} else {
-		rsp.Ret.Code = myRole.ItemExchange(conf.CostItemID, int64(conf.CostItemCnt), conf.PackageID,
+		code = myRole.ItemExchange(conf.CostItemID, int64(conf.CostItemCnt), conf.PackageID,
 			1, &role.Reason{Reason: g1_protocol.Reason_REASON_MALL_PACKAGE, Scene: req.GetConfId()})
-		if rsp.Ret.Code != g1_protocol.ErrorCode_ERR_OK {
-			return rsp, nil
+		if code != g1_protocol.ErrorCode_ERR_OK {
+			return rsp, gerr.New(code, "item_exchange", "")
 		}
 	}
 
@@ -295,8 +291,7 @@ func (s *MainC2SServiceImpl) DoBet(ctx *ssrpc.Context, req *g1_protocol.DoBetReq
 	rsp := &g1_protocol.DoBetRsp{Ret: &g1_protocol.Ret{}}
 	err := ctx.CallMsgByRouter(misc.ServerType_TexasGameSvr, req.GetRoomId(), g1_protocol.CMD_TEXAS_INNER_DO_BET_REQ, req, rsp)
 	if err != nil {
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_INTERNAL
-		rsp.Ret.Msg = err.Error()
+		return rsp, gerr.Wrap(g1_protocol.ErrorCode_ERR_INTERNAL, "forward_failed", err)
 	}
 	return rsp, nil
 }
@@ -305,8 +300,7 @@ func (s *MainC2SServiceImpl) Fold(ctx *ssrpc.Context, req *g1_protocol.FoldReq) 
 	rsp := &g1_protocol.FoldRsp{Ret: &g1_protocol.Ret{}}
 	err := ctx.CallMsgByRouter(misc.ServerType_TexasGameSvr, req.GetRoomId(), g1_protocol.CMD_TEXAS_INNER_FOLD_REQ, req, rsp)
 	if err != nil {
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_INTERNAL
-		rsp.Ret.Msg = err.Error()
+		return rsp, gerr.Wrap(g1_protocol.ErrorCode_ERR_INTERNAL, "forward_failed", err)
 	}
 	return rsp, nil
 }
@@ -316,9 +310,8 @@ func (s *MainC2SServiceImpl) MainBuyInDetail(ctx *ssrpc.Context, req *g1_protoco
 	rsp := &g1_protocol.MainBuyInDetailRsp{Ret: &g1_protocol.Ret{}}
 	cfg := texas_config.GetByRoomStageCoinType(req.GetRoomStage(), int32(req.GetCoinType()))
 	if cfg == nil {
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_CONF
-		rsp.Ret.Msg = fmt.Sprintf("missing texas config: stage=%d coinType=%d", req.GetRoomStage(), req.GetCoinType())
-		return rsp, nil
+		return rsp, gerr.New(g1_protocol.ErrorCode_ERR_CONF, "conf_not_found",
+			"missing texas config: stage=%d coinType=%d", req.GetRoomStage(), req.GetCoinType())
 	}
 	rsp.SmallBlind = cfg.SmallBlind
 	rsp.BigBlind = cfg.BigBlind
@@ -331,8 +324,7 @@ func (s *MainC2SServiceImpl) GetLookers(ctx *ssrpc.Context, req *g1_protocol.Get
 	rsp := &g1_protocol.GetLookersRsp{Ret: &g1_protocol.Ret{}}
 	err := ctx.CallMsgByRouter(misc.ServerType_TexasGameSvr, req.GetRoomId(), g1_protocol.CMD_TEXAS_INNER_GET_LOOKERS_REQ, req, rsp)
 	if err != nil {
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_INTERNAL
-		rsp.Ret.Msg = err.Error()
+		return rsp, gerr.Wrap(g1_protocol.ErrorCode_ERR_INTERNAL, "forward_failed", err)
 	}
 	return rsp, nil
 }
@@ -346,8 +338,7 @@ func (s *MainC2SServiceImpl) SitDown(ctx *ssrpc.Context, req *g1_protocol.SitDow
 	rsp := &g1_protocol.SitDownRsp{Ret: &g1_protocol.Ret{}}
 	err := ctx.CallMsgByRouter(misc.ServerType_TexasGameSvr, req.GetRoomId(), g1_protocol.CMD_TEXAS_INNER_SIT_DOWN_REQ, req, rsp)
 	if err != nil {
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_INTERNAL
-		rsp.Ret.Msg = err.Error()
+		return rsp, gerr.Wrap(g1_protocol.ErrorCode_ERR_INTERNAL, "forward_failed", err)
 	}
 	return rsp, nil
 }
@@ -356,8 +347,7 @@ func (s *MainC2SServiceImpl) StandUp(ctx *ssrpc.Context, req *g1_protocol.StandU
 	rsp := &g1_protocol.StandUpRsp{Ret: &g1_protocol.Ret{}}
 	err := ctx.CallMsgByRouter(misc.ServerType_TexasGameSvr, req.GetRoomId(), g1_protocol.CMD_TEXAS_INNER_STAND_UP_REQ, req, rsp)
 	if err != nil {
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_INTERNAL
-		rsp.Ret.Msg = err.Error()
+		return rsp, gerr.Wrap(g1_protocol.ErrorCode_ERR_INTERNAL, "forward_failed", err)
 	}
 	return rsp, nil
 }
@@ -456,8 +446,7 @@ func (s *MainC2SServiceImpl) GetRoomInfo(ctx *ssrpc.Context, req *g1_protocol.Ge
 	rsp := &g1_protocol.GetRoomInfoRsp{Ret: &g1_protocol.Ret{}}
 	err := ctx.CallMsgByRouter(misc.ServerType_TexasGameSvr, req.GetRoomId(), g1_protocol.CMD_TEXAS_INNER_GET_ROOM_INFO_REQ, req, rsp)
 	if err != nil {
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_INTERNAL
-		rsp.Ret.Msg = err.Error()
+		return rsp, gerr.Wrap(g1_protocol.ErrorCode_ERR_INTERNAL, "forward_failed", err)
 	}
 	return rsp, nil
 }
@@ -475,8 +464,7 @@ func (s *MainC2SServiceImpl) GetGameInfo(ctx *ssrpc.Context, req *g1_protocol.Ge
 	rsp := &g1_protocol.GetGameInfoRsp{Ret: &g1_protocol.Ret{}}
 	err := ctx.CallMsgByRouter(misc.ServerType_TexasGameSvr, req.GetRoomId(), g1_protocol.CMD_TEXAS_INNER_GET_GAME_INFO_REQ, req, rsp)
 	if err != nil {
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_INTERNAL
-		rsp.Ret.Msg = err.Error()
+		return rsp, gerr.Wrap(g1_protocol.ErrorCode_ERR_INTERNAL, "forward_failed", err)
 	}
 	return rsp, nil
 }
@@ -504,8 +492,7 @@ func (s *MainC2SServiceImpl) Preoperation(ctx *ssrpc.Context, req *g1_protocol.P
 	rsp := &g1_protocol.PreOperationRsp{Ret: &g1_protocol.Ret{}}
 	err := ctx.CallMsgByRouter(misc.ServerType_TexasGameSvr, req.GetRoomId(), g1_protocol.CMD_TEXAS_INNER_PREOPERATION_REQ, req, rsp)
 	if err != nil {
-		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_INTERNAL
-		rsp.Ret.Msg = err.Error()
+		return rsp, gerr.Wrap(g1_protocol.ErrorCode_ERR_INTERNAL, "forward_failed", err)
 	}
 	return rsp, nil
 }
