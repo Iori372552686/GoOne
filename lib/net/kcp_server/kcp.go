@@ -36,6 +36,11 @@ type KcpSvr struct {
 
 	lockOfConnInfo sync.RWMutex
 	mapOfConnInfo  map[net.Conn]kcpConnInfo
+
+	// listener 字段化（roadmap P0-07）：Quiesce 关 listener 停接新连接但保留既有；
+	// Stop 关 listener 与全部连接。stopCloseOnce 保证幂等。
+	listener      *kcp.Listener
+	stopCloseOnce sync.Once
 }
 
 func (s *KcpSvr) InitAndRun(ip string, port int, handler IKcpSvrEventHandler) error {
@@ -53,11 +58,32 @@ func (s *KcpSvr) InitAndRun(ip string, port int, handler IKcpSvrEventHandler) er
 		logger.Errorf("Failed to listen kcp {addr:%v, err:%v}", addr, err)
 		return err
 	}
+	s.listener = listener
 	_ = listener.SetDSCP(46)
 
 	logger.Infof("Listening kcp on %s", addr)
 	go s.runListener(listener)
 	return nil
+}
+
+// Quiesce 关闭 listener 停止接收新连接，保留既有连接处理在途工作（roadmap P0-07）。
+// 幂等。
+func (s *KcpSvr) Quiesce() {
+	s.stopCloseOnce.Do(func() {
+		if s.listener != nil {
+			_ = s.listener.Close() // 使 runListener 的 AcceptKCP 返回 err 并退出。
+		}
+	})
+}
+
+// Stop 关闭 listener 与全部已建立连接，用于排空超时后的强制关停。幂等。
+func (s *KcpSvr) Stop() {
+	s.Quiesce()
+	s.lockOfConnInfo.Lock()
+	for conn := range s.mapOfConnInfo {
+		_ = conn.Close()
+	}
+	s.lockOfConnInfo.Unlock()
 }
 
 // WriteData enqueues data1+data2 to the connection's write goroutine.

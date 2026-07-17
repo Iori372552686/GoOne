@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
@@ -38,6 +39,10 @@ type WsTcpSvr struct {
 
 	lockOfConnInfo sync.RWMutex
 	mapOfConnInfo  map[net.Conn]chan *bufpool.Buffer
+
+	// accepting 控制 wsGinPageUpgrader 是否接受新 Upgrade（roadmap P0-07）。Quiesce
+	// 置 false 后新连接被拒绝，既有连接保留处理在途工作。
+	accepting atomic.Bool
 }
 
 func (s *WsTcpSvr) InitAndRun(implType, mod string, port int, handler IWsTcpSvrEventHandler) error {
@@ -48,6 +53,7 @@ func (s *WsTcpSvr) InitAndRun(implType, mod string, port int, handler IWsTcpSvrE
 	s.lockOfConnInfo.Lock()
 	s.mapOfConnInfo = make(map[net.Conn]chan *bufpool.Buffer)
 	s.lockOfConnInfo.Unlock()
+	s.accepting.Store(true)
 
 	switch implType {
 	case "beego":
@@ -58,6 +64,21 @@ func (s *WsTcpSvr) InitAndRun(implType, mod string, port int, handler IWsTcpSvrE
 	}
 
 	return s.RunGinWs(mod, port)
+}
+
+// Quiesce 停止接受新 WS Upgrade，保留既有连接处理在途工作（roadmap P0-07）。幂等。
+func (s *WsTcpSvr) Quiesce() {
+	s.accepting.Store(false)
+}
+
+// Stop 拒绝新 Upgrade 并关闭全部已建立连接，用于排空超时后的强制关停。幂等。
+func (s *WsTcpSvr) Stop() {
+	s.Quiesce()
+	s.lockOfConnInfo.Lock()
+	for conn := range s.mapOfConnInfo {
+		_ = conn.Close()
+	}
+	s.lockOfConnInfo.Unlock()
 }
 
 func (s *WsTcpSvr) WriteData(conn net.Conn, data1 []byte, data2 []byte) error {

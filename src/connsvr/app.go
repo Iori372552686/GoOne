@@ -51,29 +51,9 @@ func NewApp() *runtime.App {
 		Cfg:         func() ssrpc.TracingConfig { return connCommon().Tracing },
 	}
 
-	// 网关监听器：在 router/bus 起来之后启动 TCP/WS/KCP。当前三传输尚无 Stop/Drain
-	// 能力（见 roadmap P0-07），这里作为 Start 阶段一次性拉起；Drain/Stop 留待
-	// P0-08 后续补齐 listener 字段与 SessionTracker 接入。
-	gateway := &bussvc.FuncComponent{
-		ComponentName: "gateway_listeners",
-		OnStart: func(_ context.Context) error {
-			if err := globals.ConnTcpSvr.CreateTcpServer(
-				gconf.ConnSvrCfg.Runtime.TcpImplType,
-				gconf.ConnSvrCfg.Runtime.ListenPort+1, onTcpPacket); err != nil {
-				return err
-			}
-			if err := globals.ConnWsSvr.CreateWebSocketServer(
-				"gin", "debug", gconf.ConnSvrCfg.Runtime.ListenPort, onWebSocketPacket); err != nil {
-				return err
-			}
-			if kcpPort := gconf.ConnSvrCfg.Runtime.KcpPort; kcpPort > 0 {
-				if err := globals.ConnKcpSvr.CreateKcpServer(kcpPort, onKcpPacket); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}
+	// 网关监听器：在 router/bus 起来之后启动 TCP/WS/KCP。实现 Quiescer（停止接新连接）
+	// 与 runtime.Component（Stop 强制关闭全部连接），满足 roadmap P0-07 网关排空。
+	gateway := &gatewayComponent{}
 
 	app, err := runtime.New("connsvr",
 		runtime.WithLoadConfig(func(_ context.Context) error {
@@ -120,4 +100,46 @@ func connCommon() bussvc.Common {
 			Headers:      c.CommonRuntime.Tracing.Headers,
 		},
 	}
+}
+
+// gatewayComponent 管理三传输（TCP/WS/KCP）网关监听器的启动、排空与停止（roadmap
+// P0-07）。Start 拉起监听；Quiesce 停止接新连接但保留既有；Stop 强制关闭全部连接。
+type gatewayComponent struct{}
+
+func (gatewayComponent) Name() string { return "gateway_listeners" }
+
+// Start 启动 TCP/WS/KCP 监听器。
+func (gatewayComponent) Start(_ context.Context) error {
+	if err := globals.ConnTcpSvr.CreateTcpServer(
+		gconf.ConnSvrCfg.Runtime.TcpImplType,
+		gconf.ConnSvrCfg.Runtime.ListenPort+1, onTcpPacket); err != nil {
+		return err
+	}
+	if err := globals.ConnWsSvr.CreateWebSocketServer(
+		"gin", "debug", gconf.ConnSvrCfg.Runtime.ListenPort, onWebSocketPacket); err != nil {
+		return err
+	}
+	if kcpPort := gconf.ConnSvrCfg.Runtime.KcpPort; kcpPort > 0 {
+		if err := globals.ConnKcpSvr.CreateKcpServer(kcpPort, onKcpPacket); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Quiesce 实现 runtime.Quiescer：三传输停止接收新连接，保留既有连接处理在途工作。
+// readyz 此刻已返回 503（由状态机保证）。
+func (gatewayComponent) Quiesce(_ context.Context) error {
+	globals.ConnTcpSvr.Quiesce()
+	globals.ConnWsSvr.Quiesce()
+	globals.ConnKcpSvr.Quiesce()
+	return nil
+}
+
+// Stop 实现 runtime.Component：强制关闭三传输的全部残留连接。幂等。
+func (gatewayComponent) Stop(_ context.Context) error {
+	globals.ConnTcpSvr.Stop()
+	globals.ConnWsSvr.Stop()
+	globals.ConnKcpSvr.Stop()
+	return nil
 }
