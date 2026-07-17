@@ -12,7 +12,6 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
-	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/infosvr/globals"
 	"github.com/Iori372552686/GoOne/src/infosvr/service"
 )
@@ -47,6 +46,12 @@ func NewApp() *runtime.App {
 		ServiceName: "infosvr",
 		Cfg:         func() ssrpc.TracingConfig { return infoCommon().Tracing },
 	}
+	logComp := &bussvc.LoggerComponent{
+		Cfg: func() bussvc.LoggerConfig {
+			c := infoCommon()
+			return bussvc.LoggerConfig{Dir: c.LogDir, Level: c.LogLevel, Name: "infosvr"}
+		},
+	}
 
 	app, err := runtime.New("infosvr",
 		runtime.WithLoadConfig(func(_ context.Context) error {
@@ -61,13 +66,19 @@ func NewApp() *runtime.App {
 		panic(fmt.Sprintf("runtime.New infosvr: %v", err))
 	}
 
-	for _, c := range []runtime.Component{tracing, redisDeps, transMgr, registerHandlers, routerComp} {
+	ic := infoCommon()
+	tracker := runtime.NewComponentTracker(nil)
+	adminComp := runtime.NewAdminComponent(app, tracker,
+		runtime.WithAdminListen(ic.AdminIP, ic.AdminPort),
+		runtime.WithAdminPprof(ic.Pprof),
+		runtime.WithAdminServiceName("infosvr"),
+	)
+
+	for _, c := range []runtime.Component{logComp, tracing, redisDeps, transMgr, registerHandlers, routerComp, adminComp} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("infosvr register %s: %v", c.Name(), err))
 		}
 	}
-	_ = misc.ServerType_InfoSvr
-	_ = buildInfoSvrComponentStatuses // 保留以备 admin /components 接入
 	return app
 }
 

@@ -180,6 +180,15 @@ func NewApp() *runtime.App {
 			}
 		},
 	}
+	logComp := &bussvc.LoggerComponent{
+		Cfg: func() bussvc.LoggerConfig {
+			return bussvc.LoggerConfig{
+				Dir:   gconf.WebSvrCfg.Debug.LogDir,
+				Level: gconf.WebSvrCfg.Debug.LogLevel,
+				Name:  "websvr",
+			}
+		},
+	}
 
 	app, err := runtime.New("websvr",
 		runtime.WithLoadConfig(func(_ context.Context) error {
@@ -200,8 +209,16 @@ func NewApp() *runtime.App {
 		panic(fmt.Sprintf("runtime.New websvr: %v", err))
 	}
 
-	// Start 顺序：tracing → web 运行时（依赖 + HTTP/gRPC）。逆序 Stop：web 先 graceful。
-	for _, c := range []runtime.Component{tracing, web} {
+	wc := gconf.WebSvrCfg.CommonRuntime
+	tracker := runtime.NewComponentTracker(nil)
+	adminComp := runtime.NewAdminComponent(app, tracker,
+		runtime.WithAdminListen(wc.AdminServer.IP, wc.AdminServer.Port),
+		runtime.WithAdminPprof(gconf.WebSvrCfg.CommonDebug.Pprof),
+		runtime.WithAdminServiceName("websvr"),
+	)
+
+	// Start 顺序：logger → tracing → web 运行时（依赖 + HTTP/gRPC） → admin。
+	for _, c := range []runtime.Component{logComp, tracing, web, adminComp} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("websvr register %s: %v", c.Name(), err))
 		}

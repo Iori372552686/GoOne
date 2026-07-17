@@ -66,6 +66,44 @@ func (t *TracingComponent) Stop(ctx context.Context) error {
 	return ssrpc.ShutdownTracing(ctx)
 }
 
+// LoggerConfig 承载 logger 初始化参数（与旧 bootstrap.LoggerConfig 对应）。
+type LoggerConfig struct {
+	Dir   string
+	Level string
+	Name  string
+}
+
+// LoggerComponent 把 logger 的初始化包成 Component（最早启动、最晚停止）。Stop 时
+// Flush，确保停机前日志落盘。
+type LoggerComponent struct {
+	Cfg    func() LoggerConfig
+	inited bool
+}
+
+// Name 实现 runtime.Component。
+func (l *LoggerComponent) Name() string { return "logger" }
+
+// Start 实现 runtime.Component：初始化 logger。
+func (l *LoggerComponent) Start(_ context.Context) error {
+	if l.Cfg == nil {
+		return nil
+	}
+	c := l.Cfg()
+	if _, err := logger.InitLogger(c.Dir, c.Level, c.Name); err != nil {
+		return err
+	}
+	l.inited = true
+	return nil
+}
+
+// Stop 实现 runtime.Component：Flush 日志。
+func (l *LoggerComponent) Stop(_ context.Context) error {
+	if l.inited {
+		logger.Flush()
+	}
+	return nil
+}
+
 // TransMgrComponent 把 TransactionMgr 的启动与排空关闭包成 Component。它实现
 // Drainer：Close 排空在途事务（受 ctx 超时约束）。
 type TransMgrComponent struct {

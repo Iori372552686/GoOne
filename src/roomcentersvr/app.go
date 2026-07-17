@@ -121,6 +121,12 @@ func NewApp() *runtime.App {
 
 	// 房间落盘：原 OnExit。TransMgr 排空后全量落盘，避免数据丢失。作为 Drainer。
 	roomFlush := &roomFlushComponent{}
+	logComp := &bussvc.LoggerComponent{
+		Cfg: func() bussvc.LoggerConfig {
+			c := roomCommon()
+			return bussvc.LoggerConfig{Dir: c.LogDir, Level: c.LogLevel, Name: "roomcentersvr"}
+		},
+	}
 
 	app, err := runtime.New("roomcentersvr",
 		runtime.WithLoadConfig(func(_ context.Context) error {
@@ -140,14 +146,21 @@ func NewApp() *runtime.App {
 		panic(fmt.Sprintf("runtime.New roomcentersvr: %v", err))
 	}
 
-	// Start 顺序：tracing → 业务依赖 → TransMgr → SSRPC 注册 → router/bus →
-	// 房间初始化 → roomTick → roomPersist → roomFlush(Drainer)。
-	for _, c := range []runtime.Component{tracing, businessDeps, transMgr, registerHandlers, routerComp, roomInit, roomTick, roomPersist, roomFlush} {
+	rc := roomCommon()
+	tracker := runtime.NewComponentTracker(nil)
+	adminComp := runtime.NewAdminComponent(app, tracker,
+		runtime.WithAdminListen(rc.AdminIP, rc.AdminPort),
+		runtime.WithAdminPprof(rc.Pprof),
+		runtime.WithAdminServiceName("roomcentersvr"),
+	)
+
+	// Start 顺序：logger → tracing → 业务依赖 → TransMgr → SSRPC 注册 → router/bus →
+	// 房间初始化 → roomTick → roomPersist → roomFlush(Drainer) → admin。
+	for _, c := range []runtime.Component{logComp, tracing, businessDeps, transMgr, registerHandlers, routerComp, roomInit, roomTick, roomPersist, roomFlush, adminComp} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("roomcentersvr register %s: %v", c.Name(), err))
 		}
 	}
-	_ = misc.ServerType_RoomCenterSvr
 	return app
 }
 

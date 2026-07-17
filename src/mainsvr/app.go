@@ -111,6 +111,12 @@ func NewApp() *runtime.App {
 	// 全量落盘，避免 write-behind 防抖窗口内的变更在停机时丢失。作为 Drainer 在
 	// TransMgr Drain 之后执行（注册顺序：roleFlush 在 transMgr 之后）。
 	roleFlush := &roleFlushComponent{}
+	logComp := &bussvc.LoggerComponent{
+		Cfg: func() bussvc.LoggerConfig {
+			c := mainCommon()
+			return bussvc.LoggerConfig{Dir: c.LogDir, Level: c.LogLevel, Name: "mainsvr"}
+		},
+	}
 
 	app, err := runtime.New("mainsvr",
 		runtime.WithLoadConfig(func(_ context.Context) error {
@@ -131,15 +137,21 @@ func NewApp() *runtime.App {
 		panic(fmt.Sprintf("runtime.New mainsvr: %v", err))
 	}
 
-	// Start 顺序：tracing → 业务依赖 → TransMgr → SSRPC 注册 → router/bus →
-	// SelfLogoutSender → roleTick(Task) → roleFlush(Drainer)。
-	// 逆序用于 Quiesce/Drain/Stop：roleFlush 先排空落盘，再 TransMgr 排空，再 router。
-	for _, c := range []runtime.Component{tracing, businessDeps, transMgr, registerHandlers, routerComp, selfLogout, roleTick, roleFlush} {
+	mc := mainCommon()
+	tracker := runtime.NewComponentTracker(nil)
+	adminComp := runtime.NewAdminComponent(app, tracker,
+		runtime.WithAdminListen(mc.AdminIP, mc.AdminPort),
+		runtime.WithAdminPprof(mc.Pprof),
+		runtime.WithAdminServiceName("mainsvr"),
+	)
+
+	// Start 顺序：logger → tracing → 业务依赖 → TransMgr → SSRPC 注册 → router/bus →
+	// SelfLogoutSender → roleTick(Task) → roleFlush(Drainer) → admin。
+	for _, c := range []runtime.Component{logComp, tracing, businessDeps, transMgr, registerHandlers, routerComp, selfLogout, roleTick, roleFlush, adminComp} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("mainsvr register %s: %v", c.Name(), err))
 		}
 	}
-	_ = misc.ServerType_MainSvr
 	return app
 }
 

@@ -10,7 +10,6 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
-	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/connsvr/globals"
 	"github.com/Iori372552686/GoOne/src/connsvr/service"
 )
@@ -50,6 +49,12 @@ func NewApp() *runtime.App {
 		ServiceName: "connsvr",
 		Cfg:         func() ssrpc.TracingConfig { return connCommon().Tracing },
 	}
+	logComp := &bussvc.LoggerComponent{
+		Cfg: func() bussvc.LoggerConfig {
+			c := connCommon()
+			return bussvc.LoggerConfig{Dir: c.LogDir, Level: c.LogLevel, Name: "connsvr"}
+		},
+	}
 
 	// 网关监听器：在 router/bus 起来之后启动 TCP/WS/KCP。实现 Quiescer（停止接新连接）
 	// 与 runtime.Component（Stop 强制关闭全部连接），满足 roadmap P0-07 网关排空。
@@ -68,13 +73,21 @@ func NewApp() *runtime.App {
 		panic(fmt.Sprintf("runtime.New connsvr: %v", err))
 	}
 
-	// Start 顺序：tracing → sign/rest → TransMgr → SSRPC 注册 → router/bus → 网关监听。
-	for _, c := range []runtime.Component{tracing, signRestDeps, transMgr, registerHandlers, routerComp, gateway} {
+	cc := connCommon()
+	tracker := runtime.NewComponentTracker(nil)
+	adminComp := runtime.NewAdminComponent(app, tracker,
+		runtime.WithAdminListen(cc.AdminIP, cc.AdminPort),
+		runtime.WithAdminPprof(cc.Pprof),
+		runtime.WithAdminServiceName("connsvr"),
+	)
+
+	// Start 顺序：logger → tracing → sign/rest → TransMgr → SSRPC 注册 → router/bus →
+	// 网关监听 → admin。
+	for _, c := range []runtime.Component{logComp, tracing, signRestDeps, transMgr, registerHandlers, routerComp, gateway, adminComp} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("connsvr register %s: %v", c.Name(), err))
 		}
 	}
-	_ = misc.ServerType_ConnSvr
 	return app
 }
 

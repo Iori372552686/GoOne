@@ -10,7 +10,6 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
-	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/globals"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/manager"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/service"
@@ -57,6 +56,13 @@ func NewApp() *runtime.App {
 		ServiceName: "mysqlsvr",
 		Cfg:         func() ssrpc.TracingConfig { return mysqlCommon().Tracing },
 	}
+	// logger：最早启动、最晚停止（Stop 时 Flush 落盘）。
+	logComp := &bussvc.LoggerComponent{
+		Cfg: func() bussvc.LoggerConfig {
+			c := mysqlCommon()
+			return bussvc.LoggerConfig{Dir: c.LogDir, Level: c.LogLevel, Name: "mysqlsvr"}
+		},
+	}
 
 	app, err := runtime.New("mysqlsvr",
 		runtime.WithLoadConfig(func(_ context.Context) error {
@@ -66,21 +72,27 @@ func NewApp() *runtime.App {
 			logger.Infof("svr_conf loaded for mysqlsvr")
 			return nil
 		}),
-		runtime.WithDrainTimeout(30e9),
 	)
 	if err != nil {
-		// New 仅在服务名非法时失败，此处服务名固定合法。
 		panic(fmt.Sprintf("runtime.New mysqlsvr: %v", err))
 	}
 
-	// 注册顺序即 Start 顺序：tracing → orm 依赖 → TransMgr → SSRPC 注册 → router/bus。
-	// 逆序用于 Quiesce/Drain/Stop。
-	for _, c := range []runtime.Component{tracing, ormDeps, transMgr, registerHandlers, routerComp} {
-		if err := app.Register(c); err != nil {
-			panic(fmt.Sprintf("mysqlsvr register %s: %v", c.Name(), err))
+	// admin 需引用 app（healthz/readyz 读取 app.State()），故在 app 创建后构造。
+	c := mysqlCommon()
+	tracker := runtime.NewComponentTracker(nil)
+	adminComp := runtime.NewAdminComponent(app, tracker,
+		runtime.WithAdminListen(c.AdminIP, c.AdminPort),
+		runtime.WithAdminPprof(c.Pprof),
+		runtime.WithAdminServiceName("mysqlsvr"),
+	)
+
+	// 注册顺序即 Start 顺序：logger → tracing → orm 依赖 → TransMgr → SSRPC 注册 →
+	// router/bus → admin。逆序用于 Quiesce/Drain/Stop。
+	for _, comp := range []runtime.Component{logComp, tracing, ormDeps, transMgr, registerHandlers, routerComp, adminComp} {
+		if err := app.Register(comp); err != nil {
+			panic(fmt.Sprintf("mysqlsvr register %s: %v", comp.Name(), err))
 		}
 	}
-	_ = misc.ServerType_MysqlSvr // 保留 serverType 引用（admin 端口派生用，未来接入）。
 	return app
 }
 
