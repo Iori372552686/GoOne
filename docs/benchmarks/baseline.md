@@ -24,6 +24,9 @@
 | CSPacketHeader.From | 2.78–2.81 | 0 | 0 | `lib/api/sharedstruct` |
 | bufpool.Get/Put | 18.46–19.16 | 24 | 1 | `lib/util/bufpool` |
 | bufpool.Acquire/Release（Lease，0-alloc） | 7.46–7.78 | 0 | 0 | `lib/util/bufpool` |
+| Scheduler TaskIdle（10ms 周期稳态） | 1000 | 0 | 0 | `lib/service/scheduler` |
+| Scheduler TaskRun（单次执行） | 56.2–58.5 | 0 | 0 | `lib/service/scheduler` |
+| Scheduler TaskNonOverlapSkip（TryLock 跳过） | 28.9–29.2 | 0 | 0 | `lib/service/scheduler` |
 | Dispatcher DispatchWS (Sealed, 无锁只读 map) | 2.79–2.87 | 0 | 0 | `lib/service/ssrpc` |
 | Dispatcher DispatchWS (Unsealed, RLock 旧路径) | 10.06–10.44 | 0 | 0 | `lib/service/ssrpc` |
 
@@ -47,5 +50,13 @@
 
 - 任何“性能”提交必须给出同机前后 bench，且：
   - 核心吞吐中位数不回退超过 5%。
+  - 0-alloc 热路径不得引入新分配。
+- 后续 P1 会新增 Dispatcher lookup、Scheduler、Gateway encode/enqueue 等 benchmark，届时补入本表。
+
+## P1 架构性验收（P0-08 达成，无 bench 数值，属行为级验收）
+
+- **空闲服务无 application 100Hz Tick**：旧 `application.Run` 的 10ms 全局 Tick 已随 `lib/service/application` 包删除而消除；六个服务改用精确周期 Task，空闲时不再每秒被唤醒 100 次。
+- **roomcenter 无每 10ms 双 goroutine**：原 `OnTick` 每 10ms 创建两个 goroutine（`RoomListMgr.Tick` + `TickPersist`）已替换为两个独立周期 Task（5s/10s，NonOverlap），不再每秒创建约 200 个短命 goroutine。
+- **Dispatcher 热路径无注册锁**：见上表 `DispatchWS (Sealed)`，Seal 后走只读 map 无锁直查。
   - 0-alloc 热路径不得引入新分配。
 - 后续 P1 会新增 Dispatcher lookup、Scheduler、Gateway encode/enqueue 等 benchmark，届时补入本表。
