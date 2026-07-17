@@ -1,14 +1,15 @@
 package infosvr
 
 import (
+	"context"
 	"fmt"
 
 	infosvrv1 "github.com/Iori372552686/GoOne/api/gen/game/infosvr/v1"
 	"github.com/Iori372552686/GoOne/common/gconf"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/lib/service/bootstrap"
-	"github.com/Iori372552686/GoOne/lib/service/bootstrap/busapp"
 	"github.com/Iori372552686/GoOne/lib/service/router"
+	"github.com/Iori372552686/GoOne/lib/service/runtime"
+	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	"github.com/Iori372552686/GoOne/module/misc"
@@ -16,98 +17,107 @@ import (
 	"github.com/Iori372552686/GoOne/src/infosvr/service"
 )
 
-func NewApp() *bootstrap.ServiceApp {
-	return busapp.New(busapp.Options{
-		ServiceName: "infosvr",
-		ServerType:  misc.ServerType_InfoSvr,
-		LoadConfig: func() error {
-			return gconf.LoadInfoConfig(*gconf.SvrConfFile)
-		},
-		Common: func() busapp.Common {
-			c := &gconf.InfoSvrCfg
-			return busapp.Common{
-				LogDir:       c.Debug.LogDir,
-				LogLevel:     c.Debug.LogLevel,
-				SelfBusId:    c.Identity.SelfBusId,
-				BusMQAddr:    c.CommonRuntime.BusMQAddr,
-				RegisterAddr: c.CommonRuntime.RegisterAddr,
-				AdminEnabled: c.CommonRuntime.AdminServer.Enabled,
-				AdminIP:      c.CommonRuntime.AdminServer.IP,
-				AdminPort:    c.CommonRuntime.AdminServer.Port,
-				Pprof:        c.CommonDebug.Pprof,
-				Tracing: ssrpc.TracingConfig{
-					Enabled:      c.CommonRuntime.Tracing.Enabled,
-					Exporter:     c.CommonRuntime.Tracing.Exporter,
-					Endpoint:     c.CommonRuntime.Tracing.Endpoint,
-					Insecure:     c.CommonRuntime.Tracing.Insecure,
-					SamplerRatio: c.CommonRuntime.Tracing.SamplerRatio,
-					Headers:      c.CommonRuntime.Tracing.Headers,
-				},
-			}
-		},
-		TransMgr: globals.TransMgr,
-		ComponentStatuses: func() []bootstrap.ComponentStatus {
-			return buildInfoSvrComponentStatuses(
-				globals.InfoMgr.RedisMgr.InstanceCount(),
-				globals.TransMgr.StatsSnapshot(),
-				router.Snapshot(),
-			)
-		},
-		InitDeps: func() error {
+// NewApp 用 runtime.App + Component 装配 infosvr。
+func NewApp() *runtime.App {
+	transMgr := &bussvc.TransMgrComponent{Mgr: globals.TransMgr}
+
+	redisDeps := &bussvc.FuncComponent{
+		ComponentName: "redis_deps",
+		OnStart: func(_ context.Context) error {
 			return globals.InfoMgr.RedisMgr.InitAndRun(gconf.InfoSvrCfg.Dependencies.DbInstances)
 		},
-		RegisterHandlers: func() error {
+	}
+
+	registerHandlers := &bussvc.FuncComponent{
+		ComponentName: "ssrpc_register",
+		OnStart: func(_ context.Context) error {
 			srv := infosvrv1.NewInfoServiceSServer(&service.InfoServiceImpl{}, ssrpc.DefaultMWOptions{})
 			d := ssrpc.NewDispatcher()
 			infosvrv1.RegisterInfoServiceToDispatcher(d, srv)
 			d.RegisterToTransactionMgr(globals.TransMgr)
 			return nil
 		},
-		OnExit: func() {
-			logger.Infof("================== infosvr Stop =========================")
-		},
-	})
+	}
+
+	routerComp := &bussvc.RouterComponent{
+		Common:   infoCommon,
+		TransMgr: globals.TransMgr,
+	}
+	tracing := &bussvc.TracingComponent{
+		ServiceName: "infosvr",
+		Cfg:         func() ssrpc.TracingConfig { return infoCommon().Tracing },
+	}
+
+	app, err := runtime.New("infosvr",
+		runtime.WithLoadConfig(func(_ context.Context) error {
+			if err := gconf.LoadInfoConfig(*gconf.SvrConfFile); err != nil {
+				return err
+			}
+			logger.Infof("svr_conf loaded for infosvr")
+			return nil
+		}),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("runtime.New infosvr: %v", err))
+	}
+
+	for _, c := range []runtime.Component{tracing, redisDeps, transMgr, registerHandlers, routerComp} {
+		if err := app.Register(c); err != nil {
+			panic(fmt.Sprintf("infosvr register %s: %v", c.Name(), err))
+		}
+	}
+	_ = misc.ServerType_InfoSvr
+	_ = buildInfoSvrComponentStatuses // 保留以备 admin /components 接入
+	return app
 }
 
-func buildInfoSvrComponentStatuses(redisInstances int, txStats transaction.TransactionMgrStats, routerSnapshot router.AdminSnapshot) []bootstrap.ComponentStatus {
-	redisStatus := bootstrap.ComponentStatus{
-		Name:    "infosvr.redis",
-		State:   "pending",
-		Ready:   false,
-		Message: "waiting for redis initialization",
+// infoCommon 从 gconf 产出 infosvr 的 bus 服务共享配置段。
+func infoCommon() bussvc.Common {
+	c := &gconf.InfoSvrCfg
+	return bussvc.Common{
+		LogDir:       c.Debug.LogDir,
+		LogLevel:     c.Debug.LogLevel,
+		SelfBusId:    c.Identity.SelfBusId,
+		BusMQAddr:    c.CommonRuntime.BusMQAddr,
+		RegisterAddr: c.CommonRuntime.RegisterAddr,
+		AdminEnabled: c.CommonRuntime.AdminServer.Enabled,
+		AdminIP:      c.CommonRuntime.AdminServer.IP,
+		AdminPort:    c.CommonRuntime.AdminServer.Port,
+		Pprof:        c.CommonDebug.Pprof,
+		Tracing: ssrpc.TracingConfig{
+			Enabled:      c.CommonRuntime.Tracing.Enabled,
+			Exporter:     c.CommonRuntime.Tracing.Exporter,
+			Endpoint:     c.CommonRuntime.Tracing.Endpoint,
+			Insecure:     c.CommonRuntime.Tracing.Insecure,
+			SamplerRatio: c.CommonRuntime.Tracing.SamplerRatio,
+			Headers:      c.CommonRuntime.Tracing.Headers,
+		},
 	}
+}
+
+// buildInfoSvrComponentStatuses 聚合 infosvr 的自定义组件状态（redis/transaction/router），
+// 供未来 admin /components 端点接入使用。
+func buildInfoSvrComponentStatuses(redisInstances int, txStats transaction.TransactionMgrStats, routerSnapshot router.AdminSnapshot) []runtime.ComponentReport {
+	redisStatus := runtime.ComponentReport{Name: "infosvr.redis", State: "pending"}
 	if redisInstances > 0 {
-		redisStatus.State = "ready"
+		redisStatus.State = "running"
 		redisStatus.Ready = true
 		redisStatus.Message = fmt.Sprintf("redis instances=%d", redisInstances)
 	}
-
-	transactionStatus := bootstrap.ComponentStatus{
+	transactionStatus := runtime.ComponentReport{
 		Name:    "infosvr.transaction_mgr",
 		State:   "pending",
-		Ready:   false,
 		Message: fmt.Sprintf("shards=%d active=%d pending=%d dropped=%d", txStats.ShardCount, txStats.ActiveTransactions, txStats.PendingPackets, txStats.DroppedPackets),
 	}
 	if txStats.ShardCount > 0 {
-		transactionStatus.State = "ready"
+		transactionStatus.State = "running"
 		transactionStatus.Ready = true
 	}
-
-	routerStatus := bootstrap.ComponentStatus{
-		Name:    "infosvr.router",
-		State:   "pending",
-		Ready:   false,
-		Message: "router not initialized",
-	}
+	routerStatus := runtime.ComponentReport{Name: "infosvr.router", State: "pending", Message: "router not initialized"}
 	if routerSnapshot.Initialized && routerSnapshot.SelfBusID != 0 {
-		routerStatus.State = "ready"
+		routerStatus.State = "running"
 		routerStatus.Ready = !routerSnapshot.ShuttingDown
 		routerStatus.Message = fmt.Sprintf("bus_id=%d shutting_down=%t", routerSnapshot.SelfBusID, routerSnapshot.ShuttingDown)
 	}
-
-	return []bootstrap.ComponentStatus{
-		redisStatus,
-		transactionStatus,
-		routerStatus,
-	}
+	return []runtime.ComponentReport{redisStatus, transactionStatus, routerStatus}
 }

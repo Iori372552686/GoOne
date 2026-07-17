@@ -118,95 +118,75 @@ func toPascalCase(s string) string {
 var tplMainGo = `package main
 
 import (
+	"context"
 	"flag"
+	"fmt"
+	"os"
 
 	"{{.Module}}/lib/api/logger"
-	"{{.Module}}/lib/service/application"
+	"{{.Module}}/src/{{.Name}}"
 )
 
 func main() {
 	flag.Parse()
 	defer logger.Flush()
 
-	application.Init(newApp())
-	application.Run()
+	if err := newApp().Run(context.Background()); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
 `
 
-var tplAppGo = `package main
+var tplAppGo = `package {{.Name}}
 
 import (
+	"context"
+	"fmt"
+
 	"{{.Module}}/common/gconf"
 	"{{.Module}}/lib/api/logger"
-	"{{.Module}}/lib/api/sharedstruct"
-	"{{.Module}}/lib/service/bootstrap"
-	"{{.Module}}/lib/service/router"
-	"{{.Module}}/lib/util/marshal"
+	"{{.Module}}/lib/service/runtime"
+	"{{.Module}}/lib/service/runtime/bussvc"
 	"{{.Module}}/module/misc"
-	"{{.Module}}/src/{{.Name}}/cmd_handler"
 	"{{.Module}}/src/{{.Name}}/globals"
 )
 
-func onRecvSSPacket(packet *sharedstruct.SSPacket) {
-	globals.TransMgr.ProcessSSPacket(packet)
-	packet = nil
+// NewApp 用 runtime.App + Component 装配 {{.Name}}（scaffold 生成的最小骨架）。
+func NewApp() *runtime.App {
+	transMgr := &bussvc.TransMgrComponent{Mgr: globals.TransMgr}
+	routerComp := &bussvc.RouterComponent{
+		Common:   svcCommon,
+		TransMgr: globals.TransMgr,
+	}
+
+	app, err := runtime.New("{{.Name}}",
+		runtime.WithLoadConfig(func(_ context.Context) error {
+			// TODO: 更新为加载你的配置 struct。
+			// return gconf.Load{{.StructName}}Config(*gconf.SvrConfFile)
+			_ = gconf.SvrConfFile
+			return nil
+		}),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("runtime.New {{.Name}}: %v", err))
+	}
+
+	// Start 顺序：TransMgr → router/bus。逆序用于 Quiesce/Drain/Stop。
+	for _, c := range []runtime.Component{transMgr, routerComp} {
+		if err := app.Register(c); err != nil {
+			panic(fmt.Sprintf("{{.Name}} register %s: %v", c.Name(), err))
+		}
+	}
+	logger.Infof("================== {{.Name}} scaffold app built =========================")
+	return app
 }
 
-func newApp() *bootstrap.ServiceApp {
-	return bootstrap.NewServiceApp(bootstrap.Options{
-		ServiceName: "{{.Name}}",
-		LoadConfig: func() error {
-			// TODO: update to load your config struct.
-			// return marshal.LoadConfFile(*gconf.SvrConfFile, &gconf.{{.StructName}}SvrCfg)
-			return nil
-		},
-		LoggerConfig: func() bootstrap.LoggerConfig {
-			// TODO: update gconf reference after adding config struct.
-			// return bootstrap.LoggerConfig{
-			// 	Dir:   gconf.{{.StructName}}SvrCfg.LogDir,
-			// 	Level: gconf.{{.StructName}}SvrCfg.LogLevel,
-			// 	Name:  "{{.Name}}",
-			// }
-			return bootstrap.LoggerConfig{Name: "{{.Name}}"}
-		},
-		AdminConfig: func() bootstrap.AdminConfig {
-			return bootstrap.NewAdminConfig("{{.Name}}", 0, false, false, "", 0)
-		},
-		RegisterHandlers: func() error {
-			cmd_handler.RegCmd()
-			return nil
-		},
-		StartRuntime: func() error {
-			// TODO: init router after adding config.
-			// if err := router.InitAndRun(
-			// 	gconf.{{.StructName}}SvrCfg.SelfBusId,
-			// 	onRecvSSPacket,
-			// 	gconf.{{.StructName}}SvrCfg.BusMQAddr,
-			// 	misc.ServerRouteRules,
-			// 	gconf.{{.StructName}}SvrCfg.RegisterAddr,
-			// ); err != nil {
-			// 	return err
-			// }
-			globals.TransMgr.InitAndRun(misc.MaxTransNumber, false, 0)
-			return nil
-		},
-		OnProc: func() bool {
-			return true
-		},
-		OnExit: func() {
-			logger.Infof("================== {{.Name}} Stop =========================")
-		},
-	})
+// svcCommon 从 gconf 产出 {{.Name}} 的 bus 服务共享配置段。
+// TODO: 在加入配置 struct 后，填充以下字段。
+func svcCommon() bussvc.Common {
+	return bussvc.Common{}
 }
-
-// Suppress unused import warnings during scaffold phase.
-var (
-	_ = gconf.SvrConfFile
-	_ = bootstrap.LoggerConfig{}
-	_ = router.InitAndRun
-	_ = marshal.LoadConfFile
-	_ = (*sharedstruct.SSPacket)(nil)
-)
 `
 
 var tplGlobalsGo = `package globals

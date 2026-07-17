@@ -1,0 +1,181 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "title": "GoOne Services Overview",
+  "uid": "goone-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "15s",
+  "templating": {
+    "list": [
+      {
+        "name": "instance",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "query": "label_values(goone_transaction_packets_total, instance)",
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2
+      }
+    ]
+  },
+  "panels": [
+    { "type": "row", "title": "Transaction (业务事务)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 } },
+    {
+      "type": "timeseries",
+      "title": "事务请求速率 by result",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum by (result) (rate(goone_transaction_packets_total{phase=\"request\", instance=~\"$instance\"}[1m]))",
+          "legendFormat": "{{result}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "事务处理耗时 P50/P95/P99",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate(goone_transaction_handler_duration_seconds_bucket{instance=~\"$instance\"}[5m])))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(goone_transaction_handler_duration_seconds_bucket{instance=~\"$instance\"}[5m])))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(goone_transaction_handler_duration_seconds_bucket{instance=~\"$instance\"}[5m])))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "事务积压（active / pending / 队列长度）",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "goone_transaction_active_transactions{instance=~\"$instance\"}", "legendFormat": "active {{instance}}" },
+        { "expr": "goone_transaction_pending_packets{instance=~\"$instance\"}", "legendFormat": "pending {{instance}}" },
+        { "expr": "goone_transaction_dispatch_queue_length{instance=~\"$instance\"}", "legendFormat": "dispatch_q {{instance}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "丢弃与超时（背压/级联超时观测）",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "sum by (result) (rate(goone_transaction_packets_total{result=~\"dropped_.*|rejected_.*\", instance=~\"$instance\"}[1m]))", "legendFormat": "{{result}}" },
+        { "expr": "sum by (stage) (rate(goone_transaction_timeouts_total{instance=~\"$instance\"}[1m]))", "legendFormat": "timeout:{{stage}}" }
+      ]
+    },
+    { "type": "row", "title": "Router / Bus (服务间消息)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 } },
+    {
+      "type": "timeseries",
+      "title": "路由消息速率 by direction/transport",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "sum by (direction, transport) (rate(goone_router_messages_total{instance=~\"$instance\"}[1m]))", "legendFormat": "{{direction}}/{{transport}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "路由字节速率 与 错误",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "sum by (direction) (rate(goone_router_message_bytes_total{instance=~\"$instance\"}[1m]))", "legendFormat": "bytes {{direction}}" },
+        { "expr": "sum by (reason) (rate(goone_router_message_errors_total{instance=~\"$instance\"}[1m]))", "legendFormat": "err {{reason}}" }
+      ]
+    },
+    { "type": "row", "title": "Gateway (connsvr 网关)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 } },
+    {
+      "type": "timeseries",
+      "title": "网关连接数 by transport",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 27 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "goone_gateway_connections{kind=\"uid_sessions\", instance=~\"$instance\"}", "legendFormat": "{{transport}} sessions" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "网关事件速率（accept/close/kick/write_error）",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 27 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "sum by (transport, event) (rate(goone_gateway_events_total{instance=~\"$instance\"}[1m]))", "legendFormat": "{{transport}}/{{event}}" }
+      ]
+    },
+    { "type": "row", "title": "ssrpc (RPC 层)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 } },
+    {
+      "type": "timeseries",
+      "title": "ssrpc 请求速率 / 错误 / 超时",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "sum (rate(goone_ssrpc_requests_total{instance=~\"$instance\"}[1m]))", "legendFormat": "requests" },
+        { "expr": "sum (rate(goone_ssrpc_request_errors_total{instance=~\"$instance\"}[1m]))", "legendFormat": "errors" },
+        { "expr": "sum (rate(goone_ssrpc_request_timeouts_total{instance=~\"$instance\"}[1m]))", "legendFormat": "timeouts" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "ssrpc 在途请求",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "goone_ssrpc_requests_in_flight{instance=~\"$instance\"}", "legendFormat": "in_flight {{instance}}" }
+      ]
+    },
+    { "type": "row", "title": "Storage (Redis / MySQL)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 44 } },
+    {
+      "type": "timeseries",
+      "title": "Redis 命令速率与错误",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 45 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "sum (rate(goone_redis_commands_total{instance=~\"$instance\"}[1m]))", "legendFormat": "commands" },
+        { "expr": "sum (rate(goone_redis_command_errors_total{instance=~\"$instance\"}[1m]))", "legendFormat": "errors" },
+        { "expr": "sum (rate(goone_redis_command_timeouts_total{instance=~\"$instance\"}[1m]))", "legendFormat": "timeouts" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "MySQL 操作速率与错误",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 45 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "sum (rate(goone_mysql_operations_total{instance=~\"$instance\"}[1m]))", "legendFormat": "operations" },
+        { "expr": "sum (rate(goone_mysql_operation_errors_total{instance=~\"$instance\"}[1m]))", "legendFormat": "errors" },
+        { "expr": "sum (rate(goone_xorm_ping_errors_total{instance=~\"$instance\"}[1m]))", "legendFormat": "xorm_ping_errors" }
+      ]
+    },
+    { "type": "row", "title": "Runtime (进程健康)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 53 } },
+    {
+      "type": "timeseries",
+      "title": "safego 捕获的 panic",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 54 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "increase(goone_safego_recovered_panics_total{instance=~\"$instance\"}[5m])", "legendFormat": "panics(5m) {{instance}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Goroutines 与内存",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 54 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "go_goroutines{instance=~\"$instance\"}", "legendFormat": "goroutines {{instance}}" },
+        { "expr": "go_memstats_heap_inuse_bytes{instance=~\"$instance\"}", "legendFormat": "heap_inuse {{instance}}" }
+      ]
+    }
+  ]
+}

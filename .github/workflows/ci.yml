@@ -41,13 +41,19 @@ jobs:
           ./tools/protoc-gen-goone/... ./tools/cmd/...
 
       - name: Race (core packages)
+        # 包含 P0 迭代新增的生命周期/配置/调度/bus 注册表等并发敏感包。
         run: >
           go test -race -count=1 -timeout 300s
           ./lib/net/...
           ./lib/service/transaction/...
           ./lib/service/router/...
           ./lib/service/ssrpc/...
+          ./lib/service/runtime/...
+          ./lib/service/appconfig/...
+          ./lib/service/scheduler/...
+          ./lib/service/bus/...
           ./lib/util/safego/...
+          ./lib/util/bufpool/...
 
   check-genproto:
     name: Check generated proto
@@ -87,6 +93,35 @@ jobs:
       - uses: golangci/golangci-lint-action@v6
         with:
           version: latest
-          # Only fail on issues introduced by the change under review.
+          # 只对本次改动引入的新问题失败；存量债务冻结在 origin/dev 基线。
           args: --new-from-rev=origin/${{ github.base_ref || 'dev' }}
-        continue-on-error: true
+
+      - name: Legacy lifecycle static scan
+        # P0-09 已删除旧生命周期；此扫描阻止 application/bootstrap/busapp 旧 API
+        # 被重新引入生产代码（cmd/src/lib/tools，排除注释与生成代码）。
+        run: |
+          set -e
+          hits=$(grep -rnE "application\.(Init|Run)|NewServiceApp|bootstrap\.ServiceApp" \
+            cmd src lib tools 2>/dev/null \
+            | grep -v "_test.go" \
+            | grep -vE "^\s*//|^\s*\*" \
+            | grep -v "api/gen/" \
+            || true)
+          if [ -n "$hits" ]; then
+            echo "Found references to removed legacy lifecycle APIs:"
+            echo "$hits"
+            exit 1
+          fi
+
+      - name: Docs link check
+        # 校验 README/CHANGELOG 引用的 docs/ 路径确实存在。
+        run: |
+          set -e
+          missing=0
+          for link in $(grep -oE "docs/[A-Za-z0-9_./-]+\.md" readme.md CHANGELOG.md 2>/dev/null | sort -u); do
+            if [ ! -f "$link" ]; then
+              echo "broken doc link: $link"
+              missing=1
+            fi
+          done
+          exit $missing

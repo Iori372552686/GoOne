@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"fmt"
+	"os"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/lib/service/application"
 	"github.com/Iori372552686/GoOne/src/web_svr"
 )
 
@@ -12,6 +14,8 @@ func main() {
 	flag.Parse()
 	defer logger.Flush()
 
-	application.Init(websvr.NewApp())
-	application.Run()
+	if err := websvr.NewApp().Run(context.Background()); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }

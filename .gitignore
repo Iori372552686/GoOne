@@ -5,11 +5,14 @@ build/*
 /deploy/hosts/*
 /deploy/hosts/host_dev.txt
 /.cursor/
-/.bin/*
-/docs/
+/.bin/
+# docs/ is tracked; only raw benchmark/profile artifacts are ignored.
+/docs/benchmarks/raw/
+/docs/profiles/
 deploy/hosts/host_dev.txt
 /.gocache
 /tools/cfgtool/gen
 /plan
 /plan
 /report
+/.zcode/plans

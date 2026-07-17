@@ -200,12 +200,23 @@ func (b *BusImplNatsMQ) run() {
 	}
 }
 
+// DriverName 是本 driver 注册时使用的 implType 字符串。
+const DriverName = "nats"
+
+// newBus 是具体 ctor，同时被遗留的 func init 注册与显式 Driver() 描述符共用。
+func newBus(selfBusId uint32, onRecvMsg bus.MsgHandler, conf any) (bus.IBus, error) {
+	cfg, ok := conf.(bus.NatsConfig)
+	if !ok {
+		return nil, fmt.Errorf("nats arg must be NatsConfig")
+	}
+	return NewBusImplNatsMQ(selfBusId, onRecvMsg, cfg), nil
+}
+
+// Driver 返回用于装配期注册的显式 driver 描述符。
+func Driver() bus.Driver {
+	return bus.Driver{Name: DriverName, Ctor: newBus}
+}
+
 func init() {
-	bus.RegisterBus("nats", func(selfBusId uint32, onRecvMsg bus.MsgHandler, conf any) (bus.IBus, error) {
-		cfg, ok := conf.(bus.NatsConfig)
-		if !ok {
-			return nil, fmt.Errorf("nats arg must be NatsConfig")
-		}
-		return NewBusImplNatsMQ(selfBusId, onRecvMsg, cfg), nil
-	})
+	bus.RegisterBus(DriverName, newBus)
 }

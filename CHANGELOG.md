@@ -37,7 +37,7 @@
 - `RoleMgr.FlushAllToDB`：优雅停机时全量落盘在线角色。
 - CI（GitHub Actions：build/vet/test/race/check-genproto/lint 增量）、`.golangci.yml`。
 - 性能基线与优化对比报告：`docs/benchmarks/baseline.md`。
-- 文档：架构评审（`docs/architecture_review_2026-07.md`）、迭代计划（`docs/optimization_roadmap.md`）、
+- 文档：架构评审（`docs/architecture_review_2026-07-v2.md`）、迭代计划（`docs/optimization_roadmap.md`）、
   代码风格规范（`docs/STYLE.md`）、`CONTRIBUTING.md`。
 
 ### Changed

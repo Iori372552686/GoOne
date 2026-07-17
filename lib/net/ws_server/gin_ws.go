@@ -3,6 +3,7 @@ package ws_server
 import (
 	"fmt"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/util/bufpool"
 	"github.com/gin-gonic/gin"
 	"net"
 	"net/http"
@@ -45,7 +46,7 @@ func (self *WsTcpSvr) wsGinPageUpgrader(c *gin.Context) {
 		return
 	}
 
-	chanWrite := make(chan []byte, 100)
+	chanWrite := make(chan *bufpool.Buffer, 100)
 	self.lockOfConnInfo.Lock()
 	self.mapOfConnInfo[socket.NetConn()] = chanWrite
 	self.lockOfConnInfo.Unlock()
