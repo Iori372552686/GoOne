@@ -2,9 +2,10 @@
 package http_sign
 
 import (
+	"sync"
+
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/module/gfunc"
-	"sync"
 )
 
 /*

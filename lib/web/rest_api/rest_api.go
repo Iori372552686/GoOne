@@ -2,10 +2,12 @@ package rest_api
 
 import (
 	"errors"
-	"github.com/Iori372552686/GoOne/lib/api/http_sign"
+
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/util/convert"
-	http_client "github.com/Iori372552686/GoOne/lib/api/httpclient"
+	"github.com/Iori372552686/GoOne/lib/web/http_client"
+	http_sign2 "github.com/Iori372552686/GoOne/lib/web/http_sign"
+
 	"math/rand"
 )
 
@@ -14,10 +16,10 @@ import (
  * @Description:
 **/
 type RestApi struct {
-	serviceName string              //服务名
-	urlAddr     *UrlConfig          //url addrs
-	signName    string              //sign indexName
-	signImpl    *http_sign.HttpSign //sign impl
+	serviceName string               //服务名
+	urlAddr     *UrlConfig           //url addrs
+	signName    string               //sign indexName
+	signImpl    *http_sign2.HttpSign //sign impl
 
 	//private
 	user     string
@@ -31,7 +33,7 @@ type RestApi struct {
 * @Author: Iori
 * @Date: 2022-07-06 15:14:20
 **/
-func NewRestInstances(conf Config, signs *http_sign.SignMgr) *RestApi {
+func NewRestInstances(conf Config, signs *http_sign2.SignMgr) *RestApi {
 	//check args
 	if conf.ServiceName == "" || len(conf.Urls) == 0 {
 		return nil
@@ -105,7 +107,7 @@ func (self *RestApi) SignGet(uin int64, uriMap *map[string]string) ([]byte, erro
 		return nil, errors.New("signImpl  is nil ,not signReq !")
 	}
 
-	url := self.urlAddr.GetHashUrl(uin) + http_sign.Map2uri(self.signImpl.PushSign(uriMap, nil, http_sign.Sign_Md5), "", true, false)
+	url := self.urlAddr.GetHashUrl(uin) + http_sign2.Map2uri(self.signImpl.PushSign(uriMap, nil, http_sign2.Sign_Md5), "", true, false)
 	rspBody, err := http_client.HttpGetRequest(url, "")
 	if err != nil {
 		logger.Errorf("SignGet Request err | %v", err.Error())
@@ -130,7 +132,7 @@ func (self *RestApi) Get(uin int64, uriMap *map[string]string) ([]byte, error) {
 	}
 
 	//req get
-	url := self.urlAddr.GetHashUrl(uin) + http_sign.Map2uri(uriMap, "", true, false)
+	url := self.urlAddr.GetHashUrl(uin) + http_sign2.Map2uri(uriMap, "", true, false)
 	rspBody, err := http_client.HttpGetRequest(url, "")
 	if err != nil {
 		logger.Errorf("Get Request err | %v", err.Error())
@@ -163,7 +165,7 @@ func (self *RestApi) SignPost(common_param, actions *map[string]interface{}) ([]
 	//gen body
 	bodystr := convert.StructToJson(&map[string]interface{}{"common_param": common_param, "actions": actions})
 	rspBody, err := http_client.HttpPostRequest(self.urlAddr.GetHashUrl(uin)+
-		http_sign.Map2uri(self.signImpl.PushSign(&uriMap, bodystr, http_sign.Sign_Md5), "", true, false), convert.Bytes2str(bodystr))
+		http_sign2.Map2uri(self.signImpl.PushSign(&uriMap, bodystr, http_sign2.Sign_Md5), "", true, false), convert.Bytes2str(bodystr))
 	if err != nil {
 		logger.Errorf("SignPost Request err | %v", err.Error())
 		return nil, err
@@ -223,7 +225,7 @@ func (self *RestApi) SignPostV2(headMap, uriMap *map[string]string, actions *map
 
 	//gen body
 	bodystr := convert.StructToJson(actions)
-	rspBody, err := http_client.HeaderHttpPostRequest(self.urlAddr.GetHashUrl(uid)+http_sign.Map2uri(self.signImpl.PushSign(uriMap, bodystr, http_sign.Sign_Md5), "", true, false),
+	rspBody, err := http_client.HeaderHttpPostRequest(self.urlAddr.GetHashUrl(uid)+http_sign2.Map2uri(self.signImpl.PushSign(uriMap, bodystr, http_sign2.Sign_Md5), "", true, false),
 		convert.Bytes2str(bodystr), headMap)
 	if err != nil {
 		logger.Errorf("SignPost Request err | %v", err.Error())

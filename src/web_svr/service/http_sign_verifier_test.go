@@ -7,22 +7,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Iori372552686/GoOne/lib/api/http_sign"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
+	http_sign2 "github.com/Iori372552686/GoOne/lib/web/http_sign"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
 func TestHTTPSignVerifierVerify(t *testing.T) {
-	signIns := http_sign.BuildHttpSign("sign", "secret", 60, "timestamp", "request_id", "1")
+	signIns := http_sign2.BuildHttpSign("sign", "secret", 60, "timestamp", "request_id", "1")
 	body := []byte(`{"account_id":"acc","msg_content":"hello","time":"123"}`)
 	params := map[string]string{
 		"timestamp": strconv.FormatInt(time.Now().Unix(), 10),
 	}
-	signIns.PushSign(&params, body, http_sign.Sign_Md5)
+	signIns.PushSign(&params, body, http_sign2.Sign_Md5)
 
 	ctx := &ssrpc.Context{}
 	ctx.SetHTTPRequest(&http.Request{
-		URL: &url.URL{RawQuery: http_sign.MapParam2Uri(&params, false)},
+		URL: &url.URL{RawQuery: http_sign2.MapParam2Uri(&params, false)},
 	}, body)
 
 	verifier := NewHTTPSignVerifier(true, signIns)
@@ -32,7 +32,7 @@ func TestHTTPSignVerifierVerify(t *testing.T) {
 
 	badCtx := &ssrpc.Context{}
 	badCtx.SetHTTPRequest(&http.Request{
-		URL: &url.URL{RawQuery: http_sign.MapParam2Uri(&params, false)},
+		URL: &url.URL{RawQuery: http_sign2.MapParam2Uri(&params, false)},
 	}, []byte(`{"account_id":"acc","msg_content":"tampered","time":"123"}`))
 
 	err := verifier.Verify(badCtx, nil)

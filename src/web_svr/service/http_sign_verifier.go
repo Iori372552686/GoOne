@@ -3,18 +3,18 @@ package service
 import (
 	"fmt"
 
-	"github.com/Iori372552686/GoOne/lib/api/http_sign"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
+	http_sign2 "github.com/Iori372552686/GoOne/lib/web/http_sign"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 	"github.com/golang/protobuf/proto"
 )
 
 type HTTPSignVerifier struct {
 	enabled bool
-	signIns *http_sign.HttpSign
+	signIns *http_sign2.HttpSign
 }
 
-func NewHTTPSignVerifier(enabled bool, signIns *http_sign.HttpSign) *HTTPSignVerifier {
+func NewHTTPSignVerifier(enabled bool, signIns *http_sign2.HttpSign) *HTTPSignVerifier {
 	return &HTTPSignVerifier{
 		enabled: enabled,
 		signIns: signIns,
@@ -36,7 +36,7 @@ func (v *HTTPSignVerifier) Verify(ctx *ssrpc.Context, req proto.Message) error {
 		return ssrpc.Wrap(g1_protocol.ErrorCode_ERR_INTERNAL, "missing http request for sign verification", nil)
 	}
 
-	ok, err, _ := v.signIns.CheckSign(http_sign.UriParam2Map(ctx.HTTPRequest.URL.RawQuery), ctx.HTTPBody, "")
+	ok, err, _ := v.signIns.CheckSign(http_sign2.UriParam2Map(ctx.HTTPRequest.URL.RawQuery), ctx.HTTPBody, "")
 	if ok {
 		return nil
 	}

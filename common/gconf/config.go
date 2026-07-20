@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Iori372552686/GoOne/lib/web/http_sign"
+	"github.com/Iori372552686/GoOne/lib/web/rest_api"
 	"github.com/Iori372552686/GoOne/lib/web/web_gin"
 
-	"github.com/Iori372552686/GoOne/lib/api/http_sign"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
-	"github.com/Iori372552686/GoOne/lib/api/rest_api"
 	"github.com/Iori372552686/GoOne/lib/db/redis"
 	orm "github.com/Iori372552686/GoOne/lib/db/xorm"
 	"github.com/Iori372552686/GoOne/lib/util/marshal"
@@ -34,9 +34,9 @@ type BaseRuntimeConfig struct {
 	//   - "consul://127.0.0.1:8500?service=online&healthcheck=true&heartbeat=true&health_interval=10"
 	//   - "nacos://127.0.0.1:8848?service=online&group=DEFAULT_GROUP&cluster=DEFAULT&kind=grpc&weight=100"
 	//   - "k8s://?service=online&incluster=true"
-	RegisterAddr string            `json:"register_addr" yaml:"register_addr"` // registry/register 地址
-	BusMQAddr    string            `json:"bus_mq_addr" yaml:"bus_mq_addr"`     // bus mq 地址
-	AdminServer  AdminServerConfig `json:"admin_server" yaml:"admin_server"`   // admin server 配置
+	RegisterAddr string               `json:"register_addr" yaml:"register_addr"` // registry/register 地址
+	BusMQAddr    string               `json:"bus_mq_addr" yaml:"bus_mq_addr"`     // bus mq 地址
+	AdminServer  AdminServerConfig    `json:"admin_server" yaml:"admin_server"`   // admin server 配置
 	Tracing      RuntimeTracingConfig `json:"tracing" yaml:"tracing"`
 }
 
@@ -162,7 +162,6 @@ type MainSvrConfig struct {
 }
 
 var MainSvrCfg MainSvrConfig
-
 
 // mysqlsvr配置
 type MySqlSvrConfig struct {
@@ -451,5 +450,3 @@ func (c *webSvrConfig) validate() error {
 	}
 	return nil
 }
-
-

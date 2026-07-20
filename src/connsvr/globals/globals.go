@@ -1,11 +1,11 @@
 package globals
 
 import (
-	"github.com/Iori372552686/GoOne/lib/api/http_sign"
-	"github.com/Iori372552686/GoOne/lib/api/rest_api"
 	"github.com/Iori372552686/GoOne/lib/net/net_mgr"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
+	"github.com/Iori372552686/GoOne/lib/web/http_sign"
+	"github.com/Iori372552686/GoOne/lib/web/rest_api"
 )
 
 var (

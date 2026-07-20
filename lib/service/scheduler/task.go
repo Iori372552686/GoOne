@@ -26,12 +26,19 @@ import (
 // 把它注册为 runtime.Component（Name 返回 TaskName）即可获得 Start/Stop 语义；
 // Start 启动周期 goroutine，Stop 取消并等待在途 Run 退出。NonOverlap=true（默认）
 // 时，若上一次 Run 未完成，本次触发被跳过并计入 skipped 计数，不创建叠加 goroutine。
+//
+// Inline=true 时绕过 goroutine 池：trigger 直接在 loop 内同步调用 Run，不起额外
+// goroutine、不走 TryLock、不记 skipped。专用于极轻量高频任务（如 datetime.Tick，
+// 纳秒级单字段赋值），避免每周期 goroutine 创建/调度开销带来的抖动与浪费。
+// 使用前提：Run 必须非阻塞且绝不会重叠（否则会拖慢整个 loop 的周期节拍）。
 type Task struct {
 	TaskName   string
 	Interval   time.Duration
 	RunOnStart bool
 	NonOverlap bool
-	Run        func(ctx context.Context) error
+	// Inline 为 true 时在 loop 内同步执行 Run。见类型注释。默认 false。
+	Inline bool
+	Run    func(ctx context.Context) error
 
 	// 运行时状态。
 	stopCh chan struct{}
@@ -81,12 +88,6 @@ func (t *Task) Start(ctx context.Context) error {
 	t.inFlightDone = make(chan struct{})
 	runCtx, cancel := context.WithCancel(ctx)
 	t.cancel = cancel
-
-	// 一次性任务（无周期）且不立即跑：无 goroutine。
-	if t.Interval <= 0 && !t.RunOnStart {
-		close(t.inFlightDone)
-		return nil
-	}
 
 	// RunOnStart 与周期循环都交给 loop 统一托管，使 Stop 通过 inFlightDone 能 join 所有
 	// 在途 execute（loop 内串行调用 execute，不会重叠）。
@@ -173,9 +174,19 @@ func (t *Task) loop(ctx context.Context) {
 	}
 }
 
-// trigger 决定是否启动一次执行。NonOverlap 时若上一次未完成（TryLock 失败），跳过并
-// 计 skipped；否则在独立 goroutine 内执行（不阻塞 loop）。
+// trigger 决定是否启动一次执行。
+//   - Inline：直接在 loop 内同步调用 runOnce，零 goroutine 开销。要求 Run 极轻量
+//     且非阻塞（如 datetime.Tick），否则会拖慢 loop 节拍。
+//   - NonOverlap：TryLock 失败则跳过并计 skipped；成功则在独立 goroutine 内执行，
+//     loop 不被慢 Run 阻塞。
+//   - 其它：每次都在独立 goroutine 内执行（允许叠加），仍受 inFlight 守护。
 func (t *Task) trigger(ctx context.Context) {
+	if t.Inline {
+		// 同步执行：loop 自身串行触发，天然不重叠，无需 TryLock / inFlight 计数。
+		// 仍走 runOnce 以获得 panic recover 与耗时上报。
+		t.runOnce(ctx)
+		return
+	}
 	if t.NonOverlap {
 		if !t.runMu.TryLock() {
 			t.skipped.Add(1)

@@ -3,8 +3,8 @@ package logger
 import (
 	"fmt"
 	"reflect"
+	"time"
 
-	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/api/logger/plug"
 	"github.com/Iori372552686/GoOne/lib/api/logger/zap"
 )
@@ -31,7 +31,7 @@ func InitLogger(logPath string, level string, name string) (zap.Logger, error) {
 		level = "debug"
 	}
 	if name == "" {
-		name = "log_" + datetime.GetDataHMS()
+		name = "log_" + time.Now().Format("2006-01-02_15-04-05")
 	}
 
 	return zap.InitLogger(zap.Config{

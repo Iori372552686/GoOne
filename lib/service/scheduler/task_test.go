@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/Iori372552686/GoOne/lib/api/datetime"
 )
 
 func TestTaskRunOnStart(t *testing.T) {
@@ -173,5 +175,88 @@ func TestTaskStopIsIdempotent(t *testing.T) {
 	}
 	if err := task.Stop(context.Background()); err != nil {
 		t.Fatalf("Stop 2 must be idempotent: %v", err)
+	}
+}
+
+// TestTaskInline 验证 Inline=true 时 trigger 同步执行 Run，不起 goroutine、
+// 不计 skipped。Inline 模式专用于 datetime.Tick 等极轻量高频任务。
+func TestTaskInline(t *testing.T) {
+	var calls atomic.Int64
+	task := New("inline", 15*time.Millisecond, func(context.Context) error {
+		calls.Add(1)
+		return nil
+	})
+	task.Inline = true
+	if err := task.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	time.Sleep(80 * time.Millisecond)
+	if err := task.Stop(context.Background()); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	if got := calls.Load(); got < 3 {
+		t.Fatalf("Inline task should run >=3 times in 80ms @15ms, got %d", got)
+	}
+	// Inline 模式绝不产生 skipped（同步执行，无 TryLock 竞争）。
+	if got := task.Skipped(); got != 0 {
+		t.Fatalf("Inline task should never skip, got %d", got)
+	}
+}
+
+// TestTaskInlineNoGoroutineSurge 验证 Inline 模式即使 Run 阻塞也不会堆积 goroutine。
+// （Inline 下慢 Run 会拖慢 loop 节拍，但绝不创建额外 goroutine。）
+func TestTaskInlineNoGoroutineSurge(t *testing.T) {
+	var inRun atomic.Int64
+	var peak atomic.Int64
+	task := New("inline-slow", 10*time.Millisecond, func(ctx context.Context) error {
+		cur := inRun.Add(1)
+		// 记录并发执行数峰值（Inline 下应恒为 1，因为 loop 串行同步调用）。
+		for {
+			p := peak.Load()
+			if cur <= p || peak.CompareAndSwap(p, cur) {
+				break
+			}
+		}
+		time.Sleep(20 * time.Millisecond) // 故意慢于周期
+		inRun.Add(-1)
+		return nil
+	})
+	task.Inline = true
+	if err := task.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	if err := task.Stop(context.Background()); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	// Inline 串行：同一时刻最多 1 个 Run 在执行。
+	if got := peak.Load(); got > 1 {
+		t.Fatalf("Inline should run serially, peak concurrency=%d", got)
+	}
+}
+
+// TestDefaultDateTimeTick 验证预设工厂能驱动 datetime 缓存刷新。
+func TestDefaultDateTimeTick(t *testing.T) {
+	task := DefaultDateTimeTick()
+	if task.Name() != "datetime_tick" {
+		t.Fatalf("expected name datetime_tick, got %q", task.Name())
+	}
+	if !task.Inline {
+		t.Fatal("DefaultDateTimeTick should set Inline=true")
+	}
+	// 用很短周期便于测试快速观测刷新。
+	task.Interval = 10 * time.Millisecond
+
+	before := datetime.NowT()
+	if err := task.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	time.Sleep(60 * time.Millisecond)
+	if err := task.Stop(context.Background()); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	after := datetime.NowT()
+	if !after.After(before) {
+		t.Fatalf("datetime snapshot should advance via DefaultDateTimeTick: before=%v after=%v", before, after)
 	}
 }

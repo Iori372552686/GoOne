@@ -14,6 +14,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
+	"github.com/Iori372552686/GoOne/lib/service/scheduler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/util/sensitive_words"
 	"github.com/Iori372552686/GoOne/lib/web/web_gin"
@@ -217,8 +218,8 @@ func NewApp() *runtime.App {
 		runtime.WithAdminServiceName("websvr"),
 	)
 
-	// Start 顺序：logger → tracing → web 运行时（依赖 + HTTP/gRPC） → admin。
-	for _, c := range []runtime.Component{logComp, tracing, web, adminComp} {
+	// Start 顺序：datetime 周期刷新 → logger → tracing → web 运行时（依赖 + HTTP/gRPC） → admin。
+	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, web, adminComp} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("websvr register %s: %v", c.Name(), err))
 		}
