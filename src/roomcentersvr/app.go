@@ -159,7 +159,7 @@ func NewApp() *runtime.App {
 	// Start 顺序：datetime 周期刷新 → logger → tracing → 业务依赖 → TransMgr → SSRPC 注册
 	// → router/bus → 房间初始化 → roomTick → roomPersist → roomFlush(Drainer) → admin。
 	// datetime_tick 放最前：room tick/房间初始化都依赖 datetime.NowMs()。
-	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, businessDeps, transMgr, registerHandlers, routerComp, roomInit, roomTick, roomPersist, roomFlush, adminComp} {
+	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, businessDeps, registerHandlers, transMgr, routerComp, roomInit, roomTick, roomPersist, roomFlush, adminComp} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("roomcentersvr register %s: %v", c.Name(), err))
 		}

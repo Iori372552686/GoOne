@@ -89,10 +89,10 @@ func NewApp() *runtime.App {
 		runtime.WithAdminReadyCheck(router.ReadyCheck),
 	)
 
-	// 注册顺序即 Start 顺序：datetime 周期刷新 → logger → tracing → orm 依赖 → TransMgr
-	// → SSRPC 注册 → router/bus → admin。逆序用于 Quiesce/Drain/Stop。
-	// datetime_tick 放最前：orm 依赖（xorm）启动期即读 datetime 做 tick 节流。
-	for _, comp := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, ormDeps, transMgr, registerHandlers, routerComp, adminComp} {
+	// 注册顺序即 Start 顺序：datetime 周期刷新 → logger → tracing → orm 依赖 →
+	// SSRPC 注册（必须在 TransMgr.InitAndRun 之前，因 RegisterToTransactionMgr 调
+	// RegisterCmd）→ TransMgr → router/bus → admin。
+	for _, comp := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, ormDeps, registerHandlers, transMgr, routerComp, adminComp} {
 		if err := app.Register(comp); err != nil {
 			panic(fmt.Sprintf("mysqlsvr register %s: %v", comp.Name(), err))
 		}

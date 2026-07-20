@@ -87,7 +87,7 @@ func NewApp() *runtime.App {
 	// Start 顺序：datetime 周期刷新 → logger → tracing → sign/rest → TransMgr → SSRPC
 	// 注册 → router/bus → 网关监听 → admin。datetime_tick 放最前：tcp/ws/kcp 服务器
 	// 启动期用 datetime.NowT() 设连接读写 deadline。
-	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, signRestDeps, transMgr, registerHandlers, routerComp, gateway, adminComp} {
+	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, signRestDeps, registerHandlers, transMgr, routerComp, gateway, adminComp} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("connsvr register %s: %v", c.Name(), err))
 		}

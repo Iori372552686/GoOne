@@ -17,6 +17,11 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	"github.com/Iori372552686/GoOne/module/misc"
+
+	// 默认引入全部 bus 驱动（database/sql 风格），使 bus.CreateBus 能解析
+	// amqp://、nats://、kafka:// 等地址。需要裁剪二进制体积的服务可不经 bussvc
+	// 自行装配，并只 blank-import 所需驱动（roadmap P2-03 独立项）。
+	_ "github.com/Iori372552686/GoOne/lib/service/bus/driver/all"
 )
 
 // Common 承载每个 bus 服务共享的配置段，由服务的配置访问器在 LoadConfig 后产出。

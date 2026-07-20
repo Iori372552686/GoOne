@@ -77,7 +77,7 @@ func NewApp() *runtime.App {
 	)
 
 	// datetime_tick 放最前：redis/tracing 启动期可能读 datetime。
-	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, redisDeps, transMgr, registerHandlers, routerComp, adminComp} {
+	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, redisDeps, registerHandlers, transMgr, routerComp, adminComp} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("infosvr register %s: %v", c.Name(), err))
 		}
