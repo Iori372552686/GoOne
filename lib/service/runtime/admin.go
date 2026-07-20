@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,6 +25,9 @@ type adminConfig struct {
 	port        int
 	serviceName string
 	pprof       bool
+	// readyCheck 是额外的就绪探针（如 router.ReadyCheck）；readyz 在 lifecycle Ready
+	// 时叠加调用它。可不设。
+	readyCheck func() error
 }
 
 // WithAdminListen 设置绑定地址与端口。空 IP 默认回环地址 127.0.0.1（绝不所有接
@@ -50,6 +54,16 @@ func WithAdminPprof(enable bool) AdminOption {
 // WithAdminServiceName 用服务名标注 admin 响应。
 func WithAdminServiceName(name string) AdminOption {
 	return func(c *adminConfig) { c.serviceName = name }
+}
+
+// WithAdminReadyCheck 注入一个额外的就绪探针（如 router.ReadyCheck）。readyz 在
+// lifecycle 状态为 Ready/Allocated 时，额外调用它；返回非 nil error 则 readyz 返回
+// 503（用于 bus 断连等运行期故障自动摘流）。可不设。
+func WithAdminReadyCheck(fn func() error) AdminOption {
+	return func(c *adminConfig) {
+		c.readyCheck = fn
+		c.enabled = true
+	}
 }
 
 // AdminComponent 把一个 HTTP admin server 包装为 Component。它暴露
@@ -102,9 +116,18 @@ func (a *AdminComponent) Start(_ context.Context) error {
 	a.srv = &http.Server{
 		Addr:    addr,
 		Handler: a.buildMux(),
+		// admin 端点为明文 HTTP；显式禁用 HTTP/2，避免 net/http 在某些 Go 版本上
+		// setupHTTP2_Serve 对未配置 TLS 的 server 触发 nil 解引用。
+		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 	}
 	go func() {
 		logger.Infof("%s admin server listening on %s", a.cfg.serviceName, a.addr)
+		// 防御：a.srv 在 Start 内赋值，理论上 goroutine 启动时已就绪；但若 Start 被
+		// 并发误调或被外部重置，避免 nil 解引用 panic 杀死测试进程。
+		if a.srv == nil {
+			logger.Errorf("%s admin server: srv is nil, cannot Serve", a.cfg.serviceName)
+			return
+		}
 		if err := a.srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Errorf("%s admin server stopped with error | %v", a.cfg.serviceName, err)
 		}
@@ -169,6 +192,14 @@ func (a *AdminComponent) handleReadyz(w http.ResponseWriter, _ *http.Request) {
 	if code := readyCode(st); code != 200 {
 		http.Error(w, "not ready", code)
 		return
+	}
+	// lifecycle Ready 时叠加运行期就绪探针（如 router.ReadyCheck）：bus 断连等故障
+	// 使 readyz 返回 503 自动摘流。
+	if a.cfg.readyCheck != nil {
+		if err := a.cfg.readyCheck(); err != nil {
+			http.Error(w, "not ready", http.StatusServiceUnavailable)
+			return
+		}
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = w.Write([]byte("ready\n"))

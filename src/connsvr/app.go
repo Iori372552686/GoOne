@@ -7,8 +7,10 @@ import (
 	connsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/connsvr/v1"
 	"github.com/Iori372552686/GoOne/common/gconf"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
+	"github.com/Iori372552686/GoOne/lib/service/scheduler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/src/connsvr/globals"
 	"github.com/Iori372552686/GoOne/src/connsvr/service"
@@ -79,11 +81,13 @@ func NewApp() *runtime.App {
 		runtime.WithAdminListen(cc.AdminIP, cc.AdminPort),
 		runtime.WithAdminPprof(cc.Pprof),
 		runtime.WithAdminServiceName("connsvr"),
+		runtime.WithAdminReadyCheck(router.ReadyCheck),
 	)
 
-	// Start 顺序：logger → tracing → sign/rest → TransMgr → SSRPC 注册 → router/bus →
-	// 网关监听 → admin。
-	for _, c := range []runtime.Component{logComp, tracing, signRestDeps, transMgr, registerHandlers, routerComp, gateway, adminComp} {
+	// Start 顺序：datetime 周期刷新 → logger → tracing → sign/rest → TransMgr → SSRPC
+	// 注册 → router/bus → 网关监听 → admin。datetime_tick 放最前：tcp/ws/kcp 服务器
+	// 启动期用 datetime.NowT() 设连接读写 deadline。
+	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, signRestDeps, transMgr, registerHandlers, routerComp, gateway, adminComp} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("connsvr register %s: %v", c.Name(), err))
 		}

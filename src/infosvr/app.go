@@ -10,6 +10,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
+	"github.com/Iori372552686/GoOne/lib/service/scheduler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	"github.com/Iori372552686/GoOne/src/infosvr/globals"
@@ -72,9 +73,11 @@ func NewApp() *runtime.App {
 		runtime.WithAdminListen(ic.AdminIP, ic.AdminPort),
 		runtime.WithAdminPprof(ic.Pprof),
 		runtime.WithAdminServiceName("infosvr"),
+		runtime.WithAdminReadyCheck(router.ReadyCheck),
 	)
 
-	for _, c := range []runtime.Component{logComp, tracing, redisDeps, transMgr, registerHandlers, routerComp, adminComp} {
+	// datetime_tick 放最前：redis/tracing 启动期可能读 datetime。
+	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, redisDeps, transMgr, registerHandlers, routerComp, adminComp} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("infosvr register %s: %v", c.Name(), err))
 		}

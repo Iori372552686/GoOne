@@ -143,11 +143,13 @@ func NewApp() *runtime.App {
 		runtime.WithAdminListen(mc.AdminIP, mc.AdminPort),
 		runtime.WithAdminPprof(mc.Pprof),
 		runtime.WithAdminServiceName("mainsvr"),
+		runtime.WithAdminReadyCheck(router.ReadyCheck),
 	)
 
-	// Start 顺序：logger → tracing → 业务依赖 → TransMgr → SSRPC 注册 → router/bus →
-	// SelfLogoutSender → roleTick(Task) → roleFlush(Drainer) → admin。
-	for _, c := range []runtime.Component{logComp, tracing, businessDeps, transMgr, registerHandlers, routerComp, selfLogout, roleTick, roleFlush, adminComp} {
+	// Start 顺序：datetime 周期刷新 → logger → tracing → 业务依赖 → TransMgr → SSRPC 注册
+	// → router/bus → SelfLogoutSender → roleTick(Task) → roleFlush(Drainer) → admin。
+	// datetime_tick 放最前：logger/xorm 等启动期即读 datetime，需保证 ticker 已起。
+	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, businessDeps, transMgr, registerHandlers, routerComp, selfLogout, roleTick, roleFlush, adminComp} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("mainsvr register %s: %v", c.Name(), err))
 		}

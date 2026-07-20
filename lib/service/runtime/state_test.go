@@ -209,6 +209,59 @@ func TestAdminDefaultsToLoopbackWhenIPEmpty(t *testing.T) {
 	}
 }
 
+// TestAdminReadyCheckFlipsReadyz 验证：注入的 readyCheck（如 router.ReadyCheck）在
+// lifecycle Ready 时叠加判定；返回 error 则 readyz 返回 503（bus 断连摘流）。
+func TestAdminReadyCheckFlipsReadyz(t *testing.T) {
+	a, _, mu := newTraceApp(t, "svc")
+	trace := make([]string, 0)
+	mustRegister(a, newRecordingComponent("c", &trace, mu))
+
+	// readyCheck 先返回 nil（健康），后返回 error（故障）。
+	healthy := true
+	check := func() error {
+		if !healthy {
+			return errors.New("bus disconnected")
+		}
+		return nil
+	}
+	tracker := NewComponentTracker(nil)
+	admin := NewAdminComponent(a, tracker,
+		WithAdminListen("127.0.0.1", 0),
+		WithAdminReadyCheck(check),
+	)
+	if err := admin.Start(context.Background()); err != nil {
+		t.Fatalf("start admin: %v", err)
+	}
+	defer admin.Stop(context.Background())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := runInBackground(t, a, ctx)
+	waitForState(t, a, StateReady, 2*time.Second)
+
+	base := "http://" + admin.addr
+	// 健康：readyz 200。
+	resp, _ := getBody(t, base+"/readyz")
+	if resp != 200 {
+		t.Fatalf("expected readyz 200 when healthy, got %d", resp)
+	}
+	// 故障：readyz 503。
+	healthy = false
+	resp, body := getBody(t, base+"/readyz")
+	if resp != 503 {
+		t.Fatalf("expected readyz 503 when check fails, got %d body=%s", resp, body)
+	}
+	// 恢复：readyz 200。
+	healthy = true
+	resp, _ = getBody(t, base+"/readyz")
+	if resp != 200 {
+		t.Fatalf("expected readyz 200 after recovery, got %d", resp)
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+}
+
 func TestComponentTrackerRecordsTiming(t *testing.T) {
 	tracker := NewComponentTracker([]string{"a", "b"})
 	tracker.MarkStarting("a")

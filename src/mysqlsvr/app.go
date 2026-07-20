@@ -7,8 +7,10 @@ import (
 	mysqlsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/mysqlsvr/v1"
 	"github.com/Iori372552686/GoOne/common/gconf"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
+	"github.com/Iori372552686/GoOne/lib/service/scheduler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/globals"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/manager"
@@ -84,11 +86,13 @@ func NewApp() *runtime.App {
 		runtime.WithAdminListen(c.AdminIP, c.AdminPort),
 		runtime.WithAdminPprof(c.Pprof),
 		runtime.WithAdminServiceName("mysqlsvr"),
+		runtime.WithAdminReadyCheck(router.ReadyCheck),
 	)
 
-	// 注册顺序即 Start 顺序：logger → tracing → orm 依赖 → TransMgr → SSRPC 注册 →
-	// router/bus → admin。逆序用于 Quiesce/Drain/Stop。
-	for _, comp := range []runtime.Component{logComp, tracing, ormDeps, transMgr, registerHandlers, routerComp, adminComp} {
+	// 注册顺序即 Start 顺序：datetime 周期刷新 → logger → tracing → orm 依赖 → TransMgr
+	// → SSRPC 注册 → router/bus → admin。逆序用于 Quiesce/Drain/Stop。
+	// datetime_tick 放最前：orm 依赖（xorm）启动期即读 datetime 做 tick 节流。
+	for _, comp := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, ormDeps, transMgr, registerHandlers, routerComp, adminComp} {
 		if err := app.Register(comp); err != nil {
 			panic(fmt.Sprintf("mysqlsvr register %s: %v", comp.Name(), err))
 		}

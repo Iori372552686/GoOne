@@ -10,6 +10,7 @@ import (
 	"github.com/Iori372552686/GoOne/common/gconf"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
+	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
 	"github.com/Iori372552686/GoOne/lib/service/scheduler"
@@ -152,11 +153,13 @@ func NewApp() *runtime.App {
 		runtime.WithAdminListen(rc.AdminIP, rc.AdminPort),
 		runtime.WithAdminPprof(rc.Pprof),
 		runtime.WithAdminServiceName("roomcentersvr"),
+		runtime.WithAdminReadyCheck(router.ReadyCheck),
 	)
 
-	// Start 顺序：logger → tracing → 业务依赖 → TransMgr → SSRPC 注册 → router/bus →
-	// 房间初始化 → roomTick → roomPersist → roomFlush(Drainer) → admin。
-	for _, c := range []runtime.Component{logComp, tracing, businessDeps, transMgr, registerHandlers, routerComp, roomInit, roomTick, roomPersist, roomFlush, adminComp} {
+	// Start 顺序：datetime 周期刷新 → logger → tracing → 业务依赖 → TransMgr → SSRPC 注册
+	// → router/bus → 房间初始化 → roomTick → roomPersist → roomFlush(Drainer) → admin。
+	// datetime_tick 放最前：room tick/房间初始化都依赖 datetime.NowMs()。
+	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, businessDeps, transMgr, registerHandlers, routerComp, roomInit, roomTick, roomPersist, roomFlush, adminComp} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("roomcentersvr register %s: %v", c.Name(), err))
 		}
