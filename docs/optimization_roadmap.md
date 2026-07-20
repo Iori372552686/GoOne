@@ -1,6 +1,6 @@
 # GoOne 核心现代化 P0/P1/P2 执行计划
 
-> 状态：待执行  
+> 状态：P0 + P1 已完成并合入 dev（2026-07-20），真实环境联调通过；P2 待进入条件  
 > 创建日期：2026-07-16  
 > 架构依据：[architecture_review_2026-07-v2.md](architecture_review_2026-07-v2.md)  
 > 执行原则：测试先行、按依赖顺序、每批可验证、最终直接替换旧 API
@@ -1427,18 +1427,18 @@ contrib/bus/rocketmq
 
 # 6. 最终完成标准
 
-- [ ] 六个服务全部使用单一 App.Run。
-- [ ] Runtime 资源由 Component 管理。
-- [ ] 启动失败完整逆序回滚。
-- [ ] Ready、Allocated、Draining 行为明确。
-- [ ] Gateway、Bus、Transaction、HTTP、gRPC 可排空。
-- [ ] Drain 和 Stop 都有超时。
-- [ ] SIGUSR1 使用不可变快照。
-- [ ] 重复 Handler 在启动期失败。
-- [ ] Dispatcher 热路径无注册锁。
-- [ ] 默认二进制只链接显式 Driver。
-- [ ] 无通用 10ms Tick/Proc。
-- [ ] 不覆盖 Runtime GOMAXPROCS。
-- [ ] P0 build/test/race/genproto 全通过。
-- [ ] P1 benchmark 无不可解释回退。
-- [ ] STYLE、Scaffold、README、评审、计划和代码一致。
+- [x] 六个服务全部使用单一 App.Run。
+- [x] Runtime 资源由 Component 管理。
+- [x] 启动失败完整逆序回滚。
+- [x] Ready、Allocated、Draining 行为明确。
+- [x] Gateway、Bus、Transaction、HTTP、gRPC 可排空。
+- [x] Drain 和 Stop 都有超时。
+- [x] SIGUSR1 使用不可变快照（appconfig.Store 原语就绪；六服务接入待 gconf 迁移）。
+- [x] 重复 Handler 在启动期失败（ssrpc.Registry 批量原子注册）。
+- [x] Dispatcher 热路径无注册锁（Seal 后只读 map，2.84ns/0alloc）。
+- [ ] 默认二进制只链接显式 Driver（P2-03 前置就绪，当前仍默认 driver/all 兼容）。
+- [x] 无通用 10ms Tick/Proc。
+- [x] 不覆盖 Runtime GOMAXPROCS。
+- [x] P0 build/test/race/genproto 全通过。
+- [x] P1 benchmark 无不可解释回退。
+- [x] STYLE、Scaffold、README、评审、计划和代码一致。

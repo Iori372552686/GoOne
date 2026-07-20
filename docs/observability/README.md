@@ -29,19 +29,36 @@ scrape_configs:
 | `goone_ssrpc_*`                                    | `requests_total`、`request_errors_total`、`request_timeouts_total`、`requests_in_flight`                                                         | RPC 层视角                                                               |
 | `goone_redis_*` / `goone_mysql_*` / `goone_xorm_*` | 命令/操作速率、错误、超时、在途                                                                                                                              | 存储层健康                                                                 |
 | `goone_safego_recovered_panics_total`              | —                                                                                                                                             | 业务 panic 捕获计数（非零应告警）                                                  |
+| `goone_lifecycle_*`                                | `state{state}`（gauge，活动状态=1）                                                                                                                  | 实例生命周期状态（Starting/Ready/Allocated/Draining/Stopping/Stopped/Failed） |
+| `goone_component_*`                                | `start_duration_seconds{component}`、`start_failures_total{component}`                                                                          | 组件启动耗时与失败                                                            |
+| `goone_drain_*`                                    | `duration_seconds`、`timeouts_total`                                                                                                            | 排空阶段耗时与超时                                                            |
+| `goone_task_*`                                     | `duration_seconds{task}`、`skipped_total{task}`                                                                                                 | 周期 Task 执行耗时与 NonOverlap 跳过                                       |
+| `goone_config_*`                                   | `reload_total{result}`（applied/restart_required/failed）                                                                                       | 配置重载结果                                                                |
 
 
 ### Grafana
 
 导入 `[grafana-dashboard.json](grafana-dashboard.json)`（Grafana ≥ 10，数据源选择 Prometheus）。
-面板分六组：Transaction / Router-Bus / Gateway / ssrpc / Storage / Runtime。
+面板分七组：Transaction / Router-Bus / Gateway / ssrpc / Storage / Runtime / Lifecycle。
+
+#### Lifecycle 面板（P1-03 新增）
+
+- **状态分布**：`goone_lifecycle_state` 按 `state` label 的 gauge，一眼看出各实例处于 Ready/Draining/Failed。
+- **组件启动健康**：`goone_component_start_duration_seconds` p99 + `goone_component_start_failures_total`（非零即启动异常）。
+- **排空效率**：`goone_drain_duration_seconds` p50/p99 + `goone_drain_timeouts_total`（超时意味着 Drain 超过 30s 预算）。
+- **Task 健康**：`goone_task_duration_seconds` + `goone_task_skipped_total`（频繁跳过意味着 Task 执行超过周期）。
+- **配置重载**：`goone_config_reload_total{result}` 关注 `failed` 与 `restart_required`。
 
 建议告警规则（示例阈值，按压测结果调整）：
 
 - `increase(goone_safego_recovered_panics_total[5m]) > 0` — 业务 panic；
 - `rate(goone_transaction_packets_total{result=~"dropped_.*"}[1m]) > 0` — 事务背压丢弃；
 - `histogram_quantile(0.99, ...handler_duration...) > 0.5` — P99 处理超 500ms；
-- `up == 0` 或 `/readyz` 非 200 — 实例失联 / bus 断连（readyz 已纳入 bus 健康）。
+- `up == 0` 或 `/readyz` 非 200 — 实例失联 / bus 断连（readyz 已纳入 bus 健康）；
+- `goone_lifecycle_state{state="failed"} == 1` — 实例进入 Failed 状态；
+- `increase(goone_component_start_failures_total[5m]) > 0` — 组件启动失败；
+- `increase(goone_drain_timeouts_total[5m]) > 0` — 排空超时（可能需调大 drain_timeout）；
+- `increase(goone_config_reload_total{result="failed"}[5m]) > 0` — 配置重载失败。
 
 ## 2. 全链路 Trace
 
@@ -69,4 +86,20 @@ Logging 中间件自动在日志前缀输出 `[trace_id:... span_id:...]`；
 - 事务日志前缀 `[uid|rid|transID]`，ssrpc 日志含 `trace_id`/`span_id`；
 - 用 trace_id 在多服务日志中检索同一请求的完整路径；
 - 心跳等高频 cmd 可用 `logger.RegisterCmdBacklist` 屏蔽。
+
+### 生命周期结构化事件（P1-03）
+
+生命周期关键节点以 `[event:xxx]` 前缀输出结构化日志，便于按事件名精确 grep 与告警：
+
+| 事件名 | 触发时机 | 级别 |
+|---|---|---|
+| `component_starting` | 组件 Start 开始 | Info |
+| `component_started` | 组件 Start 成功（含耗时） | Info |
+| `component_start_failed` | 组件 Start 失败 | Error |
+| `component_stop_failed` | 组件 Stop 失败（不阻断其余） | Error |
+| `drain_started` | 进入 Draining（含 reason） | Info |
+| `drain_completed` | 排空完成（含耗时） | Info |
+| `drain_timed_out` | 排空超时（含耗时） | Info |
+
+检索示例：`grep "\[event:drain_timed_out\]"` 找出所有排空超时的实例。
 
