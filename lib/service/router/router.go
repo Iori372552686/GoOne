@@ -82,6 +82,35 @@ func (r *Router) InitAndRun(selfBusId string, cb CbOnRecvSSPacket, busMQAddr str
 	return nil
 }
 
+// InitAndRunWithBusCtor 与 InitAndRun 相同，但使用调用方提供的 bus 创建函数
+// （busCtor），取代包级 bus.CreateBus（依赖 driver/all 的 init 注册）。
+//
+// busCtor 接收 router 的 onRecvMsg 回调（在 router 设置好 cbOnRecvSSPacket 后传入），
+// 返回一个 bus.IBus。这让服务可以用 bus.DriverRegistry 显式装配只链接所需 MQ driver
+// （如只 rabbitmq），缩小二进制与漏洞面（roadmap P2-03 前置）。bus 所有权移交 Router：
+// Close 时由 Router 关闭。
+func (r *Router) InitAndRunWithBusCtor(selfBusId string, cb CbOnRecvSSPacket,
+	busCtor func(onRecvMsg bus.MsgHandler) (bus.IBus, error),
+	routeRules map[uint32]uint32, registerAddr string) error {
+	r.beginShutdownOnce = sync.Once{}
+	r.closeOnce = sync.Once{}
+	r.shuttingDown.Store(false)
+	if err := r.instanceMgr.InitAndRun(selfBusId, routeRules, registerAddr); err != nil {
+		return err
+	}
+
+	r.cbOnRecvSSPacket = cb
+	busImpl, err := busCtor(r.onRecvBusMsg)
+	if err != nil {
+		return fmt.Errorf("failed to create bus implement: %w", err)
+	}
+	if busImpl == nil {
+		return errors.New("failed to create bus implement: nil bus")
+	}
+	r.busImpl = busImpl
+	return nil
+}
+
 func (r *Router) BeginShutdown() {
 	r.beginShutdownOnce.Do(func() {
 		r.shuttingDown.Store(true)
@@ -349,6 +378,13 @@ func SelfSvrType() uint32 { return defaultRouter.SelfSvrType() }
 func InitAndRun(selfBusId string, cb CbOnRecvSSPacket, busMQAddr string,
 	routeRules map[uint32]uint32, registerAddr string) error {
 	return defaultRouter.InitAndRun(selfBusId, cb, busMQAddr, routeRules, registerAddr)
+}
+
+// InitAndRunWithBusCtor 是 InitAndRunWithBusCtor 方法的包级包装（走 defaultRouter）。
+func InitAndRunWithBusCtor(selfBusId string, cb CbOnRecvSSPacket,
+	busCtor func(bus.MsgHandler) (bus.IBus, error),
+	routeRules map[uint32]uint32, registerAddr string) error {
+	return defaultRouter.InitAndRunWithBusCtor(selfBusId, cb, busCtor, routeRules, registerAddr)
 }
 
 func BeginShutdown() { defaultRouter.BeginShutdown() }

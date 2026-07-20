@@ -12,6 +12,7 @@ import (
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
+	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
@@ -151,6 +152,10 @@ type RouterComponent struct {
 	Common         func() Common
 	OnRecvSSPacket func(*sharedstruct.SSPacket) // 可选；为 nil 时默认投到 TransMgr。
 	TransMgr       transaction.ITransactionMgr
+	// Drivers 是可选的显式 Driver 注册表。设置时，Start 用它创建 bus（只链接注册的
+	// driver，缩小二进制），取代包级 bus.CreateBus（依赖 driver/all）。不设置时走默认
+	// driver/all 路径（向后兼容）。这是 roadmap P2-03 的前置能力。
+	Drivers *bus.DriverRegistry
 }
 
 // Name 实现 runtime.Component。
@@ -166,6 +171,17 @@ func (r *RouterComponent) Start(_ context.Context) error {
 			mgr.ProcessSSPacket(packet)
 		}
 	}
+	// 显式 DriverRegistry 路径：只链接注册的 driver。
+	if r.Drivers != nil {
+		selfBusInt := bus.IpStringToInt(c.SelfBusId)
+		addr := c.BusMQAddr
+		drivers := r.Drivers
+		busCtor := func(onRecvMsg bus.MsgHandler) (bus.IBus, error) {
+			return drivers.CreateBus(selfBusInt, onRecvMsg, addr)
+		}
+		return router.InitAndRunWithBusCtor(c.SelfBusId, onRecv, busCtor, misc.ServerRouteRules, c.RegisterAddr)
+	}
+	// 默认路径：包级 bus.CreateBus（依赖 driver/all 的 init 注册）。
 	if err := router.InitAndRun(
 		c.SelfBusId,
 		onRecv,
