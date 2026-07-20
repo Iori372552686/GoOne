@@ -107,13 +107,14 @@ func (a *App) startComponents(ctx context.Context) ([]Component, error) {
 	started := make([]Component, 0, len(components))
 	for _, c := range components {
 		name := c.Name()
-		logger.Infof("%s starting component %q", a.name, name)
+		logEvent(eventComponentStarting, a.name, "component "+name)
 		if a.tracker != nil {
 			a.tracker.MarkStarting(name)
 		}
 		begin := time.Now()
 		if err := c.Start(ctx); err != nil {
 			logger.Errorf("%s component %q start failed | %v", a.name, name, err)
+			logEventError(eventComponentStartFailed, a.name+"."+name, err)
 			if a.tracker != nil {
 				a.tracker.MarkStartFailed(name, err)
 			}
@@ -126,7 +127,7 @@ func (a *App) startComponents(ctx context.Context) ([]Component, error) {
 			a.tracker.MarkStarted(name, time.Since(begin))
 		}
 		started = append(started, c)
-		logger.Infof("%s component %q started", a.name, name)
+		logEventf(eventComponentStarted, a.name, "component %s (%.3fs)", name, time.Since(begin).Seconds())
 	}
 	return started, nil
 }
@@ -217,6 +218,11 @@ func (a *App) drainComponents(src signalSource) error {
 	// 上报排空耗时与是否超时（drainCtx 被超时取消即视为超时）。
 	timedOut := drainCtx.Err() == context.DeadlineExceeded
 	observeDrain(time.Since(drainStart).Seconds(), timedOut)
+	if timedOut {
+		logEventf(eventDrainTimedOut, a.name, "after %.3fs", time.Since(drainStart).Seconds())
+	} else {
+		logEventf(eventDrainCompleted, a.name, "in %.3fs", time.Since(drainStart).Seconds())
+	}
 	return errors.Join(errs...)
 }
 
@@ -235,6 +241,7 @@ func (a *App) stopComponents(started []Component, timeout time.Duration) error {
 		}
 		if err := c.Stop(stopCtx); err != nil && !errors.Is(err, context.Canceled) {
 			logger.Errorf("%s component %q stop failed | %v", a.name, name, err)
+			logEventError(eventComponentStopFailed, a.name+"."+name, err)
 			errs = append(errs, err)
 		}
 		if a.tracker != nil {
@@ -284,7 +291,7 @@ func (a *App) enterDraining(ctx context.Context, reason string) {
 	a.phaseSince = time.Now()
 	a.drainReason = reason
 	a.stateMu.Unlock()
-	logger.Infof("%s draining (reason=%s)", a.name, reason)
+	logEventf(eventDrainStarted, a.name, "reason=%s", reason)
 }
 
 func (a *App) enterStopping(ctx context.Context) {
