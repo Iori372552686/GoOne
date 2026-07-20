@@ -10,6 +10,45 @@
 - **SS 协议头升级 v2（54B → 86B）**：追加 `TraceID(16B)/SpanID(8B)/DeadlineUnixMs(8B)`
   实现全链路 trace 透传与级联超时。新旧节点头长不一致，**集群必须整组发版，
   不支持滚动混布**。
+- **核心生命周期现代化（P0）**：删除 `lib/service/application`（全局单例 + 10ms Tick
+  + Fatal）与 `lib/service/bootstrap`（ServiceApp Hook + admin）。六个服务全部迁移到
+  `lib/service/runtime.App.Run` + Component 生命周期。详见
+  [`docs/architecture_review_2026-07-v2.md`](docs/architecture_review_2026-07-v2.md)。
+  **配置/协议/持久化格式不变**，但服务装配方式改变（`busapp.New` → `runtime.App` +
+  Component）。
+
+### Added — 核心现代化（P0 + P1）
+
+- **`lib/service/runtime`**：统一 App.Run + Component/Quiescer/Drainer 生命周期、
+  Ready/Allocated/Draining 状态机、StateObserver、AdminComponent（statez/healthz/
+  readyz/components/metrics，默认 loopback）、Module/Registry 装配、Gateway
+  Quiesce/Drain 契约 + SessionTracker。
+- **`lib/service/appconfig`**：不可变配置 Store[T] + 安全局部重载（白名单/
+  restart_required/深拷贝防别名/原子交换）。
+- **`lib/service/scheduler`**：受生命周期管理的周期 Task（NonOverlap 跳过、Stop join
+  在途、panic 不杀 loop）。mainsvr 角色心跳（1 分钟）、roomcentersvr 房间 Tick（5s）+
+  Persist（10s）。
+- **`lib/service/ssrpc.Registry`**：Binding 批量原子注册 + Dispatcher.Seal 只读 map，
+  DispatchWS 热路径无锁（2.84ns vs 旧 10.18ns，-72%）。
+- **`lib/service/bus.DriverRegistry`**：显式 Driver 描述符装配（重复报错、未链接报错）。
+- **`lib/util/bufpool.Acquire/Release`**：Buffer Lease（0-alloc），tcp/ws/kcp 写队列
+  全部迁移（7.5ns/0alloc vs 旧 Get/Put 18.7ns/1alloc）。
+- **网关排空**：tcp/ws/kcp listener 字段化 + Quiesce（停接新连接保既有）/Stop（强制
+  关闭全部），connsvr 实现完整 Quiescer。
+- **可观测性指标**：`goone_lifecycle_state`/`component_start_duration`/
+  `drain_duration`/`task_duration`/`task_skipped`/`config_reload`。
+- **CI**：race 扩充 runtime/appconfig/scheduler/bus/bufpool；lint 去除
+  continue-on-error（阻断合并）；旧生命周期 API 静态扫描；docs link check。
+- **STYLE.md**：第 2 节注释统一中文（硬性规则）；第 11 节 P0 迭代规范。
+- 真实环境联调验证通过（六服务 Ready + tester ALL PASSED + admin 端点）。
+
+### Removed
+
+- `lib/service/application`（全局单例 AppInterface + 10ms Tick 循环 + Init Fatal）。
+- `lib/service/bootstrap`（ServiceApp Hook + admin server + busapp 装配层）。
+- 全局 10ms Tick（替换为精确周期 Task）。
+- `runtime.GOMAXPROCS(NumCPU()+1)` 调用（Go 1.25 自动管理）。
+- 启动路径的 `logger.Fatalf`。
 
 ### Added
 
@@ -37,7 +76,7 @@
 - `RoleMgr.FlushAllToDB`：优雅停机时全量落盘在线角色。
 - CI（GitHub Actions：build/vet/test/race/check-genproto/lint 增量）、`.golangci.yml`。
 - 性能基线与优化对比报告：`docs/benchmarks/baseline.md`。
-- 文档：架构评审（`docs/architecture_review_2026-07.md`）、迭代计划（`docs/optimization_roadmap.md`）、
+- 文档：架构评审（`docs/architecture_review_2026-07-v2.md`）、迭代计划（`docs/optimization_roadmap.md`）、
   代码风格规范（`docs/STYLE.md`）、`CONTRIBUTING.md`。
 
 ### Changed

@@ -190,21 +190,35 @@ func (b *BusImplRabbitMQ) run(rabbitmqAddr string) {
 	}
 }
 
-func init() {
-	bus.RegisterBus("rabbitmq", func(selfBusId uint32, onRecvMsg bus.MsgHandler, conf any) (bus.IBus, error) {
-		switch v := conf.(type) {
-		case string:
-			if v == "" {
-				return nil, fmt.Errorf("rabbitmq addr is empty")
-			}
-			return NewBusImplRabbitMQ(selfBusId, onRecvMsg, v), nil
-		case bus.RabbitMQConfig:
-			if v.Addr == "" {
-				return nil, fmt.Errorf("rabbitmq addr is empty")
-			}
-			return NewBusImplRabbitMQ(selfBusId, onRecvMsg, v.Addr), nil
-		default:
-			return nil, fmt.Errorf("rabbitmq unsupported config type %T", conf)
+// DriverName 是本 driver 注册时使用的 implType 字符串。
+const DriverName = "rabbitmq"
+
+// newBus 是具体 ctor，同时被遗留的 func init 注册与显式 Driver() 描述符共用，使两
+// 条路径不会分叉。
+func newBus(selfBusId uint32, onRecvMsg bus.MsgHandler, conf any) (bus.IBus, error) {
+	switch v := conf.(type) {
+	case string:
+		if v == "" {
+			return nil, fmt.Errorf("rabbitmq addr is empty")
 		}
-	})
+		return NewBusImplRabbitMQ(selfBusId, onRecvMsg, v), nil
+	case bus.RabbitMQConfig:
+		if v.Addr == "" {
+			return nil, fmt.Errorf("rabbitmq addr is empty")
+		}
+		return NewBusImplRabbitMQ(selfBusId, onRecvMsg, v.Addr), nil
+	default:
+		return nil, fmt.Errorf("rabbitmq unsupported config type %T", conf)
+	}
+}
+
+// Driver 返回用于装配期注册的显式 driver 描述符。只想链接本 driver 的应用，应通过
+// bus.DriverRegistry.MustRegister(rabbitmq.Driver()) 注册，而非 blank-import
+// driver/all。
+func Driver() bus.Driver {
+	return bus.Driver{Name: DriverName, Ctor: newBus}
+}
+
+func init() {
+	bus.RegisterBus(DriverName, newBus)
 }

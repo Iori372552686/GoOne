@@ -3,6 +3,7 @@ package ws_server
 import (
 	"fmt"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/util/bufpool"
 	"github.com/gin-gonic/gin"
 	"net"
 	"net/http"
@@ -39,13 +40,18 @@ func (self *WsTcpSvr) RunGinWs(mode string, wsPort int) error {
 
 // WsPage is gin websocket handler
 func (self *WsTcpSvr) wsGinPageUpgrader(c *gin.Context) {
+	// Quiesce 后拒绝新 Upgrade（roadmap P0-07）。
+	if !self.accepting.Load() {
+		http.Error(c.Writer, "shutting down", http.StatusServiceUnavailable)
+		return
+	}
 	socket, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		http.NotFound(c.Writer, c.Request)
 		return
 	}
 
-	chanWrite := make(chan []byte, 100)
+	chanWrite := make(chan *bufpool.Buffer, 100)
 	self.lockOfConnInfo.Lock()
 	self.mapOfConnInfo[socket.NetConn()] = chanWrite
 	self.lockOfConnInfo.Unlock()

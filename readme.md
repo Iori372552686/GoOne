@@ -22,9 +22,10 @@ image
 更详细的运行时与协议说明见：
 
 - `[docs/ssrpc_idl.md](docs/ssrpc_idl.md)`（ssrpc / IDL 方案）
-- `[docs/architecture_review_2026-07.md](docs/architecture_review_2026-07.md)`（架构评审与对标分析）
-- `[docs/optimization_roadmap.md](docs/optimization_roadmap.md)`（优化迭代计划与进展）
+- `[docs/architecture_review_2026-07-v2.md](docs/architecture_review_2026-07-v2.md)`（架构复审 v2：生命周期、模块化与性能治理）
+- `[docs/optimization_roadmap.md](docs/optimization_roadmap.md)`（核心现代化 P0/P1/P2 执行计划）
 - `[docs/STYLE.md](docs/STYLE.md)`（代码风格规范）
+- `[docs/observability/README.md](docs/observability/README.md)`（可观测性：指标 / Trace / 日志）
 - `[docs/benchmarks/baseline.md](docs/benchmarks/baseline.md)`（性能基线与优化对比）
 
 ---

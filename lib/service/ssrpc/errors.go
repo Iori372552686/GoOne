@@ -10,6 +10,26 @@ import (
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
+// 注册/分发层的哨兵错误。调用方可用 errors.Is 区分；它们不会被不透明包装。
+var (
+	// ErrDispatcherSealed 由 Register*E 返回（并由遗留的无返回值 Register* 方法记
+	// 录日志），在对已 Seal 的 Dispatcher 尝试注册时触发。
+	ErrDispatcherSealed = errors.New("ssrpc: dispatcher 已 seal")
+	// ErrNilDispatcher 在注册目标 Dispatcher 为 nil 时返回。
+	ErrNilDispatcher = errors.New("ssrpc: nil dispatcher")
+	// ErrNilHandler 在注册 nil handler 时返回。
+	ErrNilHandler = errors.New("ssrpc: nil handler")
+	// ErrRegistrySealed 在 Seal 后对 Registry 尝试变更时返回。
+	ErrRegistrySealed = errors.New("ssrpc: registry 已 seal")
+	// ErrDuplicateBinding 在某 Binding key 与已注册项冲突时返回（同批次内或与既有
+	// 状态冲突）。
+	ErrDuplicateBinding = errors.New("ssrpc: 重复的 binding")
+	// ErrEmptyService 在 Register 时服务名为空时返回。
+	ErrEmptyService = errors.New("ssrpc: 服务名为空")
+	// ErrInvalidBinding 在 Binding 畸形（缺 key、kind 错误等）时返回。
+	ErrInvalidBinding = errors.New("ssrpc: 非法 binding")
+)
+
 // Error is the canonical error type for GoOne RPC handlers.
 //
 // Generated wrappers will map returned error to g1_protocol.ErrorCode via ToErrorCode().

@@ -1,13 +1,19 @@
 package roomcentersvr
 
 import (
+	"context"
+	"fmt"
+	"time"
+
 	roomcenterv1 "github.com/Iori372552686/GoOne/api/gen/game/roomcenter/v1"
 	"github.com/Iori372552686/GoOne/common/gamedata"
 	"github.com/Iori372552686/GoOne/common/gconf"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
-	"github.com/Iori372552686/GoOne/lib/service/bootstrap"
-	"github.com/Iori372552686/GoOne/lib/service/bootstrap/busapp"
+	"github.com/Iori372552686/GoOne/lib/service/router"
+	"github.com/Iori372552686/GoOne/lib/service/runtime"
+	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
+	"github.com/Iori372552686/GoOne/lib/service/scheduler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	"github.com/Iori372552686/GoOne/lib/util/idgen"
@@ -21,46 +27,11 @@ import (
 	pb "github.com/Iori372552686/game_protocol/protocol"
 )
 
-func NewApp() *bootstrap.ServiceApp {
-	return busapp.New(busapp.Options{
-		ServiceName: "roomcentersvr",
-		ServerType:  misc.ServerType_RoomCenterSvr,
-		LoadConfig: func() error {
-			if err := gconf.LoadRoomCenterConfig(*gconf.SvrConfFile); err != nil {
-				return err
-			}
-			if gconf.RoomCenterSvrCfg.Dependencies.GameDataDir != "" {
-				logger.Infof("Loading local file by gameconf_dir: %v ", gconf.RoomCenterSvrCfg.Dependencies.GameDataDir)
-				if err := gamedata.InitLocal(gconf.RoomCenterSvrCfg.Dependencies.GameDataDir); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Common: func() busapp.Common {
-			c := &gconf.RoomCenterSvrCfg
-			return busapp.Common{
-				LogDir:       c.Debug.LogDir,
-				LogLevel:     c.Debug.LogLevel,
-				SelfBusId:    c.Identity.SelfBusId,
-				BusMQAddr:    c.CommonRuntime.BusMQAddr,
-				RegisterAddr: c.CommonRuntime.RegisterAddr,
-				AdminEnabled: c.CommonRuntime.AdminServer.Enabled,
-				AdminIP:      c.CommonRuntime.AdminServer.IP,
-				AdminPort:    c.CommonRuntime.AdminServer.Port,
-				Pprof:        c.CommonDebug.Pprof,
-				Tracing: ssrpc.TracingConfig{
-					Enabled:      c.CommonRuntime.Tracing.Enabled,
-					Exporter:     c.CommonRuntime.Tracing.Exporter,
-					Endpoint:     c.CommonRuntime.Tracing.Endpoint,
-					Insecure:     c.CommonRuntime.Tracing.Insecure,
-					SamplerRatio: c.CommonRuntime.Tracing.SamplerRatio,
-					Headers:      c.CommonRuntime.Tracing.Headers,
-				},
-			}
-		},
-		TransMgr: globals.TransMgr,
-		TransConfig: func() transaction.TransactionMgrConfig {
+// NewApp 用 runtime.App + Component 装配 roomcentersvr。
+func NewApp() *runtime.App {
+	transMgr := &bussvc.TransMgrComponent{
+		Mgr: globals.TransMgr,
+		Cfg: func() transaction.TransactionMgrConfig {
 			transShardCount := gconf.RoomCenterSvrCfg.Capacity.TransShardCount
 			if transShardCount <= 0 {
 				transShardCount = transaction.DefaultShardCount()
@@ -72,7 +43,11 @@ func NewApp() *bootstrap.ServiceApp {
 				MaxPendingPerKey: 200,
 			}
 		},
-		InitDeps: func() error {
+	}
+
+	businessDeps := &bussvc.FuncComponent{
+		ComponentName: "business_deps",
+		OnStart: func(_ context.Context) error {
 			idGen, err := idgen.NewIDGen()
 			if err != nil {
 				return err
@@ -93,7 +68,11 @@ func NewApp() *bootstrap.ServiceApp {
 			}
 			return nil
 		},
-		RegisterHandlers: func() error {
+	}
+
+	registerHandlers := &bussvc.FuncComponent{
+		ComponentName: "ssrpc_register",
+		OnStart: func(_ context.Context) error {
 			srv := roomcenterv1.NewRoomCenterInnerServiceSServer(&service.RoomCenterInnerServiceImpl{}, ssrpc.DefaultMWOptions{})
 			d := ssrpc.NewDispatcher()
 			roomcenterv1.RegisterRoomCenterInnerServiceToDispatcher(d, srv)
@@ -101,31 +80,128 @@ func NewApp() *bootstrap.ServiceApp {
 			logger.RegisterCmdBacklist(uint32(pb.CMD_ROOM_CENTER_INNER_TICK_REQ))
 			return nil
 		},
-		StartExtra: func() error {
+	}
+
+	routerComp := &bussvc.RouterComponent{
+		Common:   roomCommon,
+		TransMgr: globals.TransMgr,
+	}
+	tracing := &bussvc.TracingComponent{
+		ServiceName: "roomcentersvr",
+		Cfg:         func() ssrpc.TracingConfig { return roomCommon().Tracing },
+	}
+
+	// 房间初始化：RoomListMgr.Init + 从 Redis 恢复房间快照 + AI 初始化房间。必须在
+	// router 起来之后。
+	roomInit := &bussvc.FuncComponent{
+		ComponentName: "room_init",
+		OnStart: func(_ context.Context) error {
 			if err := globals.RoomListMgr.Init(); err != nil {
 				return err
 			}
-			// 启动时从 Redis 恢复房间快照（任务 2.5）。
+			// 启动时从 Redis 恢复房间快照。
 			globals.RoomListMgr.LoadAllFromDB()
 			safego.Go(func() {
 				room_ai.OnAiInitRoom()
 			})
 			return nil
 		},
-		OnTick: func(_, nowMs int64) {
-			safego.Go(func() {
-				globals.RoomListMgr.Tick(nowMs)
-			})
-			// 周期持久化变更的房间快照（与 tick 节流分离，独立节拍）。
-			safego.Go(func() {
-				globals.RoomListMgr.TickPersist(nowMs)
-			})
-		},
-		OnExit: func() {
-			logger.Infof("================== roomcentersvr Stop =========================")
-			// 停机前强制全量写所有房间，避免数据丢失。
-			saved, failed := globals.RoomListMgr.FlushAllToDB()
-			logger.Infof("roomcentersvr flush rooms on exit {saved:%d, failed:%d}", saved, failed)
-		},
+	}
+
+	// 房间 Tick：原 OnTick 每 10ms 创建两个 goroutine（Tick + TickPersist）。替换为两
+	// 个精确周期的 Task（Tick 5s、Persist 10s），NonOverlap 默认禁止重入，空闲时不
+	// 再每 10ms 唤醒，也不再每秒创建约 200 个短命 goroutine。
+	roomTick := scheduler.New("room_tick", 5*time.Second, func(_ context.Context) error {
+		globals.RoomListMgr.Tick(time.Now().UnixMilli())
+		return nil
 	})
+	roomPersist := scheduler.New("room_persist", 10*time.Second, func(_ context.Context) error {
+		globals.RoomListMgr.TickPersist(time.Now().UnixMilli())
+		return nil
+	})
+
+	// 房间落盘：原 OnExit。TransMgr 排空后全量落盘，避免数据丢失。作为 Drainer。
+	roomFlush := &roomFlushComponent{}
+	logComp := &bussvc.LoggerComponent{
+		Cfg: func() bussvc.LoggerConfig {
+			c := roomCommon()
+			return bussvc.LoggerConfig{Dir: c.LogDir, Level: c.LogLevel, Name: "roomcentersvr"}
+		},
+	}
+
+	app, err := runtime.New("roomcentersvr",
+		runtime.WithLoadConfig(func(_ context.Context) error {
+			if err := gconf.LoadRoomCenterConfig(*gconf.SvrConfFile); err != nil {
+				return err
+			}
+			if gconf.RoomCenterSvrCfg.Dependencies.GameDataDir != "" {
+				logger.Infof("Loading local file by gameconf_dir: %v ", gconf.RoomCenterSvrCfg.Dependencies.GameDataDir)
+				if err := gamedata.InitLocal(gconf.RoomCenterSvrCfg.Dependencies.GameDataDir); err != nil {
+					return err
+				}
+			}
+			return nil
+		}),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("runtime.New roomcentersvr: %v", err))
+	}
+
+	rc := roomCommon()
+	tracker := runtime.NewComponentTracker(nil)
+	adminComp := runtime.NewAdminComponent(app, tracker,
+		runtime.WithAdminListen(rc.AdminIP, rc.AdminPort),
+		runtime.WithAdminPprof(rc.Pprof),
+		runtime.WithAdminServiceName("roomcentersvr"),
+		runtime.WithAdminReadyCheck(router.ReadyCheck),
+	)
+
+	// Start 顺序：datetime 周期刷新 → logger → tracing → 业务依赖 → TransMgr → SSRPC 注册
+	// → router/bus → 房间初始化 → roomTick → roomPersist → roomFlush(Drainer) → admin。
+	// datetime_tick 放最前：room tick/房间初始化都依赖 datetime.NowMs()。
+	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, businessDeps, registerHandlers, transMgr, routerComp, roomInit, roomTick, roomPersist, roomFlush, adminComp} {
+		if err := app.Register(c); err != nil {
+			panic(fmt.Sprintf("roomcentersvr register %s: %v", c.Name(), err))
+		}
+	}
+	return app
+}
+
+// roomFlushComponent 在 Drain 阶段全量落盘所有房间（原 OnExit）。
+type roomFlushComponent struct{}
+
+func (roomFlushComponent) Name() string { return "room_flush" }
+func (roomFlushComponent) Start(_ context.Context) error { return nil }
+
+// Drain 实现 runtime.Drainer：TransMgr 已排空，强制全量写所有房间。
+func (roomFlushComponent) Drain(_ context.Context) error {
+	saved, failed := globals.RoomListMgr.FlushAllToDB()
+	logger.Infof("roomcentersvr flush rooms on drain {saved:%d, failed:%d}", saved, failed)
+	logger.Infof("================== roomcentersvr Stop =========================")
+	return nil
+}
+func (roomFlushComponent) Stop(_ context.Context) error { return nil }
+
+// roomCommon 从 gconf 产出 roomcentersvr 的 bus 服务共享配置段。
+func roomCommon() bussvc.Common {
+	c := &gconf.RoomCenterSvrCfg
+	return bussvc.Common{
+		LogDir:       c.Debug.LogDir,
+		LogLevel:     c.Debug.LogLevel,
+		SelfBusId:    c.Identity.SelfBusId,
+		BusMQAddr:    c.CommonRuntime.BusMQAddr,
+		RegisterAddr: c.CommonRuntime.RegisterAddr,
+		AdminEnabled: c.CommonRuntime.AdminServer.Enabled,
+		AdminIP:      c.CommonRuntime.AdminServer.IP,
+		AdminPort:    c.CommonRuntime.AdminServer.Port,
+		Pprof:        c.CommonDebug.Pprof,
+		Tracing: ssrpc.TracingConfig{
+			Enabled:      c.CommonRuntime.Tracing.Enabled,
+			Exporter:     c.CommonRuntime.Tracing.Exporter,
+			Endpoint:     c.CommonRuntime.Tracing.Endpoint,
+			Insecure:     c.CommonRuntime.Tracing.Insecure,
+			SamplerRatio: c.CommonRuntime.Tracing.SamplerRatio,
+			Headers:      c.CommonRuntime.Tracing.Headers,
+		},
+	}
 }

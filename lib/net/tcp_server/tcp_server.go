@@ -20,7 +20,7 @@ const (
 )
 
 type TcpConnInfo struct {
-	chanWrite chan []byte // passing 'nil' means close
+	chanWrite chan *bufpool.Buffer // passing 'nil' means close
 }
 
 type TcpSvr struct {
@@ -31,6 +31,11 @@ type TcpSvr struct {
 
 	lockOfConnInfo sync.RWMutex
 	mapOfConnInfo  map[net.Conn]TcpConnInfo
+
+	// listener 字段化（roadmap P0-07）：Quiesce 关闭 listener 停止接新连接但保留
+	// 既有连接；Stop 关闭 listener 与全部连接。StopCloseOnce 保证幂等。
+	listener       net.Listener
+	stopCloseOnce  sync.Once
 }
 
 func (s *TcpSvr) InitAndRun(ip string, port int, handler ITcpSvrEventHandler) error {
@@ -48,14 +53,35 @@ func (s *TcpSvr) InitAndRun(ip string, port int, handler ITcpSvrEventHandler) er
 		logger.Errorf("Failed to listen {err=%v}:", err.Error())
 		return err
 	}
+	s.listener = listener
 
 	logger.Infof("Listening on " + addr)
 	go s.runListener(listener)
 	return nil
 }
 
+// Quiesce 关闭 listener 停止接收新连接，但保留既有连接继续处理在途工作（roadmap
+// P0-07）。幂等。
+func (s *TcpSvr) Quiesce() {
+	s.stopCloseOnce.Do(func() {
+		if s.listener != nil {
+			_ = s.listener.Close() // 使 runListener 的 Accept 返回 err 并退出。
+		}
+	})
+}
+
+// Stop 关闭 listener 与全部已建立连接，用于排空超时后的强制关停。幂等。
+func (s *TcpSvr) Stop() {
+	s.Quiesce()
+	s.lockOfConnInfo.Lock()
+	for conn := range s.mapOfConnInfo {
+		_ = conn.Close()
+	}
+	s.lockOfConnInfo.Unlock()
+}
+
 func (s *TcpSvr) WriteData(conn net.Conn, data1 []byte, data2 []byte) error {
-	var chanWrite chan []byte = nil
+	var chanWrite chan *bufpool.Buffer = nil
 
 	s.lockOfConnInfo.RLock()
 	info, exists := s.mapOfConnInfo[conn]
@@ -68,23 +94,25 @@ func (s *TcpSvr) WriteData(conn net.Conn, data1 []byte, data2 []byte) error {
 		return fmt.Errorf("connection doesn't exist")
 	}
 
-	// 写缓冲从池中获取，由写协程在 conn.Write 完成后归还。
-	data := bufpool.Get(len(data1) + len(data2))
+	// 写缓冲从池中获取（Lease），由写协程在 conn.Write 完成后归还。
+	total := len(data1) + len(data2)
+	buf := bufpool.Acquire(total)
 	pos := 0
-	copy(data[pos:], data1)
+	copy(buf.Bytes[pos:], data1)
 	pos += len(data1)
-	copy(data[pos:], data2)
+	copy(buf.Bytes[pos:], data2)
 	pos += len(data2)
 
-	err := sendToWriteChan(chanWrite, data)
+	err := sendToWriteChan(chanWrite, buf)
 	if err != nil {
-		bufpool.Put(data)
+		// 入队失败：sender 释放 Lease。
+		bufpool.Release(buf)
 	}
 	return err
 }
 
 func (s *TcpSvr) Close(conn net.Conn) error {
-	var chanWrite chan []byte = nil
+	var chanWrite chan *bufpool.Buffer = nil
 
 	s.lockOfConnInfo.RLock()
 	info, exists := s.mapOfConnInfo[conn]
@@ -100,11 +128,11 @@ func (s *TcpSvr) Close(conn net.Conn) error {
 	return sendToWriteChan(chanWrite, nil)
 }
 
-// sendToWriteChan enqueues data (nil means close) with a bounded wait.
+// sendToWriteChan enqueues a buffer lease (nil means close) with a bounded wait.
 // The fast path avoids the timer allocation entirely.
-func sendToWriteChan(chanWrite chan []byte, data []byte) error {
+func sendToWriteChan(chanWrite chan *bufpool.Buffer, buf *bufpool.Buffer) error {
 	select {
-	case chanWrite <- data:
+	case chanWrite <- buf:
 		return nil
 	default:
 	}
@@ -112,7 +140,7 @@ func sendToWriteChan(chanWrite chan []byte, data []byte) error {
 	t := time.NewTimer(3 * time.Second)
 	defer t.Stop()
 	select {
-	case chanWrite <- data:
+	case chanWrite <- buf:
 		return nil
 	case <-t.C:
 		return fmt.Errorf("time out in 3 seconds")
@@ -129,7 +157,7 @@ func (s *TcpSvr) runListener(listener net.Listener) {
 			return
 		}
 
-		chanWrite := make(chan []byte, 100)
+		chanWrite := make(chan *bufpool.Buffer, 100)
 		s.lockOfConnInfo.Lock()
 		s.mapOfConnInfo[conn] = TcpConnInfo{chanWrite: chanWrite}
 		s.lockOfConnInfo.Unlock()
@@ -180,15 +208,15 @@ func (s *TcpSvr) destroyConn(conn net.Conn) {
 	s.lockOfConnInfo.Unlock()
 }
 
-func (s *TcpSvr) runConnWrite(conn net.Conn, chanWrite <-chan []byte) {
+func (s *TcpSvr) runConnWrite(conn net.Conn, chanWrite <-chan *bufpool.Buffer) {
 	for {
-		writeData, ok := <-chanWrite
+		buf, ok := <-chanWrite
 		if !ok { // chan is closed
 			logger.Debugf("chanWrite is closed {local:%v, remote:%v}", conn.LocalAddr(), conn.RemoteAddr())
 			break
 		}
 
-		if writeData == nil { // nil means close
+		if buf == nil { // nil means close
 			logger.Infof("A 'nil' is passed to chanWrite to close conn {local:%v, remote:%v}",
 				conn.LocalAddr(), conn.RemoteAddr())
 			_ = conn.Close()
@@ -196,10 +224,11 @@ func (s *TcpSvr) runConnWrite(conn net.Conn, chanWrite <-chan []byte) {
 		}
 
 		_ = conn.SetWriteDeadline(datetime.NowT().Add(s.TcpWriteTimeout))
-		sentLen, err := conn.Write(writeData)
-		bufpool.Put(writeData)
-		if sentLen < len(writeData) || err != nil { //todo: retry?
-			logger.Errorf("Failed to write tcp data {err:%v, dataLen: %v, sentLen: %v}", err, len(writeData), sentLen)
+		sentLen, err := conn.Write(buf.Bytes)
+		dataLen := len(buf.Bytes)
+		bufpool.Release(buf) // writer 完成（含出错）后释放 Lease，只释放一次。
+		if sentLen < dataLen || err != nil { //todo: retry?
+			logger.Errorf("Failed to write tcp data {err:%v, dataLen: %v, sentLen: %v}", err, dataLen, sentLen)
 			_ = conn.Close()
 			break
 		}

@@ -12,11 +12,11 @@ import (
 	"github.com/Iori372552686/GoOne/common/gamedata"
 	"github.com/Iori372552686/GoOne/common/gconf"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/lib/service/bootstrap"
+	"github.com/Iori372552686/GoOne/lib/service/runtime"
+	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/util/sensitive_words"
 	"github.com/Iori372552686/GoOne/lib/web/web_gin"
-	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/web_svr/controller"
 	"github.com/Iori372552686/GoOne/src/web_svr/globals"
 	"google.golang.org/grpc"
@@ -25,99 +25,53 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-type webRuntime struct {
+// webRuntimeComponent 把 websvr 的依赖初始化、HTTP/gRPC 启停包成单个 Component。
+// 它实现 Drainer：HTTP 用 Shutdown、gRPC 用 GracefulStop；超时后强制 Stop。
+type webRuntimeComponent struct {
 	mu      sync.RWMutex
 	httpSrv *http.Server
 	grpcSrv *grpc.Server
 }
 
-func NewApp() *bootstrap.ServiceApp {
-	runtime := &webRuntime{}
-	return bootstrap.NewServiceApp(bootstrap.Options{
-		ServiceName: "websvr",
-		LoadConfig: func() error {
-			if err := gconf.LoadWebConfig(*gconf.SvrConfFile); err != nil {
-				return err
-			}
-			logger.Infof("svr_conf: %+v", gconf.WebSvrCfg)
-			if gconf.WebSvrCfg.Dependencies.GameDataDir != "" {
-				logger.Infof("Loading local file by gameconf_dir: %v ", gconf.WebSvrCfg.Dependencies.GameDataDir)
-				if err := gamedata.InitLocal(gconf.WebSvrCfg.Dependencies.GameDataDir); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		LoggerConfig: func() bootstrap.LoggerConfig {
-			return bootstrap.LoggerConfig{
-				Dir:   gconf.WebSvrCfg.Debug.LogDir,
-				Level: gconf.WebSvrCfg.Debug.LogLevel,
-				Name:  "websvr",
-			}
-		},
-		AdminConfig: func() bootstrap.AdminConfig {
-			return bootstrap.NewAdminConfig(
-				"websvr",
-				misc.ServerType_WebSvr,
-				gconf.WebSvrCfg.CommonRuntime.AdminServer.Enabled,
-				gconf.WebSvrCfg.CommonDebug.Pprof,
-				gconf.WebSvrCfg.CommonRuntime.AdminServer.IP,
-				gconf.WebSvrCfg.CommonRuntime.AdminServer.Port,
-			)
-		},
-		ComponentStatuses: func() []bootstrap.ComponentStatus {
-			return runtime.componentStatuses()
-		},
-		InitDeps: func() error {
-			if err := ssrpc.InitTracing("websvr", ssrpc.TracingConfig{
-				Enabled:      gconf.WebSvrCfg.CommonRuntime.Tracing.Enabled,
-				Exporter:     gconf.WebSvrCfg.CommonRuntime.Tracing.Exporter,
-				Endpoint:     gconf.WebSvrCfg.CommonRuntime.Tracing.Endpoint,
-				Insecure:     gconf.WebSvrCfg.CommonRuntime.Tracing.Insecure,
-				SamplerRatio: gconf.WebSvrCfg.CommonRuntime.Tracing.SamplerRatio,
-				Headers:      gconf.WebSvrCfg.CommonRuntime.Tracing.Headers,
-			}); err != nil {
-				return err
-			}
-			if err := globals.RedisMgr.InitAndRun(gconf.WebSvrCfg.Dependencies.DbInstances); err != nil {
-				return err
-			}
-			globals.SignMgr.InitAndRun(gconf.WebSvrCfg.Dependencies.HTTPSigns)
-			globals.RestMgr.Init(gconf.WebSvrCfg.Dependencies.RestApiConf, globals.SignMgr)
-			sensitive_words.Init(gconf.WebSvrCfg.Dependencies.SensitiveWordsFile)
-			return nil
-		},
-		StartRuntime: func() error {
-			httpSrv, err := web_gin.StartGin(gconf.WebSvrCfg.Runtime.HttpServer, controller.LoadWebRoutes)
-			if err != nil {
-				return err
-			}
-			runtime.setHTTPServer(httpSrv)
-			if err := runtime.startGRPCServer(); err != nil {
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				_ = runtime.shutdown(ctx)
-				return err
-			}
-			return nil
-		},
-		OnProc: func() bool {
-			return true
-		},
-		OnShutdown: func(ctx context.Context) error {
-			shutdownErr := runtime.shutdown(ctx)
-			if err := ssrpc.ShutdownTracing(ctx); err != nil {
-				shutdownErr = errors.Join(shutdownErr, err)
-			}
-			return shutdownErr
-		},
-		OnExit: func() {
-			logger.Infof("================== websvr Stop =========================")
-		},
-	})
+// Name 实现 runtime.Component。
+func (w *webRuntimeComponent) Name() string { return "web_runtime" }
+
+// Start 实现 runtime.Component：初始化依赖 + 启动 HTTP/gRPC。Start 失败时自行清理。
+func (w *webRuntimeComponent) Start(_ context.Context) error {
+	if err := globals.RedisMgr.InitAndRun(gconf.WebSvrCfg.Dependencies.DbInstances); err != nil {
+		return err
+	}
+	globals.SignMgr.InitAndRun(gconf.WebSvrCfg.Dependencies.HTTPSigns)
+	globals.RestMgr.Init(gconf.WebSvrCfg.Dependencies.RestApiConf, globals.SignMgr)
+	sensitive_words.Init(gconf.WebSvrCfg.Dependencies.SensitiveWordsFile)
+
+	httpSrv, err := web_gin.StartGin(gconf.WebSvrCfg.Runtime.HttpServer, controller.LoadWebRoutes)
+	if err != nil {
+		return err
+	}
+	w.setHTTPServer(httpSrv)
+	if err := w.startGRPCServer(); err != nil {
+		// 回滚已起的 HTTP。
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = w.shutdown(ctx)
+		return err
+	}
+	return nil
 }
 
-func (r *webRuntime) startGRPCServer() error {
+// Drain 实现 runtime.Drainer：graceful 停 HTTP（Shutdown）与 gRPC（GracefulStop）。
+func (w *webRuntimeComponent) Drain(ctx context.Context) error {
+	return w.shutdown(ctx)
+}
+
+// Stop 实现 runtime.Component：强制关闭残留连接。
+func (w *webRuntimeComponent) Stop(_ context.Context) error {
+	logger.Infof("================== websvr Stop =========================")
+	return nil
+}
+
+func (w *webRuntimeComponent) startGRPCServer() error {
 	conf := gconf.WebSvrCfg.Runtime.GRPCServer
 	if !conf.Enabled {
 		return nil
@@ -141,7 +95,7 @@ func (r *webRuntime) startGRPCServer() error {
 	healthSrv.SetServingStatus("web.websvr.v1.WebApiService", grpc_health_v1.HealthCheckResponse_SERVING)
 	grpc_health_v1.RegisterHealthServer(srv, healthSrv)
 	reflection.Register(srv)
-	r.setGRPCServer(srv)
+	w.setGRPCServer(srv)
 
 	go func() {
 		logger.Infof("------ gRPC Server Running by %v ------", addr)
@@ -152,9 +106,9 @@ func (r *webRuntime) startGRPCServer() error {
 	return nil
 }
 
-func (r *webRuntime) shutdown(ctx context.Context) error {
+func (w *webRuntimeComponent) shutdown(ctx context.Context) error {
 	var shutdownErr error
-	grpcSrv := r.getGRPCServer()
+	grpcSrv := w.getGRPCServer()
 	if grpcSrv != nil {
 		done := make(chan struct{})
 		go func() {
@@ -169,9 +123,9 @@ func (r *webRuntime) shutdown(ctx context.Context) error {
 				shutdownErr = ctx.Err()
 			}
 		}
-		r.setGRPCServer(nil)
+		w.setGRPCServer(nil)
 	}
-	httpSrv := r.getHTTPServer()
+	httpSrv := w.getHTTPServer()
 	if httpSrv != nil {
 		if err := httpSrv.Shutdown(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Errorf("http shutdown error | %v", err)
@@ -179,118 +133,95 @@ func (r *webRuntime) shutdown(ctx context.Context) error {
 				shutdownErr = err
 			}
 		}
-		r.setHTTPServer(nil)
+		w.setHTTPServer(nil)
 	}
 	return shutdownErr
 }
 
-func (r *webRuntime) setHTTPServer(srv *http.Server) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.httpSrv = srv
+func (w *webRuntimeComponent) setHTTPServer(srv *http.Server) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.httpSrv = srv
 }
 
-func (r *webRuntime) getHTTPServer() *http.Server {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.httpSrv
+func (w *webRuntimeComponent) getHTTPServer() *http.Server {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.httpSrv
 }
 
-func (r *webRuntime) setGRPCServer(srv *grpc.Server) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.grpcSrv = srv
+func (w *webRuntimeComponent) setGRPCServer(srv *grpc.Server) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.grpcSrv = srv
 }
 
-func (r *webRuntime) getGRPCServer() *grpc.Server {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.grpcSrv
+func (w *webRuntimeComponent) getGRPCServer() *grpc.Server {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.grpcSrv
 }
 
-func (r *webRuntime) componentStatuses() []bootstrap.ComponentStatus {
-	return buildWebComponentStatuses(
-		globals.RedisMgr.InstanceCount(),
-		globals.SignMgr.Count(),
-		globals.RestMgr.Count(),
-		r.getHTTPServer(),
-		gconf.WebSvrCfg.Runtime.HttpServer,
-		r.getGRPCServer(),
-		gconf.WebSvrCfg.Runtime.GRPCServer,
+// NewApp 用 runtime.App + Component 装配 websvr（非 bus 服务：HTTP + 可选 gRPC）。
+func NewApp() *runtime.App {
+	web := &webRuntimeComponent{}
+
+	tracing := &bussvc.TracingComponent{
+		ServiceName: "websvr",
+		Cfg: func() ssrpc.TracingConfig {
+			t := gconf.WebSvrCfg.CommonRuntime.Tracing
+			return ssrpc.TracingConfig{
+				Enabled:      t.Enabled,
+				Exporter:     t.Exporter,
+				Endpoint:     t.Endpoint,
+				Insecure:     t.Insecure,
+				SamplerRatio: t.SamplerRatio,
+				Headers:      t.Headers,
+			}
+		},
+	}
+	logComp := &bussvc.LoggerComponent{
+		Cfg: func() bussvc.LoggerConfig {
+			return bussvc.LoggerConfig{
+				Dir:   gconf.WebSvrCfg.Debug.LogDir,
+				Level: gconf.WebSvrCfg.Debug.LogLevel,
+				Name:  "websvr",
+			}
+		},
+	}
+
+	app, err := runtime.New("websvr",
+		runtime.WithLoadConfig(func(_ context.Context) error {
+			if err := gconf.LoadWebConfig(*gconf.SvrConfFile); err != nil {
+				return err
+			}
+			logger.Infof("svr_conf loaded for websvr")
+			if gconf.WebSvrCfg.Dependencies.GameDataDir != "" {
+				logger.Infof("Loading local file by gameconf_dir: %v ", gconf.WebSvrCfg.Dependencies.GameDataDir)
+				if err := gamedata.InitLocal(gconf.WebSvrCfg.Dependencies.GameDataDir); err != nil {
+					return err
+				}
+			}
+			return nil
+		}),
 	)
-}
-
-func buildWebComponentStatuses(redisInstances, signInstances, restInstances int, httpSrv *http.Server, httpCfg web_gin.Config, grpcSrv *grpc.Server, grpcCfg gconf.GRPCServerConfig) []bootstrap.ComponentStatus {
-	httpStatus := bootstrap.ComponentStatus{
-		Name:    "websvr.http_server",
-		State:   "pending",
-		Ready:   false,
-		Message: fmt.Sprintf("configured addr=%s:%d", httpCfg.IP, httpCfg.Port),
-	}
-	if httpSrv != nil {
-		httpStatus.State = "ready"
-		httpStatus.Ready = true
-		httpStatus.Message = fmt.Sprintf("listening on %s", httpSrv.Addr)
+	if err != nil {
+		panic(fmt.Sprintf("runtime.New websvr: %v", err))
 	}
 
-	grpcStatus := bootstrap.ComponentStatus{
-		Name:    "websvr.grpc_server",
-		State:   "skipped",
-		Ready:   true,
-		Message: "grpc disabled",
-	}
-	if grpcCfg.Enabled {
-		grpcStatus.State = "pending"
-		grpcStatus.Ready = false
-		grpcStatus.Message = fmt.Sprintf("configured addr=%s:%d", grpcCfg.IP, grpcCfg.Port)
-		if grpcSrv != nil {
-			grpcStatus.State = "ready"
-			grpcStatus.Ready = true
-			grpcStatus.Message = fmt.Sprintf("listening on %s:%d", grpcCfg.IP, grpcCfg.Port)
+	wc := gconf.WebSvrCfg.CommonRuntime
+	tracker := runtime.NewComponentTracker(nil)
+	adminComp := runtime.NewAdminComponent(app, tracker,
+		runtime.WithAdminListen(wc.AdminServer.IP, wc.AdminServer.Port),
+		runtime.WithAdminPprof(gconf.WebSvrCfg.CommonDebug.Pprof),
+		runtime.WithAdminServiceName("websvr"),
+	)
+
+	// Start 顺序：logger → tracing → web 运行时（依赖 + HTTP/gRPC） → admin。
+	for _, c := range []runtime.Component{logComp, tracing, web, adminComp} {
+		if err := app.Register(c); err != nil {
+			panic(fmt.Sprintf("websvr register %s: %v", c.Name(), err))
 		}
 	}
-
-	redisStatus := bootstrap.ComponentStatus{
-		Name:    "websvr.redis",
-		State:   "pending",
-		Ready:   false,
-		Message: "waiting for redis initialization",
-	}
-	if redisInstances > 0 {
-		redisStatus.State = "ready"
-		redisStatus.Ready = true
-		redisStatus.Message = fmt.Sprintf("redis instances=%d", redisInstances)
-	}
-
-	signStatus := bootstrap.ComponentStatus{
-		Name:    "websvr.http_sign",
-		State:   "pending",
-		Ready:   false,
-		Message: "waiting for sign initialization",
-	}
-	if signInstances > 0 {
-		signStatus.State = "ready"
-		signStatus.Ready = true
-		signStatus.Message = fmt.Sprintf("sign instances=%d", signInstances)
-	}
-
-	restStatus := bootstrap.ComponentStatus{
-		Name:    "websvr.rest_api",
-		State:   "pending",
-		Ready:   false,
-		Message: "waiting for rest api initialization",
-	}
-	if restInstances > 0 {
-		restStatus.State = "ready"
-		restStatus.Ready = true
-		restStatus.Message = fmt.Sprintf("rest api instances=%d", restInstances)
-	}
-
-	return []bootstrap.ComponentStatus{
-		redisStatus,
-		signStatus,
-		restStatus,
-		httpStatus,
-		grpcStatus,
-	}
+	return app
 }
