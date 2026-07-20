@@ -7,7 +7,6 @@ import (
 
 	roomcenterv1 "github.com/Iori372552686/GoOne/api/gen/game/roomcenter/v1"
 	"github.com/Iori372552686/GoOne/common/gamedata"
-	"github.com/Iori372552686/GoOne/common/gconf"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
 	"github.com/Iori372552686/GoOne/lib/service/router"
@@ -18,6 +17,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	"github.com/Iori372552686/GoOne/lib/util/idgen"
 	"github.com/Iori372552686/GoOne/lib/util/safego"
+	"github.com/Iori372552686/GoOne/module/gconf"
 	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/globals"
 	id "github.com/Iori372552686/GoOne/src/roomcentersvr/globals/idgen"
@@ -170,7 +170,7 @@ func NewApp() *runtime.App {
 // roomFlushComponent 在 Drain 阶段全量落盘所有房间（原 OnExit）。
 type roomFlushComponent struct{}
 
-func (roomFlushComponent) Name() string { return "room_flush" }
+func (roomFlushComponent) Name() string                  { return "room_flush" }
 func (roomFlushComponent) Start(_ context.Context) error { return nil }
 
 // Drain 实现 runtime.Drainer：TransMgr 已排空，强制全量写所有房间。

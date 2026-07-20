@@ -3,11 +3,12 @@ package gfunc
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/Iori372552686/GoOne/common/define"
+	"strconv"
+
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/module/define"
 	pb "github.com/Iori372552686/game_protocol/protocol"
 	"github.com/cespare/xxhash/v2"
-	"strconv"
 )
 
 // CRC32（32 位）冲突概率 ≈ 50% 当生成 7.7 万个 ID 时（生日问题）

@@ -5,9 +5,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/Iori372552686/GoOne/common/gconf"
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/lib/service/router"
+	"github.com/Iori372552686/GoOne/module/gconf"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 	"google.golang.org/protobuf/proto"
 )

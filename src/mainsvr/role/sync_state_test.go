@@ -3,7 +3,7 @@ package role
 import (
 	"testing"
 
-	"github.com/Iori372552686/GoOne/common/gconf"
+	"github.com/Iori372552686/GoOne/module/gconf"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 

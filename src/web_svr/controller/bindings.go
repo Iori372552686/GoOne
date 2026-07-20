@@ -2,8 +2,8 @@ package controller
 
 import (
 	websvrv1 "github.com/Iori372552686/GoOne/api/gen/web/websvr/v1"
-	"github.com/Iori372552686/GoOne/common/gconf"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
+	"github.com/Iori372552686/GoOne/module/gconf"
 	"github.com/Iori372552686/GoOne/src/web_svr/globals"
 	"github.com/Iori372552686/GoOne/src/web_svr/service"
 )

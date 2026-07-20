@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/common/gamedata"
-	"github.com/Iori372552686/GoOne/common/gconf"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
@@ -18,6 +17,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/util/sensitive_words"
 	"github.com/Iori372552686/GoOne/lib/web/web_gin"
+	"github.com/Iori372552686/GoOne/module/gconf"
 	"github.com/Iori372552686/GoOne/src/web_svr/controller"
 	"github.com/Iori372552686/GoOne/src/web_svr/globals"
 	"google.golang.org/grpc"

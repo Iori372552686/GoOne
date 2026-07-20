@@ -8,7 +8,6 @@ import (
 
 	mainsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/mainsvr/v1"
 	"github.com/Iori372552686/GoOne/common/gamedata"
-	"github.com/Iori372552686/GoOne/common/gconf"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
 	"github.com/Iori372552686/GoOne/lib/service/router"
@@ -19,6 +18,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	"github.com/Iori372552686/GoOne/lib/util/idgen"
 	"github.com/Iori372552686/GoOne/lib/util/sensitive_words"
+	"github.com/Iori372552686/GoOne/module/gconf"
 	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals"
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals/rds"
@@ -160,7 +160,7 @@ func NewApp() *runtime.App {
 // roleFlushComponent 在 Drain 阶段全量落盘在线角色（原 OnShutdownExtra）。
 type roleFlushComponent struct{}
 
-func (roleFlushComponent) Name() string { return "role_flush" }
+func (roleFlushComponent) Name() string                  { return "role_flush" }
 func (roleFlushComponent) Start(_ context.Context) error { return nil }
 
 // Drain 实现 runtime.Drainer：TransMgr 已排空，此时没有 handler 并发修改角色。
