@@ -44,14 +44,38 @@
 ## 全量测试状态（冻结时）
 
 - `go test -count=1 ./lib/... ./src/... ./common/... ./module/... ./tools/protoc-gen-goone/... ./tools/cmd/...` → **全部 PASS**。
-- `go test -race` 本机因无 gcc 无法执行；CI (`.github/workflows/ci.yml` build-test job) 承担 `lib/net`、`lib/service/transaction`、`lib/service/router`、`lib/service/ssrpc`、`lib/util/safego` 的 race 检查。
+- `go test -race` 本机因无 gcc 无法执行；CI (`.github/workflows/ci.yml` build-test job) 承担 `lib/net`、`lib/service/transaction`、`lib/service/router`、`lib/service/ssrpc`、`lib/util/safego`、`lib/service/runtime`、`lib/service/appconfig`、`lib/service/scheduler`、`lib/service/bus`、`lib/util/bufpool` 的 race 检查。
+
+## 真实环境联调验证（2026-07-20）
+
+中间件（远程 `43.139.3.228`）：etcd(`:12379`)、RabbitMQ(`:15672`)、MySQL(`:3306`)、Redis(`:6379`)。
+
+| 验证项 | 结果 |
+|---|---|
+| 六服务启动到 Ready | ✅ 全部 ready（mysql/mainsvr/infosvr/roomcenter/conn/web） |
+| admin /healthz | ✅ 200 ok |
+| admin /readyz | ✅ 200 ready（router.ReadyCheck 通过） |
+| admin /statez | ✅ `{"state":"ready","allocated":false}` |
+| admin 端口安全 | ✅ 全部 127.0.0.1（loopback） |
+| tester 回归 | ✅ ALL PASSED（连接→登录→角色→心跳，192ms） |
+
+### 压测（stress，20 玩家并发，45s）
+
+| 模块 | 循环 | 通过率 | TPS | Top 协议延迟 (avg/p99) |
+|---|---:|---:|---:|---|
+| login（心跳+登录） | 2827 | **100%** | 62.82 | HeartBeatReq 18.0ms / 31.3ms |
+| room（快速开始） | 988 | 0% | — | QuickStartReq 77.9ms / 99.7ms |
+
+- login 模块（最高频操作）100% 通过，并发下网关→bus→事务→handler 链路稳定。
+- room 的 0% 是业务逻辑（`ERR_TEXAS_SEAT_NOT_FOUND` 座位不足），非框架问题。
+- 总请求 3835，login QPS ~85。
 
 ## 回归门禁
 
 - 任何“性能”提交必须给出同机前后 bench，且：
   - 核心吞吐中位数不回退超过 5%。
   - 0-alloc 热路径不得引入新分配。
-- 后续 P1 会新增 Dispatcher lookup、Scheduler、Gateway encode/enqueue 等 benchmark，届时补入本表。
+- Dispatcher lookup、Scheduler、bufpool 等 benchmark 已补入本表。
 
 ## P1 架构性验收（P0-08 达成，无 bench 数值，属行为级验收）
 
