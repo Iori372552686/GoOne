@@ -19,6 +19,11 @@ var (
 	ErrNilComponent = errors.New("runtime: nil 组件")
 	// ErrEmptyComponentName 在 Register 时组件返回空名字时返回。
 	ErrEmptyComponentName = errors.New("runtime: 组件名不能为空")
+	// ErrDrainEscalated 在第二次终止信号强制取消进行中的排空时作为排空阶段错误的
+	// 根因返回。它与"排空时间耗尽"（context.DeadlineExceeded）明确区分：
+	// ErrDrainEscalated 表示主动升级，DeadlineExceeded 表示真实超时。二者都不再计
+	// 入 drain_timeouts_total（只有 DeadlineExceeded 才是超时）。
+	ErrDrainEscalated = errors.New("runtime: 排空被第二次终止信号升级取消")
 )
 
 // 默认超时。它们约束排空与关停阶段，使行为异常的组件无法无限期挂住进程。服务
@@ -107,21 +112,18 @@ type App struct {
 	onLoadConfig func(ctx context.Context) error
 	onReload     func(ctx context.Context) error
 
-	// 生命周期状态。由 stateMu 保护。完整的 State 枚举、合法转换与观察者在状态
-	// 机任务中引入；这里只追踪一个阶段字符串加上外部可观测的 ready/alive 标志，
-	// 供调用方与测试依赖。
+	// 生命周期状态。P0-02 后，phase/ready/alive/drainReason 全部从 StateStore 派生，
+	// App 不再维护第二份副本，使 State()、Phase()、Ready()、Alive()、admin JSON 与
+	// Prometheus gauge 始终出自同一事实源。
 	stateMu     sync.RWMutex
-	phase       string
-	phaseSince  time.Time
-	ready       bool
-	alive       bool
-	startedAt   time.Time
 	drainReason string
 
 	// escalateDrain 在非 nil 时，会像收到第二次终止信号一样取消进行中的 Drain。
 	// 它在 Run 安装信号后被设置，包级私有，使测试可确定性地触发 escalation 而
-	// 无需向测试二进制投递 OS 信号。
+	// 无需向测试二进制投递 OS 信号。escalateMu 保护其读写，避免与
+	// tryEscalateDrain 的并发读产生 data race。
 	escalateDrain func()
+	escalateMu    sync.RWMutex
 
 	// state 是驱动 healthz/readyz/statez 的规范生命周期状态机。遗留的 phase 字符
 	// 串字段与之保持同步，供仍读取 Phase() 的调用方使用。
@@ -134,15 +136,11 @@ type App struct {
 	tracker *ComponentTracker
 }
 
-// startedAtLocked 返回进程启动时间。调用方可持有 stateMu 也可不持有；它为安全
-// 起见在 stateMu 下读取该近似原子的字段。
-func (a *App) startedAtLocked() time.Time {
-	a.stateMu.RLock()
-	defer a.stateMu.RUnlock()
-	return a.startedAt
-}
-
 // New 用给定服务名与 options 构建 App。名字必须非空；用于日志、指标与 admin 端点。
+//
+// P0-03：默认创建一个 ComponentTracker（app.tracker），使 /components 端点在任何接线
+// 下都能列出 pending/running 组件，无需调用方手动传入。Register 同步把组件名登记为
+// pending。可用 WithComponentTracker 覆盖（主要用于测试）。
 func New(name string, opts ...Option) (*App, error) {
 	if name == "" {
 		return nil, ErrEmptyName
@@ -153,8 +151,8 @@ func New(name string, opts ...Option) (*App, error) {
 		drainTimeout: DefaultDrainTimeout,
 		stopTimeout:  DefaultStopTimeout,
 		state:        NewStateStore(),
+		tracker:      NewComponentTracker(nil),
 	}
-	a.setPhase(phaseCreated)
 	for _, opt := range opts {
 		opt(a)
 	}
@@ -186,6 +184,10 @@ func (a *App) Register(c Component) error {
 	}
 	a.names[name] = struct{}{}
 	a.components = append(a.components, c)
+	// P0-03：登记组件名为 pending，使 /components 在 Start 前就能列出全部组件。
+	if a.tracker != nil {
+		a.tracker.MarkPending(name)
+	}
 	return nil
 }
 
@@ -199,25 +201,24 @@ func (a *App) MustRegister(c Component) {
 
 // Ready 上报 App 是否已完成启动并正在服务。它在 Run 进入 Draining 阶段时立即翻
 // 转为 false。
+//
+// P0-02：从 StateStore 派生（Ready 当且仅当 State 为 Ready 或 Allocated），不再读
+// App 自维护的标志，避免与 State()/admin JSON 不一致。
 func (a *App) Ready() bool {
-	a.stateMu.RLock()
-	defer a.stateMu.RUnlock()
-	return a.ready
+	st, _ := a.state.Current()
+	return st == StateReady || st == StateAllocated
 }
 
-// Alive 上报进程是否仍在运行（尚未完成 Stop）。
+// Alive 上报进程是否仍在运行（尚未到达 Stopped/Failed 终态）。
 func (a *App) Alive() bool {
-	a.stateMu.RLock()
-	defer a.stateMu.RUnlock()
-	return a.alive
+	st, _ := a.state.Current()
+	return st != StateStopped && st != StateFailed
 }
 
-// Phase 返回当前生命周期阶段名。阶段集合在 P0-01 生命周期内稳定；更丰富的 State
-// 机在状态机任务中到来。
+// Phase 返回当前生命周期阶段名，与 State() 的字符串形式一致。
 func (a *App) Phase() string {
-	a.stateMu.RLock()
-	defer a.stateMu.RUnlock()
-	return a.phase
+	st, _ := a.state.Current()
+	return string(st)
 }
 
 // State 返回规范的生命周期状态。它是 statez 端点暴露、并被 healthz/readyz 使用
@@ -227,39 +228,42 @@ func (a *App) State() State {
 	return st
 }
 
-// Allocate 把实例标记为已分配（分配给某局游戏/会话）。仅当 App 处于 Ready 或已
-// Allocated 时有效；其他状态忽略。Allocate 永不改变就绪性：已分配实例继续服务
-// 既有流量。
-func (a *App) Allocate() {
+// Allocate 把实例标记为已分配（分配给某局游戏/会话）。仅当 App 处于 Ready 时执行
+// Ready->Allocated 转换；对已 Allocated 的实例幂等返回 nil；其他状态返回
+// ErrInvalidStateTransition。Allocate 永不改变就绪性：已分配实例继续服务既有流量。
+//
+// P0-02：签名从 Allocate() 改为 Allocate(ctx) error，使非法状态转换以明确哨兵错误
+// 暴露，而非被静默忽略。
+func (a *App) Allocate(ctx context.Context) error {
 	current, _ := a.state.Current()
-	if current == StateReady || current == StateAllocated {
-		// 适用时执行 Ready->Allocated 转换。
-		if current == StateReady {
-			_ = a.state.transition(context.Background(), StateAllocated, "allocated", time.Time{})
-		} else {
-			a.state.markAllocated()
+	switch current {
+	case StateReady:
+		if err := a.state.transition(ctx, StateAllocated, "allocated", time.Time{}); err != nil {
+			return err
 		}
+		return nil
+	case StateAllocated:
+		// 幂等：已分配，不重复转换。
+		return nil
+	default:
+		return ErrInvalidStateTransition
 	}
 }
 
-// setPhase 在 stateMu 下更新阶段。调用方必须未持有 stateMu 锁。
-func (a *App) setPhase(phase string) {
-	a.stateMu.Lock()
-	a.phase = phase
-	a.phaseSince = time.Now()
-	a.stateMu.Unlock()
+// tryEscalateDrain 返回当前接线的 escalation 触发函数；若 Run 尚未安装信号则返回
+// nil。它供测试在确定性时机触发"第二次终止信号"路径，不依赖 OS 信号投递。
+func (a *App) tryEscalateDrain() func() {
+	a.escalateMu.RLock()
+	defer a.escalateMu.RUnlock()
+	return a.escalateDrain
 }
 
-// 最小阶段常量。导出的 State 类型与转换表位于状态机任务；这些目前为包级私有。
-const (
-	phaseCreated  = "created"
-	phaseStarting = "starting"
-	phaseReady    = "ready"
-	phaseDraining = "draining"
-	phaseStopping = "stopping"
-	phaseStopped  = "stopped"
-	phaseFailed   = "failed"
-)
+// setEscalateDrain 在 escalateMu 下安装/清空 escalation 触发函数。
+func (a *App) setEscalateDrain(fn func()) {
+	a.escalateMu.Lock()
+	a.escalateDrain = fn
+	a.escalateMu.Unlock()
+}
 
 // NewFromModules 通过把 modules 装配进一个全新 Registry 来构建 App。它是为多模块
 // 服务推荐的构造器。Registry 立即 Seal；Run 将按序 Start 其组件。

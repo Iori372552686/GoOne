@@ -100,10 +100,7 @@ func TestIntegration_SecondSignalEscalatesDrain(t *testing.T) {
 	// 触发 escalation（等价第二信号）。
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		a.mu.Lock()
-		esc := a.escalateDrain
-		a.mu.Unlock()
-		if esc != nil {
+		if esc := a.tryEscalateDrain(); esc != nil {
 			esc()
 			break
 		}
@@ -178,10 +175,13 @@ func TestIntegration_ReadyFlipsBeforeDrainCompletes(t *testing.T) {
 		t.Fatalf("readyz must be 503 the moment Draining is entered, got %d", code)
 	}
 	// 释放 drain。
-	if e := a.escalateDrain; e != nil {
+	if e := a.tryEscalateDrain(); e != nil {
 		e()
 	}
-	if err := <-done; err != nil {
+	// 升级路径会返回 ErrDrainEscalated（非空），这是本测试主动触发的预期结果，
+	// 不是失败。
+	err = <-done
+	if err != nil && !errors.Is(err, ErrDrainEscalated) {
 		t.Fatalf("Run: %v", err)
 	}
 }

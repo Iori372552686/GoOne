@@ -23,54 +23,107 @@ type signalSource struct {
 	// 排空取消确定性强，且不依赖向测试二进制投递 OS 信号。
 	escalate func()
 	stop     func()
+
+	// injectForTest 把一个信号直接注入 dispatcher 的原始输入 channel，使测试可以
+	// 确定性地模拟第 N 次终止信号，而无需依赖 OS 自投递（在 Windows 上不可靠）。
+	// 生产路径下不调用；nil 表示未接线（如 reload-only source）。
+	injectForTest func(os.Signal)
 }
 
 // installSignals 为平台合适的信号接线 os.Notify，并返回一个 signalSource 以及一
-// 个必须在 Run 返回时调用的清理函数（它调用 signal.Stop 并关闭内部第二信号观察
+// 个必须在 Run 返回时调用的清理函数（它调用 signal.Stop 并关闭内部 dispatcher
 // goroutine）。
 //
-// 内部 goroutine 观察第二次终止信号；第一个信号直接投递到 termCh。这使 channel
-// 有界，并让第二次 SIGINT/SIGTERM 能升级关停。
+// 关键不变量（P0-01 修复）：整个进程只对 SIGINT/SIGTERM 调用**一次** signal.Notify，
+// 指向单一原始 channel；由单一 dispatcher goroutine 计数并据此分别发送 first/second
+// 事件。
+//
+// 历史缺陷：曾用两个 signal.Notify channel 同时订阅 SIGINT/SIGTERM，os/signal 会把
+// 每个信号实例投递给所有已注册 channel，导致第一次信号就同时进入 termCh 与
+// secondCh，使 Drain 在开始的同时被 escalation 取消。
 func installSignals() signalSource {
 	termSignals, reloadSignals := platformSignals()
 
-	term := make(chan os.Signal, 1)
+	raw := make(chan os.Signal, 1)
 	reload := make(chan os.Signal, 1)
-	notifySignals(term, termSignals)
+	notifySignals(raw, termSignals)
 	if len(reloadSignals) > 0 {
 		notifySignals(reload, reloadSignals)
 	}
 
-	// 升级观察者：第二次终止信号关闭 secondDone。secondDone channel 及其关闭由
-	// secondOnce 守护，使 OS 信号路径与任何进程内升级都幂等。
-	second := make(chan os.Signal, 1)
-	notifySignals(second, termSignals)
+	termOut := make(chan os.Signal, 1)
 	secondDone := make(chan struct{})
 	var secondOnce sync.Once
 	escalate := func() {
 		secondOnce.Do(func() { close(secondDone) })
 	}
-	secondStop := make(chan struct{})
+	dispatcherStop := make(chan struct{})
+
+	// 单一 dispatcher：统计从 raw 收到的终止信号。第一个投递到 termOut；第二个关闭
+	// secondDone。非终止信号（理论上不会到达 raw，因为只 Notify 了终止信号集）忽略。
 	go func() {
-		select {
-		case <-second:
-			escalate()
-		case <-secondStop:
+		count := 0
+		for {
+			select {
+			case sig := <-raw:
+				if !isTermSignal(sig) {
+					continue
+				}
+				count++
+				switch count {
+				case 1:
+					select {
+					case termOut <- sig:
+					default:
+						// termOut 容量 1；若未被消费（异常），不阻塞 dispatcher。
+					}
+				default:
+					// 第二次及以后的终止信号：升级，关闭 secondDone。
+					escalate()
+				}
+			case <-dispatcherStop:
+				return
+			}
 		}
 	}()
 
 	return signalSource{
-		termCh:   term,
+		termCh:   termOut,
 		secondCh: secondDone,
 		reloadCh: reloadOrNil(reload, reloadSignals),
 		escalate: escalate,
 		stop: func() {
-			signal.Stop(term)
+			signal.Stop(raw)
 			signal.Stop(reload)
-			signal.Stop(second)
-			close(secondStop)
+			close(dispatcherStop)
+		},
+		injectForTest: func(sig os.Signal) {
+			select {
+			case raw <- sig:
+			default:
+				// raw 容量 1；测试按序注入，正常路径不会到这里。若 dispatcher 已停
+				// 止或 channel 满，丢弃而不阻塞测试。
+			}
 		},
 	}
+}
+
+// platformTermSignals 仅返回平台终止信号集，供测试注入使用。
+func platformTermSignals() []os.Signal {
+	term, _ := platformSignals()
+	return term
+}
+
+// isTermSignal 上报 s 是否属于平台终止信号集。dispatcher 只对终止信号计数；重载信
+// 号走独立的 reload channel，不会到达 raw。
+func isTermSignal(s os.Signal) bool {
+	term, _ := platformSignals()
+	for _, t := range term {
+		if t == s {
+			return true
+		}
+	}
+	return false
 }
 
 // reloadOrNil 在平台有重载信号时返回 reload，否则返回 nil，使 Run 的 select 永不

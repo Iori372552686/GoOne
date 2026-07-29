@@ -105,9 +105,21 @@ type StateStore struct {
 	observers []StateObserver
 }
 
-// NewStateStore 构建一个处于 StateStarting 的 store。
+// NewStateStore 构建一个处于 StateStarting 的 store，并在构造时把
+// goone_lifecycle_state{state="starting"} 置为 1、其余规范状态置为 0。
+//
+// 关键不变量（P0-02 修复）：构造即上报，使指标在进程启动瞬间就反映 starting，
+// 而非等到第一次状态转换才翻转。
 func NewStateStore() *StateStore {
 	now := time.Now()
+	// 构造时同步上报指标：starting=1，其余状态=0。
+	for _, st := range []State{StateStarting, StateReady, StateAllocated, StateDraining, StateStopping, StateStopped, StateFailed} {
+		val := 0.0
+		if st == StateStarting {
+			val = 1.0
+		}
+		lifecycleStateGauge.WithLabelValues(string(st)).Set(val)
+	}
 	return &StateStore{
 		current:   StateStarting,
 		since:     now,
@@ -132,6 +144,12 @@ func (s *StateStore) AddObserver(o StateObserver) {
 // transition 移到下一状态并派发观察者。对 Ready/Allocated，观察者 error 会回滚到
 // 前一状态并返回该 error。对关停状态，观察者 error 被返回但转换已提交。非法转换
 // 返回 ErrInvalidStateTransition 且不派发。
+//
+// 指标时机（P0-02 修复）：goone_lifecycle_state gauge 的翻转发生在状态**提交成功之
+// 后**，而非之前。这样被 Ready/Allocated 观察者拒绝的转换不会留下错误的 gauge 值。
+// 关停状态（Draining/Stopping/Stopped/Failed）的转换总是提交，故其 gauge 在派发观察
+// 者（best-effort）之前翻转；若观察者返回 error，转换已提交，gauge 保持与新状态一
+// 臗。
 func (s *StateStore) transition(ctx context.Context, to State, reason string, deadline time.Time) error {
 	s.mu.Lock()
 	from := s.current
@@ -139,8 +157,6 @@ func (s *StateStore) transition(ctx context.Context, to State, reason string, de
 		s.mu.Unlock()
 		return ErrInvalidStateTransition
 	}
-	// 上报状态机指标（翻转 gauge：旧状态置 0、新状态置 1）。
-	setLifecycleState(from, to)
 	change := StateChange{
 		Previous: from,
 		Current:  to,
@@ -149,11 +165,13 @@ func (s *StateStore) transition(ctx context.Context, to State, reason string, de
 		Deadline: deadline,
 	}
 	observers := append([]StateObserver(nil), s.observers...)
-	// 对关停状态（Draining、Stopping、Stopped）乐观提交转换，使失败的观察者无法
+	// 对关停状态（Draining、Stopping、Stopped、Failed）乐观提交转换，使失败的观察者无法
 	// 挂住进程；对 Ready/Allocated 则在前一状态保留，直到观察者同意。
 	committingShutdown := to == StateDraining || to == StateStopping || to == StateStopped || to == StateFailed
 	if committingShutdown {
 		s.applyLocked(to, reason, deadline)
+		// 关停转换已提交：翻转 gauge 与状态一致。
+		setLifecycleState(from, to)
 	}
 	s.mu.Unlock()
 
@@ -161,7 +179,7 @@ func (s *StateStore) transition(ctx context.Context, to State, reason string, de
 	for _, o := range observers {
 		if err := o.OnStateChange(ctx, change); err != nil {
 			if !committingShutdown {
-				// 回滚：停留于前一状态。
+				// 回滚：停留于前一状态；gauge 未翻转，保持与 from 一致。
 				return err
 			}
 			// 关停观察者错误是 best-effort：转换已提交，仅上报。
@@ -172,9 +190,11 @@ func (s *StateStore) transition(ctx context.Context, to State, reason string, de
 	}
 
 	if !committingShutdown {
+		// Ready/Allocated：观察者全部同意后才提交并翻转 gauge。
 		s.mu.Lock()
 		s.applyLocked(to, reason, deadline)
 		s.mu.Unlock()
+		setLifecycleState(from, to)
 	}
 	return firstErr
 }
@@ -199,7 +219,10 @@ func (s *StateStore) markAllocated() {
 }
 
 // snapshot 返回 statez 端点的外部可观测字段。绝不包含 Metadata 与凭据。
-func (s *StateStore) snapshot(service string, startedAt time.Time) stateSnapshot {
+//
+// P0-02：startedAt 由 StateStore 自身持有（构造时记录），admin 不再接收 App 的第二
+// 份时间，使状态、指标与 admin JSON 始终出自同一事实源。
+func (s *StateStore) snapshot(service string) stateSnapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	snap := stateSnapshot{
@@ -209,8 +232,8 @@ func (s *StateStore) snapshot(service string, startedAt time.Time) stateSnapshot
 		Reason:    s.reason,
 		Allocated: s.allocated,
 	}
-	if !startedAt.IsZero() {
-		snap.StartedAt = formatTime(startedAt)
+	if !s.startedAt.IsZero() {
+		snap.StartedAt = formatTime(s.startedAt)
 	}
 	if !s.deadline.IsZero() {
 		snap.DrainDeadline = formatTime(s.deadline)

@@ -75,19 +75,28 @@ func NewApp() *runtime.App {
 		panic(fmt.Sprintf("runtime.New connsvr: %v", err))
 	}
 
-	cc := connCommon()
-	tracker := runtime.NewComponentTracker(nil)
-	adminComp := runtime.NewAdminComponent(app, tracker,
-		runtime.WithAdminListen(cc.AdminIP, cc.AdminPort),
-		runtime.WithAdminPprof(cc.Pprof),
+	// P0-03：admin 在 LoadConfig 后用 WithAdminConfig 的 source 读取端口/IP（延迟取配
+	// 置），直接复用 app.tracker（runtime.New 默认创建），无需外部传入。
+	adminComp := runtime.NewAdminComponent(app,
+		runtime.WithAdminConfig(func() runtime.AdminConfig {
+			c := connCommon()
+			return runtime.AdminConfig{
+				Enabled: c.AdminEnabled,
+				IP:      c.AdminIP,
+				Port:    c.AdminPort,
+				Pprof:   c.Pprof,
+			}
+		}),
 		runtime.WithAdminServiceName("connsvr"),
 		runtime.WithAdminReadyCheck(router.ReadyCheck),
 	)
 
-	// Start 顺序：datetime 周期刷新 → logger → tracing → sign/rest → TransMgr → SSRPC
-	// 注册 → router/bus → 网关监听 → admin。datetime_tick 放最前：tcp/ws/kcp 服务器
-	// 启动期用 datetime.NowT() 设连接读写 deadline。
-	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, signRestDeps, registerHandlers, transMgr, routerComp, gateway, adminComp} {
+	// Start 顺序（P0-03）：datetime_tick → logger → admin → tracing → dependencies →
+	// ssrpc_registry → transaction_mgr → router → 网关。admin 紧跟 logger，使反向 Stop
+	// 时 admin 在业务资源之后、logger 之前关闭；admin 在 LoadConfig 后 Start 故端口
+	// 已生效。datetime_tick 放最前：tcp/ws/kcp 服务器启动期用 datetime.NowT() 设读写
+	// deadline。
+	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing, signRestDeps, registerHandlers, transMgr, routerComp, gateway} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("connsvr register %s: %v", c.Name(), err))
 		}

@@ -147,19 +147,26 @@ func NewApp() *runtime.App {
 		panic(fmt.Sprintf("runtime.New roomcentersvr: %v", err))
 	}
 
-	rc := roomCommon()
-	tracker := runtime.NewComponentTracker(nil)
-	adminComp := runtime.NewAdminComponent(app, tracker,
-		runtime.WithAdminListen(rc.AdminIP, rc.AdminPort),
-		runtime.WithAdminPprof(rc.Pprof),
+	// P0-03：admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
+	// app.tracker。
+	adminComp := runtime.NewAdminComponent(app,
+		runtime.WithAdminConfig(func() runtime.AdminConfig {
+			c := roomCommon()
+			return runtime.AdminConfig{
+				Enabled: c.AdminEnabled,
+				IP:      c.AdminIP,
+				Port:    c.AdminPort,
+				Pprof:   c.Pprof,
+			}
+		}),
 		runtime.WithAdminServiceName("roomcentersvr"),
 		runtime.WithAdminReadyCheck(router.ReadyCheck),
 	)
 
-	// Start 顺序：datetime 周期刷新 → logger → tracing → 业务依赖 → TransMgr → SSRPC 注册
-	// → router/bus → 房间初始化 → roomTick → roomPersist → roomFlush(Drainer) → admin。
+	// Start 顺序（P0-03）：datetime → logger → admin → tracing → 业务依赖 → SSRPC 注册
+	// → TransMgr → router/bus → 房间初始化 → roomTick → roomPersist → roomFlush(Drainer)。
 	// datetime_tick 放最前：room tick/房间初始化都依赖 datetime.NowMs()。
-	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, businessDeps, registerHandlers, transMgr, routerComp, roomInit, roomTick, roomPersist, roomFlush, adminComp} {
+	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing, businessDeps, registerHandlers, transMgr, routerComp, roomInit, roomTick, roomPersist, roomFlush} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("roomcentersvr register %s: %v", c.Name(), err))
 		}

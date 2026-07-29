@@ -34,6 +34,20 @@ type Drainer interface {
 	Drain(ctx context.Context) error
 }
 
+// RuntimeErrorSource 由持有长生命周期 goroutine（如 HTTP/gRPC listener 的 Serve）
+// 的组件实现。RuntimeErrors 返回一个 channel，组件在出现不可恢复的运行期错误
+// （监听器意外死亡等）时向其投递非 nil error。
+//
+// App 在全部组件 Start 成功后订阅所有 RuntimeErrorSource；首个非 nil error 触发
+// 标准的 Quiesce/Drain/Stop 关停，终态为 Failed，Run 返回带组件名的 error。预期
+// 的关闭错误（如 http.ErrServerClosed）不应上报。
+//
+// channel 约定：容量至少为 1，使 Serve goroutine 在 App 建立订阅前失败也不丢失错
+// 误。App 离开 Ready 后取消所有 watcher，不泄漏 goroutine。
+type RuntimeErrorSource interface {
+	RuntimeErrors() <-chan error
+}
+
 // ComponentFunc 是把简单闭包适配为 Component 的工具。用于测试和小型胶水组件
 // （无需专门 struct）。Name 固定；Start 与 Stop 为传入的闭包。Start 不得为
 // nil；Stop 可为 nil（按 no-op 处理）。

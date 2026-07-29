@@ -137,19 +137,26 @@ func NewApp() *runtime.App {
 		panic(fmt.Sprintf("runtime.New mainsvr: %v", err))
 	}
 
-	mc := mainCommon()
-	tracker := runtime.NewComponentTracker(nil)
-	adminComp := runtime.NewAdminComponent(app, tracker,
-		runtime.WithAdminListen(mc.AdminIP, mc.AdminPort),
-		runtime.WithAdminPprof(mc.Pprof),
+	// P0-03：admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
+	// app.tracker。
+	adminComp := runtime.NewAdminComponent(app,
+		runtime.WithAdminConfig(func() runtime.AdminConfig {
+			c := mainCommon()
+			return runtime.AdminConfig{
+				Enabled: c.AdminEnabled,
+				IP:      c.AdminIP,
+				Port:    c.AdminPort,
+				Pprof:   c.Pprof,
+			}
+		}),
 		runtime.WithAdminServiceName("mainsvr"),
 		runtime.WithAdminReadyCheck(router.ReadyCheck),
 	)
 
-	// Start 顺序：datetime 周期刷新 → logger → tracing → 业务依赖 → TransMgr → SSRPC 注册
-	// → router/bus → SelfLogoutSender → roleTick(Task) → roleFlush(Drainer) → admin。
+	// Start 顺序（P0-03）：datetime → logger → admin → tracing → 业务依赖 → SSRPC 注册
+	// → TransMgr → router/bus → SelfLogoutSender → roleTick(Task) → roleFlush(Drainer)。
 	// datetime_tick 放最前：logger/xorm 等启动期即读 datetime，需保证 ticker 已起。
-	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, businessDeps, registerHandlers, transMgr, routerComp, selfLogout, roleTick, roleFlush, adminComp} {
+	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing, businessDeps, registerHandlers, transMgr, routerComp, selfLogout, roleTick, roleFlush} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("mainsvr register %s: %v", c.Name(), err))
 		}

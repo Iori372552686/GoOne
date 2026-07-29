@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 func TestStateTransitionsLegal(t *testing.T) {
@@ -97,6 +99,78 @@ func TestShutdownObserverFailureDoesNotBlock(t *testing.T) {
 	}
 }
 
+// TestRejectedReadyTransitionDoesNotFlipGauge 验证 P0-02 修复：当 Ready 观察者拒绝
+// 转换时，状态回滚到前一状态，且 goone_lifecycle_state gauge 不得翻转。
+//
+// 历史缺陷：setLifecycleState(from,to) 曾在 transition 内部于"提交成功之前"调用，
+// 因此被观察者拒绝的 Ready 转换会先把 starting->ready 的 gauge 翻转，再回滚状态，
+// 导致 gauge 与实际状态不一致。
+func TestRejectedReadyTransitionDoesNotFlipGauge(t *testing.T) {
+	s := NewStateStore()
+	s.AddObserver(ObserverFunc(func(_ context.Context, ch StateChange) error {
+		if ch.Current == StateReady {
+			return errors.New("not really ready")
+		}
+		return nil
+	}))
+
+	err := s.transition(context.Background(), StateReady, "started", time.Time{})
+	if err == nil {
+		t.Fatal("期望观察者拒绝 Ready 转换")
+	}
+	current, _ := s.Current()
+	if current != StateStarting {
+		t.Fatalf("期望回滚到 starting，got %s", current)
+	}
+	// gauge：starting=1，ready=0（拒绝不得翻转）。
+	if got := testutil.ToFloat64(lifecycleStateGauge.WithLabelValues(string(StateStarting))); got != 1 {
+		t.Fatalf("期望 starting gauge=1，got %v", got)
+	}
+	if got := testutil.ToFloat64(lifecycleStateGauge.WithLabelValues(string(StateReady))); got != 0 {
+		t.Fatalf("拒绝的 Ready 转换不得翻转 gauge，ready gauge=%v", got)
+	}
+}
+
+// TestNewStateStoreInitializesStartingGauge 验证：NewStateStore 在构造时把
+// goone_lifecycle_state{state="starting"} 置为 1、其余状态置为 0，而不是等到第一次
+// 转换才翻转。
+func TestNewStateStoreInitializesStartingGauge(t *testing.T) {
+	_ = NewStateStore()
+	if got := testutil.ToFloat64(lifecycleStateGauge.WithLabelValues(string(StateStarting))); got != 1 {
+		t.Fatalf("期望构造时 starting gauge=1，got %v", got)
+	}
+}
+
+// TestAllocateSignatureReturnsErrorOnInvalidState 验证 P0-02：Allocate 接受
+// context.Context 并返回 error，对非法状态返回 ErrInvalidStateTransition，对已
+// Allocated 幂等返回 nil。
+func TestAllocateSignatureReturnsErrorOnInvalidState(t *testing.T) {
+	a, _, _ := newTraceApp(t, "svc")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := runInBackground(t, a, ctx)
+	waitForState(t, a, StateReady, 2*time.Second)
+
+	// Ready -> Allocated：成功。
+	if err := a.Allocate(context.Background()); err != nil {
+		t.Fatalf("Ready->Allocated 期望 nil，got %v", err)
+	}
+	if a.State() != StateAllocated {
+		t.Fatalf("期望 Allocated，got %s", a.State())
+	}
+	// Allocated -> Allocated：幂等 nil。
+	if err := a.Allocate(context.Background()); err != nil {
+		t.Fatalf("幂等 Allocate 期望 nil，got %v", err)
+	}
+	cancel()
+	<-done
+
+	// Stopped 后再 Allocate：ErrInvalidStateTransition。
+	if err := a.Allocate(context.Background()); !errors.Is(err, ErrInvalidStateTransition) {
+		t.Fatalf("Stopped 后 Allocate 期望 ErrInvalidStateTransition，got %v", err)
+	}
+}
+
 func TestAppReadyzFlipsImmediatelyOnDrain(t *testing.T) {
 	a, _, mu := newTraceApp(t, "svc", WithDrainTimeout(time.Minute))
 	trace := make([]string, 0)
@@ -122,10 +196,13 @@ func TestAppReadyzFlipsImmediatelyOnDrain(t *testing.T) {
 		t.Fatalf("healthz must be 200 in Draining, got %d", code)
 	}
 	// Allow drain to proceed by cancelling via escalation.
-	if e := a.escalateDrain; e != nil {
+	if e := a.tryEscalateDrain(); e != nil {
 		e()
 	}
-	if err := <-done; err != nil {
+	// 升级路径会返回 ErrDrainEscalated（非空），这是本测试主动触发的预期结果，
+	// 不是失败。本测试只关心 readyz/healthz 的翻转，不校验错误语义。
+	err := <-done
+	if err != nil && !errors.Is(err, ErrDrainEscalated) {
 		t.Fatalf("Run: %v", err)
 	}
 }
@@ -150,7 +227,9 @@ func TestAllocateFlipsAllocatedFlag(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := runInBackground(t, a, ctx)
 	waitForState(t, a, StateReady, 2*time.Second)
-	a.Allocate()
+	if err := a.Allocate(context.Background()); err != nil {
+		t.Fatalf("Allocate: %v", err)
+	}
 	if a.State() != StateAllocated {
 		t.Fatalf("expected Allocated, got %s", a.State())
 	}
@@ -166,8 +245,7 @@ func TestAllocateFlipsAllocatedFlag(t *testing.T) {
 
 func TestAdminEndpointsServeStatez(t *testing.T) {
 	a, _, _ := newTraceApp(t, "svc")
-	tracker := NewComponentTracker(nil)
-	admin := NewAdminComponent(a, tracker, WithAdminListen("127.0.0.1", 0))
+	admin := NewAdminComponent(a, WithAdminListen("127.0.0.1", 0))
 	if err := admin.Start(context.Background()); err != nil {
 		t.Fatalf("start admin: %v", err)
 	}
@@ -197,9 +275,8 @@ func TestAdminEndpointsServeStatez(t *testing.T) {
 
 func TestAdminDefaultsToLoopbackWhenIPEmpty(t *testing.T) {
 	a, _, _ := newTraceApp(t, "svc")
-	tracker := NewComponentTracker(nil)
 	// Empty IP -> must bind 127.0.0.1, never 0.0.0.0.
-	admin := NewAdminComponent(a, tracker, WithAdminListen("", 0))
+	admin := NewAdminComponent(a, WithAdminListen("", 0))
 	if err := admin.Start(context.Background()); err != nil {
 		t.Fatalf("start: %v", err)
 	}
@@ -224,8 +301,7 @@ func TestAdminReadyCheckFlipsReadyz(t *testing.T) {
 		}
 		return nil
 	}
-	tracker := NewComponentTracker(nil)
-	admin := NewAdminComponent(a, tracker,
+	admin := NewAdminComponent(a,
 		WithAdminListen("127.0.0.1", 0),
 		WithAdminReadyCheck(check),
 	)

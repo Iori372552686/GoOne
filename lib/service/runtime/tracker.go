@@ -59,6 +59,19 @@ func NewComponentTracker(names []string) *ComponentTracker {
 
 func componentStatePending() string { return "pending" }
 
+// MarkPending 把 name 登记为 pending 状态（保留注册顺序）。App.Register 在装配期调
+// 用，使 /components 在组件 Start 前就能列出全部已注册组件。若 name 已存在则保持其
+// 当前状态不变（避免覆盖已启动组件）。
+func (t *ComponentTracker) MarkPending(name string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if _, exists := t.records[name]; exists {
+		return
+	}
+	t.records[name] = &componentRecord{name: name, state: componentStatePending()}
+	t.ordering = append(t.ordering, name)
+}
+
 // MarkStarting 记录某组件的 Start 已开始。
 func (t *ComponentTracker) MarkStarting(name string) {
 	t.mu.Lock()

@@ -28,7 +28,6 @@ func (a *App) Run(ctx context.Context) error {
 	if err := a.beginRun(); err != nil {
 		return err
 	}
-	defer a.signalCleanup()
 
 	a.markStarting()
 	// 在 Run 开始时把观察者一次性附加到 state store。
@@ -45,7 +44,7 @@ func (a *App) Run(ctx context.Context) error {
 	// 阶段 3：按序 Start 组件，失败时回滚。
 	started, startErr := a.startComponents(ctx)
 	if startErr != nil {
-		// 失败组件负责自身的部分清理；App 只 Stop 已成功启动的组件。
+		// 失败组件负责自身的部分清理；App 只 STOP 已成功启动的组件。
 		stopErr := a.stopComponents(started, a.stopTimeout)
 		a.markFailed(startErr)
 		return errors.Join(startErr, stopErr)
@@ -54,26 +53,39 @@ func (a *App) Run(ctx context.Context) error {
 	// 阶段 4：Ready。阻塞直到被告知排空。重载会重新进入 Ready。
 	src := installSignals()
 	defer src.stop()
-	a.escalateDrain = src.escalate
-	defer func() { a.escalateDrain = nil }()
+	a.setEscalateDrain(src.escalate)
+	defer a.setEscalateDrain(nil)
 	if err := a.enterReady(ctx); err != nil {
 		// Ready 观察者拒绝了转换：回滚启动。
 		stopErr := a.stopComponents(started, a.stopTimeout)
 		a.markFailed(err)
 		return errors.Join(err, stopErr)
 	}
-	a.serveReady(ctx, src)
+	// P0-03：监督实现 RuntimeErrorSource 的组件（HTTP/gRPC listener 等）。首个非 nil
+	// 运行期错误触发标准 Quiesce/Drain/Stop 关停，终态 Failed。watcher 返回的错误
+	// 会作为排空原因并最终使 Run 返回带组件名的 error。
+	runtimeErr := a.serveReady(ctx, src)
 
 	// 阶段 5：Draining。Quiesce 然后 Drain，受超时约束且可被中断。
 	reason := a.currentDrainReason()
 	a.enterDraining(ctx, reason)
 	drainErr := a.drainComponents(src)
+	// 运行期错误并入排空错误链，使 Run 返回值包含组件级根因。
+	if runtimeErr != nil {
+		drainErr = errors.Join(drainErr, runtimeErr)
+	}
 
 	// 阶段 6：Stopping。无论排空结果如何，Stop 所有已启动组件。
 	a.enterStopping(ctx)
 	stopErr := a.stopComponents(started, a.stopTimeout)
 
-	a.markStopped()
+	// 终态：运行期错误（监督触发）关停走 Failed；正常信号关停走 Stopped。
+	// 关键不变量：不得先提交 Stopped 再改成 Failed。
+	if runtimeErr != nil {
+		a.markFailed(runtimeErr)
+	} else {
+		a.markStopped()
+	}
 	if drainErr != nil || stopErr != nil {
 		return errors.Join(drainErr, stopErr)
 	}
@@ -90,11 +102,6 @@ func (a *App) beginRun() error {
 	a.runStarted = true
 	return nil
 }
-
-// signalCleanup 重置一次性 guard 的可观测面，使被误用的 App 看起来不是半运行状
-// 态；guard 本身保持 true，使字面上的第二次 Run 仍报错。（空操作占位，保留以备
-// 对称/未来使用。）
-func (a *App) signalCleanup() {}
 
 // startComponents 按序 Start 每个已注册组件。它返回已成功启动的组件切片（按
 // Start 顺序）与遇到的第一个 error（若有）。出错时，失败组件**不**包含在返回切
@@ -134,18 +141,76 @@ func (a *App) startComponents(ctx context.Context) ([]Component, error) {
 
 // serveReady 在 Ready 阶段阻塞。当父 context 取消、终止信号到达、或（处理后）
 // 重载完成时返回。重载在内部处理，循环重新进入 Ready。
-func (a *App) serveReady(ctx context.Context, src signalSource) {
-	for {
-		reason, err := awaitRunReason(ctx, src)
-		if reason == "reload" {
-			a.handleReload(ctx)
-			continue
+// serveReady 在 Ready 阶段阻塞。当父 context 取消、终止信号到达、重载（处理后循
+// 环）或运行期错误到达时返回。
+//
+// P0-03：返回值 runtimeErr 非 nil 表示由 RuntimeErrorSource 监督触发的关停（如
+// HTTP/gRPC listener 意外死亡）；调用方据此走 Failed 终态。nil 表示正常信号/ctx 关
+// 停，走 Stopped 终态。
+func (a *App) serveReady(ctx context.Context, src signalSource) error {
+	// 收集实现 RuntimeErrorSource 的已注册组件，启动一个汇聚 watcher。
+	a.mu.Lock()
+	components := append([]Component(nil), a.components...)
+	a.mu.Unlock()
+	var sources []RuntimeErrorSource
+	for _, c := range components {
+		if rs, ok := c.(RuntimeErrorSource); ok {
+			sources = append(sources, rs)
 		}
-		// "ctx_done" 或 "terminated"：进入排空。err 是 ctx 错误（terminated 时为
-		// nil）；它非致命，只是触发信号。
-		_ = err
-		a.setDrainReason(reason)
-		return
+	}
+	runtimeErrCh := make(chan error, 1)
+	watcherCtx, watcherCancel := context.WithCancel(ctx)
+	defer watcherCancel()
+	for _, rs := range sources {
+		rs := rs
+		go func() {
+			select {
+			case err, ok := <-rs.RuntimeErrors():
+				if !ok || err == nil {
+					return
+				}
+				select {
+				case runtimeErrCh <- err:
+				default:
+				}
+			case <-watcherCtx.Done():
+			}
+		}()
+	}
+
+	// 用一个 reason channel 统一信号路径与运行期错误路径，避免 awaitRunReason 阻塞时
+	// 错过运行期错误。
+	reasonCh := make(chan string, 1)
+	go func() {
+		reason, _ := awaitRunReason(ctx, src)
+		select {
+		case reasonCh <- reason:
+		default:
+		}
+	}()
+
+	for {
+		select {
+		case err := <-runtimeErrCh:
+			// 运行期错误：触发排空，终态 Failed。
+			a.setDrainReason("runtime_error")
+			return err
+		case reason := <-reasonCh:
+			if reason == "reload" {
+				a.handleReload(ctx)
+				// 重新进入等待：启动新的 awaitRunReason。
+				go func() {
+					r, _ := awaitRunReason(ctx, src)
+					select {
+					case reasonCh <- r:
+					default:
+					}
+				}()
+				continue
+			}
+			a.setDrainReason(reason)
+			return nil
+		}
 	}
 }
 
@@ -166,32 +231,38 @@ func (a *App) handleReload(ctx context.Context) {
 // drainComponents 按逆序对所有已启动组件执行 Quiesce 然后 Drain。整个阶段受排空
 // 超时约束；第二次终止信号（src.secondCh 关闭）会立即取消它。返回所有
 // Quiesce/Drain 失败的 joined error。
+//
+// 取消原因（P0-01 修复）：
+//   - 排空时间耗尽：drainCtx 的根因是 context.DeadlineExceeded；计入
+//     drain_timeouts_total。
+//   - 第二次终止信号升级：drainCtx 的根因是 ErrDrainEscalated；不计入超时。
+//
+// 关键不变量：drainCtx 由 context.WithTimeout 派生，使 drainCtx.Err() 在超时时真
+// 正返回 DeadlineExceeded（而非 Canceled）。升级与超时通过 context.WithCancelCause
+// 的 cause 区分。历史实现用 WithCancel + goroutine 调 drainCancel 模拟超时，导致
+// drainCtx.Err() 永远返回 Canceled、timedOut 判定永远为 false、
+// drain_timeouts_total 永不增长。
 func (a *App) drainComponents(src signalSource) error {
 	drainStart := time.Now()
 	a.mu.Lock()
 	started := append([]Component(nil), a.components...)
 	a.mu.Unlock()
 
-	drainCtx, drainCancel := context.WithCancel(context.Background())
-	defer drainCancel()
+	// 内层 cancel-cause 承载"升级"根因；外层 WithTimeout 承载"时间耗尽"根因。
+	// 二者任一触发都会让 drainCtx.Done() 关闭，但 cause 不同：
+	//   - 升级：cancelCause(ErrDrainEscalated)
+	//   - 超时：context.WithTimeout 自身的 DeadlineExceeded
+	escalateCtx, cancelEscalate := context.WithCancelCause(context.Background())
+	defer cancelEscalate(context.Canceled)
 
-	// 升级：第二次终止信号取消排空截止时间。
+	drainCtx, cancelTimeout := context.WithTimeout(escalateCtx, a.drainTimeout)
+	defer cancelTimeout()
+
+	// 升级：第二次终止信号携带 ErrDrainEscalated 根因取消排空。
 	go func() {
 		select {
 		case <-src.secondCh:
-			drainCancel()
-		case <-drainCtx.Done():
-		}
-	}()
-
-	// 用配置的超时约束排空。我们用 timer（而非 select 中的 time.After，遵循
-	// STYLE），完成后取消。
-	timer := time.NewTimer(a.drainTimeout)
-	defer timer.Stop()
-	go func() {
-		select {
-		case <-timer.C:
-			drainCancel()
+			cancelEscalate(ErrDrainEscalated)
 		case <-drainCtx.Done():
 		}
 	}()
@@ -215,13 +286,24 @@ func (a *App) drainComponents(src signalSource) error {
 			}
 		}
 	}
-	// 上报排空耗时与是否超时（drainCtx 被超时取消即视为超时）。
-	timedOut := drainCtx.Err() == context.DeadlineExceeded
+
+	// 判定取消根因：只有 DeadlineExceeded 才算超时；ErrDrainEscalated 是升级。
+	cause := context.Cause(drainCtx)
+	timedOut := errors.Is(cause, context.DeadlineExceeded)
+	escalated := errors.Is(cause, ErrDrainEscalated)
 	observeDrain(time.Since(drainStart).Seconds(), timedOut)
-	if timedOut {
+	switch {
+	case timedOut:
 		logEventf(eventDrainTimedOut, a.name, "after %.3fs", time.Since(drainStart).Seconds())
-	} else {
+	case escalated:
+		logEventf(eventDrainEscalated, a.name, "after %.3fs", time.Since(drainStart).Seconds())
+	default:
 		logEventf(eventDrainCompleted, a.name, "in %.3fs", time.Since(drainStart).Seconds())
+	}
+
+	// 把取消根因也并入返回的 error 链，使调用方可用 errors.Is 区分超时/升级。
+	if cause != nil && !errors.Is(cause, context.Canceled) {
+		errs = append(errs, cause)
 	}
 	return errors.Join(errs...)
 }
@@ -251,18 +333,10 @@ func (a *App) stopComponents(started []Component, timeout time.Duration) error {
 	return errors.Join(errs...)
 }
 
-// --- 阶段转换（同时驱动遗留 phase 字符串与规范 State 机，使遗留调用方与新 admin
-// 端点一致）---
+// --- 阶段转换（P0-02：状态机为唯一事实源，不再维护重复的 phase/ready/alive 副本）---
 
 func (a *App) markStarting() {
-	a.stateMu.Lock()
-	a.alive = true
-	a.ready = false
-	a.startedAt = time.Now()
-	a.phase = phaseStarting
-	a.phaseSince = time.Now()
-	a.stateMu.Unlock()
-	// state store 已起始为 Starting；保持观察者一致。
+	// state store 已在 NewStateStore 构造时起始为 Starting 且上报了 gauge。
 	logger.Infof("%s starting", a.name)
 }
 
@@ -272,11 +346,6 @@ func (a *App) enterReady(ctx context.Context) error {
 	if err := a.state.transition(ctx, StateReady, "all components started", time.Time{}); err != nil {
 		return err
 	}
-	a.stateMu.Lock()
-	a.ready = true
-	a.phase = phaseReady
-	a.phaseSince = time.Now()
-	a.stateMu.Unlock()
 	logger.Infof("%s ready", a.name)
 	return nil
 }
@@ -284,45 +353,22 @@ func (a *App) enterReady(ctx context.Context) error {
 func (a *App) enterDraining(ctx context.Context, reason string) {
 	deadline := time.Now().Add(a.drainTimeout)
 	_ = a.state.transition(ctx, StateDraining, reason, deadline)
-	a.stateMu.Lock()
-	// readyz 必须在进入 Draining 的瞬间失败，先于任何资源真正排空。
-	a.ready = false
-	a.phase = phaseDraining
-	a.phaseSince = time.Now()
-	a.drainReason = reason
-	a.stateMu.Unlock()
+	a.setDrainReason(reason)
 	logEventf(eventDrainStarted, a.name, "reason=%s", reason)
 }
 
 func (a *App) enterStopping(ctx context.Context) {
 	_ = a.state.transition(ctx, StateStopping, "stopping", time.Time{})
-	a.stateMu.Lock()
-	a.ready = false
-	a.phase = phaseStopping
-	a.phaseSince = time.Now()
-	a.stateMu.Unlock()
 	logger.Infof("%s stopping", a.name)
 }
 
 func (a *App) markFailed(err error) {
 	_ = a.state.transition(context.Background(), StateFailed, err.Error(), time.Time{})
-	a.stateMu.Lock()
-	a.ready = false
-	a.alive = false
-	a.phase = phaseFailed
-	a.phaseSince = time.Now()
-	a.stateMu.Unlock()
 	logger.Errorf("%s failed | %v", a.name, err)
 }
 
 func (a *App) markStopped() {
 	_ = a.state.transition(context.Background(), StateStopped, "stopped", time.Time{})
-	a.stateMu.Lock()
-	a.ready = false
-	a.alive = false
-	a.phase = phaseStopped
-	a.phaseSince = time.Now()
-	a.stateMu.Unlock()
 	logger.Infof("%s stopped", a.name)
 	logger.Flush()
 }

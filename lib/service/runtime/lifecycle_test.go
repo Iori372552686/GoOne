@@ -241,7 +241,7 @@ type idempotentStop struct {
 	count int
 }
 
-func (i *idempotentStop) Name() string { return "idem" }
+func (i *idempotentStop) Name() string                { return "idem" }
 func (i *idempotentStop) Start(context.Context) error { return nil }
 func (i *idempotentStop) Stop(context.Context) error {
 	i.once.Do(func() { i.count++ })
@@ -274,12 +274,12 @@ func TestAppDrainTimeoutContinuesToStop(t *testing.T) {
 }
 
 type blockingDrainer struct {
-	name        string
+	name         string
 	drainStarted chan struct{}
-	stopped     atomic.Bool
+	stopped      atomic.Bool
 }
 
-func (b *blockingDrainer) Name() string { return b.name }
+func (b *blockingDrainer) Name() string                { return b.name }
 func (b *blockingDrainer) Start(context.Context) error { return nil }
 func (b *blockingDrainer) Drain(ctx context.Context) error {
 	close(b.drainStarted)
@@ -307,10 +307,7 @@ func TestAppSecondSignalCancelsDrain(t *testing.T) {
 	// signals are installed).
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		a.mu.Lock()
-		esc := a.escalateDrain
-		a.mu.Unlock()
-		if esc != nil {
+		if esc := a.tryEscalateDrain(); esc != nil {
 			esc()
 			break
 		}
@@ -406,8 +403,8 @@ func TestReadyFlipsFalseOnDrain(t *testing.T) {
 	if a.Ready() {
 		t.Fatal("Ready must be false after Run completes")
 	}
-	if a.Phase() != phaseStopped {
-		t.Fatalf("expected phase %q, got %q", phaseStopped, a.Phase())
+	if a.Phase() != string(StateStopped) {
+		t.Fatalf("expected phase %q, got %q", StateStopped, a.Phase())
 	}
 }
 
@@ -430,7 +427,7 @@ func runInBackground(t *testing.T, a *App, ctx context.Context) <-chan error {
 	// arbitrarily.
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if a.Phase() == phaseReady {
+		if a.Phase() == string(StateReady) {
 			break
 		}
 		time.Sleep(2 * time.Millisecond)

@@ -210,16 +210,25 @@ func NewApp() *runtime.App {
 		panic(fmt.Sprintf("runtime.New websvr: %v", err))
 	}
 
-	wc := gconf.WebSvrCfg.CommonRuntime
-	tracker := runtime.NewComponentTracker(nil)
-	adminComp := runtime.NewAdminComponent(app, tracker,
-		runtime.WithAdminListen(wc.AdminServer.IP, wc.AdminServer.Port),
-		runtime.WithAdminPprof(gconf.WebSvrCfg.CommonDebug.Pprof),
+	// P0-03：admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
+	// app.tracker。
+	adminComp := runtime.NewAdminComponent(app,
+		runtime.WithAdminConfig(func() runtime.AdminConfig {
+			wc := gconf.WebSvrCfg.CommonRuntime
+			return runtime.AdminConfig{
+				Enabled: wc.AdminServer.Enabled,
+				IP:      wc.AdminServer.IP,
+				Port:    wc.AdminServer.Port,
+				Pprof:   gconf.WebSvrCfg.CommonDebug.Pprof,
+			}
+		}),
 		runtime.WithAdminServiceName("websvr"),
 	)
 
-	// Start 顺序：datetime 周期刷新 → logger → tracing → web 运行时（依赖 + HTTP/gRPC） → admin。
-	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, web, adminComp} {
+	// Start 顺序（P0-03）：datetime 周期刷新 → logger → admin → tracing → web 运行时
+	//（依赖 + HTTP/gRPC）。admin 紧跟 logger，反向 Stop 时在 web 资源之后、logger 之前
+	// 关闭。
+	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing, web} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("websvr register %s: %v", c.Name(), err))
 		}

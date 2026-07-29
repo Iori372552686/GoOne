@@ -79,20 +79,26 @@ func NewApp() *runtime.App {
 		panic(fmt.Sprintf("runtime.New mysqlsvr: %v", err))
 	}
 
-	// admin 需引用 app（healthz/readyz 读取 app.State()），故在 app 创建后构造。
-	c := mysqlCommon()
-	tracker := runtime.NewComponentTracker(nil)
-	adminComp := runtime.NewAdminComponent(app, tracker,
-		runtime.WithAdminListen(c.AdminIP, c.AdminPort),
-		runtime.WithAdminPprof(c.Pprof),
+	// P0-03：admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
+	// app.tracker。
+	adminComp := runtime.NewAdminComponent(app,
+		runtime.WithAdminConfig(func() runtime.AdminConfig {
+			c := mysqlCommon()
+			return runtime.AdminConfig{
+				Enabled: c.AdminEnabled,
+				IP:      c.AdminIP,
+				Port:    c.AdminPort,
+				Pprof:   c.Pprof,
+			}
+		}),
 		runtime.WithAdminServiceName("mysqlsvr"),
 		runtime.WithAdminReadyCheck(router.ReadyCheck),
 	)
 
-	// 注册顺序即 Start 顺序：datetime 周期刷新 → logger → tracing → orm 依赖 →
-	// SSRPC 注册（必须在 TransMgr.InitAndRun 之前，因 RegisterToTransactionMgr 调
-	// RegisterCmd）→ TransMgr → router/bus → admin。
-	for _, comp := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, ormDeps, registerHandlers, transMgr, routerComp, adminComp} {
+	// 注册顺序即 Start 顺序（P0-03）：datetime 周期刷新 → logger → admin → tracing →
+	// orm 依赖 → SSRPC 注册（必须在 TransMgr.InitAndRun 之前，因
+	// RegisterToTransactionMgr 调 RegisterCmd）→ TransMgr → router/bus。
+	for _, comp := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing, ormDeps, registerHandlers, transMgr, routerComp} {
 		if err := app.Register(comp); err != nil {
 			panic(fmt.Sprintf("mysqlsvr register %s: %v", comp.Name(), err))
 		}

@@ -28,6 +28,31 @@ type adminConfig struct {
 	// readyCheck 是额外的就绪探针（如 router.ReadyCheck）；readyz 在 lifecycle Ready
 	// 时叠加调用它。可不设。
 	readyCheck func() error
+	// configSource 在 Start 时被调用一次，返回最新的 AdminConfig；用于在 LoadConfig
+	// 之后才确定端口/IP 的场景。nil 表示使用构造期已设置的静态值。
+	configSource func() AdminConfig
+}
+
+// AdminConfig 是 admin server 的可外部配置面。生产服务通过 WithAdminConfig 注入一
+// 个返回 AdminConfig 的闭包；该闭包在 AdminComponent.Start 时被调用一次，使端口/IP
+// 可以读取 LoadConfig 之后才生效的配置值。
+type AdminConfig struct {
+	Enabled bool
+	IP      string
+	Port    int
+	Pprof   bool
+}
+
+// WithAdminConfig 安装一个在 AdminComponent.Start 时调用一次的配置源。source 返回的
+// AdminConfig 覆盖构造期的 WithAdminListen/WithAdminPprof 值；这是生产服务的推荐接
+// 线方式，因为 admin 端口/IP 通常依赖 LoadConfig 之后才确定的配置。
+//
+// source 为 nil 时按已设置的静态选项工作。WithAdminReadyCheck 与 WithAdminPprof 不
+// 隐式启用 admin；只有 Enabled（直接或经 source）为 true 时才绑定监听器。
+func WithAdminConfig(source func() AdminConfig) AdminOption {
+	return func(c *adminConfig) {
+		c.configSource = source
+	}
 }
 
 // WithAdminListen 设置绑定地址与端口。空 IP 默认回环地址 127.0.0.1（绝不所有接
@@ -71,6 +96,9 @@ func WithAdminReadyCheck(fn func() error) AdminOption {
 // Drainer（HTTP Shutdown），使在途 admin 请求在排空期获得宽限窗口。
 //
 // Start 同步绑定监听器，使端口冲突在启动期而非稍后暴露。Stop 带超时关闭 server。
+//
+// P0-03：tracker 直接取自 app.tracker（runtime.New 默认创建），不再由调用方外部传
+// 入，使 /components 在任何接线上都能列出 pending/running 组件。
 type AdminComponent struct {
 	cfg     adminConfig
 	app     *App
@@ -79,11 +107,18 @@ type AdminComponent struct {
 	srv     *http.Server
 	ln      net.Listener
 	addr    string
+	// runtimeErrCh 汇聚 admin server 的运行期错误（如 Serve 异常退出），实现
+	// RuntimeErrorSource 供 App 监督。容量 1，使 Serve goroutine 在 App 订阅前失败也
+	// 不丢错误。
+	runtimeErrCh chan error
 }
 
 // NewAdminComponent 构建一个绑定到给定 App 的 state store 与 component tracker
 // 的 admin Component。必须在 Run 之前构造。
-func NewAdminComponent(app *App, tracker *ComponentTracker, opts ...AdminOption) *AdminComponent {
+//
+// P0-03：tracker 参数已移除；admin 直接使用 app.tracker（runtime.New 默认创建）。
+// 旧的 NewAdminComponent(app, tracker, ...) 调用方改为 NewAdminComponent(app, ...)。
+func NewAdminComponent(app *App, opts ...AdminOption) *AdminComponent {
 	cfg := adminConfig{serviceName: app.Name()}
 	for _, opt := range opts {
 		opt(&cfg)
@@ -91,16 +126,49 @@ func NewAdminComponent(app *App, tracker *ComponentTracker, opts ...AdminOption)
 	if cfg.ip == "" {
 		cfg.ip = "127.0.0.1"
 	}
-	return &AdminComponent{cfg: cfg, app: app, state: app.state, tracker: tracker}
+	return &AdminComponent{
+		cfg:          cfg,
+		app:          app,
+		state:        app.state,
+		tracker:      app.tracker,
+		runtimeErrCh: make(chan error, 1),
+	}
 }
 
 // Name 实现 Component。
 func (a *AdminComponent) Name() string { return "admin" }
 
+// RuntimeErrors 实现 RuntimeErrorSource。admin server 的 Serve goroutine 在异常退出
+// （非 http.ErrServerClosed）时把错误送入此 channel，使 App 能监督监听器死亡并触发标
+// 准关停。预期的 http.ErrServerClosed 不上报。
+func (a *AdminComponent) RuntimeErrors() <-chan error {
+	return a.runtimeErrCh
+}
+
 // Start 实现 Component。它同步绑定监听器。
+//
+// P0-03：若设置了 WithAdminConfig 的 source，在 Start 时调用一次以读取 LoadConfig
+// 之后才生效的端口/IP/Enabled/Pprof，覆盖构造期的静态值。这修正了历史上"构造期冻结
+// cfg.ip/cfg.port、无法反映 LoadConfig 后配置"的问题。
 func (a *AdminComponent) Start(_ context.Context) error {
+	// 先应用 configSource（若设置），使端口/IP 来自 LoadConfig 后的值。
+	if a.cfg.configSource != nil {
+		applied := a.cfg.configSource()
+		a.cfg.enabled = applied.Enabled
+		a.cfg.pprof = applied.Pprof
+		if applied.IP != "" {
+			a.cfg.ip = applied.IP
+		}
+		if applied.Port != 0 {
+			a.cfg.port = applied.Port
+		}
+	}
 	if !a.cfg.enabled {
 		return nil
+	}
+	// 空 IP 默认回环地址，绝不绑定所有接口（admin 含 pprof，不能对外暴露）。
+	if a.cfg.ip == "" {
+		a.cfg.ip = "127.0.0.1"
 	}
 	// port 为 0 让 OS 分配空闲端口；常用于测试。负端口作为配置错误拒绝。
 	if a.cfg.port < 0 {
@@ -130,6 +198,11 @@ func (a *AdminComponent) Start(_ context.Context) error {
 		}
 		if err := a.srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Errorf("%s admin server stopped with error | %v", a.cfg.serviceName, err)
+			// 上报非预期退出，触发 App 监督关停。channel 容量 1，不阻塞。
+			select {
+			case a.runtimeErrCh <- err:
+			default:
+			}
 		}
 	}()
 	return nil
@@ -206,7 +279,7 @@ func (a *AdminComponent) handleReadyz(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (a *AdminComponent) handleStatez(w http.ResponseWriter, _ *http.Request) {
-	snap := a.state.snapshot(a.cfg.serviceName, a.app.startedAtLocked())
+	snap := a.state.snapshot(a.cfg.serviceName)
 	writeJSON(w, http.StatusOK, snap)
 }
 
@@ -227,7 +300,7 @@ func (a *AdminComponent) handleComponents(w http.ResponseWriter, _ *http.Request
 		report = a.tracker.Report()
 	}
 	writeJSON(w, http.StatusOK, struct {
-		Service    string             `json:"service"`
+		Service    string            `json:"service"`
 		Components []ComponentReport `json:"components"`
 	}{
 		Service:    a.cfg.serviceName,

@@ -9,7 +9,7 @@ import (
 // 这些事件名作为日志消息的前缀（[event:xxx]），使运维可按事件名精确 grep 与告警，
 // 取代散落的 Infof/Errorf。所有生命周期关键节点都应经 logEvent 上报。
 const (
-	eventComponentStarting   = "component_starting"
+	eventComponentStarting    = "component_starting"
 	eventComponentStarted     = "component_started"
 	eventComponentStartFailed = "component_start_failed"
 	eventComponentStopFailed  = "component_stop_failed"
@@ -17,6 +17,7 @@ const (
 	eventDrainStarted         = "drain_started"
 	eventDrainCompleted       = "drain_completed"
 	eventDrainTimedOut        = "drain_timed_out"
+	eventDrainEscalated       = "drain_escalated"
 )
 
 // logEvent 记录一条结构化生命周期事件（Info 级）。

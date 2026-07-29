@@ -67,17 +67,25 @@ func NewApp() *runtime.App {
 		panic(fmt.Sprintf("runtime.New infosvr: %v", err))
 	}
 
-	ic := infoCommon()
-	tracker := runtime.NewComponentTracker(nil)
-	adminComp := runtime.NewAdminComponent(app, tracker,
-		runtime.WithAdminListen(ic.AdminIP, ic.AdminPort),
-		runtime.WithAdminPprof(ic.Pprof),
+	// P0-03：admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
+	// app.tracker。
+	adminComp := runtime.NewAdminComponent(app,
+		runtime.WithAdminConfig(func() runtime.AdminConfig {
+			c := infoCommon()
+			return runtime.AdminConfig{
+				Enabled: c.AdminEnabled,
+				IP:      c.AdminIP,
+				Port:    c.AdminPort,
+				Pprof:   c.Pprof,
+			}
+		}),
 		runtime.WithAdminServiceName("infosvr"),
 		runtime.WithAdminReadyCheck(router.ReadyCheck),
 	)
 
-	// datetime_tick 放最前：redis/tracing 启动期可能读 datetime。
-	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, tracing, redisDeps, registerHandlers, transMgr, routerComp, adminComp} {
+	// Start 顺序（P0-03）：datetime_tick → logger → admin → tracing → dependencies →
+	// ssrpc_registry → transaction_mgr → router。datetime_tick 放最前。
+	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing, redisDeps, registerHandlers, transMgr, routerComp} {
 		if err := app.Register(c); err != nil {
 			panic(fmt.Sprintf("infosvr register %s: %v", c.Name(), err))
 		}

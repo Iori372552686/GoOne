@@ -144,3 +144,62 @@ websvr:
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+// TestAdminDefaultPortByServiceType 验证 P0-03：当 admin_server.port 为 0 时，按服务
+// 类型回退到默认端口（connsvr=8101 等）。显式非 0 端口保持不变。
+func TestAdminDefaultPortByServiceType(t *testing.T) {
+	cases := []struct {
+		name       string
+		serverType int
+		wantDef    int
+	}{
+		{"connsvr", 1, 8101},
+		{"mainsvr", 2, 8102},
+		{"infosvr", 3, 8103},
+		{"mysqlsvr", 4, 8104},
+		{"roomcentersvr", 11, 8111},
+		{"websvr", 12, 8112},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// port=0 回退到默认。
+			if got := resolveAdminPort(0, tc.serverType); got != tc.wantDef {
+				t.Fatalf("resolveAdminPort(0,%d)=%d, want %d", tc.serverType, got, tc.wantDef)
+			}
+			// 显式端口保持不变。
+			if got := resolveAdminPort(9999, tc.serverType); got != 9999 {
+				t.Fatalf("resolveAdminPort(9999,%d)=%d, want 9999", tc.serverType, got)
+			}
+		})
+	}
+	// 未知服务类型保持 0（不回退）。
+	if got := resolveAdminPort(0, 999); got != 0 {
+		t.Fatalf("resolveAdminPort(0,999)=%d, want 0（未知类型不回退）", got)
+	}
+}
+
+// TestLoadConnConfigResolvesAdminDefaultPort 验证 P0-03 端到端：当配置文件中
+// admin_server.port 为 0 时，LoadConnConfig 后端口回退到 connsvr 默认端口 8101。
+func TestLoadConnConfigResolvesAdminDefaultPort(t *testing.T) {
+	path := writeTempConfig(t, `
+base_cfg:
+  runtime:
+    register_addr: "zk://127.0.0.1:2181?service=goone"
+    bus_mq_addr: "amqp://guest:guest@127.0.0.1:5672/"
+    admin_server:
+      enabled: true
+      ip: "127.0.0.1"
+      port: 0
+connsvr:
+  identity:
+    self_bus_id: "1.1.1.1"
+  runtime:
+    listen_port: 11000
+`)
+	if err := LoadConnConfig(path); err != nil {
+		t.Fatalf("LoadConnConfig: %v", err)
+	}
+	if got := ConnSvrCfg.CommonRuntime.AdminServer.Port; got != 8101 {
+		t.Fatalf("connsvr admin port 为 0 时应回退到 8101，got %d", got)
+	}
+}

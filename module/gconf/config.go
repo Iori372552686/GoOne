@@ -66,6 +66,35 @@ type AdminServerConfig struct {
 	Port    int    `json:"port" yaml:"port"`       // 监听端口，为 0 时按服务类型回退到默认端口
 }
 
+// defaultAdminPortByServerType 是方案 B P0-03 落实的稳定 Admin 默认端口表：当
+// admin_server.port 为 0 时，按服务类型回退到默认端口。同一主机部署多个相同类型实
+// 例时必须在各实例配置中显式提供唯一端口。
+//
+// 端口分配（8100 + ServerType）：
+//
+//	connsvr(1)→8101  mainsvr(2)→8102  infosvr(3)→8103  mysqlsvr(4)→8104
+//	roomcentersvr(11)→8111  websvr(12)→8112
+var defaultAdminPortByServerType = map[int]int{
+	1:  8101, // ServerType_ConnSvr
+	2:  8102, // ServerType_MainSvr
+	3:  8103, // ServerType_InfoSvr
+	4:  8104, // ServerType_MysqlSvr
+	11: 8111, // ServerType_RoomCenterSvr
+	12: 8112, // ServerType_WebSvr
+}
+
+// resolveAdminPort 在 port 为 0 时按 serverType 回退到默认端口；未知类型保持 0
+// （由 OS 分配或后续校验拒绝）。
+func resolveAdminPort(port, serverType int) int {
+	if port != 0 {
+		return port
+	}
+	if def, ok := defaultAdminPortByServerType[serverType]; ok {
+		return def
+	}
+	return port
+}
+
 type ServiceIdentityConfig struct {
 	SelfBusId string `json:"self_bus_id" yaml:"self_bus_id"`
 }
@@ -343,6 +372,9 @@ func (c *WebSvr) validate() error {
 func (c *ConnConfig) normalize() {
 	c.BaseCfg.normalize()
 	c.ConnSvr.normalize()
+	// P0-03：admin port 为 0 时按服务类型回退到默认端口（connsvr=8101）。
+	c.BaseCfg.CommonRuntime.AdminServer.Port = resolveAdminPort(
+		c.BaseCfg.CommonRuntime.AdminServer.Port, 1)
 }
 
 func (c *ConnConfig) validate() error {
@@ -358,6 +390,9 @@ func (c *ConnConfig) validate() error {
 func (c *InfoConfig) normalize() {
 	c.BaseCfg.normalize()
 	c.InfoSvr.normalize()
+	// P0-03：admin port 为 0 时按服务类型回退（infosvr=8103）。
+	c.BaseCfg.CommonRuntime.AdminServer.Port = resolveAdminPort(
+		c.BaseCfg.CommonRuntime.AdminServer.Port, 3)
 }
 
 func (c *InfoConfig) validate() error {
@@ -379,6 +414,9 @@ func (c *InfoConfig) validate() error {
 func (c *MainSvrConfig) normalize() {
 	c.BaseCfg.normalize()
 	c.MainSvr.normalize()
+	// P0-03：admin port 为 0 时按服务类型回退（mainsvr=8102）。
+	c.BaseCfg.CommonRuntime.AdminServer.Port = resolveAdminPort(
+		c.BaseCfg.CommonRuntime.AdminServer.Port, 2)
 }
 
 func (c *MainSvrConfig) validate() error {
@@ -400,6 +438,9 @@ func (c *MainSvrConfig) validate() error {
 func (c *MySqlSvrConfig) normalize() {
 	c.BaseCfg.normalize()
 	c.MySqlSvr.normalize()
+	// P0-03：admin port 为 0 时按服务类型回退（mysqlsvr=8104）。
+	c.BaseCfg.CommonRuntime.AdminServer.Port = resolveAdminPort(
+		c.BaseCfg.CommonRuntime.AdminServer.Port, 4)
 }
 
 func (c *MySqlSvrConfig) validate() error {
@@ -421,6 +462,9 @@ func (c *MySqlSvrConfig) validate() error {
 func (c *RoomCenterConfig) normalize() {
 	c.BaseCfg.normalize()
 	c.RoomCenterSvr.normalize()
+	// P0-03：admin port 为 0 时按服务类型回退（roomcentersvr=8111）。
+	c.BaseCfg.CommonRuntime.AdminServer.Port = resolveAdminPort(
+		c.BaseCfg.CommonRuntime.AdminServer.Port, 11)
 }
 
 func (c *RoomCenterConfig) validate() error {
@@ -436,6 +480,9 @@ func (c *RoomCenterConfig) validate() error {
 func (c *webSvrConfig) normalize() {
 	c.BaseCfg.normalize()
 	c.WebSvr.normalize()
+	// P0-03：admin port 为 0 时按服务类型回退（websvr=8112）。
+	c.BaseCfg.CommonRuntime.AdminServer.Port = resolveAdminPort(
+		c.BaseCfg.CommonRuntime.AdminServer.Port, 12)
 }
 
 func (c *webSvrConfig) validate() error {
