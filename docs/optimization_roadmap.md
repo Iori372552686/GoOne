@@ -1436,9 +1436,33 @@ contrib/bus/rocketmq
 - [x] SIGUSR1 使用不可变快照（appconfig.Store 原语就绪；六服务接入待 gconf 迁移）。
 - [x] 重复 Handler 在启动期失败（ssrpc.Registry 批量原子注册）。
 - [x] Dispatcher 热路径无注册锁（Seal 后只读 map，2.84ns/0alloc）。
-- [ ] 默认二进制只链接显式 Driver（P2-03 前置就绪，当前仍默认 driver/all 兼容）。
+- [x] 默认二进制只链接显式 Driver（方案 B P1-04：5 个 bus 服务显式 DriverRegistry+MustRegister(rabbitmq)，bussvc 不再 blank-import driver/all，websvr 不链接任何 MQ SDK）。
 - [x] 无通用 10ms Tick/Proc。
 - [x] 不覆盖 Runtime GOMAXPROCS。
 - [x] P0 build/test/race/genproto 全通过。
 - [x] P1 benchmark 无不可解释回退。
 - [x] STYLE、Scaffold、README、评审、计划和代码一致。
+
+---
+
+## 7. 方案 B 闭环（2026-07 实施）
+
+方案 B（[modernization_plan_b_2026-07.md](modernization_plan_b_2026-07.md)）在 roadmap P0+P1 基础上完成了生产闭环。证据见 [benchmarks/modernization-b-baseline.md](benchmarks/modernization-b-baseline.md) 与 [benchmarks/capacity-matrix.md](benchmarks/capacity-matrix.md)。
+
+新增完成项（超出原 roadmap）：
+
+- [x] 终止信号单一 dispatcher + Drain 真实 DeadlineExceeded + ErrDrainEscalated（P0-01）。
+- [x] 状态机为唯一事实源（删 App 重复字段、gauge 时机修复、Allocate(ctx)error）（P0-02）。
+- [x] Admin 延迟取配置 + App 自持 Tracker + RuntimeErrorSource 监督（P0-03）。
+- [x] 网络 deadline 用 time.Now()、写缓冲所有权、Stop 锁外关闭、WS 同步 Listen（P0-04）。
+- [x] 共享 SessionHub（跨传输原子重绑、IPv6、锁外 I/O）+ SessionTracker.WaitSessions/CAS/Close（P0-05/06）。
+- [x] gnet admission gate（P0-06，仅补 gate，backend 分派已正确）。
+- [x] websvr 单 Dispatcher 共享 + Drain 超时保留强关路径（P0-07）。
+- [x] Registry.Seal 真幂等 + RegisterBindings + RegistryComponent + TransMgr.RegisterCmdE（P1-01/02）。
+- [x] generator 生成 `<Service>Bindings`/`RegisterToRegistry` + 6 服务迁移（P1-03）。
+- [x] amqp091-go 迁移（streadway/amqp 从依赖图消失）（P1-05）。
+- [x] appconfig.Store writeMu 串行化 + MergeResult.Applied 真填充（P1-06）。
+- [x] runtime.MustNew + MustRegister 可变参数 + scaffold run()/-root/NewApp 修复（P1-07/08）。
+
+待运维执行（P2-02/P2-03）：C2–C4 压测机采集、RabbitMQ/Redis 真实重启演练、gnet vs gonet 对比、兼容入口清理门禁（见 capacity-matrix.md）。
+

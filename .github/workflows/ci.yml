@@ -113,6 +113,57 @@ jobs:
             exit 1
           fi
 
+      - name: Legacy SSRPC register API scan
+        # 方案 B P1-03：生产服务必须经 RegistryComponent + RegisterToRegistry，禁止再
+        # 调用 RegisterToDispatcher / RegisterToTransactionMgr / TransMgr.RegisterCmd
+        #（生成代码、测试与兼容实现不在扫描范围）。
+        run: |
+          set -e
+          hits=$(grep -rnE "Register[A-Za-z]+ToDispatcher|Register[A-Za-z]+ToTransactionMgr|TransMgr\.RegisterCmd" \
+            cmd src 2>/dev/null \
+            | grep -v "_test.go" \
+            | grep -vE "^\s*//|^\s*\*" \
+            | grep -v "api/gen/" \
+            || true)
+          if [ -n "$hits" ]; then
+            echo "Found legacy SSRPC register API usage in production (cmd/src):"
+            echo "$hits"
+            exit 1
+          fi
+
+      - name: Bus driver/all blank-import scan
+        # 方案 B P1-04：driver/all 的 blank import 不允许出现在 cmd/src/lib/service/runtime
+        #（生产 bus 服务必须显式 DriverRegistry+MustRegister；websvr 不导入任何 driver）。
+        # driver/all 包本身与各 driver 的 init 注册保留为兼容路径，由本扫描排除。
+        run: |
+          set -e
+          hits=$(grep -rnE '"[^"]*bus/driver/all"' \
+            cmd src lib/service/runtime 2>/dev/null \
+            | grep -v "_test.go" \
+            | grep -vE "^\s*//|^\s*\*" \
+            || true)
+          if [ -n "$hits" ]; then
+            echo "Found driver/all blank import in production (cmd/src/lib/service/runtime):"
+            echo "$hits"
+            exit 1
+          fi
+
+      - name: Binary dependency graph gate
+        # 方案 B P1-04/P1-05：websvr 不得链接任何 MQ SDK；bus 服务（connsvr 代表）只
+        # 链接 rabbitmq（amqp091-go），不链接 rocketmq/nats/nsq/kafka；streadway/amqp
+        # 不得出现在模块图。
+        run: |
+          set -e
+          if go list -deps ./cmd/web_svr 2>/dev/null | grep -Eq 'rocketmq|nats.go|go-nsq|kafka-go'; then
+            echo "websvr unexpectedly links MQ SDK"; exit 1
+          fi
+          if go list -deps ./cmd/connsvr 2>/dev/null | grep -Eq 'rocketmq|nats.go|go-nsq|kafka-go'; then
+            echo "connsvr links unselected MQ SDK"; exit 1
+          fi
+          if go list -m all 2>/dev/null | grep -q 'streadway/amqp'; then
+            echo "streadway/amqp still in module graph"; exit 1
+          fi
+
       - name: Docs link check
         # 校验 README/CHANGELOG 引用的 docs/ 路径确实存在。
         run: |
