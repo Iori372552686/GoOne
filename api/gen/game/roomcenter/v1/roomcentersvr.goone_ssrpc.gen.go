@@ -212,6 +212,88 @@ func RegisterRoomCenterInnerServiceToDispatcher(d *ssrpc.Dispatcher, srv RoomCen
 
 }
 
+// RoomCenterInnerServiceBindings returns the authoritative ssrpc binding slice for RoomCenterInnerService.
+// RegisterRoomCenterInnerServiceToRegistry and the legacy RegisterRoomCenterInnerServiceToDispatcher both consume it.
+func RoomCenterInnerServiceBindings(srv RoomCenterInnerServiceSServer) []ssrpc.Binding {
+	if srv.Impl == nil {
+		return nil
+	}
+	return []ssrpc.Binding{
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD(0xB1008), CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD(0xB1008),
+				OneWay: true,
+				Timeout: 5000 * time.Millisecond,
+				Name: "RoomCenterInnerService.Tick",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.InnerTickReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.Tick(ctx, in.(*g1_protocol.InnerTickReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_ROOM_CENTER_INNER_ROOM_LIST_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_ROOM_CENTER_INNER_ROOM_LIST_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "RoomCenterInnerService.RoomList",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.RoomListReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.RoomList(ctx, in.(*g1_protocol.RoomListReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "RoomCenterInnerService.QuickStart",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.QuickStartReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.QuickStart(ctx, in.(*g1_protocol.QuickStartReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_ROOM_CENTER_INNER_UPDATE_ROOM_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_ROOM_CENTER_INNER_UPDATE_ROOM_INFO_REQ,
+				OneWay: true,
+				Timeout: 5000 * time.Millisecond,
+				Name: "RoomCenterInnerService.UpdateRoomInfo",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.RoomShowInfo) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.UpdateRoomInfo(ctx, in.(*g1_protocol.RoomShowInfo))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_ROOM_CENTER_INNER_DEL_ROOM_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_ROOM_CENTER_INNER_DEL_ROOM_INFO_REQ,
+				OneWay: true,
+				Timeout: 5000 * time.Millisecond,
+				Name: "RoomCenterInnerService.DelRoomInfo",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.RoomShowInfo) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.DelRoomInfo(ctx, in.(*g1_protocol.RoomShowInfo))
+			},
+		)},
+	}
+}
+
+// RegisterRoomCenterInnerServiceToRegistry atomically registers all RoomCenterInnerService bindings into r.
+// It is the production entry point: RegistryComponent calls it, then Seals r.
+func RegisterRoomCenterInnerServiceToRegistry(r *ssrpc.Registry, srv RoomCenterInnerServiceSServer) error {
+	if r == nil || srv.Impl == nil {
+		return ssrpc.ErrNilRegistry
+	}
+	return r.Register("RoomCenterInnerService", RoomCenterInnerServiceBindings(srv)...)
+}
+
 // RoomCenterInnerServiceClient provides type-safe RPC stubs for RoomCenterInnerService.
 // Methods derive the target server type from CMD automatically.
 // ByRouter variants are also generated for callers that need explicit routerId routing.

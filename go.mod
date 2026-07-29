@@ -32,11 +32,11 @@ require (
 	github.com/petermattis/goid v0.0.0-20251121121749-a11dd1a45f9a
 	github.com/prometheus/client_golang v1.20.5
 	github.com/prometheus/client_model v0.6.1
+	github.com/rabbitmq/amqp091-go v1.13.0
 	github.com/seefan/gossdb/v2 v2.0.1
 	github.com/segmentio/kafka-go v0.4.49
 	github.com/sony/sonyflake v1.3.0
 	github.com/spf13/cast v1.10.0
-	github.com/streadway/amqp v1.1.0
 	github.com/stretchr/testify v1.11.1
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xtaci/kcp-go/v5 v5.6.57

@@ -1482,6 +1482,578 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 
 }
 
+// MainC2SServiceBindings returns the authoritative ssrpc binding slice for MainC2SService.
+// RegisterMainC2SServiceToRegistry and the legacy RegisterMainC2SServiceToDispatcher both consume it.
+func MainC2SServiceBindings(srv MainC2SServiceSServer) []ssrpc.Binding {
+	if srv.Impl == nil {
+		return nil
+	}
+	return []ssrpc.Binding{
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_LOGIN_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_LOGIN_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.Login",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.LoginReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.Login(ctx, in.(*g1_protocol.LoginReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_LOGOUT_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_LOGOUT_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.Logout",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.LogoutReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.Logout(ctx, in.(*g1_protocol.LogoutReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_HEARTBEAT_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_HEARTBEAT_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.HeartBeat",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.HeartBeatReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.HeartBeat(ctx, in.(*g1_protocol.HeartBeatReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_CHANGE_NAME_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_CHANGE_NAME_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.ChangeName",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.ChangeNameReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.ChangeName(ctx, in.(*g1_protocol.ChangeNameReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_CHANGE_ICON_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_CHANGE_ICON_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.ChangeIcon",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.ChangeIconReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.ChangeIcon(ctx, in.(*g1_protocol.ChangeIconReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GM_GET_ROLE_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GM_GET_ROLE_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.GmGetRole",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.GMGetRoleReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.GmGetRole(ctx, in.(*g1_protocol.GMGetRoleReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GM_SET_ROLE_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GM_SET_ROLE_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.GmSetRole",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.GMSetRoleReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.GmSetRole(ctx, in.(*g1_protocol.GMSetRoleReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GM_ADD_ITEM_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GM_ADD_ITEM_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.GmAddItem",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.GMAddItemReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.GmAddItem(ctx, in.(*g1_protocol.GMAddItemReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_MALL_BUY_PACKAGE_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_MALL_BUY_PACKAGE_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.MallBuyPackage",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.MallBuyPackageReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.MallBuyPackage(ctx, in.(*g1_protocol.MallBuyPackageReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_CREATE_ROOM_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_CREATE_ROOM_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.CreateRoom",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.CreateRoomReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.CreateRoom(ctx, in.(*g1_protocol.CreateRoomReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_JOIN_ROOM_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_JOIN_ROOM_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.JoinRoom",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.JoinRoomReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.JoinRoom(ctx, in.(*g1_protocol.JoinRoomReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_QUICK_START_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_QUICK_START_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.QuickStart",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.QuickStartReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.QuickStart(ctx, in.(*g1_protocol.QuickStartReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_ROOM_LIST_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_ROOM_LIST_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.GetRoomList",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.RoomListReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.GetRoomList(ctx, in.(*g1_protocol.RoomListReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_DO_BET_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_DO_BET_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.DoBet",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.DoBetReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.DoBet(ctx, in.(*g1_protocol.DoBetReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_FOLD_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_FOLD_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.Fold",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.FoldReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.Fold(ctx, in.(*g1_protocol.FoldReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_BUY_IN_DETAIL_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_BUY_IN_DETAIL_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.MainBuyInDetail",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.MainBuyInDetailReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.MainBuyInDetail(ctx, in.(*g1_protocol.MainBuyInDetailReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_GET_LOOKERS_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_GET_LOOKERS_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.GetLookers",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.GetLookersReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.GetLookers(ctx, in.(*g1_protocol.GetLookersReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_SIT_DOWN_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_SIT_DOWN_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.SitDown",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.SitDownReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.SitDown(ctx, in.(*g1_protocol.SitDownReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_STAND_UP_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_STAND_UP_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.StandUp",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.StandUpReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.StandUp(ctx, in.(*g1_protocol.StandUpReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_LEAVE_GAME_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_LEAVE_GAME_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.LeaveGame",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.LeaveGameReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.LeaveGame(ctx, in.(*g1_protocol.LeaveGameReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_BUY_IN_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_BUY_IN_REQ,
+				OneWay: true,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.BuyIn",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.BuyInReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.BuyIn(ctx, in.(*g1_protocol.BuyInReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_MILITARY_SUCCESS_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_MILITARY_SUCCESS_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.MilitarySuccess",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.MilitarySuccessReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.MilitarySuccess(ctx, in.(*g1_protocol.MilitarySuccessReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_GET_GAME_LOG_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_GET_GAME_LOG_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.GetGameLog",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.GetGameLogReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.GetGameLog(ctx, in.(*g1_protocol.GetGameLogReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_GET_TIME_LEFT_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_GET_TIME_LEFT_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.GetTimeLeft",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.GetTimeLeftReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.GetTimeLeft(ctx, in.(*g1_protocol.GetTimeLeftReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_VOICE_CALL_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_VOICE_CALL_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.VoiceCall",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.VoiceCallReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.VoiceCall(ctx, in.(*g1_protocol.VoiceCallReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_BUY_THINK_TIME_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_BUY_THINK_TIME_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.BuyThinkTime",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.BuyThinkTimeReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.BuyThinkTime(ctx, in.(*g1_protocol.BuyThinkTimeReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_AUTO_BUYIN_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_AUTO_BUYIN_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.AutoBuyin",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.AutoBuyinReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.AutoBuyin(ctx, in.(*g1_protocol.AutoBuyinReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_INTERACTION_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_INTERACTION_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.Interaction",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.InteractionReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.Interaction(ctx, in.(*g1_protocol.InteractionReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_EMOTICON_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_EMOTICON_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.Emoticon",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.EmoticonReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.Emoticon(ctx, in.(*g1_protocol.EmoticonReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_GET_MILITARY_DIAGRAM_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_GET_MILITARY_DIAGRAM_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.GetMilitaryDiagram",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.GetMilitaryDiagramReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.GetMilitaryDiagram(ctx, in.(*g1_protocol.GetMilitaryDiagramReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_SHOW_CARD_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_SHOW_CARD_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.ShowCard",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.ShowCardReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.ShowCard(ctx, in.(*g1_protocol.ShowCardReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_GET_ROLE_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_GET_ROLE_INFO_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.GetPlayerInfo",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.GetPlayerInfoReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.GetPlayerInfo(ctx, in.(*g1_protocol.GetPlayerInfoReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_MARK_PLAYER_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_MARK_PLAYER_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.MarkPlayer",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.MarkPlayerReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.MarkPlayer(ctx, in.(*g1_protocol.MarkPlayerReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_INSURANCE_BUY_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_INSURANCE_BUY_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.InsuranceBuy",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.InsuranceBuyReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.InsuranceBuy(ctx, in.(*g1_protocol.InsuranceBuyReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_ROOM_SET_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_ROOM_SET_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.RoomSet",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.RoomSetReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.RoomSet(ctx, in.(*g1_protocol.RoomSetReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_SNG_GET_BLIND_LEVEL_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_SNG_GET_BLIND_LEVEL_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.SngGetBlindLevel",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.SngGetBlindLevelReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.SngGetBlindLevel(ctx, in.(*g1_protocol.SngGetBlindLevelReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_GET_ROOM_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_GET_ROOM_INFO_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.GetRoomInfo",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.GetRoomInfoReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.GetRoomInfo(ctx, in.(*g1_protocol.GetRoomInfoReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_INSURANCE_THINK_TIME_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_INSURANCE_THINK_TIME_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.InsuranceThinkTime",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.InsuranceThinkTimeReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.InsuranceThinkTime(ctx, in.(*g1_protocol.InsuranceThinkTimeReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_INSURANCE_OP_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_INSURANCE_OP_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.InsuranceOp",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.InsuranceOpReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.InsuranceOp(ctx, in.(*g1_protocol.InsuranceOpReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_GET_GAME_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_GET_GAME_INFO_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.GetGameInfo",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.GetGameInfoReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.GetGameInfo(ctx, in.(*g1_protocol.GetGameInfoReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_ADD_TO_FAVORITE_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_ADD_TO_FAVORITE_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.AddToFavorite",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.AddToFavoriteReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.AddToFavorite(ctx, in.(*g1_protocol.AddToFavoriteReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_CHANGE_SKIN_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_CHANGE_SKIN_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.ChangeSkin",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.ChangeSkinReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.ChangeSkin(ctx, in.(*g1_protocol.ChangeSkinReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_RABBIT_HUNTING_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_RABBIT_HUNTING_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.RabbitHunting",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.RabbitHuntingReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.RabbitHunting(ctx, in.(*g1_protocol.RabbitHuntingReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_EARLY_SETTLE_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_EARLY_SETTLE_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.EarlySettle",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.EarlySettleReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.EarlySettle(ctx, in.(*g1_protocol.EarlySettleReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_GAME_PREOPERATION_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_GAME_PREOPERATION_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MainC2SService.Preoperation",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.PreOperationReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.Preoperation(ctx, in.(*g1_protocol.PreOperationReq))
+			},
+		)},
+		{Kind: ssrpc.BindingWS, CMD: g1_protocol.CMD_MAIN_LOGIN_REQ, CmdHandler: ssrpc.WrapWS(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MAIN_LOGIN_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "mainsvr login",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.LoginReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.Login(ctx, in.(*g1_protocol.LoginReq))
+			},
+		)},
+	}
+}
+
+// RegisterMainC2SServiceToRegistry atomically registers all MainC2SService bindings into r.
+// It is the production entry point: RegistryComponent calls it, then Seals r.
+func RegisterMainC2SServiceToRegistry(r *ssrpc.Registry, srv MainC2SServiceSServer) error {
+	if r == nil || srv.Impl == nil {
+		return ssrpc.ErrNilRegistry
+	}
+	return r.Register("MainC2SService", MainC2SServiceBindings(srv)...)
+}
+
 // MainC2SServiceClient provides type-safe RPC stubs for MainC2SService.
 // Methods derive the target server type from CMD automatically.
 // ByRouter variants are also generated for callers that need explicit routerId routing.

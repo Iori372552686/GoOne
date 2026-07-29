@@ -145,6 +145,62 @@ func RegisterInfoServiceToDispatcher(d *ssrpc.Dispatcher, srv InfoServiceSServer
 
 }
 
+// InfoServiceBindings returns the authoritative ssrpc binding slice for InfoService.
+// RegisterInfoServiceToRegistry and the legacy RegisterInfoServiceToDispatcher both consume it.
+func InfoServiceBindings(srv InfoServiceSServer) []ssrpc.Binding {
+	if srv.Impl == nil {
+		return nil
+	}
+	return []ssrpc.Binding{
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_INFO_GET_BRIEF_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_INFO_GET_BRIEF_INFO_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "InfoService.GetBriefInfo",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.InfoGetBriefInfoReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.GetBriefInfo(ctx, in.(*g1_protocol.InfoGetBriefInfoReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_INFO_GET_ICON_DESC_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_INFO_GET_ICON_DESC_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "InfoService.GetIconDesc",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.InfoGetIconDescReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.GetIconDesc(ctx, in.(*g1_protocol.InfoGetIconDescReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ,
+				OneWay: true,
+				Timeout: 5000 * time.Millisecond,
+				Name: "InfoService.SetBriefInfo",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.InfoSetBriefInfoReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.SetBriefInfo(ctx, in.(*g1_protocol.InfoSetBriefInfoReq))
+			},
+		)},
+	}
+}
+
+// RegisterInfoServiceToRegistry atomically registers all InfoService bindings into r.
+// It is the production entry point: RegistryComponent calls it, then Seals r.
+func RegisterInfoServiceToRegistry(r *ssrpc.Registry, srv InfoServiceSServer) error {
+	if r == nil || srv.Impl == nil {
+		return ssrpc.ErrNilRegistry
+	}
+	return r.Register("InfoService", InfoServiceBindings(srv)...)
+}
+
 // InfoServiceClient provides type-safe RPC stubs for InfoService.
 // Methods derive the target server type from CMD automatically.
 // ByRouter variants are also generated for callers that need explicit routerId routing.

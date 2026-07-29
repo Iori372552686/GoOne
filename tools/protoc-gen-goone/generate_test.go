@@ -1765,3 +1765,62 @@ func labelPtr(v descriptorpb.FieldDescriptorProto_Label) *descriptorpb.FieldDesc
 func typePtr(v descriptorpb.FieldDescriptorProto_Type) *descriptorpb.FieldDescriptorProto_Type {
 	return &v
 }
+
+// TestGenerate_RegistryBinding 验证 P1-01：generator 为 cmd-bound 服务生成
+// RegisterSvcToRegistry(r *ssrpc.Registry, srv) error。
+func TestGenerate_RegistryBinding(t *testing.T) {
+	descFD := protodesc.ToFileDescriptorProto(descriptorpb.File_google_protobuf_descriptor_proto)
+	optionsFD := &descriptorpb.FileDescriptorProto{
+		Name:       protoString(ssrpcOptFilePath),
+		Package:    protoString("goone.options.v1"),
+		Dependency: []string{"google/protobuf/descriptor.proto"},
+		Options:    &descriptorpb.FileOptions{GoPackage: protoString("github.com/Iori372552686/GoOne/api/gen/goone/options/v1;optionsv1")},
+		MessageType: []*descriptorpb.DescriptorProto{
+			{Name: protoString("SsRpc"), Field: []*descriptorpb.FieldDescriptorProto{
+				{Name: protoString("cmd"), Number: protoInt32(1), Label: labelPtr(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL), Type: typePtr(descriptorpb.FieldDescriptorProto_TYPE_UINT32)},
+				{Name: protoString("cmd_name"), Number: protoInt32(5), Label: labelPtr(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL), Type: typePtr(descriptorpb.FieldDescriptorProto_TYPE_STRING)},
+			}},
+		},
+		Extension: []*descriptorpb.FieldDescriptorProto{{
+			Name: protoString("ssrpc"), Number: protoInt32(61001),
+			Label: labelPtr(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL), Type: typePtr(descriptorpb.FieldDescriptorProto_TYPE_MESSAGE),
+			TypeName: protoString(".goone.options.v1.SsRpc"), Extendee: protoString(".google.protobuf.MethodOptions"),
+		}},
+	}
+	svcFD := &descriptorpb.FileDescriptorProto{
+		Name: protoString("test/reg/v1/svc.proto"), Package: protoString("test.reg.v1"),
+		Dependency: []string{ssrpcOptFilePath},
+		Options:    &descriptorpb.FileOptions{GoPackage: protoString("github.com/Iori372552686/GoOne/api/gen/test/reg/v1;regv1")},
+		MessageType: []*descriptorpb.DescriptorProto{{Name: protoString("Req")}, {Name: protoString("Rsp")}},
+		Service: []*descriptorpb.ServiceDescriptorProto{{Name: protoString("Svc"), Method: []*descriptorpb.MethodDescriptorProto{{
+			Name: protoString("Do"), InputType: protoString(".test.reg.v1.Req"), OutputType: protoString(".test.reg.v1.Rsp"),
+			Options: &descriptorpb.MethodOptions{},
+		}}}},
+	}
+	extType, extMsgDesc, _, err := buildSsRpcExtension([]*descriptorpb.FileDescriptorProto{descFD, optionsFD, svcFD})
+	if err != nil {
+		t.Fatalf("buildSsRpcExtension err: %v", err)
+	}
+	optMsg := dynamicpb.NewMessage(extMsgDesc)
+	optMsg.Set(extMsgDesc.Fields().ByName("cmd_name"), protoreflect.ValueOfString("CMD_TEST_DO_REQ"))
+	svcFD.Service[0].Method[0].Options = mustMethodOptionsUnknown(t, extType, optMsg)
+
+	req := &pluginpb.CodeGeneratorRequest{
+		FileToGenerate: []string{svcFD.GetName()},
+		ProtoFile:      []*descriptorpb.FileDescriptorProto{descFD, optionsFD, svcFD},
+		Parameter:      protoString("paths=import,module=github.com/Iori372552686/GoOne"),
+	}
+	resp, err := Generate(req)
+	if err != nil {
+		t.Fatalf("Generate err: %v", err)
+	}
+	out := resp.File[0].GetContent()
+	// 必须生成 RegisterSvcToRegistry，签名 (r *ssrpc.Registry, srv SvcSServer) error。
+	if !contains(out, "func RegisterSvcToRegistry(r *ssrpc.Registry, srv SvcSServer) error") {
+		t.Fatalf("expected RegisterSvcToRegistry in output, got:\n%s", out)
+	}
+	// 必须调用 r.Register。
+	if !contains(out, "r.Register(") {
+		t.Fatalf("expected r.Register call in output, got:\n%s", out)
+	}
+}

@@ -114,6 +114,50 @@ func RegisterConnServiceToDispatcher(d *ssrpc.Dispatcher, srv ConnServiceSServer
 
 }
 
+// ConnServiceBindings returns the authoritative ssrpc binding slice for ConnService.
+// RegisterConnServiceToRegistry and the legacy RegisterConnServiceToDispatcher both consume it.
+func ConnServiceBindings(srv ConnServiceSServer) []ssrpc.Binding {
+	if srv.Impl == nil {
+		return nil
+	}
+	return []ssrpc.Binding{
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_CONN_KICK_OUT_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_CONN_KICK_OUT_REQ,
+				OneWay: true,
+				Timeout: 5000 * time.Millisecond,
+				Name: "ConnService.KickOut",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.ConnKickOutReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.KickOut(ctx, in.(*g1_protocol.ConnKickOutReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_CONN_BROADCAST_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_CONN_BROADCAST_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "ConnService.Broadcast",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.ConnBroadcastReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.Broadcast(ctx, in.(*g1_protocol.ConnBroadcastReq))
+			},
+		)},
+	}
+}
+
+// RegisterConnServiceToRegistry atomically registers all ConnService bindings into r.
+// It is the production entry point: RegistryComponent calls it, then Seals r.
+func RegisterConnServiceToRegistry(r *ssrpc.Registry, srv ConnServiceSServer) error {
+	if r == nil || srv.Impl == nil {
+		return ssrpc.ErrNilRegistry
+	}
+	return r.Register("ConnService", ConnServiceBindings(srv)...)
+}
+
 // ConnServiceClient provides type-safe RPC stubs for ConnService.
 // Methods derive the target server type from CMD automatically.
 // ByRouter variants are also generated for callers that need explicit routerId routing.

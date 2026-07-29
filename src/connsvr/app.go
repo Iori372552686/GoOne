@@ -2,10 +2,11 @@ package connsvr
 
 import (
 	"context"
-	"fmt"
 
 	connsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/connsvr/v1"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/service/bus"
+	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
@@ -29,22 +30,28 @@ func NewApp() *runtime.App {
 		},
 	}
 
-	registerHandlers := &bussvc.FuncComponent{
-		ComponentName: "ssrpc_register",
-		OnStart: func(_ context.Context) error {
+	// P1-03：用 RegistryComponent 替代 "NewDispatcher→ToDispatcher→丢弃" 闭包。
+	// Register→Seal→TransMgr 绑定在一个组件内原子完成。
+	registerHandlers := ssrpc.NewRegistryComponent(
+		"ssrpc_registry",
+		func(r *ssrpc.Registry) error {
 			srv := connsvrv1.NewConnServiceSServer(&service.ConnServiceImpl{}, ssrpc.DefaultMWOptions{})
-			d := ssrpc.NewDispatcher()
-			connsvrv1.RegisterConnServiceToDispatcher(d, srv)
-			return d.RegisterToTransactionMgr(globals.TransMgr)
+			return connsvrv1.RegisterConnServiceToRegistry(r, srv)
 		},
-	}
+		ssrpc.WithTransactionManager(globals.TransMgr),
+	)
 
 	// connsvr 特有：客户端下行包在 onRecvSSPacket 中短路回客户端，覆盖默认的
 	// TransMgr.ProcessSSPacket。
+	// P1-04：显式装配 DriverRegistry，只注册 rabbitmq（bus 服务不再隐式链接全部 5 类
+	// MQ SDK；websvr 不链接任何 driver）。
+	drivers := bus.NewDriverRegistry()
+	drivers.MustRegister(rabbitmq.Driver())
 	routerComp := &bussvc.RouterComponent{
 		Common:         connCommon,
 		TransMgr:       globals.TransMgr,
 		OnRecvSSPacket: onRecvSSPacket,
+		Drivers:        drivers,
 	}
 	tracing := &bussvc.TracingComponent{
 		ServiceName: "connsvr",
@@ -61,7 +68,7 @@ func NewApp() *runtime.App {
 	// 与 runtime.Component（Stop 强制关闭全部连接），满足 roadmap P0-07 网关排空。
 	gateway := &gatewayComponent{}
 
-	app, err := runtime.New("connsvr",
+	app := runtime.MustNew("connsvr",
 		runtime.WithLoadConfig(func(_ context.Context) error {
 			if err := gconf.LoadConnConfig(*gconf.SvrConfFile); err != nil {
 				return err
@@ -70,9 +77,6 @@ func NewApp() *runtime.App {
 			return nil
 		}),
 	)
-	if err != nil {
-		panic(fmt.Sprintf("runtime.New connsvr: %v", err))
-	}
 
 	// P0-03：admin 在 LoadConfig 后用 WithAdminConfig 的 source 读取端口/IP（延迟取配
 	// 置），直接复用 app.tracker（runtime.New 默认创建），无需外部传入。
@@ -95,11 +99,11 @@ func NewApp() *runtime.App {
 	// 时 admin 在业务资源之后、logger 之前关闭；admin 在 LoadConfig 后 Start 故端口
 	// 已生效。datetime_tick 放最前：tcp/ws/kcp 服务器启动期用 datetime.NowT() 设读写
 	// deadline。
-	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing, signRestDeps, registerHandlers, transMgr, routerComp, gateway} {
-		if err := app.Register(c); err != nil {
-			panic(fmt.Sprintf("connsvr register %s: %v", c.Name(), err))
-		}
-	}
+	// P1-07：用 MustRegister 一次注册全部组件（顺序即 Start 顺序）。
+	app.MustRegister(
+		scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing,
+		signRestDeps, registerHandlers, transMgr, routerComp, gateway,
+	)
 	return app
 }
 

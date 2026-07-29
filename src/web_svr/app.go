@@ -245,7 +245,7 @@ func NewApp() *runtime.App {
 		},
 	}
 
-	app, err := runtime.New("websvr",
+	app := runtime.MustNew("websvr",
 		runtime.WithLoadConfig(func(_ context.Context) error {
 			if err := gconf.LoadWebConfig(*gconf.SvrConfFile); err != nil {
 				return err
@@ -260,9 +260,6 @@ func NewApp() *runtime.App {
 			return nil
 		}),
 	)
-	if err != nil {
-		panic(fmt.Sprintf("runtime.New websvr: %v", err))
-	}
 
 	// P0-03：admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
 	// app.tracker。
@@ -282,10 +279,7 @@ func NewApp() *runtime.App {
 	// Start 顺序（P0-03）：datetime 周期刷新 → logger → admin → tracing → web 运行时
 	//（依赖 + HTTP/gRPC）。admin 紧跟 logger，反向 Stop 时在 web 资源之后、logger 之前
 	// 关闭。
-	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing, web} {
-		if err := app.Register(c); err != nil {
-			panic(fmt.Sprintf("websvr register %s: %v", c.Name(), err))
-		}
-	}
+	// P1-07：用 MustRegister 一次注册全部组件。
+	app.MustRegister(scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing, web)
 	return app
 }

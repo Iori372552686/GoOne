@@ -3,7 +3,7 @@
 #ulimit -c unlimited
 source /etc/profile
 
-# 棰滆壊鏀寔锛堝鏋滄槸闈?TTY 鎴栬缃簡 NO_COLOR锛屽垯鑷姩鍏抽棴棰滆壊锛?
+# 颜色支持（如果是非 TTY 或设置了 NO_COLOR，则自动关闭颜色）
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
     COLOR_RED=$'\033[0;31m'
     COLOR_GREEN=$'\033[0;32m'
@@ -67,7 +67,7 @@ kill_process_force() {
     fi
 }
 
-# 鑴氭湰鎵€鍦ㄧ洰褰曪紝閬垮厤渚濊禆褰撳墠宸ヤ綔鐩綍
+# 脚本所在目录，避免依赖当前工作目录
 SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)"
 SERVER_PATH="$SCRIPT_PATH"
 SERVER_NAME="$(basename "$SERVER_PATH")"
@@ -93,7 +93,7 @@ is_running()
         fi
     fi
 
-    # 鍥為€€鍒拌繘绋嬪悕妫€娴?
+# 优先使用 pid 文件，如果存在的话
     proc_num=$(ps -C "${SERVER_NAME}" 2>/dev/null | sed -e '1d' | wc -l)
     if [ "${proc_num}" -gt 0 ]; then
         log_ok "Server ${SERVER_NAME} is already running!"
@@ -102,7 +102,7 @@ is_running()
         return 1
     fi
 }
-
+# 回退到进程名检测
 start()
 {
     is_running
@@ -183,7 +183,7 @@ stop()
     return 0
 }
 
-#clean()
+# is_running 返回 1 表示已经不在运行
 #{
 #    str=`grep key ${SERVER_PARAM} | grep shm | awk -F':' '{print $2}'`
 #    for key in $str; do

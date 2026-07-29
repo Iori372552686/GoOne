@@ -112,3 +112,47 @@ func RegisterWebApiServiceToDispatcher(d *ssrpc.Dispatcher, srv WebApiServiceSSe
 
 }
 
+// WebApiServiceBindings returns the authoritative ssrpc binding slice for WebApiService.
+// RegisterWebApiServiceToRegistry and the legacy RegisterWebApiServiceToDispatcher both consume it.
+func WebApiServiceBindings(srv WebApiServiceSServer) []ssrpc.Binding {
+	if srv.Impl == nil {
+		return nil
+	}
+	return []ssrpc.Binding{
+		{Kind: ssrpc.BindingHTTP, HTTPMethod: "GET", HTTPPath: "/v1/web/ping", HTTPHandler: ssrpc.WrapHTTPGin(
+			ssrpc.MethodDesc{
+				Cmd: 0,
+				Timeout: 8000 * time.Millisecond,
+				Name: "web ping",
+			},
+			srv.MW,
+			func() any { return new(PingReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.Ping(ctx, in.(*PingReq))
+			},
+		)},
+		{Kind: ssrpc.BindingHTTP, HTTPMethod: "POST", HTTPPath: "/v1/web/msg-sec-check", HTTPHandler: ssrpc.WrapHTTPGin(
+			ssrpc.MethodDesc{
+				Cmd: 0,
+				Sign: true,
+				Timeout: 8000 * time.Millisecond,
+				Name: "msg security check",
+			},
+			srv.MW,
+			func() any { return new(MsgSecCheckReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.MsgSecCheck(ctx, in.(*MsgSecCheckReq))
+			},
+		)},
+	}
+}
+
+// RegisterWebApiServiceToRegistry atomically registers all WebApiService bindings into r.
+// It is the production entry point: RegistryComponent calls it, then Seals r.
+func RegisterWebApiServiceToRegistry(r *ssrpc.Registry, srv WebApiServiceSServer) error {
+	if r == nil || srv.Impl == nil {
+		return ssrpc.ErrNilRegistry
+	}
+	return r.Register("WebApiService", WebApiServiceBindings(srv)...)
+}
+

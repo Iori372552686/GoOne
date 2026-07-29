@@ -239,6 +239,98 @@ func RegisterMysqlServiceToDispatcher(d *ssrpc.Dispatcher, srv MysqlServiceSServ
 
 }
 
+// MysqlServiceBindings returns the authoritative ssrpc binding slice for MysqlService.
+// RegisterMysqlServiceToRegistry and the legacy RegisterMysqlServiceToDispatcher both consume it.
+func MysqlServiceBindings(srv MysqlServiceSServer) []ssrpc.Binding {
+	if srv.Impl == nil {
+		return nil
+	}
+	return []ssrpc.Binding{
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MysqlService.UpdateRoleInfo",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.MysqlInnerUpdateRoleInfoReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.UpdateRoleInfo(ctx, in.(*g1_protocol.MysqlInnerUpdateRoleInfoReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_SEARCH_ROLE_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MYSQL_INNER_SEARCH_ROLE_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MysqlService.SearchRole",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.MysqlInnerSearchRoleReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.SearchRole(ctx, in.(*g1_protocol.MysqlInnerSearchRoleReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ,
+				OneWay: true,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MysqlService.Update",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.MysqlInnerUpdateReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.Update(ctx, in.(*g1_protocol.MysqlInnerUpdateReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MysqlService.QueryRoomInfo",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.QueryRoomInfoReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.QueryRoomInfo(ctx, in.(*g1_protocol.QueryRoomInfoReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MysqlService.QueryPlayerInfo",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.QueryPlayerInfoReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.QueryPlayerInfo(ctx, in.(*g1_protocol.QueryPlayerInfoReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name: "MysqlService.QueryGameInfo",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.QueryGameInfoReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.QueryGameInfo(ctx, in.(*g1_protocol.QueryGameInfoReq))
+			},
+		)},
+	}
+}
+
+// RegisterMysqlServiceToRegistry atomically registers all MysqlService bindings into r.
+// It is the production entry point: RegistryComponent calls it, then Seals r.
+func RegisterMysqlServiceToRegistry(r *ssrpc.Registry, srv MysqlServiceSServer) error {
+	if r == nil || srv.Impl == nil {
+		return ssrpc.ErrNilRegistry
+	}
+	return r.Register("MysqlService", MysqlServiceBindings(srv)...)
+}
+
 // MysqlServiceClient provides type-safe RPC stubs for MysqlService.
 // Methods derive the target server type from CMD automatically.
 // ByRouter variants are also generated for callers that need explicit routerId routing.

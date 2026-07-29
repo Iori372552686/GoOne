@@ -2,10 +2,11 @@ package mysqlsvr
 
 import (
 	"context"
-	"fmt"
 
 	mysqlsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/mysqlsvr/v1"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/service/bus"
+	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
@@ -26,15 +27,15 @@ func NewApp() *runtime.App {
 	// SSRPC 注册：必须在 Seal（于 router/bus Start 之前）完成，且在 TransMgr Start
 	// 之后（RegisterToTransactionMgr 依赖已 InitAndRun 的 TransMgr）。这里作为
 	// FuncComponent，注册顺序置于 TransMgr 之后、Router 之前。
-	registerHandlers := &bussvc.FuncComponent{
-		ComponentName: "ssrpc_register",
-		OnStart: func(_ context.Context) error {
+	// P1-03：用 RegistryComponent 替代 "NewDispatcher→ToDispatcher→丢弃" 闭包。
+	registerHandlers := ssrpc.NewRegistryComponent(
+		"ssrpc_registry",
+		func(r *ssrpc.Registry) error {
 			srv := mysqlsvrv1.NewMysqlServiceSServer(&service.MysqlServiceImpl{}, ssrpc.DefaultMWOptions{})
-			d := ssrpc.NewDispatcher()
-			mysqlsvrv1.RegisterMysqlServiceToDispatcher(d, srv)
-			return d.RegisterToTransactionMgr(globals.TransMgr)
+			return mysqlsvrv1.RegisterMysqlServiceToRegistry(r, srv)
 		},
-	}
+		ssrpc.WithTransactionManager(globals.TransMgr),
+	)
 
 	// ORM 依赖：Start 初始化；Stop 关闭（原 OnExit 的 manager.Close）。
 	ormDeps := &bussvc.FuncComponent{
@@ -49,9 +50,13 @@ func NewApp() *runtime.App {
 		},
 	}
 
+	// P1-04：显式 DriverRegistry，只注册 rabbitmq。
+	drivers := bus.NewDriverRegistry()
+	drivers.MustRegister(rabbitmq.Driver())
 	routerComp := &bussvc.RouterComponent{
 		Common:   mysqlCommon,
 		TransMgr: globals.TransMgr,
+		Drivers:  drivers,
 	}
 	tracing := &bussvc.TracingComponent{
 		ServiceName: "mysqlsvr",
@@ -65,7 +70,7 @@ func NewApp() *runtime.App {
 		},
 	}
 
-	app, err := runtime.New("mysqlsvr",
+	app := runtime.MustNew("mysqlsvr",
 		runtime.WithLoadConfig(func(_ context.Context) error {
 			if err := gconf.LoadMySQLConfig(*gconf.SvrConfFile); err != nil {
 				return err
@@ -74,9 +79,6 @@ func NewApp() *runtime.App {
 			return nil
 		}),
 	)
-	if err != nil {
-		panic(fmt.Sprintf("runtime.New mysqlsvr: %v", err))
-	}
 
 	// P0-03：admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
 	// app.tracker。
@@ -97,11 +99,11 @@ func NewApp() *runtime.App {
 	// 注册顺序即 Start 顺序（P0-03）：datetime 周期刷新 → logger → admin → tracing →
 	// orm 依赖 → SSRPC 注册（必须在 TransMgr.InitAndRun 之前，因
 	// RegisterToTransactionMgr 调 RegisterCmd）→ TransMgr → router/bus。
-	for _, comp := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing, ormDeps, registerHandlers, transMgr, routerComp} {
-		if err := app.Register(comp); err != nil {
-			panic(fmt.Sprintf("mysqlsvr register %s: %v", comp.Name(), err))
-		}
-	}
+	// P1-07：用 MustRegister 一次注册全部组件。
+	app.MustRegister(
+		scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing,
+		ormDeps, registerHandlers, transMgr, routerComp,
+	)
 	return app
 }
 

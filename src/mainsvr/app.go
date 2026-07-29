@@ -3,13 +3,14 @@ package mainsvr
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	mainsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/mainsvr/v1"
 	"github.com/Iori372552686/GoOne/common/gamedata"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
+	"github.com/Iori372552686/GoOne/lib/service/bus"
+	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
@@ -67,19 +68,23 @@ func NewApp() *runtime.App {
 		},
 	}
 
-	registerHandlers := &bussvc.FuncComponent{
-		ComponentName: "ssrpc_register",
-		OnStart: func(_ context.Context) error {
+	// P1-03：用 RegistryComponent 替代 "NewDispatcher→ToDispatcher→丢弃" 闭包。
+	registerHandlers := ssrpc.NewRegistryComponent(
+		"ssrpc_registry",
+		func(r *ssrpc.Registry) error {
 			srv := mainsvrv1.NewMainC2SServiceSServer(&service.MainC2SServiceImpl{}, ssrpc.DefaultMWOptions{})
-			d := ssrpc.NewDispatcher()
-			mainsvrv1.RegisterMainC2SServiceToDispatcher(d, srv)
-			return d.RegisterToTransactionMgr(globals.TransMgr)
+			return mainsvrv1.RegisterMainC2SServiceToRegistry(r, srv)
 		},
-	}
+		ssrpc.WithTransactionManager(globals.TransMgr),
+	)
 
+	// P1-04：显式 DriverRegistry，只注册 rabbitmq。
+	drivers := bus.NewDriverRegistry()
+	drivers.MustRegister(rabbitmq.Driver())
 	routerComp := &bussvc.RouterComponent{
 		Common:   mainCommon,
 		TransMgr: globals.TransMgr,
+		Drivers:  drivers,
 	}
 	tracing := &bussvc.TracingComponent{
 		ServiceName: "mainsvr",
@@ -117,7 +122,7 @@ func NewApp() *runtime.App {
 		},
 	}
 
-	app, err := runtime.New("mainsvr",
+	app := runtime.MustNew("mainsvr",
 		runtime.WithLoadConfig(func(_ context.Context) error {
 			if err := gconf.LoadMainConfig(*gconf.SvrConfFile); err != nil {
 				return err
@@ -132,9 +137,6 @@ func NewApp() *runtime.App {
 			return nil
 		}),
 	)
-	if err != nil {
-		panic(fmt.Sprintf("runtime.New mainsvr: %v", err))
-	}
 
 	// P0-03：admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
 	// app.tracker。
@@ -155,11 +157,12 @@ func NewApp() *runtime.App {
 	// Start 顺序（P0-03）：datetime → logger → admin → tracing → 业务依赖 → SSRPC 注册
 	// → TransMgr → router/bus → SelfLogoutSender → roleTick(Task) → roleFlush(Drainer)。
 	// datetime_tick 放最前：logger/xorm 等启动期即读 datetime，需保证 ticker 已起。
-	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing, businessDeps, registerHandlers, transMgr, routerComp, selfLogout, roleTick, roleFlush} {
-		if err := app.Register(c); err != nil {
-			panic(fmt.Sprintf("mainsvr register %s: %v", c.Name(), err))
-		}
-	}
+	// P1-07：用 MustRegister 一次注册全部组件。
+	app.MustRegister(
+		scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing,
+		businessDeps, registerHandlers, transMgr, routerComp,
+		selfLogout, roleTick, roleFlush,
+	)
 	return app
 }
 

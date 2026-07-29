@@ -940,6 +940,104 @@ func renderSSRPC(fd *descriptorpb.FileDescriptorProto, goPkgName string, curImpo
 		}
 
 		// ---------------------------------------------------------------------
+		// P1-01: Registry binding. Generate <Service>Bindings(srv) []ssrpc.Binding
+		// (the authoritative binding list) and Register<Service>ToRegistry, which
+		// atomically registers the whole batch into a ssrpc.Registry. Production
+		// code uses RegistryComponent + Register<Service>ToRegistry; the legacy
+		// ToDispatcher/ToTransactionMgr are kept for compatibility.
+		// ---------------------------------------------------------------------
+		if hasAnyCmdMethod || len(httpBinds) > 0 || hasAnyWSMethod || hasAnyGRPCMethod {
+			// <Service>Bindings returns the authoritative []ssrpc.Binding slice.
+			b.WriteString(fmt.Sprintf("// %sBindings returns the authoritative ssrpc binding slice for %s.\n", svc, svc))
+			b.WriteString(fmt.Sprintf("// Register%sToRegistry and the legacy Register%sToDispatcher both consume it.\n", svc, svc))
+			b.WriteString(fmt.Sprintf("func %sBindings(srv %sSServer) []ssrpc.Binding {\n", svc, svc))
+			b.WriteString("\tif srv.Impl == nil {\n\t\treturn nil\n\t}\n")
+			b.WriteString("\treturn []ssrpc.Binding{\n")
+
+			// cmd-bound methods -> BindingCMD
+			for _, m := range annotated {
+				ext, _, err := readSsRpcOption(m.GetOptions(), extType, extMsgDesc, extNum)
+				if err != nil {
+					return "", err
+				}
+				timeoutMs := effectiveTimeoutMs(ext.timeoutMs, serviceTimeoutMs)
+				hasCmd := !(ext.cmd == 0 && ext.cmdEnum == 0 && strings.TrimSpace(ext.cmdName) == "")
+				if !hasCmd {
+					continue
+				}
+				cmdExpr := cmdLiteral(ext)
+				method := m.GetName()
+				inGo, _, err := typeRef(m.GetInputType())
+				if err != nil {
+					return "", err
+				}
+				b.WriteString("\t\t{Kind: ssrpc.BindingCMD, CMD: " + cmdExpr + ", CmdHandler: ssrpc.WrapUnary(\n")
+				writeMethodDescForBinding(&b, ext, timeoutMs, svc+"."+method)
+				b.WriteString("\t\t\tsrv.MW,\n")
+				b.WriteString(fmt.Sprintf("\t\t\tfunc() any { return new(%s) },\n", inGo))
+				b.WriteString("\t\t\tfunc(ctx *ssrpc.Context, in any) (any, error) {\n")
+				b.WriteString(fmt.Sprintf("\t\t\t\treturn srv.Impl.%s(ctx, in.(*%s))\n", method, inGo))
+				b.WriteString("\t\t\t},\n")
+				b.WriteString("\t\t)},\n")
+			}
+			// http-bound methods -> BindingHTTP
+			for _, hb := range httpBinds {
+				b.WriteString(fmt.Sprintf("\t\t{Kind: ssrpc.BindingHTTP, HTTPMethod: %q, HTTPPath: %q, HTTPHandler: ssrpc.WrapHTTPGin(\n", hb.httpMethod, hb.path))
+				writeMethodDescForBindingRaw(&b, hb.cmdLit, hb.oneWay, hb.uidLock, hb.auth, hb.sign, hb.timeoutMs, hb.tags, hb.name)
+				b.WriteString("\t\t\tsrv.MW,\n")
+				b.WriteString(fmt.Sprintf("\t\t\tfunc() any { return new(%s) },\n", hb.inGo))
+				b.WriteString("\t\t\tfunc(ctx *ssrpc.Context, in any) (any, error) {\n")
+				b.WriteString(fmt.Sprintf("\t\t\t\treturn srv.Impl.%s(ctx, in.(*%s))\n", hb.method, hb.inGo))
+				b.WriteString("\t\t\t},\n")
+				b.WriteString("\t\t)},\n")
+			}
+			// ws-bound methods -> BindingWS
+			for _, wb := range wsBinds {
+				b.WriteString("\t\t{Kind: ssrpc.BindingWS, CMD: " + wb.cmdLit + ", CmdHandler: ssrpc.WrapWS(\n")
+				writeMethodDescForBindingRaw(&b, wb.cmdLit, wb.oneWay, wb.uidLock, wb.auth, wb.sign, wb.timeoutMs, wb.tags, wb.name)
+				b.WriteString("\t\t\tsrv.MW,\n")
+				b.WriteString(fmt.Sprintf("\t\t\tfunc() any { return new(%s) },\n", wb.inGo))
+				b.WriteString("\t\t\tfunc(ctx *ssrpc.Context, in any) (any, error) {\n")
+				b.WriteString(fmt.Sprintf("\t\t\t\treturn srv.Impl.%s(ctx, in.(*%s))\n", wb.method, wb.inGo))
+				b.WriteString("\t\t\t},\n")
+				b.WriteString("\t\t)},\n")
+			}
+			// grpc-bound methods -> BindingGRPCUnary / BindingGRPCStream
+			for _, gb := range grpcBinds {
+				if gb.grpcServerStream {
+					b.WriteString(fmt.Sprintf("\t\t{Kind: ssrpc.BindingGRPCStream, GRPCService: %q, GRPCMethod: %q, StreamHandler: ssrpc.WrapGRPCServerStreamTyped[*%s](\n", gb.grpcService, gb.method, gb.outGo))
+				} else {
+					b.WriteString(fmt.Sprintf("\t\t{Kind: ssrpc.BindingGRPCUnary, GRPCService: %q, GRPCMethod: %q, ReqFactory: func() any { return new(%s) }, UnaryHandler: ssrpc.WrapGRPCUnary(\n", gb.grpcService, gb.method, gb.inGo))
+				}
+				writeMethodDescForBindingRaw(&b, gb.cmdLit, gb.oneWay, gb.uidLock, gb.auth, gb.sign, gb.timeoutMs, gb.tags, gb.name)
+				b.WriteString("\t\t\tsrv.MW,\n")
+				if gb.grpcServerStream {
+					b.WriteString(fmt.Sprintf("\t\t\tfunc() any { return new(%s) },\n", gb.inGo))
+					b.WriteString(fmt.Sprintf("\t\t\tfunc(ctx *ssrpc.Context, in any, stream *ssrpc.ServerStream[*%s]) error {\n", gb.outGo))
+					b.WriteString(fmt.Sprintf("\t\t\t\treturn srv.Impl.%s(ctx, in.(*%s), stream)\n", gb.method, gb.inGo))
+					b.WriteString("\t\t\t},\n")
+				} else {
+					b.WriteString("\t\t\tfunc(ctx *ssrpc.Context, in any) (any, error) {\n")
+					b.WriteString(fmt.Sprintf("\t\t\t\treturn srv.Impl.%s(ctx, in.(*%s))\n", gb.method, gb.inGo))
+					b.WriteString("\t\t\t},\n")
+				}
+				b.WriteString("\t\t)},\n")
+			}
+			b.WriteString("\t}\n")
+			b.WriteString("}\n\n")
+
+			// Register<Service>ToRegistry atomically registers the batch into a Registry.
+			b.WriteString(fmt.Sprintf("// Register%sToRegistry atomically registers all %s bindings into r.\n", svc, svc))
+			b.WriteString(fmt.Sprintf("// It is the production entry point: RegistryComponent calls it, then Seals r.\n"))
+			b.WriteString(fmt.Sprintf("func Register%sToRegistry(r *ssrpc.Registry, srv %sSServer) error {\n", svc, svc))
+			b.WriteString("\tif r == nil || srv.Impl == nil {\n")
+			b.WriteString("\t\treturn ssrpc.ErrNilRegistry\n")
+			b.WriteString("\t}\n")
+			b.WriteString(fmt.Sprintf("\treturn r.Register(%q, %sBindings(srv)...)\n", svc, svc))
+			b.WriteString("}\n\n")
+		}
+
+		// ---------------------------------------------------------------------
 		// Client stub generation: type-safe RPC client for service-to-service calls.
 		// Only generates for methods with cmd bindings.
 		// ---------------------------------------------------------------------
@@ -1289,6 +1387,93 @@ func writeTimeoutField(b *strings.Builder, timeoutMs uint32) {
 		return
 	}
 	b.WriteString(fmt.Sprintf("\t\t\tTimeout: %d * time.Millisecond,\n", timeoutMs))
+}
+
+// cmdLiteral 返回 ext 的 cmd 表达式字面量（如 g1_protocol.CMD(0x12) 或
+// g1_protocol.CMD_MAIN_LOGIN_REQ）。用于 binding 生成。
+func cmdLiteral(ext ssrpcOpt) string {
+	if ext.cmd != 0 {
+		return fmt.Sprintf("g1_protocol.CMD(0x%X)", ext.cmd)
+	}
+	if ext.cmdEnum != 0 {
+		return fmt.Sprintf("g1_protocol.CMD(0x%X)", uint32(ext.cmdEnum))
+	}
+	return "g1_protocol." + strings.TrimSpace(ext.cmdName)
+}
+
+// writeMethodDescForBinding 写入一个 ssrpc.MethodDesc{...} 字面量（用于 binding 生成），
+// 从 ssrpcOpt 取字段。
+func writeMethodDescForBinding(b *strings.Builder, ext ssrpcOpt, timeoutMs uint32, name string) {
+	b.WriteString("\t\t\tssrpc.MethodDesc{\n")
+	b.WriteString(fmt.Sprintf("\t\t\t\tCmd: %s,\n", cmdLiteral(ext)))
+	if ext.cmdResp != 0 {
+		b.WriteString(fmt.Sprintf("\t\t\t\tCmdResp: g1_protocol.CMD(0x%X),\n", ext.cmdResp))
+	}
+	if ext.oneWay {
+		b.WriteString("\t\t\t\tOneWay: true,\n")
+	}
+	if ext.uidLock {
+		b.WriteString("\t\t\t\tUIDLock: true,\n")
+	}
+	if ext.auth {
+		b.WriteString("\t\t\t\tAuth: true,\n")
+	}
+	if ext.sign {
+		b.WriteString("\t\t\t\tSign: true,\n")
+	}
+	if timeoutMs != 0 {
+		b.WriteString(fmt.Sprintf("\t\t\t\tTimeout: %d * time.Millisecond,\n", timeoutMs))
+	}
+	if tagMap := parseTraceTags(ext.tags); len(tagMap) > 0 {
+		b.WriteString("\t\t\t\tTraceTags: map[string]string{")
+		keys := make([]string, 0, len(tagMap))
+		for k := range tagMap {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			b.WriteString(fmt.Sprintf("%q: %q, ", k, tagMap[k]))
+		}
+		b.WriteString("},\n")
+	}
+	b.WriteString(fmt.Sprintf("\t\t\t\tName: %q,\n", name))
+	b.WriteString("\t\t\t},\n")
+}
+
+// writeMethodDescForBindingRaw 与 writeMethodDescForBinding 相同，但从已解构的原始字段
+// 构造（用于 http/ws/grpc bind，它们不持有 ssrpcOpt）。
+func writeMethodDescForBindingRaw(b *strings.Builder, cmdLit string, oneWay, uidLock, auth, sign bool, timeoutMs uint32, tags []string, name string) {
+	b.WriteString("\t\t\tssrpc.MethodDesc{\n")
+	b.WriteString(fmt.Sprintf("\t\t\t\tCmd: %s,\n", cmdLit))
+	if oneWay {
+		b.WriteString("\t\t\t\tOneWay: true,\n")
+	}
+	if uidLock {
+		b.WriteString("\t\t\t\tUIDLock: true,\n")
+	}
+	if auth {
+		b.WriteString("\t\t\t\tAuth: true,\n")
+	}
+	if sign {
+		b.WriteString("\t\t\t\tSign: true,\n")
+	}
+	if timeoutMs != 0 {
+		b.WriteString(fmt.Sprintf("\t\t\t\tTimeout: %d * time.Millisecond,\n", timeoutMs))
+	}
+	if tagMap := parseTraceTags(tags); len(tagMap) > 0 {
+		b.WriteString("\t\t\t\tTraceTags: map[string]string{")
+		keys := make([]string, 0, len(tagMap))
+		for k := range tagMap {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			b.WriteString(fmt.Sprintf("%q: %q, ", k, tagMap[k]))
+		}
+		b.WriteString("},\n")
+	}
+	b.WriteString(fmt.Sprintf("\t\t\t\tName: %q,\n", name))
+	b.WriteString("\t\t\t},\n")
 }
 
 func effectiveTimeoutMs(methodTimeoutMs, serviceTimeoutMs uint32) uint32 {

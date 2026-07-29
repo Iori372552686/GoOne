@@ -6,6 +6,8 @@ import (
 
 	infosvrv1 "github.com/Iori372552686/GoOne/api/gen/game/infosvr/v1"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/service/bus"
+	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
@@ -28,19 +30,23 @@ func NewApp() *runtime.App {
 		},
 	}
 
-	registerHandlers := &bussvc.FuncComponent{
-		ComponentName: "ssrpc_register",
-		OnStart: func(_ context.Context) error {
+	// P1-03：用 RegistryComponent 替代 "NewDispatcher→ToDispatcher→丢弃" 闭包。
+	registerHandlers := ssrpc.NewRegistryComponent(
+		"ssrpc_registry",
+		func(r *ssrpc.Registry) error {
 			srv := infosvrv1.NewInfoServiceSServer(&service.InfoServiceImpl{}, ssrpc.DefaultMWOptions{})
-			d := ssrpc.NewDispatcher()
-			infosvrv1.RegisterInfoServiceToDispatcher(d, srv)
-			return d.RegisterToTransactionMgr(globals.TransMgr)
+			return infosvrv1.RegisterInfoServiceToRegistry(r, srv)
 		},
-	}
+		ssrpc.WithTransactionManager(globals.TransMgr),
+	)
 
+	// P1-04：显式 DriverRegistry，只注册 rabbitmq。
+	drivers := bus.NewDriverRegistry()
+	drivers.MustRegister(rabbitmq.Driver())
 	routerComp := &bussvc.RouterComponent{
 		Common:   infoCommon,
 		TransMgr: globals.TransMgr,
+		Drivers:  drivers,
 	}
 	tracing := &bussvc.TracingComponent{
 		ServiceName: "infosvr",
@@ -53,7 +59,7 @@ func NewApp() *runtime.App {
 		},
 	}
 
-	app, err := runtime.New("infosvr",
+	app := runtime.MustNew("infosvr",
 		runtime.WithLoadConfig(func(_ context.Context) error {
 			if err := gconf.LoadInfoConfig(*gconf.SvrConfFile); err != nil {
 				return err
@@ -62,9 +68,6 @@ func NewApp() *runtime.App {
 			return nil
 		}),
 	)
-	if err != nil {
-		panic(fmt.Sprintf("runtime.New infosvr: %v", err))
-	}
 
 	// P0-03：admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
 	// app.tracker。
@@ -84,11 +87,11 @@ func NewApp() *runtime.App {
 
 	// Start 顺序（P0-03）：datetime_tick → logger → admin → tracing → dependencies →
 	// ssrpc_registry → transaction_mgr → router。datetime_tick 放最前。
-	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing, redisDeps, registerHandlers, transMgr, routerComp} {
-		if err := app.Register(c); err != nil {
-			panic(fmt.Sprintf("infosvr register %s: %v", c.Name(), err))
-		}
-	}
+	// P1-07：用 MustRegister 一次注册全部组件。
+	app.MustRegister(
+		scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing,
+		redisDeps, registerHandlers, transMgr, routerComp,
+	)
 	return app
 }
 

@@ -18,12 +18,13 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	"github.com/Iori372552686/GoOne/module/misc"
-
-	// 默认引入全部 bus 驱动（database/sql 风格），使 bus.CreateBus 能解析
-	// amqp://、nats://、kafka:// 等地址。需要裁剪二进制体积的服务可不经 bussvc
-	// 自行装配，并只 blank-import 所需驱动（roadmap P2-03 独立项）。
-	_ "github.com/Iori372552686/GoOne/lib/service/bus/driver/all"
 )
+
+// ErrDriversNotConfigured 在 RouterComponent.Drivers 为 nil 时由 Start 返回（P1-04）。
+// 历史实现回退到 driver/all 的包级 bus.CreateBus，使所有 bus 服务都隐式链接全部 5 类
+// MQ SDK。生产 bus 服务必须显式装配 DriverRegistry（通常只注册 rabbitmq）；websvr 不装
+// 配任何 bus。
+var ErrDriversNotConfigured = errors.New("bussvc: RouterComponent.Drivers not configured; bus services must explicitly register drivers")
 
 // Common 承载每个 bus 服务共享的配置段，由服务的配置访问器在 LoadConfig 后产出。
 type Common struct {
@@ -152,9 +153,10 @@ type RouterComponent struct {
 	Common         func() Common
 	OnRecvSSPacket func(*sharedstruct.SSPacket) // 可选；为 nil 时默认投到 TransMgr。
 	TransMgr       transaction.ITransactionMgr
-	// Drivers 是可选的显式 Driver 注册表。设置时，Start 用它创建 bus（只链接注册的
-	// driver，缩小二进制），取代包级 bus.CreateBus（依赖 driver/all）。不设置时走默认
-	// driver/all 路径（向后兼容）。这是 roadmap P2-03 的前置能力。
+	// Drivers 是显式 Driver 注册表（P1-04：必填）。bus 服务在装配期创建
+	// bus.NewDriverRegistry() 并 MustRegister 所需 driver（通常仅 rabbitmq）；Start 用它
+	// 创建 bus，只链接注册的 driver。nil 时 Start 返回 ErrDriversNotConfigured（不再
+	// 回退到 driver/all）。websvr 不装配 bus，故不创建 RouterComponent。
 	Drivers *bus.DriverRegistry
 }
 
@@ -162,7 +164,13 @@ type RouterComponent struct {
 func (r *RouterComponent) Name() string { return "router_bus" }
 
 // Start 实现 runtime.Component：启动 router（含 bus 连接与服务注册）。
+//
+// P1-04：Drivers 必须显式装配（bus 服务只链接选定的 driver，通常 rabbitmq）。nil
+// Drivers 返回 ErrDriversNotConfigured。历史实现的 driver/all 回退已删除。
 func (r *RouterComponent) Start(_ context.Context) error {
+	if r.Drivers == nil {
+		return ErrDriversNotConfigured
+	}
 	c := r.Common()
 	onRecv := r.OnRecvSSPacket
 	if onRecv == nil {
@@ -171,27 +179,13 @@ func (r *RouterComponent) Start(_ context.Context) error {
 			mgr.ProcessSSPacket(packet)
 		}
 	}
-	// 显式 DriverRegistry 路径：只链接注册的 driver。
-	if r.Drivers != nil {
-		selfBusInt := bus.IpStringToInt(c.SelfBusId)
-		addr := c.BusMQAddr
-		drivers := r.Drivers
-		busCtor := func(onRecvMsg bus.MsgHandler) (bus.IBus, error) {
-			return drivers.CreateBus(selfBusInt, onRecvMsg, addr)
-		}
-		return router.InitAndRunWithBusCtor(c.SelfBusId, onRecv, busCtor, misc.ServerRouteRules, c.RegisterAddr)
+	selfBusInt := bus.IpStringToInt(c.SelfBusId)
+	addr := c.BusMQAddr
+	drivers := r.Drivers
+	busCtor := func(onRecvMsg bus.MsgHandler) (bus.IBus, error) {
+		return drivers.CreateBus(selfBusInt, onRecvMsg, addr)
 	}
-	// 默认路径：包级 bus.CreateBus（依赖 driver/all 的 init 注册）。
-	if err := router.InitAndRun(
-		c.SelfBusId,
-		onRecv,
-		c.BusMQAddr,
-		misc.ServerRouteRules,
-		c.RegisterAddr,
-	); err != nil {
-		return err
-	}
-	return nil
+	return router.InitAndRunWithBusCtor(c.SelfBusId, onRecv, busCtor, misc.ServerRouteRules, c.RegisterAddr)
 }
 
 // Quiesce 实现 runtime.Quiescer：从服务注册中心注销，admission gate 拒绝新请求，但仍

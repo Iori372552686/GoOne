@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -159,6 +160,16 @@ func New(name string, opts ...Option) (*App, error) {
 	return a, nil
 }
 
+// MustNew 是 New 的便捷封装，在出错时 panic。仅在装配错误即程序员错误的 src/<service>/
+// app.go 这类装配代码中使用；库代码应继续用 New 并返回 error。
+func MustNew(name string, opts ...Option) *App {
+	app, err := New(name, opts...)
+	if err != nil {
+		panic(err)
+	}
+	return app
+}
+
 // Name 返回 New 时传入的服务名。
 func (a *App) Name() string { return a.name }
 
@@ -191,12 +202,23 @@ func (a *App) Register(c Component) error {
 	return nil
 }
 
-// MustRegister 是在 Register 出错时 panic 的便捷方法。仅在装配错误即程序员错误
-// 的装配代码中使用。
-func (a *App) MustRegister(c Component) {
-	if err := a.Register(c); err != nil {
-		panic(err)
+// MustRegister 是在 Register 出错时 panic 的便捷方法。仅在装配错误即程序员错误的装
+// 配代码（src/<service>/app.go）中使用。P1-07：支持可变参数，便于
+// app.MustRegister(datetime, logger, admin, ...) 一次注册多个组件。
+func (a *App) MustRegister(components ...Component) {
+	for _, c := range components {
+		if err := a.Register(c); err != nil {
+			panic(fmt.Errorf("register component %q: %w", componentName(c), err))
+		}
 	}
+}
+
+// componentName 返回组件名，供 MustRegister 的 panic 消息使用。
+func componentName(c Component) string {
+	if c == nil {
+		return "<nil>"
+	}
+	return c.Name()
 }
 
 // Ready 上报 App 是否已完成启动并正在服务。它在 Run 进入 Draining 阶段时立即翻

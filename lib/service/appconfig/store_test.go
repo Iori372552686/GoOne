@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // cfg is a small config shape exercising scalars, a slice and a map (the kinds
@@ -64,11 +65,12 @@ func TestLoadRejectsSecondCall(t *testing.T) {
 
 // mergeWhitelist applies only LogLevel and Tracing from candidate; everything
 // else (Port, Headers, Tags) stays at old. It reports Port as restart_required
-// when it differs.
-func mergeWhitelist(old, candidate *cfg) (*cfg, []string, error) {
+// when it differs. P1-06：返回 MergeResult，Applied 上报被应用字段。
+func mergeWhitelist(old, candidate *cfg) (MergeResult[cfg], error) {
 	effective := *old // shallow copy of scalar struct
 	effective.LogLevel = candidate.LogLevel
 	effective.Tracing = candidate.Tracing
+	applied := []string{"log_level", "tracing"}
 	// Deep-copy candidate's hot maps/slices so later candidate mutation cannot
 	// affect the published snapshot.
 	if candidate.Headers != nil {
@@ -76,15 +78,17 @@ func mergeWhitelist(old, candidate *cfg) (*cfg, []string, error) {
 		for k, v := range candidate.Headers {
 			effective.Headers[k] = v
 		}
+		applied = append(applied, "headers")
 	}
 	if len(candidate.Tags) > 0 {
 		effective.Tags = append([]string(nil), candidate.Tags...)
+		applied = append(applied, "tags")
 	}
 	var restart []string
 	if candidate.Port != old.Port {
 		restart = append(restart, "port")
 	}
-	return &effective, restart, nil
+	return MergeResult[cfg]{Effective: &effective, Applied: applied, RestartRequired: restart}, nil
 }
 
 func TestReloadAppliesWhitelistAndReportsRestart(t *testing.T) {
@@ -135,9 +139,9 @@ func TestReloadInvalidCandidateLeavesOldUnchanged(t *testing.T) {
 			}
 			return &cfg{Port: 1, LogLevel: "info"}, nil
 		},
-		func(old, candidate *cfg) (*cfg, []string, error) {
+		func(old, candidate *cfg) (MergeResult[cfg], error) {
 			if candidate.Port == 9999 {
-				return nil, nil, errors.New("invalid port")
+				return MergeResult[cfg]{}, errors.New("invalid port")
 			}
 			return mergeWhitelist(old, candidate)
 		},
@@ -224,4 +228,143 @@ func TestConcurrentCurrentAndReload(t *testing.T) {
 	}
 	close(stop)
 	wg.Wait()
+}
+
+// TestConcurrentLoadOnlyPublishesOnce 验证 P1-06：writeMu 串行化 Load，并发调用只有
+// 一个成功发布，另一个返回 ErrAlreadyLoaded。
+func TestConcurrentLoadOnlyPublishesOnce(t *testing.T) {
+	s := New[cfg](
+		func(context.Context) (*cfg, error) {
+			time.Sleep(20 * time.Millisecond) // 模拟慢 loader，放大并发窗口
+			return &cfg{Port: 1}, nil
+		},
+		nil,
+	)
+	var wg sync.WaitGroup
+	var successes, alreadyLoaded atomic.Int64
+	const n = 20
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := s.Load(context.Background())
+			switch {
+			case err == nil:
+				successes.Add(1)
+			case errors.Is(err, ErrAlreadyLoaded):
+				alreadyLoaded.Add(1)
+			default:
+				t.Errorf("unexpected Load err: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+	if successes.Load() != 1 {
+		t.Fatalf("期望恰好 1 次 Load 成功，got %d", successes.Load())
+	}
+	if alreadyLoaded.Load() != n-1 {
+		t.Fatalf("期望 %d 次 ErrAlreadyLoaded，got %d", n-1, alreadyLoaded.Load())
+	}
+}
+
+// TestConcurrentReloadIsSerialized 验证 P1-06：并发 Reload 被串行化，无部分提交/竞争。
+func TestConcurrentReloadIsSerialized(t *testing.T) {
+	var loadCount atomic.Int64
+	s := New[cfg](
+		func(context.Context) (*cfg, error) {
+			c := loadCount.Add(1)
+			return &cfg{Port: int(c)}, nil
+		},
+		mergeWhitelist,
+	)
+	if err := s.Load(context.Background()); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	var wg sync.WaitGroup
+	const n = 20
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := s.Reload(context.Background()); err != nil {
+				t.Errorf("Reload err: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+	// 不 panic、不 race 即通过（race 由 CI 承担）。
+}
+
+// TestReloadReportsAppliedAndRestartRequired 验证 P1-06：MergeResult.Applied 被正确上报
+//（历史实现 Applied 字段从未填充）。
+func TestReloadReportsAppliedAndRestartRequired(t *testing.T) {
+	first := true
+	s := New[cfg](
+		func(context.Context) (*cfg, error) {
+			if first {
+				first = false
+				return &cfg{Port: 1, LogLevel: "info", Tracing: "off"}, nil
+			}
+			return &cfg{Port: 2, LogLevel: "debug", Tracing: "on", Headers: map[string]string{"x": "y"}}, nil
+		},
+		mergeWhitelist,
+	)
+	if err := s.Load(context.Background()); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	res, err := s.Reload(context.Background())
+	if err != nil {
+		t.Fatalf("Reload: %v", err)
+	}
+	// Applied 应包含 log_level、tracing、headers（白名单字段被应用）。
+	appliedHas := func(f string) bool {
+		for _, a := range res.Applied {
+			if a == f {
+				return true
+			}
+		}
+		return false
+	}
+	if !appliedHas("log_level") || !appliedHas("tracing") || !appliedHas("headers") {
+		t.Fatalf("Applied 缺少白名单字段，got %v", res.Applied)
+	}
+	// RestartRequired 应包含 port（被忽略的差异字段）。
+	rrHas := false
+	for _, f := range res.RestartRequired {
+		if f == "port" {
+			rrHas = true
+		}
+	}
+	if !rrHas {
+		t.Fatalf("RestartRequired 缺少 port，got %v", res.RestartRequired)
+	}
+}
+
+// TestMergerFailureKeepsOldSnapshot 验证 P1-06：merger 失败时保留旧快照，不发布无效候选。
+func TestMergerFailureKeepsOldSnapshot(t *testing.T) {
+	first := true
+	s := New[cfg](
+		func(context.Context) (*cfg, error) {
+			if first {
+				first = false
+				return &cfg{Port: 1, LogLevel: "info"}, nil
+			}
+			return &cfg{Port: 9999}, nil
+		},
+		func(old, candidate *cfg) (MergeResult[cfg], error) {
+			if candidate.Port == 9999 {
+				return MergeResult[cfg]{}, errors.New("invalid")
+			}
+			return mergeWhitelist(old, candidate)
+		},
+	)
+	if err := s.Load(context.Background()); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if _, err := s.Reload(context.Background()); err == nil {
+		t.Fatal("期望 merger 失败 error")
+	}
+	if got := s.Current(); got.Port != 1 || got.LogLevel != "info" {
+		t.Fatalf("旧快照应保留，got %+v", got)
+	}
 }

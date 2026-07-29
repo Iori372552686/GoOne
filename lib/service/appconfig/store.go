@@ -14,6 +14,7 @@ package appconfig
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 )
 
@@ -21,23 +22,37 @@ import (
 // store 绝不在发布后原地修改其结果。
 type Loader[T any] func(ctx context.Context) (*T, error)
 
-// Merger 把候选配置折叠进 effective 配置。它接收先前 effective 快照的深拷贝
-// （oldConfig）与刚解析的候选（candidate）。它必须：
+// MergeResult 是 Merger 的显式结果（P1-06）。Effective 是合并后的不可变快照（不得
+// 别名 old/candidate，必须深拷贝其 map/slice）；Applied 是本次真正被热更应用的字段
+// 名；RestartRequired 是差异但未应用、需重启才生效的字段名。
+type MergeResult[T any] struct {
+	Effective       *T
+	Applied         []string
+	RestartRequired []string
+}
+
+// Merger 把候选配置折叠进 effective 配置。它接收先前的 effective 快照（oldConfig）
+// 与刚解析的候选（candidate）。
 //
-//   - 只把候选中可热更（白名单）字段拷进 effective 结果。
-//   - 把需重启字段保留旧值。
-//   - 返回差异但未被应用的字段名列表，使调用方能上报 restart_required 诊断。
-//
-// 返回的 effective 指针会被原子发布；它不得别名 candidate 或 oldConfig（store 在
-// 调用前深拷贝 oldConfig，并在合并后丢弃 candidate）。
-type Merger[T any] func(oldConfig, candidate *T) (effective *T, restartRequired []string, err error)
+// P1-06 契约修正：
+//   - Merger 必须构造一个**不别名** old/candidate 的新 effective 对象，并深拷贝其
+//     map/slice。Store **不**自动深拷贝 oldConfig（历史文档谎称 store 会深拷贝）。
+//   - 只把候选中可热更（白名单）字段拷进 effective 结果；需重启字段保留旧值。
+//   - 返回 Applied（被应用字段）与 RestartRequired（被忽略的差异字段），使调用方能
+//     上报诊断。仅上报字段名、绝不上报值。
+type Merger[T any] func(oldConfig, candidate *T) (MergeResult[T], error)
 
 // Store 持有一份原子发布的不可变配置快照。读者用 Current()；单一写者用 Load（初
 // 始）与 Reload（后续）。
 //
+// P1-06：writeMu 串行化 Load/Reload，使并发 Load 只发布一次、并发 Reload 顺序确定；
+// Current() 仍走 atomic 无锁读。历史实现无 writeMu，并发 Load 的 current.Load() 检查
+// 存在 TOCTOU。
+//
 // 零值不可用；请用 New。
 type Store[T any] struct {
 	current atomic.Pointer[T]
+	writeMu sync.Mutex
 	loader  Loader[T]
 	merger  Merger[T]
 }
@@ -59,10 +74,15 @@ func (s *Store[T]) Current() *T {
 
 // Load 执行初始加载并发布快照。若快照已发布则失败（后续更新用 Reload），或 loader
 // 出错。出错时不发布任何快照。
+//
+// P1-06：writeMu 串行化，使并发 Load 只有一个成功发布，另一个返回 ErrAlreadyLoaded
+//（历史 current.Load() 检查存在 TOCTOU，并发 Load 可能双发）。
 func (s *Store[T]) Load(ctx context.Context) error {
 	if s == nil {
 		return ErrNilStore
 	}
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
 	if s.current.Load() != nil {
 		return ErrAlreadyLoaded
 	}
@@ -89,9 +109,9 @@ type ReloadResult[T any] struct {
 // 故失败的合并保持先前快照不变（无部分提交）。
 //
 // 若未配置 merger，候选原样发布（仍为原子）。配置 merger 时，只取候选的白名单字
-// 段；restart_required 列出被忽略的差异字段。
+// 段；Applied/RestartRequired 分别列出被应用与需重启的字段。
 //
-// Reload 对并发调用安全（内部串行），且与 Current() 读者并发安全。
+// P1-06：writeMu 串行化并发 Reload（后一次基于前一次 effective）；Current() 仍无锁读。
 func (s *Store[T]) Reload(ctx context.Context) (*ReloadResult[T], error) {
 	if s == nil {
 		return nil, ErrNilStore
@@ -99,6 +119,9 @@ func (s *Store[T]) Reload(ctx context.Context) (*ReloadResult[T], error) {
 	if s.loader == nil {
 		return nil, ErrNoLoader
 	}
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+
 	candidate, err := s.loader(ctx)
 	if err != nil {
 		return nil, err
@@ -120,17 +143,18 @@ func (s *Store[T]) Reload(ctx context.Context) (*ReloadResult[T], error) {
 		return &ReloadResult[T]{Effective: candidate}, nil
 	}
 
-	effective, restartRequired, err := s.merger(old, candidate)
+	result, err := s.merger(old, candidate)
 	if err != nil {
 		return nil, err
 	}
-	if effective == nil {
+	if result.Effective == nil {
 		return nil, ErrNilMerge
 	}
-	s.current.Store(effective)
+	s.current.Store(result.Effective)
 	return &ReloadResult[T]{
-		Effective:       effective,
-		RestartRequired: restartRequired,
+		Effective:       result.Effective,
+		Applied:         result.Applied,
+		RestartRequired: result.RestartRequired,
 	}, nil
 }
 

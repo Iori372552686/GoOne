@@ -2,13 +2,14 @@ package roomcentersvr
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	roomcenterv1 "github.com/Iori372552686/GoOne/api/gen/game/roomcenter/v1"
 	"github.com/Iori372552686/GoOne/common/gamedata"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
+	"github.com/Iori372552686/GoOne/lib/service/bus"
+	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
@@ -70,23 +71,32 @@ func NewApp() *runtime.App {
 		},
 	}
 
-	registerHandlers := &bussvc.FuncComponent{
-		ComponentName: "ssrpc_register",
-		OnStart: func(_ context.Context) error {
+	// P1-03：用 RegistryComponent 替代 "NewDispatcher→ToDispatcher→丢弃" 闭包。
+	// logger.RegisterCmdBacklist 是 roomcenter 特有的日志黑名单，作为独立 FuncComponent
+	// 在 RegistryComponent 之后注册（注册顺序即 Start 顺序，故 TransMgr 绑定先于黑名单）。
+	registerHandlers := ssrpc.NewRegistryComponent(
+		"ssrpc_registry",
+		func(r *ssrpc.Registry) error {
 			srv := roomcenterv1.NewRoomCenterInnerServiceSServer(&service.RoomCenterInnerServiceImpl{}, ssrpc.DefaultMWOptions{})
-			d := ssrpc.NewDispatcher()
-			roomcenterv1.RegisterRoomCenterInnerServiceToDispatcher(d, srv)
-			if err := d.RegisterToTransactionMgr(globals.TransMgr); err != nil {
-				return err
-			}
+			return roomcenterv1.RegisterRoomCenterInnerServiceToRegistry(r, srv)
+		},
+		ssrpc.WithTransactionManager(globals.TransMgr),
+	)
+	cmdBacklist := &bussvc.FuncComponent{
+		ComponentName: "cmd_backlist",
+		OnStart: func(_ context.Context) error {
 			logger.RegisterCmdBacklist(uint32(pb.CMD_ROOM_CENTER_INNER_TICK_REQ))
 			return nil
 		},
 	}
 
+	// P1-04：显式 DriverRegistry，只注册 rabbitmq。
+	drivers := bus.NewDriverRegistry()
+	drivers.MustRegister(rabbitmq.Driver())
 	routerComp := &bussvc.RouterComponent{
 		Common:   roomCommon,
 		TransMgr: globals.TransMgr,
+		Drivers:  drivers,
 	}
 	tracing := &bussvc.TracingComponent{
 		ServiceName: "roomcentersvr",
@@ -131,7 +141,7 @@ func NewApp() *runtime.App {
 		},
 	}
 
-	app, err := runtime.New("roomcentersvr",
+	app := runtime.MustNew("roomcentersvr",
 		runtime.WithLoadConfig(func(_ context.Context) error {
 			if err := gconf.LoadRoomCenterConfig(*gconf.SvrConfFile); err != nil {
 				return err
@@ -145,9 +155,6 @@ func NewApp() *runtime.App {
 			return nil
 		}),
 	)
-	if err != nil {
-		panic(fmt.Sprintf("runtime.New roomcentersvr: %v", err))
-	}
 
 	// P0-03：admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
 	// app.tracker。
@@ -168,11 +175,12 @@ func NewApp() *runtime.App {
 	// Start 顺序（P0-03）：datetime → logger → admin → tracing → 业务依赖 → SSRPC 注册
 	// → TransMgr → router/bus → 房间初始化 → roomTick → roomPersist → roomFlush(Drainer)。
 	// datetime_tick 放最前：room tick/房间初始化都依赖 datetime.NowMs()。
-	for _, c := range []runtime.Component{scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing, businessDeps, registerHandlers, transMgr, routerComp, roomInit, roomTick, roomPersist, roomFlush} {
-		if err := app.Register(c); err != nil {
-			panic(fmt.Sprintf("roomcentersvr register %s: %v", c.Name(), err))
-		}
-	}
+	// P1-07：用 MustRegister 一次注册全部组件。
+	app.MustRegister(
+		scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing,
+		businessDeps, registerHandlers, cmdBacklist, transMgr, routerComp,
+		roomInit, roomTick, roomPersist, roomFlush,
+	)
 	return app
 }
 

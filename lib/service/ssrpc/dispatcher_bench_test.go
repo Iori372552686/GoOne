@@ -38,3 +38,43 @@ func BenchmarkDispatchWS_Unsealed(b *testing.B) {
 		_, _ = d.DispatchWS(nil, 1, body)
 	}
 }
+
+// BenchmarkRegistrySeal100Bindings 测量 P1-01：Registry.Seal 100 个 binding 的成本。
+func BenchmarkRegistrySeal100Bindings(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		r := NewRegistry()
+		bindings := make([]Binding, 100)
+		for j := 0; j < 100; j++ {
+			bindings[j] = Binding{Kind: BindingCMD, CMD: g1_protocol.CMD(j + 1), CmdHandler: dummyCmdHandler()}
+		}
+		if err := r.Register("svc", bindings...); err != nil {
+			b.Fatalf("register: %v", err)
+		}
+		if _, err := r.Seal(); err != nil {
+			b.Fatalf("seal: %v", err)
+		}
+	}
+}
+
+// BenchmarkDispatcherCMDSealed 测量 sealed Dispatcher 的 WS 分发查找成本（0 alloc 目标）。
+// CMD 分发经 TransactionMgr；这里用 DispatchWS 覆盖 sealed 只读 map 查找路径。
+func BenchmarkDispatcherCMDSealed(b *testing.B) {
+	r := NewRegistry()
+	bindings := make([]Binding, 100)
+	for j := 0; j < 100; j++ {
+		bindings[j] = Binding{Kind: BindingWS, CMD: g1_protocol.CMD(j + 1), CmdHandler: dummyCmdHandler()}
+	}
+	if err := r.Register("svc", bindings...); err != nil {
+		b.Fatalf("register: %v", err)
+	}
+	d, err := r.Seal()
+	if err != nil {
+		b.Fatalf("seal: %v", err)
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _ = d.DispatchWS(nil, uint32((i%100)+1), nil)
+	}
+}
