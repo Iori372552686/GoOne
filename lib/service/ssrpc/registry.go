@@ -163,6 +163,10 @@ type Registry struct {
 	httpOrder []httpRouteKey
 	wsOrder   []uint32
 	grpcOrder []grpcMethodEntry
+
+	// sealedDispatcher 缓存首次 Seal 的结果，使 Seal 真正幂等（P1-01：后续调用返回
+	// 同一个 Dispatcher）。历史实现二次 Seal 返回 ErrRegistrySealed，与文档承诺矛盾。
+	sealedDispatcher *Dispatcher
 }
 
 // NewRegistry 构建一个空的、未 Seal 的 Registry。
@@ -175,9 +179,11 @@ func NewRegistry() *Registry {
 // 变。返回的 error 合并所有检测到的问题，使调用方一次看到全部问题。
 //
 // service 必须非空，是逻辑服务名（用于错误消息与未来指标）。
+//
+// P1-01：nil 接收者返回 ErrNilRegistry（历史返回 ErrNilDispatcher，语义不准）。
 func (r *Registry) Register(service string, bindings ...Binding) error {
 	if r == nil {
-		return ErrNilDispatcher
+		return ErrNilRegistry
 	}
 	if strings.TrimSpace(service) == "" {
 		return ErrEmptyService
@@ -256,14 +262,21 @@ func (r *Registry) Register(service string, bindings ...Binding) error {
 }
 
 // Seal 冻结 Registry，并从已注册 binding 构建一个不可变 Dispatcher。返回的
-// Dispatcher 已 Seal，故其热路径无锁。Seal 幂等：后续调用返回同一个 Dispatcher。
+// Dispatcher 已 Seal，故其热路径无锁。
+//
+// P1-01：Seal 真正幂等——缓存并重复返回同一个 Dispatcher（历史二次调用返回
+// ErrRegistrySealed，与文档承诺矛盾）。Seal 后再 Register 仍返回 ErrRegistrySealed。
 func (r *Registry) Seal() (*Dispatcher, error) {
 	if r == nil {
-		return nil, ErrNilDispatcher
+		return nil, ErrNilRegistry
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.sealed {
+		// 幂等：返回缓存的 Dispatcher（若有），否则（异常路径）返回 ErrRegistrySealed。
+		if r.sealedDispatcher != nil {
+			return r.sealedDispatcher, nil
+		}
 		return nil, ErrRegistrySealed
 	}
 	r.sealed = true
@@ -294,6 +307,7 @@ func (r *Registry) Seal() (*Dispatcher, error) {
 	}
 	copy(d.grpcMethods, r.grpcOrder)
 	d.Seal()
+	r.sealedDispatcher = d
 	return d, nil
 }
 

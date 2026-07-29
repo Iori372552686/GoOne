@@ -76,7 +76,9 @@ func NewApp() *runtime.App {
 			srv := roomcenterv1.NewRoomCenterInnerServiceSServer(&service.RoomCenterInnerServiceImpl{}, ssrpc.DefaultMWOptions{})
 			d := ssrpc.NewDispatcher()
 			roomcenterv1.RegisterRoomCenterInnerServiceToDispatcher(d, srv)
-			d.RegisterToTransactionMgr(globals.TransMgr)
+			if err := d.RegisterToTransactionMgr(globals.TransMgr); err != nil {
+				return err
+			}
 			logger.RegisterCmdBacklist(uint32(pb.CMD_ROOM_CENTER_INNER_TICK_REQ))
 			return nil
 		},

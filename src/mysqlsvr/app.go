@@ -32,8 +32,7 @@ func NewApp() *runtime.App {
 			srv := mysqlsvrv1.NewMysqlServiceSServer(&service.MysqlServiceImpl{}, ssrpc.DefaultMWOptions{})
 			d := ssrpc.NewDispatcher()
 			mysqlsvrv1.RegisterMysqlServiceToDispatcher(d, srv)
-			d.RegisterToTransactionMgr(globals.TransMgr)
-			return nil
+			return d.RegisterToTransactionMgr(globals.TransMgr)
 		},
 	}
 

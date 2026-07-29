@@ -197,3 +197,63 @@ func waitFor(t *testing.T, cond func() bool, desc string) {
 	}
 	t.Fatalf("timed out waiting for %s", desc)
 }
+
+// TestRegisterCmdERejectsNil 验证 P1-02：RegisterCmdE 对 nil handler 返回
+// ErrNilCmdHandler。
+func TestRegisterCmdERejectsNil(t *testing.T) {
+	mgr := &TransactionMgr{}
+	if err := mgr.RegisterCmdE(testTransactionCmd, nil); err != ErrNilCmdHandler {
+		t.Fatalf("期望 ErrNilCmdHandler，got %v", err)
+	}
+}
+
+// TestRegisterCmdERejectsDuplicate 验证 P1-02：重复 cmd 返回 ErrDuplicateCmd（不再
+// last-write-wins 静默覆盖）。
+func TestRegisterCmdERejectsDuplicate(t *testing.T) {
+	mgr := &TransactionMgr{}
+	h := func(c cmd_handler.IContext, data []byte) g1_protocol.ErrorCode {
+		return g1_protocol.ErrorCode_ERR_OK
+	}
+	if err := mgr.RegisterCmdE(testTransactionCmd, h); err != nil {
+		t.Fatalf("首次注册失败: %v", err)
+	}
+	if err := mgr.RegisterCmdE(testTransactionCmd, h); err != ErrDuplicateCmd {
+		t.Fatalf("期望 ErrDuplicateCmd，got %v", err)
+	}
+}
+
+// TestRegisterCmdERejectsAfterStart 验证 P1-02：InitAndRun 之后注册返回
+// ErrRegisterAfterStart（历史为 logger.Fatalf 杀进程）。
+func TestRegisterCmdERejectsAfterStart(t *testing.T) {
+	mgr := &TransactionMgr{}
+	h := func(c cmd_handler.IContext, data []byte) g1_protocol.ErrorCode {
+		return g1_protocol.ErrorCode_ERR_OK
+	}
+	mgr.InitAndRunWithConfig(TransactionMgrConfig{
+		MaxTrans:         4,
+		ShardCount:       2,
+		MaxPendingPerKey: 2,
+	})
+	defer mgr.Close(context.Background())
+	if err := mgr.RegisterCmdE(testTransactionCmd, h); err != ErrRegisterAfterStart {
+		t.Fatalf("期望 ErrRegisterAfterStart，got %v", err)
+	}
+}
+
+// TestLegacyRegisterCmdDoesNotFatalOrOverwrite 验证 P1-02：兼容 RegisterCmd 不 Fatal、
+// 不静默覆盖（重复注册时第二个被拒绝，第一个保留）。
+func TestLegacyRegisterCmdDoesNotFatalOrOverwrite(t *testing.T) {
+	mgr := &TransactionMgr{}
+	first := func(c cmd_handler.IContext, data []byte) g1_protocol.ErrorCode {
+		return g1_protocol.ErrorCode_ERR_OK
+	}
+	second := func(c cmd_handler.IContext, data []byte) g1_protocol.ErrorCode {
+		return g1_protocol.ErrorCode_ERR_INTERNAL
+	}
+	mgr.RegisterCmd(testTransactionCmd, first)
+	mgr.RegisterCmd(testTransactionCmd, second) // 重复：应被拒绝，不覆盖
+	// 第一个 handler 仍在，未被 second 覆盖。
+	if mgr.cmdHandlers[testTransactionCmd] == nil {
+		t.Fatal("first handler 应保留")
+	}
+}

@@ -34,8 +34,7 @@ func NewApp() *runtime.App {
 			srv := infosvrv1.NewInfoServiceSServer(&service.InfoServiceImpl{}, ssrpc.DefaultMWOptions{})
 			d := ssrpc.NewDispatcher()
 			infosvrv1.RegisterInfoServiceToDispatcher(d, srv)
-			d.RegisterToTransactionMgr(globals.TransMgr)
-			return nil
+			return d.RegisterToTransactionMgr(globals.TransMgr)
 		},
 	}
 

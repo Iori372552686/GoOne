@@ -91,15 +91,35 @@ func (m *TransactionMgr) InitAndRunWithConfig(cfg TransactionMgrConfig) {
 	}
 }
 
+// RegisterCmd 是兼容入口：委托 RegisterCmdE 并仅记录错误（不 Fatal、不覆盖，P1-02）。
 func (m *TransactionMgr) RegisterCmd(cmd g1_protocol.CMD, cmdHandler cmd_handler.CmdHandlerFunc) {
-	if m.started {
-		logger.Fatalf("RegisterCmd must be invoked before InitAndRun")
+	if err := m.RegisterCmdE(cmd, cmdHandler); err != nil {
+		logger.Errorf("RegisterCmd(%d) failed: %v", cmd, err)
 	}
+}
 
+// RegisterCmdE 注册一个 cmd handler，返回明确哨兵错误（P1-02）：
+//   - nil handler → ErrNilCmdHandler
+//   - 重复 cmd → ErrDuplicateCmd（不再 last-write-wins 静默覆盖）
+//   - InitAndRun 之后注册 → ErrRegisterAfterStart
+//
+// 历史缺陷：RegisterCmd 在 m.started 时 logger.Fatalf（杀进程），且不检测重复
+//（last-write-wins 静默覆盖）。
+func (m *TransactionMgr) RegisterCmdE(cmd g1_protocol.CMD, cmdHandler cmd_handler.CmdHandlerFunc) error {
+	if cmdHandler == nil {
+		return ErrNilCmdHandler
+	}
+	if m.started {
+		return ErrRegisterAfterStart
+	}
 	if m.cmdHandlers == nil {
 		m.cmdHandlers = make(map[g1_protocol.CMD]cmd_handler.CmdHandlerFunc)
 	}
+	if _, exists := m.cmdHandlers[cmd]; exists {
+		return ErrDuplicateCmd
+	}
 	m.cmdHandlers[cmd] = cmdHandler
+	return nil
 }
 
 func (m *TransactionMgr) ProcessSSPacket(packet *sharedstruct.SSPacket) {

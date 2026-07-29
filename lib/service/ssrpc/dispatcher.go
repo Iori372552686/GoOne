@@ -2,6 +2,8 @@ package ssrpc
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -156,6 +158,44 @@ func (d *Dispatcher) RegisterCmdE(cmd g1_protocol.CMD, h cmd_handler.CmdHandlerF
 	return nil
 }
 
+// RegisterBindings 按 Kind 把一组 Binding 注册到 Dispatcher（P1-01）。对 CMD/HTTP/WS/
+// gRPC 使用与单方法 Register* 相同的底层写入。任一 binding 非法（handler nil、key 缺
+// 失）即返回 error 并中止（已写入的不回滚——装配期失败应直接中止启动）。
+//
+// 这是 Registry.Seal 之外的批量入口；生成器从 <Service>Bindings 取数据，经
+// RegisterBindings 写入 Dispatcher，使生产代码共享同一套 Binding 校验。
+func (d *Dispatcher) RegisterBindings(bindings ...Binding) error {
+	if d == nil {
+		return ErrNilDispatcher
+	}
+	for i, b := range bindings {
+		if err := b.validate(); err != nil {
+			return fmt.Errorf("ssrpc: binding %d: %w", i, err)
+		}
+		switch b.Kind {
+		case BindingCMD:
+			if err := d.RegisterCmdE(b.CMD, b.CmdHandler); err != nil {
+				return fmt.Errorf("ssrpc: binding %d (cmd %d): %w", i, b.CMD, err)
+			}
+		case BindingWS:
+			if err := d.RegisterCmdE(b.CMD, b.CmdHandler); err != nil {
+				return fmt.Errorf("ssrpc: binding %d (ws %d): %w", i, b.CMD, err)
+			}
+			// WS 路由用 uint32(cmd) 索引；RegisterWS 写入 wsHandlers。
+			d.RegisterWS(uint32(b.CMD), b.CmdHandler)
+		case BindingHTTP:
+			d.RegisterHTTP(b.HTTPMethod, b.HTTPPath, b.HTTPHandler)
+		case BindingGRPCUnary:
+			d.RegisterGRPCUnary(b.GRPCService, b.GRPCMethod, b.ReqFactory, b.UnaryHandler)
+		case BindingGRPCStream:
+			d.RegisterGRPCStream(b.GRPCService, b.GRPCMethod, b.StreamHandler)
+		default:
+			return fmt.Errorf("ssrpc: binding %d: %w", i, ErrInvalidBinding)
+		}
+	}
+	return nil
+}
+
 func (d *Dispatcher) RegisterHTTP(method, path string, h gin.HandlerFunc) {
 	if d == nil || h == nil {
 		return
@@ -193,15 +233,24 @@ func (d *Dispatcher) MountGin(r gin.IRoutes) {
 }
 
 // RegisterToTransactionMgr registers all known cmd handlers into the TransactionMgr.
-func (d *Dispatcher) RegisterToTransactionMgr(mgr transaction.ITransactionMgr) {
-	if d == nil || mgr == nil {
-		return
+//
+// P1-02：返回 error，任一注册失败（重复 cmd、nil handler、启动后注册）即中止并返回，
+// 不静默覆盖。历史实现为 void，丢弃所有错误。
+func (d *Dispatcher) RegisterToTransactionMgr(mgr transaction.ITransactionMgr) error {
+	if d == nil {
+		return ErrNilDispatcher
+	}
+	if mgr == nil {
+		return errors.New("ssrpc: nil transaction manager")
 	}
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	for cmd, h := range d.cmdHandlers {
-		mgr.RegisterCmd(cmd, h)
+		if err := mgr.RegisterCmdE(cmd, h); err != nil {
+			return fmt.Errorf("ssrpc: RegisterToTransactionMgr cmd %d: %w", cmd, err)
+		}
 	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------

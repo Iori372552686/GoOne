@@ -35,8 +35,7 @@ func NewApp() *runtime.App {
 			srv := connsvrv1.NewConnServiceSServer(&service.ConnServiceImpl{}, ssrpc.DefaultMWOptions{})
 			d := ssrpc.NewDispatcher()
 			connsvrv1.RegisterConnServiceToDispatcher(d, srv)
-			d.RegisterToTransactionMgr(globals.TransMgr)
-			return nil
+			return d.RegisterToTransactionMgr(globals.TransMgr)
 		},
 	}
 

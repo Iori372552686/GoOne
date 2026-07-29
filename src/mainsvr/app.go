@@ -73,8 +73,7 @@ func NewApp() *runtime.App {
 			srv := mainsvrv1.NewMainC2SServiceSServer(&service.MainC2SServiceImpl{}, ssrpc.DefaultMWOptions{})
 			d := ssrpc.NewDispatcher()
 			mainsvrv1.RegisterMainC2SServiceToDispatcher(d, srv)
-			d.RegisterToTransactionMgr(globals.TransMgr)
-			return nil
+			return d.RegisterToTransactionMgr(globals.TransMgr)
 		},
 	}
 

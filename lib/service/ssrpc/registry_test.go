@@ -246,3 +246,52 @@ func TestRegistryBindingKeyRoundTrip(t *testing.T) {
 		t.Fatalf("expected distinct method to have own key, got %v", seen)
 	}
 }
+
+// TestRegistrySealIsIdempotent 验证 P1-01：Seal 真正幂等——二次调用返回同一个
+// Dispatcher（历史返回 ErrRegistrySealed，与文档矛盾）。
+func TestRegistrySealIsIdempotent(t *testing.T) {
+	r := NewRegistry()
+	if err := r.Register("svc", Binding{Kind: BindingCMD, CMD: 42, CmdHandler: dummyCmdHandler()}); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	d1, err := r.Seal()
+	if err != nil {
+		t.Fatalf("first seal: %v", err)
+	}
+	d2, err := r.Seal()
+	if err != nil {
+		t.Fatalf("second seal should be idempotent, got: %v", err)
+	}
+	if d1 != d2 {
+		t.Fatal("幂等 Seal 应返回同一个 Dispatcher 实例")
+	}
+}
+
+// TestRegistryRegisterNilReturnsErrNilRegistry 验证 P1-01：nil 接收者返回
+// ErrNilRegistry（历史返回 ErrNilDispatcher）。
+func TestRegistryRegisterNilReturnsErrNilRegistry(t *testing.T) {
+	var r *Registry
+	if err := r.Register("svc"); !errors.Is(err, ErrNilRegistry) {
+		t.Fatalf("期望 ErrNilRegistry，got %v", err)
+	}
+	if _, err := r.Seal(); !errors.Is(err, ErrNilRegistry) {
+		t.Fatalf("nil Seal 期望 ErrNilRegistry，got %v", err)
+	}
+}
+
+// TestDispatcherRegisterBindings 验证 P1-01：RegisterBindings 按 Kind 批量注册。
+func TestDispatcherRegisterBindings(t *testing.T) {
+	d := NewDispatcher()
+	bindings := []Binding{
+		{Kind: BindingCMD, CMD: 100, CmdHandler: dummyCmdHandler()},
+		{Kind: BindingHTTP, HTTPMethod: "POST", HTTPPath: "/x", HTTPHandler: dummyHTTPHandler()},
+		{Kind: BindingWS, CMD: 200, CmdHandler: dummyCmdHandler()},
+	}
+	if err := d.RegisterBindings(bindings...); err != nil {
+		t.Fatalf("RegisterBindings: %v", err)
+	}
+	// 非法 binding（nil handler）应返回 error。
+	if err := d.RegisterBindings(Binding{Kind: BindingCMD, CMD: 300, CmdHandler: nil}); !errors.Is(err, ErrNilHandler) {
+		t.Fatalf("期望 ErrNilHandler，got %v", err)
+	}
+}
