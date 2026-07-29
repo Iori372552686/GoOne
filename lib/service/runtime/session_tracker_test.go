@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -105,9 +106,31 @@ func TestSessionTrackerWaitIdleContextCancel(t *testing.T) {
 	}
 }
 
-func TestSessionTrackerCloseWakesWaiters(t *testing.T) {
+// TestSessionTrackerCloseReturnsErrorWhenNonZero 验证 P0-06：Close 在计数非零时让等待
+// 者返回 ErrSessionTrackerClosed，不返回 nil 冒充成功排空。
+//
+// 历史缺陷：Close 无论计数都让 WaitIdle 返回 nil，使排空未完成时上层误判成功。
+func TestSessionTrackerCloseReturnsErrorWhenNonZero(t *testing.T) {
 	tr := NewSessionTracker()
-	tr.IncSession()
+	tr.IncSession() // session=1，未归零
+	done := make(chan error, 1)
+	go func() { done <- tr.WaitIdle(context.Background()) }()
+	time.Sleep(30 * time.Millisecond)
+	tr.Close()
+	select {
+	case err := <-done:
+		if !errors.Is(err, ErrSessionTrackerClosed) {
+			t.Fatalf("期望 ErrSessionTrackerClosed（计数非零），got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Close 未唤醒 WaitIdle")
+	}
+}
+
+// TestSessionTrackerCloseReturnsNilWhenZero 验证 Close 在计数已归零时返回 nil。
+func TestSessionTrackerCloseReturnsNilWhenZero(t *testing.T) {
+	tr := NewSessionTracker()
+	// 不 Inc；计数为 0。
 	done := make(chan error, 1)
 	go func() { done <- tr.WaitIdle(context.Background()) }()
 	time.Sleep(30 * time.Millisecond)
@@ -115,10 +138,63 @@ func TestSessionTrackerCloseWakesWaiters(t *testing.T) {
 	select {
 	case err := <-done:
 		if err != nil {
-			t.Fatalf("expected nil on Close, got %v", err)
+			t.Fatalf("计数归零时 Close 应返回 nil，got %v", err)
 		}
 	case <-time.After(time.Second):
-		t.Fatal("Close did not wake WaitIdle")
+		t.Fatal("Close 未唤醒 WaitIdle")
+	}
+}
+
+// TestSessionTrackerWaitSessionsWaitsForSessionsOnly 验证 WaitSessions 只等逻辑会话归零，
+// 不受 connection 影响（网关 Drain 用它）。
+func TestSessionTrackerWaitSessionsWaitsForSessionsOnly(t *testing.T) {
+	tr := NewSessionTracker()
+	tr.IncConnection() // connection=1，但 session=0
+	// WaitSessions 应立即返回（session 已归零），不等 connection。
+	if err := tr.WaitSessions(context.Background()); err != nil {
+		t.Fatalf("session=0 时 WaitSessions 应立即返回 nil，got %v", err)
+	}
+
+	tr.IncSession()
+	done := make(chan error, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { done <- tr.WaitSessions(ctx) }()
+	time.Sleep(30 * time.Millisecond)
+	tr.DecSession() // session 归零
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("session 归零后 WaitSessions 应返回 nil，got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("WaitSessions 未在 session 归零时唤醒")
+	}
+	cancel()
+}
+
+// TestSessionTrackerDecCASDoesNotOverwriteConcurrentInc 验证 P0-06：Dec 用 CAS 防止
+// underflow 覆盖并发 Inc。旧实现 Add(-1) 后 Store(0) 会丢失并发 +1。
+func TestSessionTrackerDecCASDoesNotOverwriteConcurrentInc(t *testing.T) {
+	tr := NewSessionTracker()
+	tr.IncSession()
+	tr.IncSession() // session=2
+	// 并发：一个 goroutine 反复 Inc，主线程 Dec。CAS 保证不丢 Inc。
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			tr.IncSession()
+			tr.DecSession()
+		}()
+	}
+	// 同时主线程多次 Dec（可能触发 underflow 路径，CAS 应钳为 0 不取负）。
+	for i := 0; i < 10; i++ {
+		tr.DecSession()
+	}
+	wg.Wait()
+	if got := tr.ActiveSessions(); got < 0 {
+		t.Fatalf("session 计数不得为负，got %d", got)
 	}
 }
 

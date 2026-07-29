@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/util/bufpool"
 	"github.com/Iori372552686/GoOne/module/misc"
@@ -21,6 +20,10 @@ const (
 
 type TcpConnInfo struct {
 	chanWrite chan *bufpool.Buffer // passing 'nil' means close
+	// closed 标记连接正在拆除。destroyConn 在锁内置 true 并删除 map；WriteData/Close
+	// 在锁内读取该标志，true 时放弃入队，避免 send-on-closed-channel panic（P0-04）。
+	// chanWrite 的实际 close 仍在 destroyConn 中完成，但只在确认 closed 后进行。
+	closed bool
 }
 
 type TcpSvr struct {
@@ -30,7 +33,7 @@ type TcpSvr struct {
 	handler ITcpSvrEventHandler
 
 	lockOfConnInfo sync.RWMutex
-	mapOfConnInfo  map[net.Conn]TcpConnInfo
+	mapOfConnInfo  map[net.Conn]*TcpConnInfo
 
 	// listener 字段化（roadmap P0-07）：Quiesce 关闭 listener 停止接新连接但保留
 	// 既有连接；Stop 关闭 listener 与全部连接。StopCloseOnce 保证幂等。
@@ -44,7 +47,7 @@ func (s *TcpSvr) InitAndRun(ip string, port int, handler ITcpSvrEventHandler) er
 
 	s.handler = handler
 	s.lockOfConnInfo.Lock()
-	s.mapOfConnInfo = make(map[net.Conn]TcpConnInfo)
+	s.mapOfConnInfo = make(map[net.Conn]*TcpConnInfo)
 	s.lockOfConnInfo.Unlock()
 
 	addr := ip + ":" + strconv.Itoa(port)
@@ -71,13 +74,20 @@ func (s *TcpSvr) Quiesce() {
 }
 
 // Stop 关闭 listener 与全部已建立连接，用于排空超时后的强制关停。幂等。
+//
+// P0-04：先在锁内快照连接列表并立即释放锁，再在锁外逐个 Close。禁止在连接表锁内
+// 执行网络 Close，否则慢连接会阻塞 lookup/remove 等持锁操作。
 func (s *TcpSvr) Stop() {
 	s.Quiesce()
 	s.lockOfConnInfo.Lock()
+	conns := make([]net.Conn, 0, len(s.mapOfConnInfo))
 	for conn := range s.mapOfConnInfo {
-		_ = conn.Close()
+		conns = append(conns, conn)
 	}
 	s.lockOfConnInfo.Unlock()
+	for _, conn := range conns {
+		_ = conn.Close()
+	}
 }
 
 func (s *TcpSvr) WriteData(conn net.Conn, data1 []byte, data2 []byte) error {
@@ -85,7 +95,7 @@ func (s *TcpSvr) WriteData(conn net.Conn, data1 []byte, data2 []byte) error {
 
 	s.lockOfConnInfo.RLock()
 	info, exists := s.mapOfConnInfo[conn]
-	if exists {
+	if exists && !info.closed {
 		chanWrite = info.chanWrite
 	}
 	s.lockOfConnInfo.RUnlock()
@@ -116,7 +126,7 @@ func (s *TcpSvr) Close(conn net.Conn) error {
 
 	s.lockOfConnInfo.RLock()
 	info, exists := s.mapOfConnInfo[conn]
-	if exists {
+	if exists && !info.closed {
 		chanWrite = info.chanWrite
 	}
 	s.lockOfConnInfo.RUnlock()
@@ -159,7 +169,7 @@ func (s *TcpSvr) runListener(listener net.Listener) {
 
 		chanWrite := make(chan *bufpool.Buffer, 100)
 		s.lockOfConnInfo.Lock()
-		s.mapOfConnInfo[conn] = TcpConnInfo{chanWrite: chanWrite}
+		s.mapOfConnInfo[conn] = &TcpConnInfo{chanWrite: chanWrite}
 		s.lockOfConnInfo.Unlock()
 
 		logger.Debugf("New Connection: {local:%v, remote:%v}", conn.LocalAddr(), conn.RemoteAddr())
@@ -177,7 +187,11 @@ func (s *TcpSvr) runConnRead(conn net.Conn) {
 	readBuf := make([]byte, kReadBufSize)
 
 	for {
-		_ = conn.SetReadDeadline(datetime.NowT().Add(s.TcpReadTimeout))
+		// P0-04：socket deadline 必须用 time.Now()，不得用 datetime.NowT()（100ms tick
+		// 刷新的缓存时间）。否则在 datetime tick 未运行或缓存陈旧时，deadline 会以过
+		// 去时间为基准提前到期，导致读返回 i/o timeout（见 BenchmarkTCPEchoPipelined
+		// 历史失败）。
+		_ = conn.SetReadDeadline(time.Now().Add(s.TcpReadTimeout))
 		readLen, err := conn.Read(readBuf)
 
 		if err == nil {
@@ -199,13 +213,27 @@ func (s *TcpSvr) runConnRead(conn net.Conn) {
 	s.destroyConn(conn)
 }
 
+// destroyConn 拆除一个连接。P0-04：锁内置 closed=true 并删除；不调用 close(chanWrite)
+//（直接 close channel 会与并发 WriteData 的 send 产生 send-on-closed-channel 竞态）。
+// 改为向 chanWrite 投递一个 nil（关闭信号）：写协程收到 nil 即退出循环并 Close 底层
+// conn。chan 本身随 entry 一起被 GC。
+//
+// 投递 nil 用非阻塞 select：若 chan 已满（写协程慢），跳过 nil 投递，写协程最终会
+// 因 conn 已关闭（Stop/Quiesce 路径）或写超时而退出。
 func (s *TcpSvr) destroyConn(conn net.Conn) {
 	s.lockOfConnInfo.Lock()
-	if info, exists := s.mapOfConnInfo[conn]; exists {
-		close(info.chanWrite)
+	info, exists := s.mapOfConnInfo[conn]
+	if exists {
+		info.closed = true
 		delete(s.mapOfConnInfo, conn)
 	}
 	s.lockOfConnInfo.Unlock()
+	if exists {
+		select {
+		case info.chanWrite <- nil:
+		default:
+		}
+	}
 }
 
 func (s *TcpSvr) runConnWrite(conn net.Conn, chanWrite <-chan *bufpool.Buffer) {
@@ -223,7 +251,8 @@ func (s *TcpSvr) runConnWrite(conn net.Conn, chanWrite <-chan *bufpool.Buffer) {
 			break
 		}
 
-		_ = conn.SetWriteDeadline(datetime.NowT().Add(s.TcpWriteTimeout))
+		// P0-04：socket deadline 用 time.Now()，不用 datetime.NowT()。
+		_ = conn.SetWriteDeadline(time.Now().Add(s.TcpWriteTimeout))
 		sentLen, err := conn.Write(buf.Bytes)
 		dataLen := len(buf.Bytes)
 		bufpool.Release(buf) // writer 完成（含出错）后释放 Lease，只释放一次。

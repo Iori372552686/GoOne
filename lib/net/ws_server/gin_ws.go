@@ -1,24 +1,27 @@
 package ws_server
 
 import (
+	"errors"
 	"fmt"
-	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/lib/util/bufpool"
-	"github.com/gin-gonic/gin"
 	"net"
 	"net/http"
 	"strconv"
+
+	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/util/bufpool"
+	"github.com/gin-gonic/gin"
 )
 
-var router *gin.Engine
-
-// load  router
-func (self *WsTcpSvr) loadRoutes() {
-	router.GET("/ws", self.wsGinPageUpgrader)
-}
-
-// Run gin start the websocket server
-func (self *WsTcpSvr) RunGinWs(mode string, wsPort int) error {
+// RunGinWs 同步绑定 HTTP 监听器并启动 Gin WebSocket 服务。
+//
+// P0-04 关键修复：
+//   - 同步 net.Listen 使端口冲突在 Start 期（而非稍后的 goroutine 内）返回。
+//   - 删除包级全局 gin.Engine，改为实例字段，支持同进程多 WS 实例。
+//   - 保存 listener / http.Server，使 Quiesce 能关闭 listener 停止新 Upgrade、Stop 能
+//     强制 Close 残留连接。
+//   - Serve goroutine 的非预期退出错误送入 serveErr（容量 1），供上层监督（如
+//     RuntimeErrorSource）感知监听器死亡；预期的 http.ErrServerClosed 不上报。
+func (s *WsTcpSvr) RunGinWs(mode string, wsPort int) error {
 	port := strconv.Itoa(wsPort)
 	if port == "" {
 		return fmt.Errorf("port args err!")
@@ -30,18 +33,40 @@ func (self *WsTcpSvr) RunGinWs(mode string, wsPort int) error {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	router = gin.Default()
-	self.loadRoutes()
+	// 同步绑定，使端口冲突立即返回。
+	addr := ":" + port
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("ws server listen %s: %w", addr, err)
+	}
+	s.httpListener = ln
 
-	go router.Run(":" + port)
-	logger.Infof("------ Http Gin WsServer Running by :%v ------", port)
+	router := gin.Default()
+	router.GET("/ws", s.wsGinPageUpgrader)
+
+	srv := &http.Server{Handler: router}
+	s.httpServer = srv
+	if s.serveErr == nil {
+		s.serveErr = make(chan error, 1)
+	}
+
+	go func() {
+		logger.Infof("------ Http Gin WsServer Running on %s ------", port)
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Errorf("ws gin server stopped with error | %v", err)
+			select {
+			case s.serveErr <- err:
+			default:
+			}
+		}
+	}()
 	return nil
 }
 
-// WsPage is gin websocket handler
-func (self *WsTcpSvr) wsGinPageUpgrader(c *gin.Context) {
+// wsGinPageUpgrader 是 gin websocket 升级 handler。
+func (s *WsTcpSvr) wsGinPageUpgrader(c *gin.Context) {
 	// Quiesce 后拒绝新 Upgrade（roadmap P0-07）。
-	if !self.accepting.Load() {
+	if !s.accepting.Load() {
 		http.Error(c.Writer, "shutting down", http.StatusServiceUnavailable)
 		return
 	}
@@ -52,17 +77,23 @@ func (self *WsTcpSvr) wsGinPageUpgrader(c *gin.Context) {
 	}
 
 	chanWrite := make(chan *bufpool.Buffer, 100)
-	self.lockOfConnInfo.Lock()
-	self.mapOfConnInfo[socket.NetConn()] = chanWrite
-	self.lockOfConnInfo.Unlock()
+	s.lockOfConnInfo.Lock()
+	s.mapOfConnInfo[socket.NetConn()] = &wsConnEntry{chanWrite: chanWrite}
+	s.lockOfConnInfo.Unlock()
 
 	//opt
 	if tcpConn, ok := socket.NetConn().(*net.TCPConn); ok {
 		_ = tcpConn.SetNoDelay(true) // true 表示禁用 Nagle
 	}
 
-	self.handler.OnConn(socket.NetConn())
-	go self.runConnRead(socket)
-	go self.runConnWrite(socket, chanWrite)
+	s.handler.OnConn(socket.NetConn())
+	go s.runConnRead(socket)
+	go s.runConnWrite(socket, chanWrite)
 	logger.Infof("gin webSocket 建立连接:%v", socket.RemoteAddr().String())
+}
+
+// ServeErrors 返回 ws gin server 的运行期错误 channel（容量 1）。非预期退出（非
+// http.ErrServerClosed）会送入此 channel，供上层监督监听器死亡。
+func (s *WsTcpSvr) ServeErrors() <-chan error {
+	return s.serveErr
 }

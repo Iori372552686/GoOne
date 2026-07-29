@@ -37,6 +37,9 @@ func (t *ConnKcpSvr) initAndRun(ip string, port int, cb func(conn net.Conn, data
 func (t *ConnKcpSvr) OnConn(conn net.Conn) {
 	logger.Infof("kcp new conn: %s", conn.RemoteAddr().String())
 	observeGatewayEvent("kcp", "accepted")
+	if t.hub != nil {
+		t.hub.IncConnection()
+	}
 }
 
 // 被Read协程调用。handler 在读协程内同步执行：保证同连接消息顺序、
@@ -50,6 +53,9 @@ func (t *ConnKcpSvr) OnPacket(conn net.Conn, data []byte) {
 func (t *ConnKcpSvr) OnClose(conn net.Conn) {
 	observeGatewayEvent("kcp", "closed")
 	uid := t.removeConn(conn)
+	if t.hub != nil {
+		t.hub.DecConnection()
+	}
 	if uid == 0 {
 		return
 	}
@@ -67,6 +73,25 @@ func (t *ConnKcpSvr) OnClose(conn net.Conn) {
 }
 
 func (t *ConnKcpSvr) SendByUid(uid uint64, data1 []byte, data2 []byte) error {
+	// P0-05：hub 路径锁内取 Client，锁外写。
+	if t.hub != nil {
+		client := t.hub.ClientForSend(uid)
+		if client == nil {
+			logger.Debugf("uid doesn't exist {uid: %v}", uid)
+			return fmt.Errorf("uid doesn't exist {uid: %v}", uid)
+		}
+		if err := t.WriteData(client.Conn, data1, data2); err != nil {
+			client.Conn.Close()
+			observeGatewayEvent("kcp", "write_error")
+			logger.Errorf("Closed kcp connection for failing to write data {uid: %v} | %v", uid, err)
+			return err
+		}
+		if logger.DebugEnabled() {
+			logger.Debugf("Send to kcp client {uid: %v, len: %v}", uid, len(data1)+len(data2))
+		}
+		return nil
+	}
+
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -91,7 +116,20 @@ func (t *ConnKcpSvr) SendByUid(uid uint64, data1 []byte, data2 []byte) error {
 }
 
 // BroadcastByZone 向指定 zone 的所有在线客户端广播；zone <= 0 表示全服广播。
+// P0-05：hub 路径锁内快照、锁外写。
 func (t *ConnKcpSvr) BroadcastByZone(zone int32, data1 []byte, data2 []byte) {
+	if t.hub != nil {
+		clients := t.hub.SnapshotByZone(zone)
+		for _, client := range clients {
+			if err := t.WriteData(client.Conn, data1, data2); err != nil {
+				client.Conn.Close()
+				observeGatewayEvent("kcp", "write_error")
+				logger.Errorf("Closed kcp connection for failing to write data {uid: %v} | %v", client.Uid, err)
+			}
+		}
+		return
+	}
+
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -110,6 +148,16 @@ func (t *ConnKcpSvr) BroadcastByZone(zone int32, data1 []byte, data2 []byte) {
 }
 
 func (t *ConnKcpSvr) Kick(uid uint64, reason g1_protocol.EKickOutReason) {
+	if t.hub != nil {
+		client := t.hub.ClientForSend(uid)
+		if client == nil {
+			logger.Infof("Can't find kcp conn to kick. {uid:%v, reason:%v}", uid, reason)
+			return
+		}
+		t.kick(client.Conn, uid, reason)
+		return
+	}
+
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -123,6 +171,17 @@ func (t *ConnKcpSvr) Kick(uid uint64, reason g1_protocol.EKickOutReason) {
 }
 
 func (t *ConnKcpSvr) KickByRemoteAddr(uid uint64, reason g1_protocol.EKickOutReason, remoteAddr string) {
+	if t.hub != nil {
+		conn := t.hub.ConnByRemoteAddr(remoteAddr)
+		if conn == nil {
+			logger.Infof("Can't find kcp conn to kick. {uid:%v, reason:%v}", uid, reason)
+			return
+		}
+		t.hub.MarkKick(remoteAddr)
+		t.kick(conn, uid, reason)
+		return
+	}
+
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -137,6 +196,14 @@ func (t *ConnKcpSvr) KickByRemoteAddr(uid uint64, reason g1_protocol.EKickOutRea
 }
 
 func (t *ConnKcpSvr) removeConn(conn net.Conn) uint64 {
+	if t.hub != nil {
+		uid, kicked := t.hub.RemoveConn(conn)
+		if kicked {
+			return 0
+		}
+		return uid
+	}
+
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -189,6 +256,19 @@ func (t *ConnKcpSvr) kick(conn net.Conn, uid uint64, reason g1_protocol.EKickOut
 }
 
 func (t *ConnKcpSvr) UpdateClientByUid(conn net.Conn, uid uint64, zone uint32) *Client {
+	// P0-05：hub 路径原子绑定 + IPv6 兼容 + 锁外 kick 旧连接。
+	if t.hub != nil {
+		newIns, oldCli, err := t.hub.BindClient(conn, uid, zone)
+		if err != nil {
+			logger.Errorf("BindClient failed {uid: %v}: %v", uid, err)
+			return nil
+		}
+		if oldCli != nil {
+			t.kick(oldCli.Conn, uid, g1_protocol.EKickOutReason_MULTI_PLACE_LOGIN)
+		}
+		return newIns
+	}
+
 	oldCli := t.GetClientByUid(uid)
 	ipAddr := strings.Split(conn.RemoteAddr().String(), ":")
 	ip, port := ipAddr[0], ipAddr[1]
@@ -216,6 +296,9 @@ func (t *ConnKcpSvr) UpdateClientByUid(conn net.Conn, uid uint64, zone uint32) *
 }
 
 func (t *ConnKcpSvr) GetClientByUid(uid uint64) *Client {
+	if t.hub != nil {
+		return t.hub.GetClientByUid(uid)
+	}
 	t.lock.RLock()
 	client := t.uidConnMap[uid]
 	t.lock.RUnlock()

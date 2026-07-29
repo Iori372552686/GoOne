@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/util/bufpool"
 	"github.com/Iori372552686/GoOne/module/misc"
@@ -23,8 +22,11 @@ import (
 
 const kReadBufSize = 64 * 1024
 
+// kcpConnInfo 封装每连接的写 channel 与关闭标志（P0-04：消除 send-on-closed-channel
+// 竞态）。
 type kcpConnInfo struct {
 	chanWrite chan *bufpool.Buffer // passing 'nil' means close
+	closed    bool                 // destroyConn 在锁内置 true，配合 WriteData/Close 检查
 }
 
 // KcpSvr is the raw-stream KCP server (mirrors tcp_server.TcpSvr).
@@ -35,7 +37,7 @@ type KcpSvr struct {
 	handler IKcpSvrEventHandler
 
 	lockOfConnInfo sync.RWMutex
-	mapOfConnInfo  map[net.Conn]kcpConnInfo
+	mapOfConnInfo  map[net.Conn]*kcpConnInfo
 
 	// listener 字段化（roadmap P0-07）：Quiesce 关 listener 停接新连接但保留既有；
 	// Stop 关 listener 与全部连接。stopCloseOnce 保证幂等。
@@ -49,7 +51,7 @@ func (s *KcpSvr) InitAndRun(ip string, port int, handler IKcpSvrEventHandler) er
 
 	s.handler = handler
 	s.lockOfConnInfo.Lock()
-	s.mapOfConnInfo = make(map[net.Conn]kcpConnInfo)
+	s.mapOfConnInfo = make(map[net.Conn]*kcpConnInfo)
 	s.lockOfConnInfo.Unlock()
 
 	addr := ip + ":" + strconv.Itoa(port)
@@ -77,13 +79,20 @@ func (s *KcpSvr) Quiesce() {
 }
 
 // Stop 关闭 listener 与全部已建立连接，用于排空超时后的强制关停。幂等。
+//
+// P0-04：先在锁内快照连接列表并释放锁，再在锁外逐个 Close。禁止在连接表锁内执行
+// 网络 Close。
 func (s *KcpSvr) Stop() {
 	s.Quiesce()
 	s.lockOfConnInfo.Lock()
+	conns := make([]net.Conn, 0, len(s.mapOfConnInfo))
 	for conn := range s.mapOfConnInfo {
-		_ = conn.Close()
+		conns = append(conns, conn)
 	}
 	s.lockOfConnInfo.Unlock()
+	for _, conn := range conns {
+		_ = conn.Close()
+	}
 }
 
 // WriteData enqueues data1+data2 to the connection's write goroutine.
@@ -92,7 +101,7 @@ func (s *KcpSvr) WriteData(conn net.Conn, data1 []byte, data2 []byte) error {
 	var chanWrite chan *bufpool.Buffer
 
 	s.lockOfConnInfo.RLock()
-	if info, exists := s.mapOfConnInfo[conn]; exists {
+	if info, exists := s.mapOfConnInfo[conn]; exists && !info.closed {
 		chanWrite = info.chanWrite
 	}
 	s.lockOfConnInfo.RUnlock()
@@ -118,7 +127,7 @@ func (s *KcpSvr) Close(conn net.Conn) error {
 	var chanWrite chan *bufpool.Buffer
 
 	s.lockOfConnInfo.RLock()
-	if info, exists := s.mapOfConnInfo[conn]; exists {
+	if info, exists := s.mapOfConnInfo[conn]; exists && !info.closed {
 		chanWrite = info.chanWrite
 	}
 	s.lockOfConnInfo.RUnlock()
@@ -144,7 +153,7 @@ func (s *KcpSvr) runListener(listener *kcp.Listener) {
 
 		chanWrite := make(chan *bufpool.Buffer, 100)
 		s.lockOfConnInfo.Lock()
-		s.mapOfConnInfo[conn] = kcpConnInfo{chanWrite: chanWrite}
+		s.mapOfConnInfo[conn] = &kcpConnInfo{chanWrite: chanWrite}
 		s.lockOfConnInfo.Unlock()
 
 		logger.Debugf("New kcp connection: {local:%v, remote:%v}", conn.LocalAddr(), conn.RemoteAddr())
@@ -173,7 +182,8 @@ func (s *KcpSvr) runConnRead(conn net.Conn) {
 	readBuf := make([]byte, kReadBufSize)
 
 	for {
-		_ = conn.SetReadDeadline(datetime.NowT().Add(s.KcpReadTimeout))
+		// P0-04：socket deadline 用 time.Now()，不用 datetime.NowT()（缓存时间会陈旧）。
+		_ = conn.SetReadDeadline(time.Now().Add(s.KcpReadTimeout))
 		readLen, err := conn.Read(readBuf)
 
 		if err == nil {
@@ -194,13 +204,24 @@ func (s *KcpSvr) runConnRead(conn net.Conn) {
 	s.destroyConn(conn)
 }
 
+// destroyConn 拆除一个连接。P0-04：锁内置 closed=true 并删除；不调用 close(chanWrite)
+//（直接 close channel 会与并发 WriteData 的 send 产生 send-on-closed-channel 竞态）。
+// 改为向 chanWrite 投递一个 nil（关闭信号）：写协程收到 nil 即退出循环并 Close 底层
+// conn。chan 本身随 entry 一起被 GC。
 func (s *KcpSvr) destroyConn(conn net.Conn) {
 	s.lockOfConnInfo.Lock()
-	if info, exists := s.mapOfConnInfo[conn]; exists {
-		close(info.chanWrite)
+	info, exists := s.mapOfConnInfo[conn]
+	if exists {
+		info.closed = true
 		delete(s.mapOfConnInfo, conn)
 	}
 	s.lockOfConnInfo.Unlock()
+	if exists {
+		select {
+		case info.chanWrite <- nil:
+		default:
+		}
+	}
 }
 
 func (s *KcpSvr) runConnWrite(conn net.Conn, chanWrite <-chan *bufpool.Buffer) {
@@ -218,7 +239,8 @@ func (s *KcpSvr) runConnWrite(conn net.Conn, chanWrite <-chan *bufpool.Buffer) {
 			break
 		}
 
-		_ = conn.SetWriteDeadline(datetime.NowT().Add(s.KcpWriteTimeout))
+		// P0-04：socket deadline 用 time.Now()。
+		_ = conn.SetWriteDeadline(time.Now().Add(s.KcpWriteTimeout))
 		sentLen, err := conn.Write(buf.Bytes)
 		dataLen := len(buf.Bytes)
 		bufpool.Release(buf) // writer 完成（含出错）后释放 Lease，只释放一次。

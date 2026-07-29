@@ -153,19 +153,29 @@ func (gatewayComponent) Start(_ context.Context) error {
 	return nil
 }
 
-// Quiesce 实现 runtime.Quiescer：三传输停止接收新连接，保留既有连接处理在途工作。
-// readyz 此刻已返回 503（由状态机保证）。
+// Quiesce 实现 runtime.Quiescer：三传输停止接收新连接，SessionHub 拒绝新会话绑定
+//（P0-05）。保留既有连接处理在途工作。readyz 此刻已返回 503（由状态机保证）。
 func (gatewayComponent) Quiesce(_ context.Context) error {
+	// P0-05：先让 hub 拒绝新 BindClient（draining），再停三传输 listener。
+	globals.SessionHub.Quiesce()
 	globals.ConnTcpSvr.Quiesce()
 	globals.ConnWsSvr.Quiesce()
 	globals.ConnKcpSvr.Quiesce()
 	return nil
 }
 
-// Stop 实现 runtime.Component：强制关闭三传输的全部残留连接。幂等。
+// Drain 实现 runtime.Drainer（P0-06）：等待逻辑会话（ActiveSessions）归零。
+// 只等 session，不等未认证连接；超时由 App 的 drain 超时统一处理。
+func (gatewayComponent) Drain(ctx context.Context) error {
+	return globals.SessionTracker.WaitSessions(ctx)
+}
+
+// Stop 实现 runtime.Component：强制关闭三传输的全部残留连接，并关闭 SessionTracker
+//（唤醒任何仍在等待的 Drain）。幂等。
 func (gatewayComponent) Stop(_ context.Context) error {
 	globals.ConnTcpSvr.Stop()
 	globals.ConnWsSvr.Stop()
 	globals.ConnKcpSvr.Stop()
+	globals.SessionTracker.Close()
 	return nil
 }

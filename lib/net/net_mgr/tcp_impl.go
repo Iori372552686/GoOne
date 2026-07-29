@@ -58,6 +58,10 @@ func (t *ConnTcpSvr) initSessionMaps(cb func(conn net.Conn, data []byte)) {
 func (t *ConnTcpSvr) OnConn(conn net.Conn) {
 	logger.Infof("new conn: %s", conn.RemoteAddr().String())
 	observeGatewayEvent("tcp", "accepted")
+	// P0-06：底层连接计数。未认证连接只计入 connection，不计入 session。
+	if t.hub != nil {
+		t.hub.IncConnection()
+	}
 }
 
 // 被Read协程调用，每个Connection对应一个Read协调。
@@ -71,6 +75,10 @@ func (t *ConnTcpSvr) OnPacket(conn net.Conn, data []byte) {
 func (t *ConnTcpSvr) OnClose(conn net.Conn) {
 	observeGatewayEvent("tcp", "closed")
 	uid := t.removeConn(conn)
+	// P0-06：连接计数递减（hub 路径下 session 计数已在 hub.RemoveConn 内处理）。
+	if t.hub != nil {
+		t.hub.DecConnection()
+	}
 	if uid == 0 {
 		return
 	}
@@ -89,6 +97,25 @@ func (t *ConnTcpSvr) OnClose(conn net.Conn) {
 }
 
 func (t *ConnTcpSvr) SendByUid(uid uint64, data1 []byte, data2 []byte) error {
+	// P0-05：hub 路径只锁内取不可变 Client，锁外写网络。
+	if t.hub != nil {
+		client := t.hub.ClientForSend(uid)
+		if client == nil {
+			logger.Debugf("uid doesn't exist {uid: %v}", uid)
+			return fmt.Errorf("uid doesn't exist {uid: %v}", uid)
+		}
+		if err := t.transport.WriteData(client.Conn, data1, data2); err != nil {
+			client.Conn.Close()
+			observeGatewayEvent("tcp", "write_error")
+			logger.Errorf("Closed connection for failing to write data {uid: %v}| %v", uid, err)
+			return err
+		}
+		if logger.DebugEnabled() {
+			logger.Debugf("Send to client {uid: %v, len: %v}", uid, len(data1)+len(data2))
+		}
+		return nil
+	}
+
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -113,7 +140,21 @@ func (t *ConnTcpSvr) SendByUid(uid uint64, data1 []byte, data2 []byte) error {
 }
 
 // BroadcastByZone 向指定 zone 的所有在线客户端广播；zone <= 0 表示全服广播。
+//
+// P0-05：hub 路径在锁内构造目标快照，锁外逐个写——一个慢连接不得阻塞其它连接发送。
 func (t *ConnTcpSvr) BroadcastByZone(zone int32, data1 []byte, data2 []byte) {
+	if t.hub != nil {
+		clients := t.hub.SnapshotByZone(zone)
+		for _, client := range clients {
+			if err := t.transport.WriteData(client.Conn, data1, data2); err != nil {
+				client.Conn.Close()
+				observeGatewayEvent("tcp", "write_error")
+				logger.Errorf("Closed connection for failing to write data {uid: %v} | %v", client.Uid, err)
+			}
+		}
+		return
+	}
+
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -132,6 +173,17 @@ func (t *ConnTcpSvr) BroadcastByZone(zone int32, data1 []byte, data2 []byte) {
 }
 
 func (t *ConnTcpSvr) Kick(uid uint64, reason g1_protocol.EKickOutReason) {
+	// P0-05：hub 路径锁内取 conn，锁外 marshal/write/close。
+	if t.hub != nil {
+		client := t.hub.ClientForSend(uid)
+		if client == nil {
+			logger.Infof("Can't find conn to kick. {uid:%v, reason:%v}", uid, reason)
+			return
+		}
+		t.kick(client.Conn, uid, reason)
+		return
+	}
+
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -145,6 +197,17 @@ func (t *ConnTcpSvr) Kick(uid uint64, reason g1_protocol.EKickOutReason) {
 }
 
 func (t *ConnTcpSvr) KickByRemoteAddr(uid uint64, reason g1_protocol.EKickOutReason, remoteAddr string) {
+	if t.hub != nil {
+		conn := t.hub.ConnByRemoteAddr(remoteAddr)
+		if conn == nil {
+			logger.Infof("Cann't find conn to kick. {uid:%v, reason:%v}", uid, reason)
+			return
+		}
+		t.hub.MarkKick(remoteAddr)
+		t.kick(conn, uid, reason)
+		return
+	}
+
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -159,6 +222,16 @@ func (t *ConnTcpSvr) KickByRemoteAddr(uid uint64, reason g1_protocol.EKickOutRea
 }
 
 func (t *ConnTcpSvr) removeConn(conn net.Conn) uint64 {
+	// P0-05：hub 路径委托 hub.RemoveConn；返回 uid=0 表示未绑定或被替换（不触发登出）。
+	// kicked=true 表示是 kick 导致的关闭，不触发登出包。
+	if t.hub != nil {
+		uid, kicked := t.hub.RemoveConn(conn)
+		if kicked {
+			return 0
+		}
+		return uid
+	}
+
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -213,6 +286,20 @@ func (t *ConnTcpSvr) kick(conn net.Conn, uid uint64, reason g1_protocol.EKickOut
 }
 
 func (t *ConnTcpSvr) UpdateClientByUid(conn net.Conn, uid uint64, zone uint32) *Client {
+	// P0-05：hub 路径用 BindClient 原子完成查旧+写新索引，IPv6 兼容（net.SplitHostPort），
+	// 锁外 kick 旧连接。
+	if t.hub != nil {
+		newIns, oldCli, err := t.hub.BindClient(conn, uid, zone)
+		if err != nil {
+			logger.Errorf("BindClient failed {uid: %v}: %v", uid, err)
+			return nil
+		}
+		if oldCli != nil {
+			t.kick(oldCli.Conn, uid, g1_protocol.EKickOutReason_MULTI_PLACE_LOGIN)
+		}
+		return newIns
+	}
+
 	oldCli := t.GetClientByUid(uid)
 	ipAddr := strings.Split(conn.RemoteAddr().String(), ":")
 	ip, port := ipAddr[0], ipAddr[1]
@@ -240,6 +327,9 @@ func (t *ConnTcpSvr) UpdateClientByUid(conn net.Conn, uid uint64, zone uint32) *
 }
 
 func (t *ConnTcpSvr) GetClientByUid(uid uint64) *Client {
+	if t.hub != nil {
+		return t.hub.GetClientByUid(uid)
+	}
 	t.lock.RLock()
 	conn := t.uidConnMap[uid]
 	t.lock.RUnlock()

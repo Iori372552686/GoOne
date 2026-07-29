@@ -53,6 +53,10 @@ type ConnTcpSvr struct {
 	// gnet 时为事件驱动 server。所有下行写与关闭必须经 transport。
 	transport gatewayTransport
 
+	// hub 是共享会话状态拥有者（P0-05）。nil 时回退到下方本地 map（兼容旧测试）。
+	// 生产由 connsvr globals 注入单一 SessionHub，使 TCP/WS/KCP 共享会话状态。
+	hub *SessionHub
+
 	uidConnMap        map[uint64]*Client
 	connUidMap        map[net.Conn]uint64
 	remoteAddrConnMap map[string]net.Conn
@@ -63,6 +67,9 @@ type ConnTcpSvr struct {
 
 type ConnWsTcpSvr struct {
 	ws_server.WsTcpSvr
+
+	// hub 同 ConnTcpSvr（P0-05）。
+	hub *SessionHub
 
 	uidConnMap        map[uint64]*Client
 	connUidMap        map[net.Conn]uint64
@@ -77,6 +84,9 @@ type ConnWsTcpSvr struct {
 // identical to the TCP gateway.
 type ConnKcpSvr struct {
 	kcp_server.KcpPacketSvr
+
+	// hub 同 ConnTcpSvr（P0-05）。
+	hub *SessionHub
 
 	uidConnMap        map[uint64]*Client
 	connUidMap        map[net.Conn]uint64
@@ -103,3 +113,9 @@ func NewKcpSvr() *ConnKcpSvr {
 	registerGatewaySource("kcp", svr)
 	return svr
 }
+
+// SetHub 注入共享 SessionHub（P0-05）。三种传输（TCP/WS/KCP）必须注入同一个 hub 实
+// 例，使同一 UID 跨传输重绑原子化。必须在 Start 前调用。
+func (t *ConnTcpSvr) SetHub(h *SessionHub)    { t.hub = h }
+func (t *ConnWsTcpSvr) SetHub(h *SessionHub)  { t.hub = h }
+func (t *ConnKcpSvr) SetHub(h *SessionHub)    { t.hub = h }

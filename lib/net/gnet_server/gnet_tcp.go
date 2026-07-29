@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
@@ -34,6 +35,12 @@ type TcpServer struct {
 	handler TcpEventHandler
 
 	ready chan struct{}
+
+	// accepting 是 admission gate（P0-06）：Quiesce 置 false 后，OnOpened 立即关闭新
+	// 连接，使网关排空期不再接收新客户端。Start 时为 true。
+	accepting atomic.Bool
+	// stopped 保证 Stop 幂等。
+	stopped atomic.Bool
 }
 
 // NewTcpServer creates a gnet-backed TCP server. headerLen/bodyLen describe
@@ -52,6 +59,7 @@ func (s *TcpServer) Start(ip string, port int) error {
 		return errors.New("gnet tcp server requires a handler")
 	}
 	s.addr = fmt.Sprintf("tcp://%s:%d", ip, port)
+	s.accepting.Store(true)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -76,8 +84,18 @@ func (s *TcpServer) Start(ip string, port int) error {
 	}
 }
 
-// Stop shuts the event loop down.
+// Quiesce 关闭 admission gate：新连接在 OnOpened 被立即关闭，但既有连接保留（P0-06）。
+// 幂等。
+func (s *TcpServer) Quiesce() {
+	s.accepting.Store(false)
+}
+
+// Stop shuts the event loop down. P0-06：幂等，关闭 admission gate 后停止 gnet。
 func (s *TcpServer) Stop() error {
+	s.accepting.Store(false)
+	if !s.stopped.CompareAndSwap(false, true) {
+		return nil
+	}
 	return gnet.Stop(context.Background(), s.addr)
 }
 
@@ -114,6 +132,10 @@ func (s *TcpServer) OnInitComplete(_ gnet.Server) gnet.Action {
 }
 
 func (s *TcpServer) OnOpened(c gnet.Conn) ([]byte, gnet.Action) {
+	// P0-06 admission gate：Quiesce 后新连接立即关闭，不进入 handler。
+	if !s.accepting.Load() {
+		return nil, gnet.Close
+	}
 	adapter := &gnetConn{c: c}
 	c.SetContext(adapter)
 	s.handler.OnConn(adapter)
