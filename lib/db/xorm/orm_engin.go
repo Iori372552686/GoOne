@@ -88,6 +88,8 @@ func (self *OrmSql) AddInstance(conf Config, tables ...interface{}) (*xorm.Engin
 
 	err = self.SyncTables(tables...)
 	if err != nil {
+		// SyncTables 失败时关闭已创建的 Engine，避免连接泄漏（V3-P0-05）。
+		_ = impl.Close()
 		return nil, err
 	}
 
@@ -127,11 +129,12 @@ func (self *OrmSql) refresh() (err error) {
 }
 
 /**
-* @Description: 连接监控器
-* @Author: Iori
-* @Date: 2022-05-21 16:48:40
-**/
+ * @Description: 连接监控器
+ * @Author: Iori
+ * @Date: 2022-05-21 16:48:40
+ **/
 func (self *OrmSql) MonitorConn() {
+
 	finishPing := beginXormPingObserve(self.name)
 	err := self.Engine.Ping()
 	finishPing(err)
@@ -144,10 +147,10 @@ func (self *OrmSql) MonitorConn() {
 }
 
 /**
-* @Description: 同步创建表與字段
-* @Author: Iori
-* @Date: 2022-05-21 16:53:20
-**/
+ * @Description: 同步创建表與字段
+ * @Author: Iori
+ * @Date: 2022-05-21 16:53:20
+ **/
 func (self *OrmSql) SyncTables(tables ...interface{}) error {
 	if self.syncFlag && tables != nil {
 
@@ -165,5 +168,19 @@ func (self *OrmSql) SyncTables(tables ...interface{}) error {
 
 	}
 
+	return nil
+}
+
+// Close 关闭 Engine 与 Session，释放数据库连接。幂等：Engine 为 nil 时安全返回
+//（V3-P0-05：OrmSql 增加显式 Close，使资源由 Component 统一关闭）。
+func (self *OrmSql) Close() error {
+	if self.Session != nil {
+		self.Session.Close()
+		self.Session = nil
+	}
+	if self.Engine != nil {
+		_ = self.Engine.Close()
+		self.Engine = nil
+	}
 	return nil
 }

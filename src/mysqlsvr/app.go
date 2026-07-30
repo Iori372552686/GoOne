@@ -48,6 +48,8 @@ func NewApp() *runtime.App {
 		},
 		OnStop: func(_ context.Context) error {
 			manager.Close()
+			// V3-P0-05：同时关闭 ORM Engine（此前只关 async worker，Engine 靠 OS 回收）。
+			_ = globals.OrmMgr.Close()
 			logger.Infof("================== mysqlsvr Stop =========================")
 			return nil
 		},

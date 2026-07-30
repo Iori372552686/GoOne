@@ -64,17 +64,37 @@ func (self *OrmMgr) GetOrmEngine(dbName ...string) *xorm.EngineGroup {
 func (self *OrmMgr) InitAndRun(dbIns []Config, tables ...interface{}) error {
 	logger.Infof("OrmMgr   InsInit.. | %#v", tables)
 
+	// 记录已成功添加的实例，用于中途失败时逆序关闭（V3-P0-05：多实例初始化失败
+	// 必须回滚已成功 Engine，避免连接泄漏）。
+	added := make([]string, 0, len(dbIns))
 	for _, ds := range dbIns {
 		orm := NewOrmSql()
 		_, err := orm.AddInstance(ds, tables...)
 		if err != nil {
+			// 逆序关闭已成功添加的 Engine。
+			for i := len(added) - 1; i >= 0; i-- {
+				_ = self.XormEngine[added[i]].Close()
+				delete(self.XormEngine, added[i])
+			}
 			return err
 		}
 
 		self.SetOrm(ds.IndexName, orm)
+		added = append(added, ds.IndexName)
 	}
 
 	logger.Infof("OrmMgr   InsInit... Done !")
+	return nil
+}
+
+// Close 关闭所有 ORM Engine，释放数据库连接。幂等（V3-P0-05：OrmManager 增加 Close）。
+func (self *OrmMgr) Close() error {
+	for name, orm := range self.XormEngine {
+		if orm != nil {
+			_ = orm.Close()
+		}
+		delete(self.XormEngine, name)
+	}
 	return nil
 }
 
