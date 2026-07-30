@@ -1,0 +1,34 @@
+# GoOne 行尾与文件属性（V3-P0-07）
+# 统一 Go、Markdown、Shell、YAML 等文本文件为 LF 行尾，避免跨平台 CRLF/LF 混用导致
+# 全文件无语义 diff。生成代码同样使用 LF。
+
+# 默认：文本文件自动归一化为 LF（检入时），检出时保持 LF。
+* text=auto eol=lf
+
+# 明确指定常见文本类型（防止某些编辑器/平台误判）。
+*.go    text eol=lf
+*.md    text eol=lf
+*.sh    text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.toml  text eol=lf
+*.json  text eol=lf
+*.proto text eol=lf
+*.mod   text eol=lf
+*.sum   text eol=lf
+
+# Windows 专用脚本保持 CRLF。
+*.ps1   text eol=crlf
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# 二进制文件，不做行尾归一化。
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.xlsx  binary
+*.zip   binary
+*.gz    binary

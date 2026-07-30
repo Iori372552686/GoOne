@@ -1447,7 +1447,7 @@ contrib/bus/rocketmq
 
 ## 7. 方案 B 闭环（2026-07 实施）
 
-方案 B（[modernization_plan_b_2026-07.md](modernization_plan_b_2026-07.md)）在 roadmap P0+P1 基础上完成了生产闭环。证据见 [benchmarks/modernization-b-baseline.md](benchmarks/modernization-b-baseline.md) 与 [benchmarks/capacity-matrix.md](benchmarks/capacity-matrix.md)。
+方案 B 在 roadmap P0+P1 基础上完成了生产闭环。后续证据与容量矩阵由 v3 计划维护：见 [modernization_execution_plan_2026-07-v3.md](modernization_execution_plan_2026-07-v3.md) 与 [architecture_review_2026-07-v3.md](architecture_review_2026-07-v3.md)；容量矩阵 `benchmarks/capacity-matrix.md` 待 V3-P1-06 产出。
 
 新增完成项（超出原 roadmap）：
 
@@ -1464,5 +1464,5 @@ contrib/bus/rocketmq
 - [x] appconfig.Store writeMu 串行化 + MergeResult.Applied 真填充（P1-06）。
 - [x] runtime.MustNew + MustRegister 可变参数 + scaffold run()/-root/NewApp 修复（P1-07/08）。
 
-待运维执行（P2-02/P2-03）：C2–C4 压测机采集、RabbitMQ/Redis 真实重启演练、gnet vs gonet 对比、兼容入口清理门禁（见 capacity-matrix.md）。
+待运维执行（P2-02/P2-03）：C2–C4 压测机采集、RabbitMQ/Redis 真实重启演练、gnet vs gonet 对比、兼容入口清理门禁（容量矩阵 `benchmarks/capacity-matrix.md` 待 V3-P1-06 产出）。
 
