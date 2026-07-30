@@ -166,6 +166,9 @@ type GRPCServerConfig struct {
 	Enabled bool   `json:"enabled" yaml:"enabled"`
 	IP      string `json:"ip" yaml:"ip"`
 	Port    int    `json:"port" yaml:"port"`
+	// Reflection 仅在显式开启时注册 gRPC reflection 服务，避免生产环境暴露
+	// 服务元数据。默认 false。
+	Reflection bool `json:"reflection" yaml:"reflection"`
 }
 
 // connsvr配置

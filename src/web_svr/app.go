@@ -143,7 +143,10 @@ func (w *webRuntimeComponent) startGRPCServer(d *ssrpc.Dispatcher) error {
 	healthSrv.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 	healthSrv.SetServingStatus("web.websvr.v1.WebApiService", grpc_health_v1.HealthCheckResponse_SERVING)
 	grpc_health_v1.RegisterHealthServer(srv, healthSrv)
-	reflection.Register(srv)
+	// reflection 仅在显式 debug 配置下启用，避免生产环境暴露服务元数据。
+	if conf.Reflection {
+		reflection.Register(srv)
+	}
 	w.setGRPCServer(srv)
 
 	go func() {

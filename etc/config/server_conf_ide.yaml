@@ -133,6 +133,7 @@ websvr:
       enabled: true
       ip: ""
       port: 10002
+      reflection: true
 
 roomcentersvr:
   identity:
