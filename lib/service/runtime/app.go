@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 )
@@ -25,6 +26,10 @@ var (
 	// ErrDrainEscalated 表示主动升级，DeadlineExceeded 表示真实超时。二者都不再计
 	// 入 drain_timeouts_total（只有 DeadlineExceeded 才是超时）。
 	ErrDrainEscalated = errors.New("runtime: 排空被第二次终止信号升级取消")
+	// ErrStartupInterrupted 在组件启动阶段收到终止信号取消 signalCtx 时，作为
+	// signalCtx 的取消原因返回。它使启动期 SIGTERM/SIGINT 能立即中断进行中的
+	// Component.Start，而非等到所有组件启动完毕进入 Ready 后才响应。
+	ErrStartupInterrupted = errors.New("runtime: 启动阶段被终止信号中断")
 )
 
 // 默认超时。它们约束排空与关停阶段，使行为异常的组件无法无限期挂住进程。服务
@@ -125,6 +130,12 @@ type App struct {
 	// tryEscalateDrain 的并发读产生 data race。
 	escalateDrain func()
 	escalateMu    sync.RWMutex
+
+	// injectStartupSignal 在 Run 安装信号源后被设置为 src.injectForTest，使测试能
+	// 确定性地向 Run 内部的信号 dispatcher 注入第一个终止信号（模拟启动期 SIGTERM），
+	// 而无需依赖 OS 信号自投递（在 Windows 上不可靠）。生产代码不调用。
+	injectStartupSignal func(os.Signal)
+	injectSignalMu      sync.RWMutex
 
 	// state 是驱动 healthz/readyz/statez 的规范生命周期状态机。遗留的 phase 字符
 	// 串字段与之保持同步，供仍读取 Phase() 的调用方使用。
@@ -285,6 +296,22 @@ func (a *App) setEscalateDrain(fn func()) {
 	a.escalateMu.Lock()
 	a.escalateDrain = fn
 	a.escalateMu.Unlock()
+}
+
+// tryInjectStartupSignal 返回当前接线的首信号注入函数；若 Run 尚未安装信号则返回
+// nil。它供测试在确定性时机向 Run 内部的信号 dispatcher 注入第一个终止信号，模拟
+// 启动期 SIGTERM/SIGINT，不依赖 OS 信号投递。
+func (a *App) tryInjectStartupSignal() func(os.Signal) {
+	a.injectSignalMu.RLock()
+	defer a.injectSignalMu.RUnlock()
+	return a.injectStartupSignal
+}
+
+// setInjectStartupSignal 在 injectSignalMu 下安装/清空首信号注入函数。
+func (a *App) setInjectStartupSignal(fn func(os.Signal)) {
+	a.injectSignalMu.Lock()
+	a.injectStartupSignal = fn
+	a.injectSignalMu.Unlock()
 }
 
 // NewFromModules 通过把 modules 装配进一个全新 Registry 来构建 App。它是为多模块

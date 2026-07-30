@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
@@ -34,15 +35,41 @@ func (a *App) Run(ctx context.Context) error {
 	for _, o := range a.observers {
 		a.state.AddObserver(o)
 	}
+
+	// 阶段 2：安装信号源。提前到 onLoadConfig/Start 之前，使启动阶段收到 SIGTERM/
+	// SIGINT 能立即取消进行中的 Component.Start（V3-P0-03）。signalCtx 由第一个终止
+	// 信号取消，传给 onLoadConfig 与 startComponents；startupDone 用于在启动成功后把
+	// termCh 的消费权从启动监督 goroutine 交接给 serveReady 内部的 awaitRunReason。
+	src := installSignals()
+	defer src.stop()
+	a.setEscalateDrain(src.escalate)
+	defer a.setEscalateDrain(nil)
+	a.setInjectStartupSignal(src.injectForTest)
+	defer a.setInjectStartupSignal(nil)
+
+	signalCtx, signalCancel := context.WithCancelCause(ctx)
+	defer signalCancel(context.Canceled)
+	startupDone := make(chan struct{})
+	go func() {
+		select {
+		case <-src.termCh:
+			signalCancel(ErrStartupInterrupted)
+		case <-startupDone:
+			// 启动完成，把 termCh 消费权交给 serveReady。
+		}
+	}()
+
 	if a.onLoadConfig != nil {
-		if err := a.onLoadConfig(ctx); err != nil {
+		if err := a.onLoadConfig(signalCtx); err != nil {
+			close(startupDone)
 			a.markFailed(err)
 			return err
 		}
 	}
 
-	// 阶段 3：按序 Start 组件，失败时回滚。
-	started, startErr := a.startComponents(ctx)
+	// 阶段 3：按序 Start 组件，失败时回滚。用 signalCtx 使启动期信号能取消 Start。
+	started, startErr := a.startComponents(signalCtx)
+	close(startupDone) // 启动阶段结束，释放启动监督 goroutine。
 	if startErr != nil {
 		// 失败组件负责自身的部分清理；App 只 STOP 已成功启动的组件。
 		stopErr := a.stopComponents(started, a.stopTimeout)
@@ -51,10 +78,6 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// 阶段 4：Ready。阻塞直到被告知排空。重载会重新进入 Ready。
-	src := installSignals()
-	defer src.stop()
-	a.setEscalateDrain(src.escalate)
-	defer a.setEscalateDrain(nil)
 	if err := a.enterReady(ctx); err != nil {
 		// Ready 观察者拒绝了转换：回滚启动。
 		stopErr := a.stopComponents(started, a.stopTimeout)
@@ -152,30 +175,31 @@ func (a *App) serveReady(ctx context.Context, src signalSource) error {
 	a.mu.Lock()
 	components := append([]Component(nil), a.components...)
 	a.mu.Unlock()
-	var sources []RuntimeErrorSource
-	for _, c := range components {
-		if rs, ok := c.(RuntimeErrorSource); ok {
-			sources = append(sources, rs)
-		}
-	}
 	runtimeErrCh := make(chan error, 1)
 	watcherCtx, watcherCancel := context.WithCancel(ctx)
 	defer watcherCancel()
-	for _, rs := range sources {
-		rs := rs
-		go func() {
+	// 每个 RuntimeErrorSource 启动一个汇聚 watcher；收到非 nil error 时用组件名包装，
+	// 使 Run 返回的 error 含组件身份（component.go 的契约要求）。
+	for _, c := range components {
+		rs, ok := c.(RuntimeErrorSource)
+		if !ok {
+			continue
+		}
+		name := c.Name()
+		go func(rs RuntimeErrorSource, name string) {
 			select {
 			case err, ok := <-rs.RuntimeErrors():
 				if !ok || err == nil {
 					return
 				}
+				wrapped := fmt.Errorf("runtime: component %q runtime error: %w", name, err)
 				select {
-				case runtimeErrCh <- err:
+				case runtimeErrCh <- wrapped:
 				default:
 				}
 			case <-watcherCtx.Done():
 			}
-		}()
+		}(rs, name)
 	}
 
 	// 用一个 reason channel 统一信号路径与运行期错误路径，避免 awaitRunReason 阻塞时
