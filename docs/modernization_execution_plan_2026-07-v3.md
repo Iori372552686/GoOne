@@ -42,7 +42,7 @@
 |---|---|---|---|---|
 | PRE-01 | 冻结执行文档和审计证据 | V3 | 已完成 | v3 评审已建，缺口证据见 architecture_review_2026-07-v3.md §4-5 |
 | PRE-02 | 冻结构建、测试、安全和性能基线 | V3 | 待 Linux 验证 | 本机为 Windows 开发机；正式基线须固定 Linux 机器执行 |
-| V3-P0-01 | 安全漏洞与敏感信息治理 | V3 新增 | 待执行 | 依赖升级全未做；Redis 密码/XORM DSN 明文入日志；reflection 无条件注册；无日志捕获测试 |
+| V3-P0-01 | 安全漏洞与敏感信息治理 | V3 新增 | 代码侧完成，待 Linux 验证 | 依赖升级4组已完成(gRPC1.82.1/OTel1.43/x-net0.56/x-text0.39/quic0.59.1)；脱敏/reflection开关/pprof旁路已完成；race/govulncheck待Linux |
 | V3-P0-02 | 测试分层与 CI 可信性 | V3 新增 | 待执行 | `GOONE_INTEGRATION` 未落地；xorm 仍 `os.Exit(0)`；CI 未拆 job、无 govulncheck |
 | V3-P0-03 | Runtime 状态机与启动期信号 | 方案B基础+V3补齐 | 部分完成（~90%） | 缺：signal context 前置到 Start 前；RuntimeError 带组件名；3 个点名测试 |
 | V3-P0-04 | Gateway 部分启动回滚 | 方案B基础+V3补齐 | 部分完成（~50%） | 缺：传输级回滚（端口泄漏）；错误含 tcp/ws/kcp 名；`Stop(ctx) error` 签名 |

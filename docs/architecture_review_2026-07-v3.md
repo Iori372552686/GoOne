@@ -102,19 +102,20 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 
 | 子项 | 状态 | 证据 |
 |---|---|---|
-| Go 工具链 ≥1.25.12 | 未完成 | `go.mod:3` = `1.25.4`；本地 = 1.25.10 |
-| gRPC ≥1.82.1 | 未完成 | `go.mod` = `v1.77.0` |
-| OpenTelemetry ≥1.43.0 | 未完成 | `go.mod` = `v1.38.0` |
-| x/net ≥0.55.0 | 未完成 | `go.mod` = `v0.47.0` |
-| x/text ≥0.39.0 | 未完成 | `go.mod` = `v0.31.0` |
-| quic-go ≥0.59.1 | 未完成 | `go.mod` = `v0.54.0` |
-| Redis 日志脱敏 | **未完成** | `lib/db/redis/redis_mgr.go:43` 打印含 `Password` 字段的 `Config`（`config.go:8`） |
-| XORM 脱敏 DSN | **未完成** | `lib/db/xorm/orm_engin.go:74` 打印含 `user:password@...` 的完整 DSN |
+| Go 工具链 ≥1.25.12 | 待 Linux 验证 | go.mod 指令 `1.25.4`（最低要求）；本机 1.25.10，需 Linux 安装 1.25.12 |
+| gRPC ≥1.82.1 | 已完成 | `go.mod` 升至 `v1.82.1`（V3-P0-01c 第3组） |
+| OpenTelemetry ≥1.43.0 | 已完成 | `go.mod` 升至 `v1.43.0`（V3-P0-01c 第2组） |
+| x/net ≥0.55.0 | 已完成 | `go.mod` 升至 `v0.56.0`（V3-P0-01c 第1组） |
+| x/text ≥0.39.0 | 已完成 | `go.mod` 升至 `v0.39.0`（V3-P0-01c 第1组） |
+| quic-go ≥0.59.1 | 已完成 | `go.mod` 升至 `v0.59.1`（V3-P0-01c 第4组） |
+| Redis 日志脱敏 | 已完成 | `Config.SafeString()` 脱敏；`redis_mgr.go` 改用之（V3-P0-01a） |
+| XORM 脱敏 DSN | 已完成 | `redactDSN` 脱敏；`orm_engin.go`/`mysql_facade.go` 改用之（V3-P0-01a） |
 | Tracing 不记 Header/Token | 已完成 | trace.go 只记 span 名/cost |
-| gRPC reflection 仅 debug | **未完成** | `src/web_svr/app.go:146` 无条件 `reflection.Register(srv)` |
+| gRPC reflection 仅 debug | 已完成 | `GRPCServerConfig.Reflection` 开关，默认 false（V3-P0-01b） |
 | pprof 双开关 | 已完成 | `lib/service/runtime/admin.go`（enabled + pprof + 回环），五服务接线一致 |
-| 日志捕获测试 | 未完成 | 全仓无相关断言 |
-| 潜在旁路 | 风险 | `lib/db/ssdb/test.go` 含 `func main()` 且 blank-import `_ "net/http/pprof"`，会注册到 `http.DefaultServeMux`，绕过 admin 双开关 |
+| 日志捕获测试 | 已完成 | `lib/db/redis/config_test.go`、`lib/db/xorm/redact_test.go`（V3-P0-01a） |
+| pprof DefaultServeMux 旁路 | 已完成 | 删除 `lib/db/ssdb/test.go`（V3-P0-01b） |
+| race 验证 | 待 Linux 验证 | 本机 CGO_ENABLED=0，race 需 cgo；build/vet/55包测试已通过 |
 
 ### V3-P0-02 测试分层与 CI 可信性
 
