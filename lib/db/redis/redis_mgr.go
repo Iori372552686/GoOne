@@ -40,7 +40,11 @@ func NewRedisMgr() *RedisMgr {
 * @Date: 2022-02-26 11:42:42
 **/
 func (self *RedisMgr) InitAndRun(dbIns []Config) error {
-	logger.Infof("RedisMgr   InsInit.. | %v", dbIns)
+	safe := make([]string, len(dbIns))
+	for i, ds := range dbIns {
+		safe[i] = ds.SafeString()
+	}
+	logger.Infof("RedisMgr   InsInit.. | %v", safe)
 
 	for _, ds := range dbIns {
 		err := self.AddInstance(uint32(ds.InstanceID), ds.IP, ds.Port, ds.Password, ds.DbIndex, ds.IsCluster)

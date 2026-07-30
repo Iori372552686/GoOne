@@ -71,7 +71,7 @@ func (self *OrmSql) AddInstance(conf Config, tables ...interface{}) (*xorm.Engin
 		)
 	}
 
-	logger.Infof("init data source | %v", self.dsn)
+	logger.Infof("init data source | %v", redactDSNs(self.dsn))
 	impl, err := xorm.NewEngineGroup(self.driveName, self.dsn)
 	if err != nil {
 		logger.Errorf("data source init error | %v", err.Error())

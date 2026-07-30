@@ -21,7 +21,8 @@ func (f *Facade) Init(ip string, port int16, user, password, schema string) erro
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", user, password, ip, port, schema)
 	f.db, err = sql.Open("mysql", dsn)
 	if err != nil {
-		logger.Errorf("Failed to open a mysql {dsn:%s} | %v", dsn, err)
+		// 不打印 dsn，避免明文密码落盘；仅记录可诊断的连接目标。
+		logger.Errorf("Failed to open a mysql {user:%s addr:%s:%d schema:%s} | %v", user, ip, port, schema, err)
 		return err
 	}
 
