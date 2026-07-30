@@ -28,29 +28,45 @@
 
 ## 2. 执行任务总览
 
-| 编号 | 任务 | 优先级 | 依赖 | 状态（2026-07-30 勘察） | 负责人 |
-|---|---|---:|---|---|---|
-| PRE-01 | 冻结执行文档和审计证据 | PRE | 无 | 进行中：v3 评审已建，缺口证据见 architecture_review_2026-07-v3.md §4-5 | Iori |
-| PRE-02 | 冻结构建、测试、安全和性能基线 | PRE | PRE-01 | 待 Linux 验证（本机为 Windows 开发机） | Iori(Linux) |
-| P0-01 | 安全漏洞与敏感信息治理 | P0 | PRE-02 | 部分完成（~15%）：pprof 双开关+Tracing 已完成；依赖升级/脱敏/reflection 未做 | Iori |
-| P0-02 | 测试分层与 CI 可信性 | P0 | PRE-02 | 部分完成（~25%）：各测试有 Skip 但门控不统一；GOONE_INTEGRATION/CI 拆分/govulncheck 未做 | Iori |
-| P0-03 | Runtime 状态机与启动期信号 | P0 | P0-02 | 部分完成（~90%）：状态机/Failed/汇聚/回滚已落地；signal 前置/组件名/3 测试缺失 | Iori |
-| P0-04 | Gateway 部分启动回滚 | P0 | P0-03 | 部分完成（~50%）：Quiesce/Drain/Stop 幂等已落地；传输级回滚完全未实现（端口泄漏） | Iori |
-| P0-05 | Redis、XORM、Nacos、Gamedata 生命周期 | P0 | P0-03 | 部分：Nacos config 已完成；Redis/XORM 无 Close；MySQL Worker 仍 init() 启动 | Iori |
-| P0-06 | Web HTTP/gRPC 生命周期 | P0 | P0-03 | 部分：gRPC Listen-first+Stop 强关已落地；HTTP 超时/health/reflection/拆分未做 | Iori |
-| P0-07 | 代码风格和文档一致性 | P0 | P0-01～P0-06 | 待执行：无 .gitattributes；170 处历史注释；protoc 未接 go/format；docs 断链 | Iori |
-| P1-01 | Admission Control 与过载保护 | P1 | P0 全部完成 | 待执行：capacity 字段/连接上限/限速/admission mw/ErrOverloaded 全缺 | Iori |
-| P1-02 | SessionHub 单路径化 | P1 | P0-04 | 部分完成：共享 Hub 已落地；本地 map/锁、hub!=nil 双分支（~23 处）未删 | Iori |
-| P1-03 | 服务装配简化 | P1 | P0-05、P0-06 | 已完成：CI 门禁代码真实合规 | Iori |
-| P1-04 | 配置不可变与全局状态收敛 | P1 | P1-03 | 部分完成（~40%）：appconfig.Store 设计完备但生产未采用；gconf 仍可变全局 | Iori |
-| P1-05 | 显式 Driver 与依赖裁剪 | P1 | P1-03 | 部分完成（~60%）：DriverRegistry+裁剪+CI 门禁达成；init() 未 Deprecated、无重连测试 | Iori |
-| P1-06 | 容量工具升级 | P1 | P1-01、P1-02 | 部分完成（~35%）：stress 工具基础在；缺序列号关联/阶段机/分片/矩阵/多数指标 | Iori |
-| P1-07 | 基于证据的性能优化 | P1 | P1-06 | 部分完成（~65%）：CS/SS Header.To 0-alloc+TCP/KCP 已改造；WS 热路径仍 1-alloc | Iori |
-| P2-01 | gnet v2 A/B 验证 | P2 | P1-06 | Deferred | 待分配 |
-| P2-02 | PGO 验证 | P2 | P1-06 | Deferred | 待分配 |
-| P2-03 | Agones Adapter | P2 | 明确 Agones 部署需求 | Deferred | 待分配 |
-| P2-04 | 下一主版本破坏性清理 | P2 | 一版弃用周期完成 | Deferred | 待分配 |
-| P2-05 | 基础依赖现代化 | P2 | P0、P1 稳定 | Deferred | 待分配 |
+> 状态分类（替代旧"待执行/部分完成"二元模型，避免与方案 B 旧编号混淆）：
+>
+> - **已完成(基线)**：方案 B 已落地，CI 有防回归门禁，无需重做。
+> - **兼容残留(本轮删除)**：方案 B 过渡期的兼容包装，生产主路径已不依赖，本轮直接删除。
+> - **部分完成**：基座已存在，仅剩明确缺口，只列剩余差距。
+> - **待执行**：V3 新增项，从零开始。
+> - **Deferred**：条件性延后，满足量化门槛或明确需求后才实施。
+>
+> 任务编号统一加 `V3-` 前缀，与旧 roadmap 的 P0/P1 编号解耦。
+
+| 编号 | 任务 | 来源 | 状态 | 剩余差距 / 证据 |
+|---|---|---|---|---|
+| PRE-01 | 冻结执行文档和审计证据 | V3 | 已完成 | v3 评审已建，缺口证据见 architecture_review_2026-07-v3.md §4-5 |
+| PRE-02 | 冻结构建、测试、安全和性能基线 | V3 | 待 Linux 验证 | 本机为 Windows 开发机；正式基线须固定 Linux 机器执行 |
+| V3-P0-01 | 安全漏洞与敏感信息治理 | V3 新增 | 待执行 | 依赖升级全未做；Redis 密码/XORM DSN 明文入日志；reflection 无条件注册；无日志捕获测试 |
+| V3-P0-02 | 测试分层与 CI 可信性 | V3 新增 | 待执行 | `GOONE_INTEGRATION` 未落地；xorm 仍 `os.Exit(0)`；CI 未拆 job、无 govulncheck |
+| V3-P0-03 | Runtime 状态机与启动期信号 | 方案B基础+V3补齐 | 部分完成（~90%） | 缺：signal context 前置到 Start 前；RuntimeError 带组件名；3 个点名测试 |
+| V3-P0-04 | Gateway 部分启动回滚 | 方案B基础+V3补齐 | 部分完成（~50%） | 缺：传输级回滚（端口泄漏）；错误含 tcp/ws/kcp 名；`Stop(ctx) error` 签名 |
+| V3-P0-05 | Redis、XORM、Nacos、Gamedata 生命周期 | 方案B基础+V3补齐 | 部分完成 | Nacos config 已完成；缺：Redis/XORM Close 与失败回滚；MySQL Worker 移除 init() 并 Component 化 |
+| V3-P0-06 | Web HTTP/gRPC 生命周期 | 方案B基础+V3补齐 | 部分完成 | gRPC Listen-first+Stop 强关已完成；缺：HTTP 超时配置；Quiesce 翻 health；reflection 开关；资源拆组件 |
+| V3-P0-07 | 代码风格和文档一致性 | V3 新增 | 待执行 | 无 `.gitattributes`；170 处历史注释；protoc 未接 go/format；docs 断链 |
+| V3-P1-01 | Admission Control 与过载保护 | V3 新增 | 待执行 | capacity 配置字段全缺；无连接上限/登录限速/admission mw/ErrOverloaded/rejected 指标 |
+| V3-P1-02 | SessionHub 单路径化 | 方案B基础+V3补齐 | 部分完成 | 共享 Hub 已落地；缺：本地 map/锁、`hub!=nil` 双分支（~23 处）；严格 BusID/IP 解析；SetHub 退出 |
+| V3-BASE-01 | 服务装配简化（RegistryComponent） | 方案 B | **已完成(基线)** | CI 门禁真实合规；六服务经 RegistryComponent 装配 |
+| V3-BASE-02 | 显式 DriverRegistry 装配 | 方案 B | **已完成(基线)** | 五 Bus 服务显式构造 DriverRegistry 只注册 RabbitMQ |
+| V3-BASE-03 | 二进制依赖图裁剪 | 方案 B | **已完成(基线)** | websvr 无 MQ SDK；connsvr 只链 amqp091-go |
+| V3-DEL-01 | 旧生命周期删除（application/bootstrap） | 方案 B | **已完成(基线)** | 六服务 NewApp().Run；CI 防回归扫描 |
+| V3-DEL-02 | 删除兼容残留：driver/all、包级 Driver `init()`、`RegisterBus`/`CreateBus`、旧注册包装 | 方案B过渡期 | **兼容残留(本轮删除)** | 生产主路径已不依赖；CI 已禁 driver/all 生产导入；本轮直接删除退出 |
+| V3-P1-04 | 配置不可变与全局状态收敛 | V3 新增 | 部分完成（~40%） | appconfig.Store 设计完备但生产未采用；gconf 仍可变全局；业务层直读全局 |
+| V3-P1-05 | Driver 生命周期契约与断线重连测试 | 方案B基础+V3补齐 | 部分完成 | DriverRegistry 已达成；缺：driver 层 Start/Quiesce/Drain/Stop 契约；断线重连自动化测试 |
+| V3-P1-06 | 容量工具升级 | V3 新增 | 部分完成（~35%） | stress 工具基础在；缺：序列号关联/显式阶段机/多机分片/JSON/矩阵/多数资源指标 |
+| V3-P1-07 | 基于证据的性能优化 | V3 新增 | 部分完成（~65%） | CS/SS Header.To 0-alloc+TCP/KCP 已改造；缺：WS 热路径仍 1-alloc |
+| V3-P2-01 | gnet v2 A/B 验证 | V3 | Deferred | 仅 Linux A/B 达门槛（吞吐+10% 或 CPU/RSS-15%）才实施 |
+| V3-P2-02 | PGO 验证 | V3 | Deferred | 容量矩阵稳定提升≥5% 才实施 |
+| V3-P2-03 | Agones Adapter | V3 | Deferred | 明确 Agones 部署需求后才实施 |
+| V3-P2-04 | 下一主版本破坏性清理 | V3 | Deferred | 一个弃用周期完成后实施 |
+| V3-P2-05 | 基础依赖现代化 | V3 | Deferred | P0/P1 稳定后实施 |
+
+执行顺序（依据状态与依赖）：先 V3-DEL-02（删兼容残留，净化基线）→ V3-P0-01 → V3-P0-02 → V3-P0-03/04/05/06 → V3-P0-07 → V3-P1 系列。
 
 ## 3. 执行前准备
 
@@ -120,7 +136,7 @@ go test -run '^$' -bench . -benchmem -count=10 \
 
 P0 未全部通过前，不开始性能结构调整，也不能发布下一稳定版本。
 
-### P0-01 安全漏洞与敏感信息治理
+### V3-P0-01 安全漏洞与敏感信息治理
 
 #### 当前问题
 
@@ -178,7 +194,7 @@ govulncheck ./...
 - 依赖升级提交不得混入生命周期重构。
 - 每组依赖升级都必须有独立回滚提交点。
 
-### P0-02 测试分层与 CI 可信性
+### V3-P0-02 测试分层与 CI 可信性
 
 #### 当前问题
 
@@ -232,7 +248,7 @@ GOONE_INTEGRATION=1 go test -count=1 -tags=integration ./lib/contrib/... ./lib/d
 - 外部依赖测试必须通过 `t.Cleanup` 释放资源。
 - 单元测试不得访问固定开发地址。
 
-### P0-03 Runtime 状态机与启动期信号
+### V3-P0-03 Runtime 状态机与启动期信号
 
 #### 当前问题
 
@@ -294,7 +310,7 @@ go test -race -count=20 ./lib/service/runtime/...
 - transition mutex 可覆盖 observer，但 observer 不得重入状态迁移。
 - `errors.Join` 后仍需保留组件名和生命周期阶段。
 
-### P0-04 Gateway 部分启动回滚
+### V3-P0-04 Gateway 部分启动回滚
 
 #### 当前问题
 
@@ -340,7 +356,7 @@ Gateway 按 TCP、WS、KCP 顺序启动。后一个启动失败时，前面已�
 - 三种传输必须使用相同排空语义。
 - 回滚本身失败时必须保留原始启动错误。
 
-### P0-05 Redis、XORM、Nacos、Gamedata 生命周期
+### V3-P0-05 Redis、XORM、Nacos、Gamedata 生命周期
 
 #### Redis
 
@@ -423,7 +439,7 @@ Gateway 按 TCP、WS、KCP 顺序启动。后一个启动失败时，前面已�
 - Stop 必须容忍 Start 只完成部分步骤。
 - 不在日志中记录完整远端配置内容。
 
-### P0-06 Web HTTP/gRPC 生命周期
+### V3-P0-06 Web HTTP/gRPC 生命周期
 
 #### 执行步骤
 
@@ -473,7 +489,7 @@ Gateway 按 TCP、WS、KCP 顺序启动。后一个启动失败时，前面已�
 - 强制 Stop 只能发生在优雅关闭超时之后。
 - 默认超时值必须兼容现有业务，再由生产配置收紧。
 
-### P0-07 代码风格和文档一致性
+### V3-P0-07 代码风格和文档一致性
 
 #### 执行步骤
 
@@ -516,7 +532,7 @@ git diff --check
 
 ## 5. P1：生产能力与简洁性
 
-### P1-01 Admission Control 与过载保护
+### V3-P1-01 Admission Control 与过载保护
 
 #### 配置模型
 
@@ -565,7 +581,7 @@ git diff --check
 - IP 限制考虑 NAT，不使用不可配置的固定小上限。
 - 预期流控拒绝不全部记录 Error 日志。
 
-### P1-02 SessionHub 单路径化
+### V3-P1-02 SessionHub 单路径化
 
 #### 执行步骤
 
@@ -592,7 +608,7 @@ git diff --check
 - 兼容构造函数也必须进入同一 Hub 实现，不能保留第二套 map。
 - 不通过对象池优化低频登录路径，除非容量测试证明必要。
 
-### P1-03 服务装配简化
+### V3-P1-03 服务装配简化
 
 #### 设计规则
 
@@ -627,7 +643,7 @@ git diff --check
 - 注册失败时没有端口、连接池或 worker 启动。
 - 六服务均有启动和停止顺序测试。
 
-### P1-04 配置不可变与全局状态收敛
+### V3-P1-04 配置不可变与全局状态收敛
 
 #### 执行步骤
 
@@ -653,7 +669,7 @@ git diff --check
 - map、slice 发布前必须深拷贝或保证不可变。
 - 兼容全局变量在弃用期内只能只读。
 
-### P1-05 显式 Driver 与依赖裁剪
+### V3-P1-05 显式 Driver 与依赖裁剪
 
 #### 执行步骤
 
@@ -692,7 +708,7 @@ go mod graph
 - 不通过 build tag 隐藏无法编译的驱动。
 - 未进入测试矩阵的驱动不得标记为正式支持。
 
-### P1-06 容量工具升级
+### V3-P1-06 容量工具升级
 
 #### 当前问题
 
@@ -764,7 +780,7 @@ go mod graph
 - `docs/benchmarks/capacity-matrix.md`。
 - 带 commit、Go 版本、Linux 内核、CPU、内存和参数的原始结果。
 
-### P1-07 基于证据的性能优化
+### V3-P1-07 基于证据的性能优化
 
 #### Packet 编解码
 
@@ -822,7 +838,7 @@ go mod graph
 
 ## 6. P2：条件执行项
 
-### P2-01 gnet v2
+### V3-P2-01 gnet v2
 
 只在 Linux A/B 分支验证。
 
@@ -834,7 +850,7 @@ go mod graph
 
 未达到门槛则保持 Deferred。
 
-### P2-02 PGO
+### V3-P2-02 PGO
 
 只使用代表性生产 CPU profile。
 
@@ -845,7 +861,7 @@ go mod graph
 - 无 profile 时构建可以回退。
 - profile 不包含敏感业务数据。
 
-### P2-03 Agones Adapter
+### V3-P2-03 Agones Adapter
 
 当前继续使用 VM/Ansible，保留 Agones 适配边界，不提前引入 SDK。
 
@@ -868,7 +884,7 @@ go mod graph
 - Drain 超时。
 - 远端状态延迟和失败。
 
-### P2-04 下一主版本破坏性清理
+### V3-P2-04 下一主版本破坏性清理
 
 在一个完整弃用周期后删除：
 
@@ -882,7 +898,7 @@ go mod graph
 - 旧配置加载器。
 - 无错误返回的 BusID/IP 解析接口。
 
-### P2-05 基础依赖现代化
+### V3-P2-05 基础依赖现代化
 
 独立执行：
 

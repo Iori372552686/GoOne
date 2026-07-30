@@ -12,6 +12,8 @@ v2 评审与 [optimization_roadmap.md](optimization_roadmap.md) 的整改（旧�
 
 本轮 v3 不再重复这些结论。本文档的唯一目的是：**在执行 v3 计划之前，逐项核对每个任务的真实完成度，冻结缺口证据，作为后续一切改造的可信基线。**
 
+任务编号统一加 `V3-` 前缀（V3-P0-* / V3-P1-* / V3-BASE-* / V3-DEL-*），与旧 roadmap 和方案 B 的 P0/P1 编号解耦。状态采用四分类（已完成基线 / 兼容残留本轮删除 / 部分完成 / 待执行 / Deferred），不再沿用"待执行"一元标注。
+
 ## 2. 环境基线
 
 | 项 | 值 |
@@ -45,28 +47,58 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 
 ## 4. 任务真实完成度
 
-> 下表"完成度"为勘察结论，与 v3 计划"状态"列（此前一律标"待执行"）存在差异，差异已在各任务小节说明。
+> 状态分类（替代旧"待执行/部分完成"二元模型，避免与方案 B 旧 P0/P1 编号混淆）：
+>
+> - **已完成(基线)**：方案 B 已落地，CI 有防回归门禁，无需重做。
+> - **兼容残留**：方案 B 过渡期兼容包装，生产主路径已不依赖，本轮删除退出。
+> - **部分完成**：基座已存在，仅剩明确缺口，只列剩余差距。
+> - **待执行**：V3 新增项，从零开始。
+> - **Deferred**：条件性延后。
+>
+> 下表为勘察结论。V3 计划文档的任务总览表据此编号与状态（统一加 `V3-` 前缀）。
 
-| 任务 | 计划状态 | 勘察完成度 | 核心缺口 |
+| V3 编号 | 任务 | 状态 | 核心缺口 / 证据 |
 |---|---|---|---|
-| P0-01 安全/敏感信息 | 待执行 | ~15% | 依赖升级全未做；Redis 密码、XORM DSN 明文入日志；reflection 无条件注册；无日志捕获测试 |
-| P0-02 测试分层/CI | 待执行 | ~25% | `GOONE_INTEGRATION` 未落地；xorm 仍用 `os.Exit(0)`；CI 未拆 job、无 govulncheck |
-| P0-03 Runtime 状态机 | 待执行 | ~90% | signal context 未前置到 Start 前；RuntimeError 未带组件名；3 个点名测试缺失 |
-| P0-04 Gateway 回滚 | 待执行 | ~50% | **部分启动回滚完全未实现**（端口泄漏）；错误不含 tcp/ws/kcp 名；Stop 签名非 `Stop(ctx) error` |
-| P0-05 资源生命周期 | 待执行 | 混合 | Redis Manager 无 Close/无回滚；MySQL Worker 仍用 `init()` 启动；XORM 无 Close |
-| P0-06 Web 生命周期 | 待执行 | 部分 | HTTP Server 无任何超时配置；Quiesce 不翻 health；reflection 无开关；资源未拆组件 |
-| P0-07 风格/文档 | 待执行 | 未开始 | 无 `.gitattributes`；170 处历史注释未清理；protoc 插件未接 go/format；docs 12 处断链 |
-| P1-01 过载保护 | 待执行 | 未开始 | capacity 配置字段全缺；无连接上限/登录限速/admission mw/ErrOverloaded/rejected 指标 |
-| P1-02 SessionHub 单路径 | 待执行 | 部分 | 共享 Hub 已落地；但本地 map/锁未删、`hub!=nil` 双分支约 23 处仍在、严格 BusID/IP 解析接口缺失 |
-| P1-03 服务装配 | 待执行 | **已完成** | 无实质缺口；CI 门禁代码真实合规 |
-| P1-04 配置不可变 | 待执行 | ~40% | `appconfig.Store` 设计完备但生产未采用；gconf 仍 6 个可变全局；业务层直读全局；无 Deprecated 标记 |
-| P1-05 Driver 裁剪 | 待执行 | ~60% | 显式 DriverRegistry + 二进制裁剪 + CI 门禁已达成；但包级注册/init() 未标 Deprecated、driver 无生命周期契约、无断线重连测试 |
-| P1-06 容量工具 | 待执行 | ~35% | 有 stress 工具但缺序列号关联、显式阶段机、多机分片、JSON 原始数据、容量矩阵、多数资源指标 |
-| P1-07 性能优化 | 待执行 | ~65% | CS/SS Header.To 0-alloc 已落地、TCP/KCP 热路径已改造；WS 热路径仍 1-alloc；TransactionMgr 有 bench/profile 门禁文档 |
+| V3-P0-01 | 安全/敏感信息 | 待执行 | 依赖升级全未做；Redis 密码、XORM DSN 明文入日志；reflection 无条件注册；无日志捕获测试 |
+| V3-P0-02 | 测试分层/CI | 待执行 | `GOONE_INTEGRATION` 未落地；xorm 仍用 `os.Exit(0)`；CI 未拆 job、无 govulncheck |
+| V3-P0-03 | Runtime 状态机 | 部分完成（~90%） | signal context 未前置到 Start 前；RuntimeError 未带组件名；3 个点名测试缺失 |
+| V3-P0-04 | Gateway 回滚 | 部分完成（~50%） | **部分启动回滚完全未实现**（端口泄漏）；错误不含 tcp/ws/kcp 名；Stop 签名非 `Stop(ctx) error` |
+| V3-P0-05 | 资源生命周期 | 部分完成 | Redis Manager 无 Close/无回滚；MySQL Worker 仍用 `init()` 启动；XORM 无 Close |
+| V3-P0-06 | Web 生命周期 | 部分完成 | HTTP Server 无任何超时配置；Quiesce 不翻 health；reflection 无开关；资源未拆组件 |
+| V3-P0-07 | 风格/文档 | 待执行 | 无 `.gitattributes`；170 处历史注释未清理；protoc 插件未接 go/format；docs 12 处断链 |
+| V3-P1-01 | 过载保护 | 待执行 | capacity 配置字段全缺；无连接上限/登录限速/admission mw/ErrOverloaded/rejected 指标 |
+| V3-P1-02 | SessionHub 单路径 | 部分完成 | 共享 Hub 已落地；但本地 map/锁未删、`hub!=nil` 双分支约 23 处仍在、严格 BusID/IP 解析接口缺失 |
+| V3-P1-04 | 配置不可变 | 部分完成（~40%） | `appconfig.Store` 设计完备但生产未采用；gconf 仍 6 个可变全局；业务层直读全局；无 Deprecated 标记 |
+| V3-P1-05 | Driver 契约/重连 | 部分完成 | DriverRegistry 已达成；driver 层无 Start/Quiesce/Drain/Stop 契约；无断线重连测试 |
+| V3-P1-06 | 容量工具 | 部分完成（~35%） | 有 stress 工具但缺序列号关联、显式阶段机、多机分片、JSON 原始数据、容量矩阵、多数资源指标 |
+| V3-P1-07 | 性能优化 | 部分完成（~65%） | CS/SS Header.To 0-alloc 已落地、TCP/KCP 热路径已改造；WS 热路径仍 1-alloc；TransactionMgr 有 bench/profile 门禁文档 |
+
+## 4a. 方案 B 已验证基线（无需重做）
+
+以下为方案 B 已落地且 CI 有防回归门禁的能力。v3 计划不再重复实施，仅在本轮删除其过渡期兼容残留（见 V3-DEL-02）。
+
+| 能力 | 状态 | 证据 |
+|---|---|---|
+| 旧生命周期删除（application/bootstrap） | 已完成(基线) | 六服务 `NewApp().Run(ctx)`；CI legacy lifecycle 扫描（`ci.yml:99-114`） |
+| 服务装配（RegistryComponent） | 已完成(基线) | 五 Bus 服务 `NewRegistryComponent`+`RegisterToRegistry`；Web `Registry→Seal`；CI legacy SSRPC register 扫描（`ci.yml:116-132`） |
+| 显式 DriverRegistry 装配 | 已完成(基线) | 五 Bus 服务显式构造 `bus.NewDriverRegistry()` 只注册 RabbitMQ（如 `src/mainsvr/app.go:82-83`） |
+| 二进制依赖图裁剪 | 已完成(基线) | websvr 不含 MQ SDK；connsvr 只链 amqp091-go；CI `go list -deps` 门禁（`ci.yml:151-165`），实测通过 |
+| pprof 双开关 | 已完成(基线) | `lib/service/runtime/admin.go`（enabled+pprof+回环），五服务接线一致 |
+| Tracing 不记敏感信息 | 已完成(基线) | trace.go 只记 span 名/cost |
+| CSPacketHeader/SSPacketHeader 0-alloc `To` | 已完成(基线) | `lib/api/sharedstruct`；TCP/KCP 网关热路径已用 `To`+栈数组 |
+
+兼容残留（生产主路径已不依赖，本轮删除退出）：
+
+| 残留 | 证据 | 处置 |
+|---|---|---|
+| `bus/driver/all` 兼容包 | `lib/service/bus/driver/all/all.go`；CI 已禁 cmd/src/lib/service/runtime 导入 | 本轮删除（V3-DEL-02） |
+| 包级 Driver `init()` 注册 | 各 driver 的 `func init()`；`RegisterBus`/`CreateBus`（`bus_factory.go:17,26`） | 本轮删除（V3-DEL-02） |
+| 旧 SSRPC 注册包装 | `RegisterXxxToDispatcher` 等；生产代码无调用（CI 门禁证实），仅生成代码/兼容实现保留 | 本轮删除非生成兼容实现（V3-DEL-02） |
+| 生产代码历史注释 | 170 处"方案B/P0-xx/P1-xx/roadmap"（43 文件）+ ci.yml 10 行 | 本轮按字面删除（V3-P0-07） |
 
 ## 5. 各任务缺口证据（file:line）
 
-### P0-01 安全漏洞与敏感信息治理
+### V3-P0-01 安全漏洞与敏感信息治理
 
 | 子项 | 状态 | 证据 |
 |---|---|---|
@@ -84,7 +116,7 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 | 日志捕获测试 | 未完成 | 全仓无相关断言 |
 | 潜在旁路 | 风险 | `lib/db/ssdb/test.go` 含 `func main()` 且 blank-import `_ "net/http/pprof"`，会注册到 `http.DefaultServeMux`，绕过 admin 双开关 |
 
-### P0-02 测试分层与 CI 可信性
+### V3-P0-02 测试分层与 CI 可信性
 
 | 子项 | 状态 | 证据 |
 |---|---|---|
@@ -97,7 +129,7 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 | 固定 lint/vulncheck 版本 | 未完成 | `version: latest` |
 | 文档链接检查扩全 docs | 未完成 | 仅扫 readme/CHANGELOG 引用的 docs/*.md |
 
-### P0-03 Runtime 状态机
+### V3-P0-03 Runtime 状态机
 
 已完成项：状态机（`lib/service/runtime/state.go`，含 `StateFailed`）、`markFailed` 触发（`run.go:365`）、统一 reason 汇聚首条即进入 Draining（`run.go:192-214`）、Drain `context.WithCancelCause`+`WithTimeout`（`run.go:255-266`）、组件级逆序 Stop 回滚（`run.go:109-140`）、observer 回调读状态测试。
 
@@ -112,7 +144,7 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 | SIGTERM 到达慢 Start 测试 | 缺失 | — |
 | Allocate 与 Drain 并发测试 | 缺失 | — |
 
-### P0-04 Gateway 部分启动回滚
+### V3-P0-04 Gateway 部分启动回滚
 
 已完成项：传输级 Stop 幂等（`sync.Once`：`tcp_server.go:68/80`、`ws.go:86/98`、`kcp.go:73/85`）；Quiesce 关 listener 拒新会话（`app.go:161-168`）；Drain 等 ActiveSessions（`app.go:172-174`）；Stop 强制处理剩余连接。
 
@@ -125,7 +157,7 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 | Stop 签名 `Stop(ctx) error` | 不符 | 实际 `Stop()` 无参无返回；`gatewayComponent.Stop` 忽略 ctx 返回 nil |
 | 网关回滚测试 | 缺失 | net_mgr/tcp/ws 测试无相关用例 |
 
-### P0-05 资源生命周期
+### V3-P0-05 资源生命周期
 
 | 子项 | 状态 | 证据 |
 |---|---|---|
@@ -141,7 +173,7 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 | Nacos ListenConfig 记录/取消 | 已完成 | `watcher.go:23-69` |
 | Gamedata 不可变快照/原子替换 | 部分 | gen 层 `atomic.Value` 满足；中心 `gamedata.go:55-64` 无版本通知/校验封装，OnChange 失败仅记日志 |
 
-### P0-06 Web HTTP/gRPC 生命周期
+### V3-P0-06 Web HTTP/gRPC 生命周期
 
 已完成项：HTTP/gRPC server 实例化（`src/web_svr/app.go:37-44`）；gRPC Listen-then-Serve（`app.go:134`）；RuntimeErrors channel（`app.go:50-52`）；Stop 超时强制关闭设计（`app.go:108-122,174,187` 保留指针供强关）。
 
@@ -156,7 +188,7 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 | reflection debug 开关 | 未完成 | `app.go:146` 无条件 Register |
 | 资源拆为独立组件 | 未完成 | `app.go:66-98` Redis/签名/敏感词/HTTP/gRPC 同一组件 |
 
-### P0-07 代码风格和文档一致性
+### V3-P0-07 代码风格和文档一致性
 
 | 子项 | 状态 | 证据 |
 |---|---|---|
@@ -165,7 +197,7 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 | protoc 插件接 go/format | 未完成 | `tools/protoc-gen-goone/generate.go` 不 import go/format，Buffer 直接拼接 |
 | docs 内部链接有效 | 部分失效 | 12 处断链，如 `architecture_review_2026-07-v3.md`（被引用不存在）、`capacity-matrix.md`、`modernization-b-baseline.md` |
 
-### P1-01 Admission Control
+### V3-P1-01 Admission Control
 
 | 子项 | 状态 | 证据 |
 |---|---|---|
@@ -176,7 +208,7 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 | ErrOverloaded | 未完成 | `errors.go:14-33` 无定义 |
 | rejected/queue/wait 指标 | 未完成 | 仅有 inflight/active-conn 基础（可复用） |
 
-### P1-02 SessionHub 单路径化
+### V3-P1-02 SessionHub 单路径化
 
 已完成项：共享 `SessionHub` 设计与生产注入（`lib/net/net_mgr/session_hub.go`、`src/connsvr/globals/globals.go:20-45` 三传输共享同一 Hub）。
 
@@ -190,11 +222,11 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 | 公开构造函数 hub==nil | 风险 | `NewTcpSvr` 等产出 hub==nil 实例走本地 map |
 | 严格 BusID/IP 解析 | 未完成 | `lib/service/bus/bus_ip.go:9-54` 全无 error 返回；无"仅 IPv4"声明 |
 
-### P1-03 服务装配简化 — 已完成
+### 服务装配 / 显式 Driver / 二进制裁剪 — 已完成(基线)
 
-无实质缺口。证据见 §3 CI 门禁 + 各 `src/*/app.go`（`MustRegister` 顺序统一、组件名 snake_case、SSRPC 经 RegistryComponent、main.go 显式 `NewApp().Run(ctx)`）。
+归入 §4a 方案 B 已验证基线（V3-BASE-01/02/03、V3-DEL-01），无需重做。本轮仅删除其过渡期兼容残留（V3-DEL-02）。
 
-### P1-04 配置不可变与全局状态收敛
+### V3-P1-04 配置不可变与全局状态收敛
 
 | 子项 | 状态 | 证据 |
 |---|---|---|
@@ -204,7 +236,7 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 | 业务层收敛 | 未完成 | `sync_state.go:293,345,348`、`base.go:56`、`bindings.go:19` 等直读全局 |
 | Deprecated 标记 | 未完成 | Store/WithReload/Module Registry 全仓 0 处 Deprecated |
 
-### P1-05 显式 Driver 与依赖裁剪
+### V3-P1-05 显式 Driver 与依赖裁剪
 
 已完成项：`bus.DriverRegistry` + 各服务 `drivers.MustRegister(rabbitmq.Driver())`；websvr 不含 MQ；CI 二进制裁剪门禁。
 
@@ -216,13 +248,13 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 | driver 生命周期契约 | 未完成 | `IBus`（`bus_i.go:22-35`）仅 Send/Close/Healthy；Quiesce/Drain/Stop 在上层 RouterComponent |
 | 断线重连测试 | 未完成 | 重连逻辑在 `rabbitmq.go:162-191`，但无自动化测试 |
 
-### P1-06 容量工具升级
+### V3-P1-06 容量工具升级
 
 已有：stress 工具复用真实协议、ramp-up、重连、Markdown 报告、服务端 CPU/heap/goroutine 采集。
 
 缺口：序列号关联（现按 cmd+1 FIFO）、显式阶段机（steady/drain 独立）、多进程多机分片、JSON 原始数据、容量矩阵 Markdown、客户端资源采集、服务端 RSS/GC/FD/Session、P999。
 
-### P1-07 基于证据的性能优化
+### V3-P1-07 基于证据的性能优化
 
 已完成项：`CSPacketHeader.To(b)`、`SSPacketHeader.To` 0-alloc 写已有缓冲区；TCP/KCP 网关热路径已用 `To`+栈数组；`ToBytes` 保留为兼容接口；TransactionMgr bench 基线（`docs/benchmarks/baseline.md`）+ profile 证据门禁文档。
 
@@ -240,17 +272,18 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 | Kratos | 已有统一 Component Start/Stop | 补齐部分启动回滚与 Failed 终态语义 |
 | Pitaya | 已有 Quiesce/Drain 接口 | 落实网关传输级回滚与 HTTP/gRPC Drain |
 | due | 已有显式 DriverRegistry | driver 生命周期契约与断线重连测试 |
-| Agones | 保留 VM/Ansible + 边界 | 不提前引入 SDK（P2-03 维持 Deferred） |
+| Agones | 保留 VM/Ansible + 边界 | 不提前引入 SDK（V3-P2-03 维持 Deferred） |
 
 ## 7. 待执行优先级
 
-依据 §4 完成度，本轮执行顺序（不打破 v3 计划依赖约束）：
+依据 §4 完成度与依赖，本轮执行顺序：
 
-1. P0-01 依赖升级与脱敏（安全阻断项优先）。
-2. P0-02 测试分层与 CI 拆分（为后续所有验收提供可信基础）。
-3. P0-03 / P0-04 / P0-05 / P0-06 生命周期补齐。
-4. P0-07 风格与文档（本轮触及文件清理，单独提交）。
-5. P1 系列按依赖推进。
+1. V3-DEL-02 删除兼容残留（净化基线，让后续工作基于唯一主路径）。
+2. V3-P0-01 安全治理：依赖升级与脱敏（安全阻断项优先）。
+3. V3-P0-02 测试分层与 CI 拆分（为后续所有验收提供可信基础）。
+4. V3-P0-03 / 04 / 05 / 06 生命周期补齐。
+5. V3-P0-07 风格与文档（本轮触及文件清理，单独提交）。
+6. V3-P1 系列按依赖推进。
 
 ## 8. 待 Linux 验证项（本机无法完成）
 
