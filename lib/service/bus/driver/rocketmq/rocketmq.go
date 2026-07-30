@@ -224,7 +224,3 @@ func newBus(selfBusId uint32, onRecvMsg bus.MsgHandler, conf any) (bus.IBus, err
 func Driver() bus.Driver {
 	return bus.Driver{Name: DriverName, Ctor: newBus}
 }
-
-func init() {
-	bus.RegisterBus(DriverName, newBus)
-}

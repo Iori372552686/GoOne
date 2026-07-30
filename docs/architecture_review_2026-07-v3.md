@@ -91,9 +91,9 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 
 | 残留 | 证据 | 处置 |
 |---|---|---|
-| `bus/driver/all` 兼容包 | `lib/service/bus/driver/all/all.go`；CI 已禁 cmd/src/lib/service/runtime 导入 | 本轮删除（V3-DEL-02） |
-| 包级 Driver `init()` 注册 | 各 driver 的 `func init()`；`RegisterBus`/`CreateBus`（`bus_factory.go:17,26`） | 本轮删除（V3-DEL-02） |
-| 旧 SSRPC 注册包装 | `RegisterXxxToDispatcher` 等；生产代码无调用（CI 门禁证实），仅生成代码/兼容实现保留 | 本轮删除非生成兼容实现（V3-DEL-02） |
+| `bus/driver/all` 兼容包 | `lib/service/bus/driver/all/all.go`；CI 已禁 cmd/src/lib/service/runtime 导入 | 已删除（V3-DEL-02） |
+| 包级 Driver `init()` 注册 | 各 driver 的 `func init()`；`RegisterBus`/`CreateBus`（`bus_factory.go`） | 已删除（V3-DEL-02）；`BusCtor` 类型迁移至 driver_registry.go |
+| 旧 SSRPC 注册包装 | `RegisterXxxToDispatcher` 等；生产代码无调用（CI 门禁证实），仅生成代码/兼容实现保留 | 生成包装本轮保留（属生成代码，改生成器留独立任务）；手写兼容层已删 |
 | 生产代码历史注释 | 170 处"方案B/P0-xx/P1-xx/roadmap"（43 文件）+ ci.yml 10 行 | 本轮按字面删除（V3-P0-07） |
 
 ## 5. 各任务缺口证据（file:line）

@@ -7,7 +7,11 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/service/bus"
-	_ "github.com/Iori372552686/GoOne/lib/service/bus/driver/all"
+	"github.com/Iori372552686/GoOne/lib/service/bus/driver/kafka"
+	"github.com/Iori372552686/GoOne/lib/service/bus/driver/nats"
+	"github.com/Iori372552686/GoOne/lib/service/bus/driver/nsq"
+	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
+	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rocketmq"
 )
 
 func onRecvMsg(srcBusID uint32, data []byte) error {
@@ -24,9 +28,20 @@ func requireBusITest(t *testing.T) {
 	}
 }
 
+// fullRegistry 显式注册全部内置 driver，取代已删除的 driver/all blank import。
+func fullRegistry() *bus.DriverRegistry {
+	r := bus.NewDriverRegistry()
+	r.MustRegister(rabbitmq.Driver())
+	r.MustRegister(nsq.Driver())
+	r.MustRegister(nats.Driver())
+	r.MustRegister(kafka.Driver())
+	r.MustRegister(rocketmq.Driver())
+	return r
+}
+
 func runBusSmoke(t *testing.T, addr string) {
 	t.Helper()
-	impl, err := bus.CreateBus(bus.IpStringToInt("1.1.2.2"), onRecvMsg, addr)
+	impl, err := fullRegistry().CreateBus(bus.IpStringToInt("1.1.2.2"), onRecvMsg, addr)
 	if err != nil || impl == nil {
 		t.Skipf("bus not available for %q: %v", addr, err)
 	}

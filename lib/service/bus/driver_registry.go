@@ -8,6 +8,9 @@ import (
 	"sync"
 )
 
+// BusCtor 创建一个 bus 实现。返回 error 而非 panic，以保持 factory 健壮。
+type BusCtor func(selfBusId uint32, onRecvMsg MsgHandler, conf any) (IBus, error)
+
 // Driver 是一个显式的、链接期的 bus driver 描述符。每个 driver 包
 // （rabbitmq、nats、kafka、nsq、rocketmq）导出一个 Driver() 函数返回此种描述符；
 // 应用只链接所需 driver 并把它们注册到 DriverRegistry，取代遗留的 blank-import /
@@ -128,8 +131,7 @@ func (r *DriverRegistry) has(name string) bool {
 // "rabbitmq"（与遗留默认一致）。若请求的 driver 未注册，错误列出可用名字，使运维
 // 知道链接了哪些 driver。
 //
-// 不同于包级全局的 CreateBus，它绝不回退到 init 注册的 driver：未链接的 driver 是
-// 配置错误，而非静默成功。
+// 未链接的 driver 是配置错误，而非静默成功。
 func (r *DriverRegistry) CreateBus(selfBusId uint32, onRecvMsg MsgHandler, addr string) (IBus, error) {
 	if r == nil {
 		return nil, ErrNilDriverRegistry
@@ -148,19 +150,6 @@ func (r *DriverRegistry) CreateBus(selfBusId uint32, onRecvMsg MsgHandler, addr 
 		return nil, fmt.Errorf("bus driver %q not registered (available: %v); link the driver package and register it, or fix bus_mq_addr", implType, r.Names())
 	}
 	return ctor(selfBusId, onRecvMsg, cfg)
-}
-
-// FromGlobal 把遗留的包级全局 busCtors 收纳进一个 DriverRegistry。它是过渡期的桥
-// 接：仍 blank-import driver/all 的服务可从全局已注册 ctor 构造一个 DriverRegistry，
-// 而无需改动其 import 图。新服务应改为注册显式 Driver 描述符。
-func FromGlobal() *DriverRegistry {
-	r := NewDriverRegistry()
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	for name, ctor := range busCtors {
-		r.drivers[name] = ctor
-	}
-	return r
 }
 
 // driver registry 的哨兵错误。

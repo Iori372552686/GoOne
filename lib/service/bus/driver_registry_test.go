@@ -92,21 +92,3 @@ func TestDriverRegistryNamesSorted(t *testing.T) {
 		t.Fatalf("expected sorted %v, got %v", want, got)
 	}
 }
-
-func TestFromGlobalBridgeSeesInitRegisteredDrivers(t *testing.T) {
-	// driver/all is imported by busapp, so by the time tests in package bus
-	// run, the package-global busCtors may or may not contain the real drivers
-	// (depends on test binary import graph). We only assert that FromGlobal
-	// produces a registry that mirrors whatever is in busCtors, without error.
-	r := FromGlobal()
-	if r == nil {
-		t.Fatal("expected non-nil registry")
-	}
-	// Regardless of contents, Names() must not panic and must be sorted.
-	names := r.Names()
-	for i := 1; i < len(names); i++ {
-		if names[i-1] > names[i] {
-			t.Fatalf("Names not sorted: %v", names)
-		}
-	}
-}

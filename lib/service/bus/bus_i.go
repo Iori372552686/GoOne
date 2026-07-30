@@ -1,14 +1,14 @@
-// Package bus 定义服务间消息总线的抽象（IBus）、驱动注册工厂与地址解析。
+// Package bus 定义服务间消息总线的抽象（IBus）、显式 driver 注册表与地址解析。
 //
-// 具体 MQ 后端以驱动形式提供（database/sql 风格），位于
-// lib/service/bus/driver/<name>，通过 blank import 按需编入：
+// 具体 MQ 后端以驱动形式提供，位于 lib/service/bus/driver/<name>，每个驱动导出
+// Driver() 描述符。服务在装配期通过 DriverRegistry 显式注册所需驱动，只链接用到的
+// MQ SDK：
 //
-//	import _ "github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
-//	// 或一次引入全部：
-//	import _ "github.com/Iori372552686/GoOne/lib/service/bus/driver/all"
+//	drivers := bus.NewDriverRegistry()
+//	drivers.MustRegister(rabbitmq.Driver())
 //
-// bootstrap/busapp 默认引入 driver/all；需要裁剪二进制体积的服务可自行
-// 装配并只引入所需驱动。
+// 生产服务均经 DriverRegistry 装配（见各 src/<svc>/app.go），不再依赖包级 init
+// 自注册或 driver/all 聚合包。
 package bus
 
 import (
