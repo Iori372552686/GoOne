@@ -2,6 +2,7 @@ package connsvr
 
 import (
 	"context"
+	"fmt"
 
 	connsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/connsvr/v1"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
@@ -137,21 +138,51 @@ type gatewayComponent struct{}
 
 func (gatewayComponent) Name() string { return "gateway_listeners" }
 
-// Start 启动 TCP/WS/KCP 监听器。
+// Start 启动 TCP/WS/KCP 监听器。任一传输启动失败时，逆序 Stop 已成功启动的传输，
+// 合并原始启动错误与回滚错误，并在错误中标注传输名（tcp/ws/kcp），避免端口泄漏
+//（V3-P0-04）。
 func (gatewayComponent) Start(_ context.Context) error {
+	// started 记录已成功启动的传输及其 Stop 函数，用于部分启动失败时逆序回滚。
+	started := make([]struct {
+		name string
+		stop func()
+	}, 0, 3)
+	rollback := func(startErr error) error {
+		// 逆序回滚已启动传输。Stop 是幂等无返回值的，回滚本身不产生错误；
+		// 原始启动错误（已含传输名）作为返回值保留。
+		for i := len(started) - 1; i >= 0; i-- {
+			started[i].stop()
+		}
+		return startErr
+	}
+
 	if err := globals.ConnTcpSvr.CreateTcpServer(
 		gconf.ConnSvrCfg.Runtime.TcpImplType,
 		gconf.ConnSvrCfg.Runtime.ListenPort+1, onTcpPacket); err != nil {
-		return err
+		return rollback(fmt.Errorf("tcp: %w", err))
 	}
+	started = append(started, struct {
+		name string
+		stop func()
+	}{"tcp", globals.ConnTcpSvr.Stop})
+
 	if err := globals.ConnWsSvr.CreateWebSocketServer(
 		"gin", "debug", gconf.ConnSvrCfg.Runtime.ListenPort, onWebSocketPacket); err != nil {
-		return err
+		return rollback(fmt.Errorf("ws: %w", err))
 	}
+	started = append(started, struct {
+		name string
+		stop func()
+	}{"ws", globals.ConnWsSvr.Stop})
+
 	if kcpPort := gconf.ConnSvrCfg.Runtime.KcpPort; kcpPort > 0 {
 		if err := globals.ConnKcpSvr.CreateKcpServer(kcpPort, onKcpPacket); err != nil {
-			return err
+			return rollback(fmt.Errorf("kcp: %w", err))
 		}
+		started = append(started, struct {
+			name string
+			stop func()
+		}{"kcp", globals.ConnKcpSvr.Stop})
 	}
 	return nil
 }
