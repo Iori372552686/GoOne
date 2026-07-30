@@ -2,19 +2,15 @@ package zookeeper
 
 import (
 	"context"
-	"net"
 	"testing"
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/contrib/registry"
+	"github.com/Iori372552686/GoOne/lib/internal/itest"
 )
 
 func TestRegistry(t *testing.T) {
-	if conn, err := net.DialTimeout("tcp", "127.0.0.1:2181", 2*time.Second); err != nil {
-		t.Skipf("zookeeper unavailable, skipping integration test: %v", err)
-	} else {
-		_ = conn.Close()
-	}
+	itest.Require(t, "127.0.0.1:2181")
 
 	ctx := context.Background()
 	s := &registry.ServiceInstance{

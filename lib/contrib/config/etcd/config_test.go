@@ -8,22 +8,32 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
+
+	"github.com/Iori372552686/GoOne/lib/internal/itest"
 )
 
 const testKey = "/kratos/test/config"
 
-func TestConfig(t *testing.T) {
+// newTestClient 构造连接本地 etcd 的客户端。调用方需先通过 itest.Require 门控。
+func newTestClient(t *testing.T) *clientv3.Client {
+	t.Helper()
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{"127.0.0.1:2379"},
 		DialTimeout: time.Second, DialOptions: []grpc.DialOption{grpc.WithBlock()},
 	})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("connect etcd: %v", err)
 	}
-	defer func() {
-		_ = client.Close()
-	}()
-	if _, err = client.Put(context.Background(), testKey, "test config"); err != nil {
+	return client
+}
+
+func TestConfig(t *testing.T) {
+	// V3-P0-02：集成测试统一门控，未开启或 etcd 不可达时 t.Skip。
+	itest.Require(t, "127.0.0.1:2379")
+	client := newTestClient(t)
+	defer func() { _ = client.Close() }()
+
+	if _, err := client.Put(context.Background(), testKey, "test config"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -67,22 +77,16 @@ func TestConfig(t *testing.T) {
 }
 
 func TestExtToFormat(t *testing.T) {
-	client, err := clientv3.New(clientv3.Config{
-		Endpoints:   []string{"127.0.0.1:2379"},
-		DialTimeout: time.Second, DialOptions: []grpc.DialOption{grpc.WithBlock()},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		_ = client.Close()
-	}()
+	// V3-P0-02：集成测试统一门控。
+	itest.Require(t, "127.0.0.1:2379")
+	client := newTestClient(t)
+	defer func() { _ = client.Close() }()
 
 	tp := "/kratos/test/ext"
 	tn := "a.bird.json"
 	tk := tp + "/" + tn
 	tc := `{"a":1}`
-	if _, err = client.Put(context.Background(), tk, tc); err != nil {
+	if _, err := client.Put(context.Background(), tk, tc); err != nil {
 		t.Fatal(err)
 	}
 

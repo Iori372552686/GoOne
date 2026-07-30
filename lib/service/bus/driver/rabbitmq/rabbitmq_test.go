@@ -4,10 +4,12 @@ import (
 	"errors"
 	"net"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/Iori372552686/GoOne/lib/internal/itest"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 )
 
@@ -51,16 +53,20 @@ func TestNewBusImplRabbitMQCloseIsIdempotent(t *testing.T) {
 	}
 }
 
+// amqpTestAddr 取自环境变量（默认本地实例），便于在不同环境下运行真实联调。
+func amqpTestAddr() string {
+	if v := os.Getenv("GOONE_AMQP_ADDR"); v != "" {
+		return v
+	}
+	return "amqp://guest:guest@127.0.0.1:5672/"
+}
+
 // TestRabbitMQRealIntegration 验证 P1-05：真实 RabbitMQ 联调——两个不同 bus ID 的实例
 // 经 amqp091-go 互通（A→B 收发）。需要真实 RabbitMQ；无中间件时跳过。
-//
-// 适配 etc/env/env_docker.yaml 与 baseline 的远程中间件 43.139.3.228:15672。
 func TestRabbitMQRealIntegration(t *testing.T) {
-	const addr = "amqp://guest:guest@43.139.3.228:15672/"
-	// 快速探测可达性，避免无中间件时长时间挂起。
-	if err := probeAMQP(addr, 3*time.Second); err != nil {
-		t.Skipf("RabbitMQ 不可达，跳过真实联调: %v", err)
-	}
+	addr := amqpTestAddr()
+	// 快速探测可达性（含 env 门控），避免无中间件时长时间挂起。
+	itest.Require(t, parseAMQPHostPort(addr))
 
 	const sender = 0x01010101
 	const receiver = 0x02020202

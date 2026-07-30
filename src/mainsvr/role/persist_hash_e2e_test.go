@@ -11,7 +11,7 @@ import (
 )
 
 // 端到端联调：连真实 Redis 验证角色 hash 持久化。
-// 触发：GOONE_REDIS_ADDR=43.139.3.228:6379 GOONE_REDIS_PASS=go123456 go test -run TestRoleHashE2E ./src/mainsvr/role/
+// 触发：GOONE_REDIS_ADDR=<host:port> GOONE_REDIS_PASS=<pass> go test -run TestRoleHashE2E ./src/mainsvr/role/
 
 func redisAddr() (addr, pass string) {
 	return os.Getenv("GOONE_REDIS_ADDR"), os.Getenv("GOONE_REDIS_PASS")

@@ -2,10 +2,10 @@ package bus_test
 
 import (
 	"log"
-	"os"
 	"testing"
 	"time"
 
+	"github.com/Iori372552686/GoOne/lib/internal/itest"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/kafka"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/nats"
@@ -20,11 +20,11 @@ func onRecvMsg(srcBusID uint32, data []byte) error {
 	return nil
 }
 
-// requireBusITest skips unless BUS_ITEST=1 (integration tests need local MQ).
+// requireBusITest skips unless GOONE_INTEGRATION=1 (integration tests need local MQ).
 func requireBusITest(t *testing.T) {
 	t.Helper()
-	if os.Getenv("BUS_ITEST") != "1" {
-		t.Skip("set BUS_ITEST=1 to run bus integration tests")
+	if !itest.Enabled() {
+		t.Skip("set GOONE_INTEGRATION=1 to run bus integration tests")
 	}
 }
 

@@ -3,6 +3,7 @@ package nacos
 import (
 	"context"
 	"github.com/Iori372552686/GoOne/lib/contrib/registry"
+	"github.com/Iori372552686/GoOne/lib/internal/itest"
 	"log"
 	"net"
 	"testing"
@@ -30,20 +31,9 @@ func getIntranetIP() string {
 	return "127.0.0.1"
 }
 
-// requireNacos skips the test when no nacos server is reachable
-// (integration test dependency).
-func requireNacos(t *testing.T, ip string) {
-	t.Helper()
-	conn, err := net.DialTimeout("tcp", net.JoinHostPort(ip, "8848"), 2*time.Second)
-	if err != nil {
-		t.Skipf("nacos unavailable at %s:8848, skipping integration test: %v", ip, err)
-	}
-	_ = conn.Close()
-}
-
 func TestRegistry(t *testing.T) {
 	ip := getIntranetIP()
-	requireNacos(t, ip)
+	itest.Require(t, net.JoinHostPort(ip, "8848"))
 	serviceName := "golang-sms@grpc"
 	ctx := context.Background()
 
@@ -135,7 +125,7 @@ func TestRegistry(t *testing.T) {
 
 func TestRegistryMany(t *testing.T) {
 	ip := getIntranetIP()
-	requireNacos(t, ip)
+	itest.Require(t, net.JoinHostPort(ip, "8848"))
 	serviceName := "golang-sms@grpc"
 	// ctx := context.Background()
 

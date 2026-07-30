@@ -2,44 +2,54 @@ package orm
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"testing"
 
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/go-xorm/xorm"
+
+	"github.com/Iori372552686/GoOne/lib/internal/itest"
 )
 
-var engine *xorm.Engine
-
-// TestMain is integration-flavoured: it requires a local MySQL. When MySQL is
-// unavailable (e.g. CI with -short), all tests in this package are skipped.
-func TestMain(m *testing.M) {
-	cnn, err := xorm.NewEngine("mysql", "root:123456@tcp(127.0.0.1:3306)/testdb?charset=utf8")
-	if err != nil {
-		log.Printf("skip xorm integration tests: %v", err)
-		os.Exit(0)
+// testDSN 返回本地 MySQL 测试 DSN。可通过 GOONE_MYSQL_DSN 覆盖，默认指向本地 testdb。
+// 仅用于集成测试，且仅在 GOONE_INTEGRATION=1 时才会被访问。
+func testDSN() string {
+	if dsn := os.Getenv("GOONE_MYSQL_DSN"); dsn != "" {
+		return dsn
 	}
-
-	if err := cnn.Ping(); err != nil {
-		log.Printf("skip xorm integration tests, mysql unavailable: %v", err)
-		os.Exit(0)
-	}
-
-	if err := cnn.Sync2(new(g1_protocol.MysqlTexasRoomInfo)); err != nil {
-		log.Printf("skip xorm integration tests, sync failed: %v", err)
-		os.Exit(0)
-	}
-
-	engine = cnn
-	os.Exit(m.Run())
+	return "root:123456@tcp(127.0.0.1:3306)/testdb?charset=utf8"
 }
 
-func TestXorm(t *testing.T) {
-	if testing.Short() {
-		t.Skip("integration test; requires local mysql")
+// newTestEngine 建立 xorm engine 并同步测试表。调用方需先通过 itest.Require 门控。
+func newTestEngine(t *testing.T, tables ...interface{}) *xorm.Engine {
+	t.Helper()
+	cnn, err := xorm.NewEngine("mysql", testDSN())
+	if err != nil {
+		t.Fatalf("connect mysql: %v", err)
 	}
+	if err := cnn.Ping(); err != nil {
+		_ = cnn.Close()
+		t.Fatalf("ping mysql: %v", err)
+	}
+	for _, tbl := range tables {
+		if err := cnn.Sync2(tbl); err != nil {
+			_ = cnn.Close()
+			t.Fatalf("sync table: %v", err)
+		}
+	}
+	return cnn
+}
+
+// V3-P0-02：删除原 TestMain 的 os.Exit(0) 跳过整个包的做法（它会掩盖真实失败，
+// 且让 CI 无法区分"跳过"与"通过"）。改为每个集成测试函数独立用 itest.Require 门控：
+// 未开启集成模式或 mysql 不可达时 t.Skip，而非以 0 退出码退出进程。
+
+func TestXorm(t *testing.T) {
+	// V3-P0-02：集成测试统一门控。
+	itest.Require(t, "127.0.0.1:3306")
+	engine := newTestEngine(t, new(g1_protocol.MysqlTexasRoomInfo))
+	defer engine.Close()
 
 	item := &g1_protocol.MysqlTexasRoomInfo{
 		RoomId:  1,
@@ -61,14 +71,10 @@ type User struct {
 }
 
 func TestUser(t *testing.T) {
-	if testing.Short() {
-		t.Skip("integration test; requires local mysql")
-	}
-
-	// 同步结构体到数据库表结构
-	if err := engine.Sync2(new(User)); err != nil {
-		t.Fatalf("同步表结构失败: %v", err)
-	}
+	// V3-P0-02：集成测试统一门控。
+	itest.Require(t, "127.0.0.1:3306")
+	engine := newTestEngine(t, new(User))
+	defer engine.Close()
 
 	// 插入数据
 	user := &User{Name: "Alice", Age: 25}
