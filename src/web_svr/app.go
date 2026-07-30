@@ -77,15 +77,20 @@ func (w *webRuntimeComponent) Start(_ context.Context) error {
 	// P0-07：构建一次 Dispatcher，HTTP 与 gRPC 共享。
 	d, srv := controller.BuildWebDispatcher()
 
-	httpSrv, err := web_gin.StartGin(gconf.WebSvrCfg.Runtime.HttpServer, func(router *gin.Engine) {
+	httpSrv, httpServeErr, err := web_gin.StartGin(gconf.WebSvrCfg.Runtime.HttpServer, func(router *gin.Engine) {
 		controller.LoadWebRoutesWithDispatcher(router, d, srv)
 	})
 	if err != nil {
 		return err
 	}
 	w.setHTTPServer(httpSrv)
-	// 注意：web_gin.StartGin 内部已起 ListenAndServe goroutine；HTTP Serve 的非预期退出
-	// 当前仅记日志（web_gin 内部）。gRPC 路径在此组件内监督并上报 RuntimeErrorSource。
+	// V3-P0-06：监督 HTTP Serve 的非预期退出，送入 RuntimeErrorSource channel，
+	// 使 HTTP listener 异常能触发 App Drain/Failed（与 gRPC 路径一致）。
+	go func() {
+		if err := <-httpServeErr; err != nil {
+			w.reportRuntimeErr(fmt.Errorf("http: %w", err))
+		}
+	}()
 
 	if err := w.startGRPCServer(d); err != nil {
 		// 回滚已起的 HTTP。
