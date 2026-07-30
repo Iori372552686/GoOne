@@ -46,15 +46,45 @@ func (self *RedisMgr) InitAndRun(dbIns []Config) error {
 	}
 	logger.Infof("RedisMgr   InsInit.. | %v", safe)
 
+	// 记录已成功添加的实例 ID，用于中途失败时逆序关闭（V3-P0-05：多实例初始化失败
+	// 必须回滚已成功实例，避免连接泄漏）。
+	added := make([]uint32, 0, len(dbIns))
 	for _, ds := range dbIns {
-		err := self.AddInstance(uint32(ds.InstanceID), ds.IP, ds.Port, ds.Password, ds.DbIndex, ds.IsCluster)
+		instID := uint32(ds.InstanceID)
+		err := self.AddInstance(instID, ds.IP, ds.Port, ds.Password, ds.DbIndex, ds.IsCluster)
 		if err != nil {
+			// 逆序关闭已成功添加的实例。
+			for i := len(added) - 1; i >= 0; i-- {
+				self.closeInstance(added[i])
+			}
 			return err
 		}
+		added = append(added, instID)
 	}
 
 	logger.Infof("RedisMgr   InsInit... Done !")
 	return nil
+}
+
+// Close 关闭所有 Redis 实例的连接池。幂等：重复调用不 panic、不重复释放
+//（V3-P0-05：Redis Manager 增加 Close，使资源由 Component 统一关闭）。
+func (m *RedisMgr) Close() error {
+	m.clients.Range(func(key, value any) bool {
+		m.closeInstance(key.(uint32))
+		return true
+	})
+	return nil
+}
+
+// closeInstance 关闭并移除指定实例。已不存在时安全返回。
+func (m *RedisMgr) closeInstance(instID uint32) {
+	v, ok := m.clients.LoadAndDelete(instID)
+	if !ok {
+		return
+	}
+	if client, ok := v.(radix.Client); ok {
+		_ = client.Close()
+	}
 }
 
 /**

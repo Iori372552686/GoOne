@@ -37,10 +37,13 @@ func NewApp() *runtime.App {
 		ssrpc.WithTransactionManager(globals.TransMgr),
 	)
 
-	// ORM 依赖：Start 初始化；Stop 关闭（原 OnExit 的 manager.Close）。
+	// ORM 依赖：Start 初始化（启动异步 worker + 初始化 ORM Engine）；Stop 关闭。
+	// V3-P0-05：worker 启动从 package init 移到显式 manager.Start，使 import 不再
+	// 产生 goroutine，生命周期由 Component 统一管理。
 	ormDeps := &bussvc.FuncComponent{
 		ComponentName: "orm_deps",
 		OnStart: func(_ context.Context) error {
+			manager.Start()
 			return globals.OrmMgr.InitAndRun(gconf.MySqlSvrCfg.Dependencies.OrmConf, manager.GetTables()...)
 		},
 		OnStop: func(_ context.Context) error {
