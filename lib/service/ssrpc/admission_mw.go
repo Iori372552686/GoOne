@@ -1,6 +1,10 @@
 package ssrpc
 
 import (
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/golang/protobuf/proto"
 )
@@ -15,25 +19,48 @@ type ssrpcError string
 
 func (e ssrpcError) Error() string { return string(e) }
 
-// InflightLimiter 上报当前在途计数与是否应拒绝（V3-P1-01）。
+// InflightLimiter 原子地占用与释放 SSRPC 在途请求名额（V4 P0-03）。
 // net_mgr.AdmissionController 实现此接口，使 ssrpc 中间件无需 import net_mgr
-//（避免循环依赖）。
+// （避免循环依赖）。
+//
+// TryAcquireInflight 用原子 CAS 完成"检查上限 + 占位"，避免历史 check-then-act 超限。
+// 成功后调用方必须配对调用 ReleaseInflight(method)。
 type InflightLimiter interface {
-	IncInflight() int64
-	DecInflight() int64
-	// InflightWouldReject 上报当前在途是否达到 max（按全局或 per-method）。
-	// method 为 RPC 方法名（ctx.Method）；max<=0 表示不限。
-	InflightWouldReject(max int) bool
+	// TryAcquireInflight 原子占用一个名额。globalLimit/methodLimit 任一 > 0 启用，都 <= 0
+	// 表示不限。返回 true 表示占用成功。shadow 模式不拒绝（返回 true）但计数仍正确。
+	TryAcquireInflight(method string, globalLimit, methodLimit int) bool
+	// ReleaseInflight 释放一个已占用名额，必须与成功的 Acquire 配对。
+	ReleaseInflight(method string)
 }
 
-// AdmissionMiddleware 构造一个 SSRPC 在途请求限流中间件（V3-P1-01）。
+// rejectLogMu/rejectLogLastSeen 实现拒绝日志的按 reason 限频采样（V4 P0-03）。
+// 过载时不再逐请求 Warning（会放大 I/O），改为每个 reason 至多每秒记录一次首个样本。
+var (
+	rejectLogMu      sync.Mutex
+	rejectLogLastSec = make(map[string]int64)
+)
+
+// logRejectSample 按 reason 限频记录一次拒绝日志：每个 method 至多每秒一条。
+func logRejectSample(method string) {
+	now := time.Now().Unix()
+	rejectLogMu.Lock()
+	last := rejectLogLastSec[method]
+	if now-last >= 1 {
+		rejectLogLastSec[method] = now
+		rejectLogMu.Unlock()
+		logger.Warningf("ssrpc inflight overloaded, reject sample method=%s (rate-limited)", method)
+		return
+	}
+	rejectLogMu.Unlock()
+}
+
+// AdmissionMiddleware 构造一个 SSRPC 在途请求限流中间件（V3-P1-01；V4 P0-03 原子化）。
 //
-// limiter 为 nil 时直通（无 admission）。limiter 非 nil 但 maxInflight<=0 时也直通。
-// 每个请求 IncInflight，处理完 DecInflight；进入前若 InflightWouldReject 则返回
-// ErrOverloaded（不调用下游 handler）。
+// limiter 为 nil 时直通（无 admission）。每个请求用 TryAcquireInflight 原子占位，处理完
+// 用 ReleaseInflight 释放；占位失败（enforce 满载）返回 ErrOverloaded，不调用下游 handler。
 //
-// 注意：本中间件只做计数与拒绝决策；shadow/enforce 模式的策略由 limiter 实现侧
-//（AdmissionController）决定。InflightWouldReject 在 enforce 满载时返回 true。
+// 注意：shadow/enforce 的策略由 limiter 实现侧（AdmissionController）决定；本中间件只做
+// 原子占位/释放与拒绝。拒绝日志按 reason 限频采样，过载 60s 日志量保持有界。
 func AdmissionMiddleware(limiter InflightLimiter, maxInflight int, maxPerMethod map[string]int) Middleware {
 	return func(next Handler) Handler {
 		return func(ctx *Context, req proto.Message) (proto.Message, error) {
@@ -41,18 +68,26 @@ func AdmissionMiddleware(limiter InflightLimiter, maxInflight int, maxPerMethod 
 				return next(ctx, req)
 			}
 			// 选定本方法的 inflight 上限：per-method 覆盖优先，否则全局。
-			max := maxInflight
+			methodLimit := 0
 			if m, ok := maxPerMethod[ctx.Method]; ok && m > 0 {
-				max = m
+				methodLimit = m
 			}
-			if max > 0 && limiter.InflightWouldReject(max) {
-				// 过载：不进入下游，不增减计数（已达上限）。
-				logger.Warningf("ssrpc inflight overloaded, reject method=%s", ctx.Method)
-				return nil, ErrOverloaded
+			if globalLimit := maxInflight; globalLimit > 0 || methodLimit > 0 {
+				if !limiter.TryAcquireInflight(ctx.Method, globalLimit, methodLimit) {
+					// 过载（enforce）：不进入下游，不占名额（Acquire 已回滚）。
+					atomic.AddInt64(&admissionRejectCount, 1)
+					logRejectSample(ctx.Method)
+					return nil, ErrOverloaded
+				}
+				defer limiter.ReleaseInflight(ctx.Method)
 			}
-			limiter.IncInflight()
-			defer limiter.DecInflight()
 			return next(ctx, req)
 		}
 	}
 }
+
+// admissionRejectCount 累计过载拒绝次数，供指标/测试观测。
+var admissionRejectCount int64
+
+// AdmissionRejectCount 返回累计过载拒绝次数（测试与指标用）。
+func AdmissionRejectCount() int64 { return atomic.LoadInt64(&admissionRejectCount) }

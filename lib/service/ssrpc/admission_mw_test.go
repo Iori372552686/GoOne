@@ -7,19 +7,29 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// fakeLimiter 是测试用的 InflightLimiter，可控在途计数与拒绝阈值。
+// fakeLimiter 是测试用的 InflightLimiter，实现 V4 P0-03 的原子占位/释放语义。
+// 它用一个全局计数（不区分 method）模拟；per-method 上限通过 TryAcquireInflight 的
+// methodLimit 参数传入，本桩取 globalLimit 与 methodLimit 中生效的较小值。
 type fakeLimiter struct {
 	inflight int64
-	rejectAt int64 // 达到此值时 InflightWouldReject 返回 true
 }
 
-func (f *fakeLimiter) IncInflight() int64 { f.inflight++; return f.inflight }
-func (f *fakeLimiter) DecInflight() int64 { f.inflight--; return f.inflight }
-func (f *fakeLimiter) InflightWouldReject(max int) bool {
-	if max <= 0 {
+// TryAcquireInflight 原子占用：取生效上限（globalLimit 与 methodLimit 中 > 0 的较小者），
+// 当前已达上限则拒绝，否则计数 +1。
+func (f *fakeLimiter) TryAcquireInflight(method string, globalLimit, methodLimit int) bool {
+	limit := globalLimit
+	if methodLimit > 0 && (limit <= 0 || methodLimit < limit) {
+		limit = methodLimit
+	}
+	if limit > 0 && f.inflight >= int64(limit) {
 		return false
 	}
-	return f.inflight >= int64(max)
+	f.inflight++
+	return true
+}
+
+func (f *fakeLimiter) ReleaseInflight(method string) {
+	f.inflight--
 }
 
 // noopHandler 总是成功返回。
@@ -29,7 +39,7 @@ func noopHandler(_ *Context, _ proto.Message) (proto.Message, error) {
 
 // TestAdmissionMiddlewareAdmitsWhenBelowLimit 验证未达上限时放行。
 func TestAdmissionMiddlewareAdmitsWhenBelowLimit(t *testing.T) {
-	lim := &fakeLimiter{rejectAt: 5}
+	lim := &fakeLimiter{}
 	mw := AdmissionMiddleware(lim, 5, nil)
 	h := mw(noopHandler)
 	ctx := &Context{Method: "Svc.Do"}

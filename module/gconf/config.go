@@ -332,6 +332,25 @@ func (c *ConnSvr) validate() error {
 		cap.ConnectionRate < 0 || cap.LoginRate < 0 || cap.MaxInflight < 0 {
 		return fmt.Errorf("connsvr.capacity 字段不得为负")
 	}
+	// V4 P0-03：per-method inflight 上限必须 >= 0。
+	for method, m := range cap.MaxInflightPerMethod {
+		if m < 0 {
+			return fmt.Errorf("connsvr.capacity.max_inflight_per_method[%q] 不得为负", method)
+		}
+	}
+	// V4 P0-03：未认证上限不得超过总连接上限（总上限为 0 表示不限，例外）。
+	if cap.MaxConnections > 0 && cap.MaxUnauthenticatedConnections > 0 &&
+		cap.MaxUnauthenticatedConnections > cap.MaxConnections {
+		return fmt.Errorf("connsvr.capacity.max_unauthenticated_connections (%d) 不得超过 max_connections (%d)",
+			cap.MaxUnauthenticatedConnections, cap.MaxConnections)
+	}
+	// V4 P0-03：生产 enforce 模式不得把全部限制都配置为 0（等于没有过载保护）。
+	if cap.OverloadMode == "enforce" &&
+		cap.MaxConnections == 0 && cap.MaxUnauthenticatedConnections == 0 &&
+		cap.ConnectionRate == 0 && cap.LoginRate == 0 && cap.MaxInflight == 0 &&
+		len(cap.MaxInflightPerMethod) == 0 {
+		return fmt.Errorf("connsvr.capacity.overload_mode=enforce 时不得把全部限制配置为 0（无过载保护）")
+	}
 	switch cap.OverloadMode {
 	case "", "off", "shadow", "enforce":
 		// 空字符串等同于 off（向后兼容）。
