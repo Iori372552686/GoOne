@@ -1,5 +1,11 @@
 # GoOne 架构复审 v2：生命周期、模块化与性能治理
 
+> **⚠️ 历史归档（2026-07-31 核销）**：本文档的「方案 B」整改（runtime.App + Component、
+> 生成 Registry 装配、显式 DriverRegistry、CI 静态门禁）已全部落地并由 v3/v4 验证。
+> 当前架构事实以代码与
+> [`modernization_execution_plan_2026-07-v4.md`](modernization_execution_plan_2026-07-v4.md)
+> 为准。本文保留作为决策溯源，其中的待办项仅反映 2026-07-16 的历史快照。
+
 > 评审日期：2026-07-16  
 > 评审范围：cmd/、src/、lib/、common/、module/、tools/、deploy/、docs/  
 > 评审基线：当前工作区代码优先于 README 和历史文档  

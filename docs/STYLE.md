@@ -81,9 +81,13 @@
 ## 7. 配置与接线
 
 - 新配置只加 grouped 结构（`base_cfg.runtime` 等），禁止新增 legacy flat 字段。
-- bus 服务装配使用 `bootstrap/busapp`，不手写 bootstrap.Options 全量模板。
-- 依赖注入通过 app 装配层（`InitDeps/StartExtra`）；`globals.*` 仅限 `src/<svr>/globals`，
-  `lib/` 与 `module/` 禁止引用任何 globals。
+- 启动配置视为**不可变值**：装配期读取后不再运行时改写；唯一允许的热更是 gamedata
+  （经配置中心 watcher，每表 atomic.Value 原子替换）。
+- 服务装配使用 `runtime.App + Component`（`runtime.MustNew` + `MustRegister`）；
+  `bootstrap/busapp` 旧 API 已删除，不得重新引入。bus 服务经 `DriverRegistry`
+  显式注册所需 MQ driver（通常仅 rabbitmq）。
+- 依赖注入通过 app 装配层（Component 的 Start/Stop）；`globals.*` 仅限
+  `src/<svr>/globals`，`lib/` 与 `module/` 禁止引用任何 globals。
 
 ## 8. 生成代码边界
 
@@ -92,9 +96,12 @@
 
 ## 9. 测试
 
-- 单元测试不依赖外部中间件；集成测试必须带可达性预检查并 `t.Skip`
-  （参考 `lib/contrib/registry/zookeeper/register_test.go`），禁止无限循环/永不返回的测试。
+- 单元测试不依赖外部中间件；集成测试经 `lib/internal/itest.Require` 统一门控：
+  未设 `GOONE_INTEGRATION=1` 时 `t.Skip`；**设置后中间件不可达必须 `t.Fatal`**
+  （CI 环境下不得静默跳过，否则产生「用例数为 0 却通过」的虚假绿灯）。
 - 修 bug 先写复现测试；性能项写 benchmark。
+- 提交前本地过：`go build ./...`、`go vet -composites=false ./...`、
+  `go test -count=1 ./...`、`go run ./tools/cmd/checkdocs ./docs`。
 
 ## 10. 提交与 CI
 

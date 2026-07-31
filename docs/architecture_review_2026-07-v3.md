@@ -1,5 +1,11 @@
 # GoOne 架构评审 v3：现代化执行前基线
 
+> **⚠️ 已被 v4 取代（2026-07-31 核销）**：本文档是 v3 计划执行**前**的基线勘察。
+> V3-P0-* 任务已全部完成；当前架构事实以代码与
+> [`modernization_execution_plan_2026-07-v4.md`](modernization_execution_plan_2026-07-v4.md)
+> 为准。本文保留作为基线证据归档，其中的「部分完成 / 待执行」标注仅反映 2026-07-30
+> 的历史快照，不再代表当前状态。
+
 > 评审日期：2026-07-30  
 > 评审范围：cmd/、src/、lib/、common/、module/、tools/、deploy/、.github/、docs/  
 > 配套执行计划：[modernization_execution_plan_2026-07-v3.md](modernization_execution_plan_2026-07-v3.md)  
