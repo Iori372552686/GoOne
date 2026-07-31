@@ -53,6 +53,36 @@ func TestNewBusImplRabbitMQCloseIsIdempotent(t *testing.T) {
 	}
 }
 
+// TestRabbitMQReconnectRetryOnUnreachable 验证断线重连契约（V3-P1-05）：
+// broker 不可达时 run 进入重试循环（不立即放弃），Close 能干净中断重试 goroutine。
+// 不依赖真实 RabbitMQ。
+func TestRabbitMQReconnectRetryOnUnreachable(t *testing.T) {
+	// 不可达地址：run 的 process 会立即失败，进入指数退避重试循环。
+	b := NewBusImplRabbitMQ(0x03030303, func(uint32, []byte) error { return nil }, "amqp://guest:guest@127.0.0.1:1/")
+	// 让 run 进入重试循环（process 失败 → retryCount 增长 → 退避）。
+	time.Sleep(300 * time.Millisecond)
+	// 不可达时 Healthy 应为 false（connected 未置位）。
+	if b.Healthy() {
+		t.Fatal("unreachable broker: Healthy should be false during retry")
+	}
+	// Close 必须能中断重试循环并返回（不阻塞、不泄漏 goroutine）。
+	done := make(chan struct{})
+	go func() {
+		_ = b.Close()
+		close(done)
+	}()
+	select {
+	case <-done:
+		// Close 成功返回，重试 goroutine 已退出。
+	case <-time.After(3 * time.Second):
+		t.Fatal("Close 未在 3s 内中断重试循环（goroutine 泄漏）")
+	}
+	// 重复 Close 仍幂等。
+	if err := b.Close(); err != nil {
+		t.Fatalf("repeat Close should be idempotent: %v", err)
+	}
+}
+
 // amqpTestAddr 取自环境变量（默认本地实例），便于在不同环境下运行真实联调。
 func amqpTestAddr() string {
 	if v := os.Getenv("GOONE_AMQP_ADDR"); v != "" {
