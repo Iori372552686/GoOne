@@ -106,13 +106,15 @@ func WithLogger(logger Logger) Option {
 	}
 }
 
+// NewSource Deprecated: P1-07 起推荐使用 MustNewSource（语义更明确）或 NewSourceE
+// （error 返回，库/工厂优先）。本函数保留一个版本以兼容旧调用方，内部委托 MustNewSource。
 func NewSource(opts ...Option) config.Source {
-	op := options{
-		logger: stdLogger{},
-	}
-	for _, o := range opts {
-		o(&op)
-	}
+	return MustNewSource(opts...)
+}
+
+// MustNewSource 构造 Apollo 配置源，失败时 panic（P1-07）。
+// 适用于「配置错误即程序错误」的启动期装配；库/工厂代码请用 NewSourceE。
+func MustNewSource(opts ...Option) config.Source {
 	src, err := NewSourceE(opts...)
 	if err != nil {
 		panic(err)

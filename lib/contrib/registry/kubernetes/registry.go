@@ -180,12 +180,20 @@ func (s *Registry) Service(name string) ([]*registry.ServiceInstance, error) {
 	return ret, nil
 }
 
+// sendLatestInstances 把当前过滤后的实例列表推送到 announcement。
+// P1-07：list 失败是瞬态的（informer 缓存尚未同步等），不再 panic 杀死进程；
+// 记录后跳过本次推送，后续 Add/Update/Delete 事件会重新触发，最终一致。
 func (s *Registry) sendLatestInstances(name string, announcement chan []*registry.ServiceInstance) {
 	instances, err := s.Service(name)
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "kuberegistry: list instances for %q failed (skip push, will retry on next event): %v\n", name, err)
+		return
 	}
-	announcement <- instances
+	select {
+	case announcement <- instances:
+	default:
+		// 已有未消费的变更通知，丢弃重复推送（消费方会在 Next 时取到最新一份）。
+	}
 }
 
 // Watch creates a watcher according to the service name.
@@ -221,10 +229,12 @@ func (s *Registry) Watch(name string) (registry.Watcher, error) {
 }
 
 // Start is used to start the Registry
-// It is non-blocking
+// It is non-blocking. P1-07：cache 同步失败不再静默吞掉，记录告警供上层排查
+// （Service/Watch 仍可工作，但首次列表可能为空，待 informer 重试后一致）。
 func (s *Registry) Start() {
 	s.informerFactory.Start(s.stopCh)
 	if !cache.WaitForCacheSync(s.stopCh, s.podInformer.HasSynced) {
+		fmt.Fprintln(os.Stderr, "kuberegistry: informer cache sync failed; Service/Watch may be stale until resync")
 		return
 	}
 }
