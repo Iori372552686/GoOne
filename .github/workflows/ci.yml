@@ -97,7 +97,7 @@ jobs:
           args: --new-from-rev=origin/${{ github.base_ref || 'dev' }}
 
       - name: Legacy lifecycle static scan
-        # P0-09 已删除旧生命周期；此扫描阻止 application/bootstrap/busapp 旧 API
+        # 已删除旧生命周期；此扫描阻止 application/bootstrap/busapp 旧 API
         # 被重新引入生产代码（cmd/src/lib/tools，排除注释与生成代码）。
         run: |
           set -e
@@ -114,7 +114,7 @@ jobs:
           fi
 
       - name: Legacy SSRPC register API scan
-        # 方案 B P1-03：生产服务必须经 RegistryComponent + RegisterToRegistry，禁止再
+        # 生产服务必须经 RegistryComponent + RegisterToRegistry，禁止再
         # 调用 RegisterToDispatcher / RegisterToTransactionMgr / TransMgr.RegisterCmd
         #（生成代码、测试与兼容实现不在扫描范围）。
         run: |
@@ -132,7 +132,7 @@ jobs:
           fi
 
       - name: Bus driver/all blank-import scan
-        # 方案 B P1-04：driver/all 的 blank import 不允许出现在 cmd/src/lib/service/runtime
+        # driver/all 的 blank import 不允许出现在 cmd/src/lib/service/runtime
         #（生产 bus 服务必须显式 DriverRegistry+MustRegister；websvr 不导入任何 driver）。
         # driver/all 包本身与各 driver 的 init 注册保留为兼容路径，由本扫描排除。
         run: |
@@ -149,7 +149,7 @@ jobs:
           fi
 
       - name: Binary dependency graph gate
-        # 方案 B P1-04/P1-05：websvr 不得链接任何 MQ SDK；bus 服务（connsvr 代表）只
+        # websvr 不得链接任何 MQ SDK；bus 服务（connsvr 代表）只
         # 链接 rabbitmq（amqp091-go），不链接 rocketmq/nats/nsq/kafka；streadway/amqp
         # 不得出现在模块图。
         run: |

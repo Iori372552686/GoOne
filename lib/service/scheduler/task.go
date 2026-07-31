@@ -1,7 +1,7 @@
 // Package scheduler 提供受生命周期管理的周期任务（Task），取代旧的
 // application.Run 全局 10ms Tick。
 //
-// 设计要点（遵循 roadmap P0-08）：
+// 设计要点：
 //   - 每个 Task 有固定周期 Interval、可选 RunOnStart、默认禁止重入（NonOverlap）。
 //   - 使用可停止的 timer/ticker，不用 time.After 循环。
 //   - Stop 取消 context 并等待当前 Run 返回（不创建叠加 goroutine）。

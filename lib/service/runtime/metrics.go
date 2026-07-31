@@ -5,7 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// 运行时生命周期可观测性指标（roadmap P1-03）。
+// 运行时生命周期可观测性指标。
 //
 // 命名空间统一为 goone，按领域分子系统：lifecycle（状态机）、component（组件启停）、
 // drain（排空）、task（调度器）、config（重载）。这些指标由 App / ComponentTracker /

@@ -5,7 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// 调度器可观测性指标（roadmap P1-03）。
+// 调度器可观测性指标。
 //
 //   - goone_task_duration_seconds：Task 单次执行耗时（按 task 名 label）。
 //   - goone_task_skipped_total：Task 因 NonOverlap 被跳过的次数。

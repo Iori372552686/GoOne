@@ -46,7 +46,7 @@ type WsTcpSvr struct {
 	lockOfConnInfo sync.RWMutex
 	mapOfConnInfo  map[net.Conn]*wsConnEntry
 
-	// accepting 控制 wsGinPageUpgrader 是否接受新 Upgrade（roadmap P0-07）。Quiesce
+	// accepting 控制 wsGinPageUpgrader 是否接受新 Upgrade。Quiesce
 	// 置 false 后新连接被拒绝，既有连接保留处理在途工作。
 	accepting atomic.Bool
 
@@ -79,7 +79,7 @@ func (s *WsTcpSvr) InitAndRun(implType, mod string, port int, handler IWsTcpSvrE
 	return s.RunGinWs(mod, port)
 }
 
-// Quiesce 停止接受新 WS Upgrade，保留既有连接处理在途工作（roadmap P0-07）。幂等。
+// Quiesce 停止接受新 WS Upgrade，保留既有连接处理在途工作。幂等。
 //
 // P0-04：关闭 HTTP listener 以停止新 Upgrade（gin 的 Serve 会退出），但保留已升级的
 // WebSocket 连接；它们的拆除留给 Stop 强制执行。

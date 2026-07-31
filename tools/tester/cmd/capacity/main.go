@@ -1,4 +1,4 @@
-// Capacity load generator for GoOne connsvr (方案 B P2-02 C1–C4).
+// Capacity load generator for GoOne connsvr.
 //
 // Opens N TCP connections, sends a login frame (binds UID), and keeps each
 // connection alive with periodic heartbeats. Reports login success rate.

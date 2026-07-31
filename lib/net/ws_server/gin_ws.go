@@ -65,7 +65,7 @@ func (s *WsTcpSvr) RunGinWs(mode string, wsPort int) error {
 
 // wsGinPageUpgrader 是 gin websocket 升级 handler。
 func (s *WsTcpSvr) wsGinPageUpgrader(c *gin.Context) {
-	// Quiesce 后拒绝新 Upgrade（roadmap P0-07）。
+	// Quiesce 后拒绝新 Upgrade。
 	if !s.accepting.Load() {
 		http.Error(c.Writer, "shutting down", http.StatusServiceUnavailable)
 		return

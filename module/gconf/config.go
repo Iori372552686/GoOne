@@ -66,7 +66,7 @@ type AdminServerConfig struct {
 	Port    int    `json:"port" yaml:"port"`       // 监听端口，为 0 时按服务类型回退到默认端口
 }
 
-// defaultAdminPortByServerType 是方案 B P0-03 落实的稳定 Admin 默认端口表：当
+// defaultAdminPortByServerType 是稳定 Admin 默认端口表：当
 // admin_server.port 为 0 时，按服务类型回退到默认端口。同一主机部署多个相同类型实
 // 例时必须在各实例配置中显式提供唯一端口。
 //

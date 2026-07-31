@@ -39,7 +39,7 @@ type KcpSvr struct {
 	lockOfConnInfo sync.RWMutex
 	mapOfConnInfo  map[net.Conn]*kcpConnInfo
 
-	// listener 字段化（roadmap P0-07）：Quiesce 关 listener 停接新连接但保留既有；
+	// listener 字段化：Quiesce 关 listener 停接新连接但保留既有；
 	// Stop 关 listener 与全部连接。stopCloseOnce 保证幂等。
 	listener      *kcp.Listener
 	stopCloseOnce sync.Once
@@ -68,7 +68,7 @@ func (s *KcpSvr) InitAndRun(ip string, port int, handler IKcpSvrEventHandler) er
 	return nil
 }
 
-// Quiesce 关闭 listener 停止接收新连接，保留既有连接处理在途工作（roadmap P0-07）。
+// Quiesce 关闭 listener 停止接收新连接，保留既有连接处理在途工作。
 // 幂等。
 func (s *KcpSvr) Quiesce() {
 	s.stopCloseOnce.Do(func() {

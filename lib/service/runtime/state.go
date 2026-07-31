@@ -72,7 +72,7 @@ type StateChange struct {
 // StateObserver 在每次状态转换时被通知。实现必须并发安全且不得阻塞：transition
 // 在派发时持有状态锁。
 //
-// 观察者语义（见 roadmap P0-02）：
+// 观察者语义：
 //   - 在 Ready/Allocated 时，返回 error 会中止转换并回滚到前一状态（故失败的
 //     就绪闸门会阻止服务）。
 //   - 在 Draining/Stopping/Stopped 时，错误会被记录但绝不阻断退出。
@@ -241,7 +241,7 @@ func (s *StateStore) snapshot(service string) stateSnapshot {
 	return snap
 }
 
-// healthCode/readyCode 编码 roadmap 状态表中的 healthz/readyz 契约。
+// healthCode/readyCode 编码状态表中的 healthz/readyz 契约。
 func healthCode(s State) int {
 	switch s {
 	case StateStopping, StateStopped, StateFailed:

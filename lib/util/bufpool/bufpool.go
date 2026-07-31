@@ -1,7 +1,7 @@
 // Package bufpool 提供共享的字节缓冲池，用于热路径（网关写合并、帧装配）的每消息
 // 暂存缓冲。
 //
-// 池化模型（roadmap P1-01）：
+// 池化模型：
 //
 //   - Acquire 返回一个 *Buffer（Lease），其 Bytes 字段为可用字节切片。
 //   - Release 把 Buffer 归还池。调用方 Release 后不得再引用 Bytes。

@@ -12,7 +12,7 @@ import (
 )
 
 // BindingKind 按 Binding 所目标的传输分类。每种 kind 有独立唯一 key 空间，与
-// roadmap 的按传输唯一性规则一致。
+// 按传输唯一性规则一致。
 type BindingKind uint8
 
 const (
@@ -151,7 +151,7 @@ func itoa(n int) string {
 // Register 原子地校验整批（批次内与跨批次查重），仅当每条 binding 良构时才提交。
 // Seal 随后把 Registry 冻结为一个不可变、已 sealed 的 Dispatcher。
 //
-// Registry 是 app 实例级的（绝不包级全局），且不使用 func init 注册，遵循 roadmap。
+// Registry 是 app 实例级的（绝不包级全局），且不使用 func init 注册。
 type Registry struct {
 	mu     sync.Mutex
 	sealed bool

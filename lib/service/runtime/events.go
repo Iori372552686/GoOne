@@ -4,7 +4,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 )
 
-// 结构化生命周期事件名（roadmap P1-03）。
+// 结构化生命周期事件名。
 //
 // 这些事件名作为日志消息的前缀（[event:xxx]），使运维可按事件名精确 grep 与告警，
 // 取代散落的 Infof/Errorf。所有生命周期关键节点都应经 logEvent 上报。

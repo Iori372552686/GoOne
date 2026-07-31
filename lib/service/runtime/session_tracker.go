@@ -15,7 +15,7 @@ var ErrSessionTrackerClosed = errors.New("session tracker closed before drain co
 
 // SessionTracker 跟踪网关的活跃连接数与活跃会话数，并在两者归零时通知等待者。
 //
-// 设计要点（遵循 roadmap P0-07 / 方案 B P0-06）：
+// 设计要点：
 //   - ActiveConnections：底层连接已建立且未关闭。
 //   - ActiveSessions：已绑定 UID 的逻辑会话；重复绑定不重复计数，OnClose 只减一次。
 //   - 等待归零用状态变更通知（broadcast），不用轮询。

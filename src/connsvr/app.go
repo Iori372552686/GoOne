@@ -67,7 +67,7 @@ func NewApp() *runtime.App {
 	}
 
 	// 网关监听器：在 router/bus 起来之后启动 TCP/WS/KCP。实现 Quiescer（停止接新连接）
-	// 与 runtime.Component（Stop 强制关闭全部连接），满足 roadmap P0-07 网关排空。
+	// 与 runtime.Component（Stop 强制关闭全部连接），满足网关排空。
 	gateway := &gatewayComponent{}
 
 	app := runtime.MustNew("connsvr",
@@ -133,8 +133,8 @@ func connCommon() bussvc.Common {
 	}
 }
 
-// gatewayComponent 管理三传输（TCP/WS/KCP）网关监听器的启动、排空与停止（roadmap
-// P0-07）。Start 拉起监听；Quiesce 停止接新连接但保留既有；Stop 强制关闭全部连接。
+// gatewayComponent 管理三传输（TCP/WS/KCP）网关监听器的启动、排空与停止。
+// Start 拉起监听；Quiesce 停止接新连接但保留既有；Stop 强制关闭全部连接。
 type gatewayComponent struct{}
 
 func (gatewayComponent) Name() string { return "gateway_listeners" }

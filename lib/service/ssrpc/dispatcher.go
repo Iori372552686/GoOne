@@ -52,7 +52,7 @@ type grpcMethodEntry struct {
 //     进一步的 Register* 调用被以 error 拒绝（Register*E）或记日志后忽略（遗留的
 //     无返回值变体），使既有调用方继续可编译。
 //
-// Seal 正是使热路径免分配、免锁的关键（roadmap “Dispatcher 热路径无注册锁”）。一个
+// Seal 正是使热路径免分配、免锁的关键。一个
 // Sealed 的 Dispatcher 无需任何同步即可安全并发 dispatch。
 type Dispatcher struct {
 	mu sync.RWMutex
