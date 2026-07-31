@@ -45,11 +45,15 @@ type Merger[T any] func(oldConfig, candidate *T) (MergeResult[T], error)
 // Store 持有一份原子发布的不可变配置快照。读者用 Current()；单一写者用 Load（初
 // 始）与 Reload（后续）。
 //
-// P1-06：writeMu 串行化 Load/Reload，使并发 Load 只发布一次、并发 Reload 顺序确定；
-// Current() 仍走 atomic 无锁读。历史实现无 writeMu，并发 Load 的 current.Load() 检查
-// 存在 TOCTOU。
+// writeMu 串行化 Load/Reload，使并发 Load 只发布一次、并发 Reload 顺序确定；
+// Current() 仍走 atomic 无锁读。
 //
 // 零值不可用；请用 New。
+//
+// Deprecated: appconfig.Store 是通用配置热更抽象，但 GoOne 生产配置采用启动不可变
+// 模型（仅 gamedata 热更）。当前无生产代码使用 Store；通用 Reload 能力将在下一主
+// 版本删除（V3-P1-04）。需要配置读取的服务应通过构造参数接收已 Normalize/Validate
+// 的配置快照。
 type Store[T any] struct {
 	current atomic.Pointer[T]
 	writeMu sync.Mutex

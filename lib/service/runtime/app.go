@@ -65,6 +65,9 @@ func WithStopTimeout(d time.Duration) Option {
 // WithReload 安装一个在收到平台重载信号（Unix 上为 SIGUSR1；Windows 永远不会）
 // 时被调用的回调。回调不得修改运行时资源；它接收一个可安全重载的快照，返回的
 // error（若非 nil）会被记录但绝不中止进程。可为 nil。
+//
+// Deprecated: GoOne 生产配置采用启动不可变模型（仅 gamedata 热更）。通用运行配置
+// 热更不在生产路径上，WithReload 仅测试使用；下一主版本将删除（V3-P1-04）。
 func WithReload(fn func(ctx context.Context) error) Option {
 	return func(a *App) {
 		a.onReload = fn
@@ -318,6 +321,9 @@ func (a *App) setInjectStartupSignal(fn func(os.Signal)) {
 // 服务推荐的构造器。Registry 立即 Seal；Run 将按序 Start 其组件。
 //
 // 模块注册失败时返回错误，且不构建 App。
+//
+// Deprecated: Module Registry 仅为测试场景保留；生产服务用 MustNew + MustRegister
+// 显式装配（V3-P1-04）。NewFromModules 下一主版本将删除。
 func NewFromModules(name string, modules []Module, opts ...Option) (*App, error) {
 	a, err := New(name, opts...)
 	if err != nil {
