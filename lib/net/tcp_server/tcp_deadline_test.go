@@ -19,6 +19,9 @@ import (
 func TestTcpDeadlineUsesRealTimeNotCachedDatetime(t *testing.T) {
 	port := freePort(t)
 	svr := &TcpSvr{}
+	// 在 InitAndRun 前设置读超时：Start 后读 goroutine 热路径读此字段，运行期修改
+	// 会导致数据竞争。
+	svr.TcpReadTimeout = 30 * time.Second
 
 	handler := &noopHandler{}
 	// 覆盖 OnRead：收到任意数据计数。
@@ -27,9 +30,6 @@ func TestTcpDeadlineUsesRealTimeNotCachedDatetime(t *testing.T) {
 		t.Fatalf("InitAndRun: %v", err)
 	}
 	defer svr.Stop()
-
-	// 给 svr 设置一个较长的读超时（避免误判）。
-	svr.TcpReadTimeout = 30 * time.Second
 
 	c, err := net.Dial("tcp", "127.0.0.1:"+strconv.Itoa(port))
 	if err != nil {

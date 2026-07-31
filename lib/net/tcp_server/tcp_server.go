@@ -42,8 +42,14 @@ type TcpSvr struct {
 }
 
 func (s *TcpSvr) InitAndRun(ip string, port int, handler ITcpSvrEventHandler) error {
-	s.TcpReadTimeout = 2 * misc.ClientExpiryThreshold
-	s.TcpWriteTimeout = 10 * time.Second
+	// 仅在调用方未预设（零值）时填默认。TcpReadTimeout/WriteTimeout 在 Start 后被读
+	// goroutine 热路径读取，InitAndRun 后不得再修改（避免数据竞争）。
+	if s.TcpReadTimeout == 0 {
+		s.TcpReadTimeout = 2 * misc.ClientExpiryThreshold
+	}
+	if s.TcpWriteTimeout == 0 {
+		s.TcpWriteTimeout = 10 * time.Second
+	}
 
 	s.handler = handler
 	s.lockOfConnInfo.Lock()
