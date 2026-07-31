@@ -112,20 +112,25 @@ func (w *webRuntimeComponent) Drain(ctx context.Context) error {
 
 // Stop 实现 runtime.Component：强制关闭残留连接。
 // P0-07：无论 Drain 是否成功/超时，Stop 必须对仍存在的 server 调用 Close 强制关闭。
+// V4 P0-05：同时关闭 Redis 连接池，消除连接泄漏。
 func (w *webRuntimeComponent) Stop(_ context.Context) error {
 	logger.Infof("================== websvr Stop =========================")
-	var stopErr error
+	var errs []error
 	if grpcSrv := w.getGRPCServer(); grpcSrv != nil {
 		grpcSrv.Stop()
 		w.setGRPCServer(nil)
 	}
 	if httpSrv := w.getHTTPServer(); httpSrv != nil {
 		if err := httpSrv.Close(); err != nil {
-			stopErr = err
+			errs = append(errs, err)
 		}
 		w.setHTTPServer(nil)
 	}
-	return stopErr
+	// V4 P0-05：关闭 Redis 连接池，聚合 Close error。
+	if err := globals.RedisMgr.Close(); err != nil {
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
 }
 
 func (w *webRuntimeComponent) startGRPCServer(d *ssrpc.Dispatcher) error {

@@ -28,6 +28,10 @@ func NewApp() *runtime.App {
 		OnStart: func(_ context.Context) error {
 			return globals.InfoMgr.RedisMgr.InitAndRun(gconf.InfoSvrCfg.Dependencies.DbInstances)
 		},
+		// V4 P0-05：Stop 时关闭 Redis 连接池，消除连接泄漏。
+		OnStop: func(_ context.Context) error {
+			return globals.InfoMgr.RedisMgr.Close()
+		},
 	}
 
 	// P1-03：用 RegistryComponent 替代 "NewDispatcher→ToDispatcher→丢弃" 闭包。

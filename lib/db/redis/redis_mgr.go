@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -53,9 +54,9 @@ func (self *RedisMgr) InitAndRun(dbIns []Config) error {
 		instID := uint32(ds.InstanceID)
 		err := self.AddInstance(instID, ds.IP, ds.Port, ds.Password, ds.DbIndex, ds.IsCluster)
 		if err != nil {
-			// 逆序关闭已成功添加的实例。
+			// 逆序关闭已成功添加的实例（清理路径，忽略各自的 Close error）。
 			for i := len(added) - 1; i >= 0; i-- {
-				self.closeInstance(added[i])
+				_ = self.closeInstance(added[i])
 			}
 			return err
 		}
@@ -67,24 +68,32 @@ func (self *RedisMgr) InitAndRun(dbIns []Config) error {
 }
 
 // Close 关闭所有 Redis 实例的连接池。幂等：重复调用不 panic、不重复释放
-//（V3-P0-05：Redis Manager 增加 Close，使资源由 Component 统一关闭）。
+// （V3-P0-05：Redis Manager 增加 Close，使资源由 Component 统一关闭）。
+//
+// 错误聚合（V4 P0-05）：聚合每个实例 Close 的 error，不再静默忽略。任一实例关闭失败时
+// 返回 errors.Join 的聚合错误；全部成功返回 nil。
 func (m *RedisMgr) Close() error {
+	var errs []error
 	m.clients.Range(func(key, value any) bool {
-		m.closeInstance(key.(uint32))
+		if err := m.closeInstance(key.(uint32)); err != nil {
+			errs = append(errs, fmt.Errorf("redis instance %d close: %w", key.(uint32), err))
+		}
 		return true
 	})
-	return nil
+	return errors.Join(errs...)
 }
 
-// closeInstance 关闭并移除指定实例。已不存在时安全返回。
-func (m *RedisMgr) closeInstance(instID uint32) {
+// closeInstance 关闭并移除指定实例。已不存在时安全返回。返回 client.Close 的 error
+// （V4 P0-05）。
+func (m *RedisMgr) closeInstance(instID uint32) error {
 	v, ok := m.clients.LoadAndDelete(instID)
 	if !ok {
-		return
+		return nil
 	}
 	if client, ok := v.(radix.Client); ok {
-		_ = client.Close()
+		return client.Close()
 	}
+	return nil
 }
 
 /**
