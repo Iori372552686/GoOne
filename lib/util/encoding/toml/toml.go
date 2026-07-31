@@ -1,13 +1,11 @@
-package xml
+package toml
 
 import (
-	"encoding/xml"
-
+	"github.com/BurntSushi/toml"
 	"github.com/Iori372552686/GoOne/lib/util/encoding"
 )
 
-// Name is the name registered for the xml codec.
-const Name = "xml"
+const Name = "toml"
 
 var DefaultCodec = &codec{}
 
@@ -15,19 +13,21 @@ func init() {
 	encoding.RegisterCodec(codec{})
 }
 
-// codec is a Codec implementation with xml.
 type codec struct{}
 
-func (codec) Marshal(v interface{}) ([]byte, error) {
-	return xml.Marshal(v)
-}
-
-func (codec) Unmarshal(data []byte, v interface{}) error {
-	return xml.Unmarshal(data, v)
-}
-
+// Name 编解码器名称
 func (codec) Name() string {
 	return Name
+}
+
+// Marshal 编码
+func (codec) Marshal(v any) ([]byte, error) {
+	return toml.Marshal(v)
+}
+
+// Unmarshal 解码
+func (codec) Unmarshal(data []byte, v any) error {
+	return toml.Unmarshal(data, v)
 }
 
 // Marshal 编码

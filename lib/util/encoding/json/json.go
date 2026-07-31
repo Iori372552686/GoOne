@@ -2,8 +2,9 @@ package json
 
 import (
 	"encoding/json"
-	"github.com/Iori372552686/GoOne/lib/util/encoding"
 	"reflect"
+
+	"github.com/Iori372552686/GoOne/lib/util/encoding"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -21,6 +22,8 @@ var (
 	UnmarshalOptions = protojson.UnmarshalOptions{
 		DiscardUnknown: true,
 	}
+
+	DefaultCodec = &codec{}
 )
 
 func init() {
@@ -64,4 +67,14 @@ func (codec) Unmarshal(data []byte, v interface{}) error {
 
 func (codec) Name() string {
 	return Name
+}
+
+// Marshal 编码
+func Marshal(v any) ([]byte, error) {
+	return DefaultCodec.Marshal(v)
+}
+
+// Unmarshal 解码
+func Unmarshal(data []byte, v any) error {
+	return DefaultCodec.Unmarshal(data, v)
 }

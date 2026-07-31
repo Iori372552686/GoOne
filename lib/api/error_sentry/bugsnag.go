@@ -1,4 +1,4 @@
-package error_capture
+package error_sentry
 
 import (
 	"context"

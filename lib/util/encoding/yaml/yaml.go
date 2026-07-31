@@ -26,3 +26,15 @@ func (codec) Unmarshal(data []byte, v interface{}) error {
 func (codec) Name() string {
 	return Name
 }
+
+var DefaultCodec = &codec{}
+
+// Marshal 编码
+func Marshal(v any) ([]byte, error) {
+	return DefaultCodec.Marshal(v)
+}
+
+// Unmarshal 解码
+func Unmarshal(data []byte, v any) error {
+	return DefaultCodec.Unmarshal(data, v)
+}
