@@ -18,7 +18,8 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          # V4 P0-01：固定到具体补丁版本，避免从 go.mod 旧 patch 解析出不安全工具链。
+          go-version: '1.25.12'
           cache: true
 
       - name: Build
@@ -65,7 +66,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: '1.25.12'
           cache: true
 
       - name: Install protoc
@@ -87,12 +88,13 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: '1.25.12'
           cache: true
 
       - uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          # V4 P0-01：固定版本，避免浮动 latest 导致门禁不可复现。
+          version: v2.12.2
           # 只对本次改动引入的新问题失败；存量债务冻结在 origin/dev 基线。
           args: --new-from-rev=origin/${{ github.base_ref || 'dev' }}
 
@@ -176,3 +178,34 @@ jobs:
             fi
           done
           exit $missing
+
+  security:
+    # V4 P0-01：供应链与凭据门禁。govulncheck 可达漏洞为 0；gitleaks 阻止真实凭据进入 diff。
+    # 工具版本固定以保证可复现：govulncheck v1.6.0、gitleaks v8.30.1。
+    name: Security (govulncheck + gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.12'
+          cache: true
+
+      - name: govulncheck
+        # 可达漏洞必须为 0；任一可达漏洞阻断合并。
+        run: |
+          set -e
+          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          govulncheck ./...
+
+      - name: gitleaks
+        # 扫描全部历史与工作区，禁止 Token、完整 DSN、Authorization、私钥进入仓库。
+        # 配置见仓库根 .gitleaks.toml（allowRules 仅放行 .env.example 中的 change-me 占位）。
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          version: v8.30.1

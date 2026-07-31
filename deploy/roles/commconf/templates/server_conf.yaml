@@ -17,7 +17,7 @@ base_cfg:
     sensitive_words_file: '{{ root_path }}/commconf/sensitive.txt'
     http_sign:
       - index_name: default
-        private_key: d1233f2b7e9885ffb8a8268d06f44c6e2
+        private_key: '{{ http_sign_private_key }}'
         sign_name: sign
         expired_time: 1800
         timestamp_name: timestamp
@@ -61,8 +61,8 @@ base_cfg:
       port: 8848
       namespace_id: df4ad231-f231-49a1-b309-44493e949dd0
       group_name: poker_gameconf
-      user_name: poker
-      password: poker123
+      user_name: '{{ nacos_user }}'
+      password: '{{ nacos_password }}'
       log_dir: \tmp\nacos\log
       cache_dir: \tmp\nacos\cache
       rotate_time: 1h

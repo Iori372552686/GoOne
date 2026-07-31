@@ -11,6 +11,10 @@ build/*
 /docs/profiles/
 # V4 原始测试、profile 与容量 JSON 放入本地忽略目录，仓库只提交摘要与容量矩阵。
 /.artifacts/v4/
+# 环境变量文件含真实凭据，一律忽略；只提交 *.env.example 样例（V4 P0-01）。
+.env
+*.env
+!*.env.example
 deploy/hosts/host_dev.txt
 /.gocache
 /tools/cfgtool/gen

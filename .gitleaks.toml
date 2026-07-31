@@ -1,0 +1,43 @@
+# gitleaks 配置（V4 P0-01）
+#
+# 目标：阻止真实凭据（钉钉 access_token、数据库口令、完整 DSN、Authorization、私钥）
+# 进入仓库，同时放行：
+#   - *.env.example 中的 change-me-* 占位值；
+#   - server_conf.yaml 等 GoOne 部署模板里的 {{ var }} 占位符。
+#
+# gitleaks-action 默认加载内置规则；本文件通过 extend 引入内置规则，再用 allowRules 与
+# [allowlist] 做项目特定的豁免。
+
+title = "GoOne gitleaks 配置"
+
+[extend]
+# 继承 gitleaks 内置默认规则。
+useDefault = true
+
+# 全局允许路径：样例与文档不参与扫描。
+[allowlist]
+description = "允许示例/模板/文档文件"
+paths = [
+  '''\.env\.example$''',
+  '''\.gitleaks\.toml$''',
+  '''docs/.*\.md$''',
+  # GoOne 部署模板使用 {{ var }} 占位符，不含真实凭据。
+  '''module/gconf/server_conf\.yaml$''',
+]
+
+# 放行明确的占位值，避免误报。
+[[allowlist]]
+description = "放行 change-me 占位与 {{ }} 模板变量"
+regexes = [
+  '''change-me-[a-z-]+''',
+  '''\{\{[a-z_]+\}\}''',
+]
+
+# 放行以无权限示例值出现的弱口令（仅出现在 .env.example 中）。
+[[allowlist]]
+description = "放行示例弱口令值"
+paths = ['''\.env\.example$''']
+regexes = [
+  '''123456''',
+  '''guest''',
+]

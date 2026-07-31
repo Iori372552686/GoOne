@@ -1,10 +1,14 @@
+# 本地开发中间件编排。
+#
+# 安全说明：所有口令均通过同目录 .env（git 忽略）注入，模板见 .env.example。
+# 仓库不再保存任何真实凭据（V4 P0-01）。docker-compose 会自动加载同目录的 .env 文件。
 services:
   mysql:
     image: mysql:8.4.3
     container_name: mysql
     environment:
-      MYSQL_ROOT_PASSWORD: Iori123456
-      MYSQL_DATABASE: game
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
     ports:
       - "3306:3306"
     networks:
@@ -16,7 +20,7 @@ services:
     ports:
       - "6379:6379"
     environment:
-      REDIS_PASSWORD: 123456
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     networks:
       my_bridge_network:
 
@@ -36,9 +40,10 @@ services:
     container_name: rabbitmq
     hostname: bt-rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-      RABBITMQ_LOOPBACK_USERS: "none"  # 允许 guest 远程访问
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      # 默认安全：不放开 guest 远程访问。需要时显式设为 "none"（不推荐生产使用）。
+      RABBITMQ_LOOPBACK_USERS: ${RABBITMQ_LOOPBACK_USERS:-guest}
     ports:
       - "5672:5672" # 映射 RabbitMQ 的 AMQP 端口
       - "15672:15672" # 映射 RabbitMQ 的管理界面端口

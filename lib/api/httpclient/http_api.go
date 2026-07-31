@@ -2,6 +2,7 @@ package http_client
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -14,18 +15,34 @@ import (
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 )
 
-// http args
-var HttpConnectPool http.RoundTripper = &http.Transport{
-	DialContext: (&net.Dialer{
-		Timeout:   10 * time.Second,
-		KeepAlive: 30 * time.Second,
-	}).DialContext,
-	MaxIdleConns:          1000,
-	IdleConnTimeout:       60 * time.Second,
-	ExpectContinueTimeout: 1 * time.Second,
-	TLSClientConfig: &tls.Config{
-		InsecureSkipVerify: true,
-	},
+// HttpConnectPool 是包级默认 HTTP 传输层。
+//
+// 安全说明（V4 P0-01）：默认严格校验 TLS 证书（使用系统证书池），不再设置
+// InsecureSkipVerify: true。仅测试专用构造器可显式跳过校验，生产代码不得回退。
+var HttpConnectPool http.RoundTripper = func() http.RoundTripper {
+	pool, err := SystemCertPool()
+	if err != nil {
+		// 系统证书池不可用时退回 nil，由 crypto/tls 使用其内置根证书校验逻辑，
+		// 仍然校验证书链，绝不关闭校验。
+		pool = nil
+	}
+	return &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		MaxIdleConns:          1000,
+		IdleConnTimeout:       60 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig: &tls.Config{
+			RootCAs: pool,
+		},
+	}
+}()
+
+// SystemCertPool 返回系统证书池。抽为变量以便测试替换。
+var SystemCertPool = func() (*x509.CertPool, error) {
+	return x509.SystemCertPool()
 }
 
 /**
