@@ -294,3 +294,27 @@ CI 缺口（v3 计划 P0-02 要求）：无独立 race job、**无 govulncheck**
 - benchmark×10（`lib/api/sharedstruct`、`lib/service/transaction`、`lib/service/ssrpc`、`lib/net`）+ benchstat 对比。
 - 容量矩阵 C1–C4（单 connsvr 10,000 长连接 SLO）。
 - 二进制依赖图门禁（`go list -deps ./cmd/*`）的 Linux 确认。
+
+## 9. WSL 验证结果（2026-07-31）
+
+在 WSL（Ubuntu, go1.26.0 linux/amd64, CGO_ENABLED=1）执行了 P0 完成门禁验证。
+
+### race 检测（P0 门禁：无数据竞争）
+
+CI race job 覆盖的全部包 `go test -race -count=2` **全绿，0 个 DATA RACE**。
+
+过程中发现并修复 2 个真实数据竞争（commit `73897c2`、`a366572`）：
+
+| race | 根因 | 修复 |
+|---|---|---|
+| AdminComponent Serve goroutine 读 `a.srv` 与 Stop 写 `a.srv` | admin.go:195 读 / admin.go:229 写，无同步 | Start 启动 goroutine 前捕获 `srv` 局部变量，goroutine 不再读 `a.srv` 字段 |
+| TcpSvr 读 goroutine 读 `TcpReadTimeout` 与测试运行期写 | tcp_server.go:193 读 / tcp_deadline_test.go:32 写 | InitAndRun 仅零值时设默认（Start 后不可变）；测试在 InitAndRun 前设置 |
+
+### govulncheck（P0 门禁：可达漏洞为 0）
+
+`govulncheck ./...` 结果（EXIT=3）：
+- **18 个 Go 标准库可达漏洞**：全部来自 go1.26.0 标准库（crypto/tls、crypto/x509、net/http 等），修复版本 go1.26.1~1.26.5。**只能通过升级 Go 工具链修复**，非代码问题。
+- **12 个第三方包漏洞 + 2 个模块漏洞**：govulncheck 确认"代码未调用这些漏洞"（不可达），不影响。
+
+结论：第三方依赖可达漏洞为 0（V3-P0-01 依赖升级生效）。标准库漏洞需 Go 官方补丁版本（go1.26.5+），属环境待办。
+
