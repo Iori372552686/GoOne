@@ -1,6 +1,7 @@
 package ws_server
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -95,7 +96,10 @@ func (s *WsTcpSvr) Quiesce() {
 //
 // P0-04：先在锁内快照连接列表并释放锁，再在锁外逐个 Close。禁止在连接表锁内执行
 // 网络 Close。同时关闭 HTTP server 强制拆除底层监听器。
-func (s *WsTcpSvr) Stop() {
+//
+// ctx 当前未使用（关闭是同步的），保留作为未来受 context 约束强制关闭的扩展点；
+// 返回 error 使关闭结果可观测。
+func (s *WsTcpSvr) Stop(_ context.Context) error {
 	s.Quiesce()
 	s.lockOfConnInfo.Lock()
 	conns := make([]net.Conn, 0, len(s.mapOfConnInfo))
@@ -111,6 +115,7 @@ func (s *WsTcpSvr) Stop() {
 		_ = s.httpServer.Close()
 		s.httpServer = nil
 	}
+	return nil
 }
 
 func (s *WsTcpSvr) WriteData(conn net.Conn, data1 []byte, data2 []byte) error {

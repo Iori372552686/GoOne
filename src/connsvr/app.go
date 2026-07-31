@@ -156,15 +156,18 @@ func (gatewayComponent) Start(_ context.Context) error {
 	}))
 
 	// started 记录已成功启动的传输及其 Stop 函数，用于部分启动失败时逆序回滚。
+	// Stop 签名为 Stop(context.Context) error（V3-P0-04）：ctx 约束强制关闭、错误可观测。
 	started := make([]struct {
 		name string
-		stop func()
+		stop func(context.Context) error
 	}, 0, 3)
 	rollback := func(startErr error) error {
-		// 逆序回滚已启动传输。Stop 是幂等无返回值的，回滚本身不产生错误；
+		// 逆序回滚已启动传输。Stop 幂等；回滚期用 context.Background() 不受超时约束，
+		// 仅尽力关闭监听器避免端口泄漏。Stop 返回的错误被忽略：回滚的目的是清理，
 		// 原始启动错误（已含传输名）作为返回值保留。
+		ctx := context.Background()
 		for i := len(started) - 1; i >= 0; i-- {
-			started[i].stop()
+			_ = started[i].stop(ctx)
 		}
 		return startErr
 	}
@@ -176,7 +179,7 @@ func (gatewayComponent) Start(_ context.Context) error {
 	}
 	started = append(started, struct {
 		name string
-		stop func()
+		stop func(context.Context) error
 	}{"tcp", globals.ConnTcpSvr.Stop})
 
 	if err := globals.ConnWsSvr.CreateWebSocketServer(
@@ -185,7 +188,7 @@ func (gatewayComponent) Start(_ context.Context) error {
 	}
 	started = append(started, struct {
 		name string
-		stop func()
+		stop func(context.Context) error
 	}{"ws", globals.ConnWsSvr.Stop})
 
 	if kcpPort := gconf.ConnSvrCfg.Runtime.KcpPort; kcpPort > 0 {
@@ -194,7 +197,7 @@ func (gatewayComponent) Start(_ context.Context) error {
 		}
 		started = append(started, struct {
 			name string
-			stop func()
+			stop func(context.Context) error
 		}{"kcp", globals.ConnKcpSvr.Stop})
 	}
 	return nil
@@ -218,11 +221,12 @@ func (gatewayComponent) Drain(ctx context.Context) error {
 }
 
 // Stop 实现 runtime.Component：强制关闭三传输的全部残留连接，并关闭 SessionTracker
-//（唤醒任何仍在等待的 Drain）。幂等。
-func (gatewayComponent) Stop(_ context.Context) error {
-	globals.ConnTcpSvr.Stop()
-	globals.ConnWsSvr.Stop()
-	globals.ConnKcpSvr.Stop()
+//（唤醒任何仍在等待的 Drain）。幂等。ctx 透传给三传输 Stop（V3-P0-04：受 context
+// 约束、错误可观测）。
+func (gatewayComponent) Stop(ctx context.Context) error {
+	_ = globals.ConnTcpSvr.Stop(ctx)
+	_ = globals.ConnWsSvr.Stop(ctx)
+	_ = globals.ConnKcpSvr.Stop(ctx)
 	globals.SessionTracker.Close()
 	return nil
 }

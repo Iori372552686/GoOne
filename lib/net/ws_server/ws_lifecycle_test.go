@@ -1,6 +1,7 @@
 package ws_server
 
 import (
+	"context"
 	"net"
 	"strconv"
 	"testing"
@@ -53,7 +54,7 @@ func TestWsRunGinWsReportsPortConflictAtStart(t *testing.T) {
 		// 旧实现用 go router.Run 异步绑定，Start 永不返回端口冲突；这里给一点时间
 		// 让后台 goroutine（若有）跑完，再判定。
 		time.Sleep(100 * time.Millisecond)
-		svr.Stop()
+		svr.Stop(context.Background())
 		t.Fatal("期望端口冲突在 Start 期同步返回 error，实际 nil（疑似仍用异步 ListenAndServe）")
 	}
 }
@@ -83,7 +84,7 @@ func TestWsQuiesceClosesListenerKeepsUpgradeRejecting(t *testing.T) {
 	if svr.httpServer == nil {
 		t.Fatal("Quiesce 后 httpServer 应保留供 Stop 强关")
 	}
-	svr.Stop()
+	svr.Stop(context.Background())
 }
 
 // TestWsStopForceClosesHttpServer 验证 P0-04：Stop 强制 Close httpServer 并清空指针。
@@ -95,7 +96,7 @@ func TestWsStopForceClosesHttpServer(t *testing.T) {
 	if err := svr.RunGinWs("release", port); err != nil {
 		t.Fatalf("RunGinWs: %v", err)
 	}
-	svr.Stop()
+	svr.Stop(context.Background())
 	if svr.httpServer != nil {
 		t.Fatal("Stop 后 httpServer 应置 nil")
 	}

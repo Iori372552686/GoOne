@@ -7,6 +7,7 @@ package kcp_server
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -82,7 +83,10 @@ func (s *KcpSvr) Quiesce() {
 //
 // P0-04：先在锁内快照连接列表并释放锁，再在锁外逐个 Close。禁止在连接表锁内执行
 // 网络 Close。
-func (s *KcpSvr) Stop() {
+//
+// ctx 当前未使用（关闭是同步的），保留作为未来受 context 约束强制关闭的扩展点；
+// 返回 error 使关闭结果可观测。
+func (s *KcpSvr) Stop(_ context.Context) error {
 	s.Quiesce()
 	s.lockOfConnInfo.Lock()
 	conns := make([]net.Conn, 0, len(s.mapOfConnInfo))
@@ -93,6 +97,7 @@ func (s *KcpSvr) Stop() {
 	for _, conn := range conns {
 		_ = conn.Close()
 	}
+	return nil
 }
 
 // WriteData enqueues data1+data2 to the connection's write goroutine.

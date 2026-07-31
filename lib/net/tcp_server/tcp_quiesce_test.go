@@ -1,6 +1,7 @@
 package tcp_server
 
 import (
+	"context"
 	"net"
 	"strconv"
 	"sync"
@@ -77,7 +78,7 @@ func TestTcpSvrQuiesceRejectsNewConnections(t *testing.T) {
 	// 幂等：再次 Quiesce 不 panic。
 	svr.Quiesce()
 	// Stop 关闭既有连接并清理。
-	svr.Stop()
+	svr.Stop(context.Background())
 }
 
 func TestTcpSvrStopClosesExistingConnections(t *testing.T) {
@@ -96,7 +97,7 @@ func TestTcpSvrStopClosesExistingConnections(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Stop 应关闭既有连接。
-	svr.Stop()
+	svr.Stop(context.Background())
 	// 客户端读应返回 EOF 或 error（连接被关）。
 	buf := make([]byte, 1)
 	if _, err := c.Read(buf); err == nil {
@@ -105,5 +106,5 @@ func TestTcpSvrStopClosesExistingConnections(t *testing.T) {
 	_ = c.Close()
 
 	// 幂等。
-	svr.Stop()
+	svr.Stop(context.Background())
 }

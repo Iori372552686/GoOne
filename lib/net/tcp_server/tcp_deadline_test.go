@@ -1,6 +1,7 @@
 package tcp_server
 
 import (
+	"context"
 	"net"
 	"strconv"
 	"testing"
@@ -29,7 +30,7 @@ func TestTcpDeadlineUsesRealTimeNotCachedDatetime(t *testing.T) {
 	if err := svr.InitAndRun("127.0.0.1", port, handler); err != nil {
 		t.Fatalf("InitAndRun: %v", err)
 	}
-	defer svr.Stop()
+	defer svr.Stop(context.Background())
 
 	c, err := net.Dial("tcp", "127.0.0.1:"+strconv.Itoa(port))
 	if err != nil {
@@ -79,7 +80,7 @@ func TestTcpStopReleasesConnTableLockQuickly(t *testing.T) {
 	time.Sleep(100 * time.Millisecond) // 等 server 注册全部连接。
 
 	start := time.Now()
-	svr.Stop()
+	svr.Stop(context.Background())
 	elapsed := time.Since(start)
 	for _, c := range conns {
 		_ = c.Close()
