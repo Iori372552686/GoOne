@@ -188,15 +188,10 @@ func (a *AdminComponent) Start(_ context.Context) error {
 		// setupHTTP2_Serve 对未配置 TLS 的 server 触发 nil 解引用。
 		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 	}
+	srv := a.srv // 捕获到局部变量，Serve goroutine 只用它，避免与 Stop 的 a.srv 写竞争。
 	go func() {
 		logger.Infof("%s admin server listening on %s", a.cfg.serviceName, a.addr)
-		// 防御：a.srv 在 Start 内赋值，理论上 goroutine 启动时已就绪；但若 Start 被
-		// 并发误调或被外部重置，避免 nil 解引用 panic 杀死测试进程。
-		if a.srv == nil {
-			logger.Errorf("%s admin server: srv is nil, cannot Serve", a.cfg.serviceName)
-			return
-		}
-		if err := a.srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Errorf("%s admin server stopped with error | %v", a.cfg.serviceName, err)
 			// 上报非预期退出，触发 App 监督关停。channel 容量 1，不阻塞。
 			select {
