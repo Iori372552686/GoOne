@@ -38,6 +38,8 @@ type webRuntimeComponent struct {
 	mu      sync.RWMutex
 	httpSrv *http.Server
 	grpcSrv *grpc.Server
+	// healthSrv 是 gRPC health 服务，Drain 时置 NOT_SERVING 使负载均衡摘流（V3-P0-06）。
+	healthSrv *health.Server
 
 	// runtimeErrCh 汇聚 HTTP/gRPC Serve 的非预期退出错误（容量 1）。
 	runtimeErrCh chan error
@@ -148,6 +150,7 @@ func (w *webRuntimeComponent) startGRPCServer(d *ssrpc.Dispatcher) error {
 	healthSrv.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 	healthSrv.SetServingStatus("web.websvr.v1.WebApiService", grpc_health_v1.HealthCheckResponse_SERVING)
 	grpc_health_v1.RegisterHealthServer(srv, healthSrv)
+	w.setHealthSrv(healthSrv)
 	// reflection 仅在显式 debug 配置下启用，避免生产环境暴露服务元数据。
 	if conf.Reflection {
 		reflection.Register(srv)
@@ -167,6 +170,12 @@ func (w *webRuntimeComponent) startGRPCServer(d *ssrpc.Dispatcher) error {
 // shutdown 是 Drain 的实现。P0-07：超时时保留 server 指针（不置 nil），让 Stop 能强关。
 func (w *webRuntimeComponent) shutdown(ctx context.Context) error {
 	var shutdownErr error
+	// V3-P0-06：先把 gRPC health 置 NOT_SERVING，使外部负载均衡/探针立即摘流，
+	// 再 GracefulStop/Shutdown 等待在途请求。
+	if hs := w.getHealthSrv(); hs != nil {
+		hs.SetServingStatus("", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
+		hs.SetServingStatus("web.websvr.v1.WebApiService", grpc_health_v1.HealthCheckResponse_NOT_SERVING)
+	}
 	grpcSrv := w.getGRPCServer()
 	if grpcSrv != nil {
 		done := make(chan struct{})
@@ -217,6 +226,18 @@ func (w *webRuntimeComponent) setGRPCServer(srv *grpc.Server) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.grpcSrv = srv
+}
+
+func (w *webRuntimeComponent) setHealthSrv(srv *health.Server) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.healthSrv = srv
+}
+
+func (w *webRuntimeComponent) getHealthSrv() *health.Server {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.healthSrv
 }
 
 func (w *webRuntimeComponent) getGRPCServer() *grpc.Server {
