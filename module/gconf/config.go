@@ -118,6 +118,26 @@ type ConnRuntimeConfig struct {
 	KcpPort int `json:"kcp_port" yaml:"kcp_port"`
 }
 
+// ConnCapacityConfig 定义 connsvr 网关的过载保护参数（V3-P1-01）。
+// 所有字段 0 值表示"不限制"（向后兼容）；生产配置应显式设置。
+// OverloadMode 控制策略：off（不限）、shadow（只统计不拒绝）、enforce（拒绝）。
+type ConnCapacityConfig struct {
+	// MaxConnections 总连接数上限（含未认证）。0=不限。
+	MaxConnections int64 `json:"max_connections" yaml:"max_connections"`
+	// MaxUnauthenticatedConnections 未认证连接上限（已连接但未 BindClient）。
+	MaxUnauthenticatedConnections int64 `json:"max_unauthenticated_connections" yaml:"max_unauthenticated_connections"`
+	// ConnectionRate 每秒新建连接数上限。0=不限。
+	ConnectionRate int `json:"connection_rate" yaml:"connection_rate"`
+	// LoginRate 每秒首次登录（BindClient）数上限。0=不限。
+	LoginRate int `json:"login_rate" yaml:"login_rate"`
+	// MaxInflight SSRPC 全局并发在途请求数上限。0=不限。
+	MaxInflight int `json:"max_inflight" yaml:"max_inflight"`
+	// MaxInflightPerMethod 按 method 名覆盖 MaxInflight。key 为 method 名。
+	MaxInflightPerMethod map[string]int `json:"max_inflight_per_method" yaml:"max_inflight_per_method"`
+	// OverloadMode 取值 off/shadow/enforce。shadow 只统计上报不拒绝；enforce 超限拒绝。
+	OverloadMode string `json:"overload_mode" yaml:"overload_mode"`
+}
+
 type MainCapacityConfig struct {
 	TransShardCount        int      `json:"trans_shard_count" yaml:"trans_shard_count"`
 	RoleSyncPatchEnabled   bool     `json:"role_sync_patch_enabled" yaml:"role_sync_patch_enabled"`
@@ -136,7 +156,8 @@ type WebRuntimeConfig struct {
 
 type ConnSvr struct {
 	ServiceCommonConfig `yaml:",inline"`
-	Runtime             ConnRuntimeConfig `json:"runtime" yaml:"runtime"`
+	Runtime             ConnRuntimeConfig  `json:"runtime" yaml:"runtime"`
+	Capacity            ConnCapacityConfig `json:"capacity" yaml:"capacity"`
 }
 
 type InfoSvr struct {
@@ -304,6 +325,18 @@ func (c *ConnSvr) validate() error {
 	}
 	if c.Runtime.ListenPort <= 0 {
 		return fmt.Errorf("connsvr.runtime.listen_port must be > 0")
+	}
+	// V3-P1-01：capacity 字段校验。
+	cap := &c.Capacity
+	if cap.MaxConnections < 0 || cap.MaxUnauthenticatedConnections < 0 ||
+		cap.ConnectionRate < 0 || cap.LoginRate < 0 || cap.MaxInflight < 0 {
+		return fmt.Errorf("connsvr.capacity 字段不得为负")
+	}
+	switch cap.OverloadMode {
+	case "", "off", "shadow", "enforce":
+		// 空字符串等同于 off（向后兼容）。
+	default:
+		return fmt.Errorf("connsvr.capacity.overload_mode 取值必须为 off/shadow/enforce，实际 %q", cap.OverloadMode)
 	}
 	return nil
 }
