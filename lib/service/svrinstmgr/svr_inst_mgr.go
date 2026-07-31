@@ -42,9 +42,15 @@ type ServerInstanceMgr struct {
 	client             registry.Client
 	reg                registry.Registrar
 	discovery          registry.Discovery
-	watcher            registry.Watcher
-	stopWatch          func()
-	lock               sync.RWMutex
+
+	// V4 P0-07：watcher/cancel/registry 的创建与 Close 全部在 closeMu 下进行，
+	// 消除「Close 与 watcher 创建并发」的迟到 watcher / use-after-close 竞态。
+	closeMu   sync.Mutex
+	watcher   registry.Watcher
+	stopWatch context.CancelFunc
+	watchWG   sync.WaitGroup // join runWatch goroutine
+	closed    bool
+	lock      sync.RWMutex
 }
 
 // -------------------------------- public --------------------------------
@@ -81,20 +87,34 @@ func (s *ServerInstanceMgr) InitAndRun(selfBusID string, routeRules map[uint32]u
 		return fmt.Errorf("register self into registry error: %w", err)
 	}
 
+	s.watchWG.Add(1)
 	go s.runWatch(cfg.ServiceName)
 	return nil
 }
 
+// Close 取消 watch context、join runWatch goroutine 并关闭 registry client（V4 P0-07）。
+// 与 runWatch 的 watcher 创建互斥，避免迟到 watcher 与 use-after-close。
 func (s *ServerInstanceMgr) Close() {
+	s.closeMu.Lock()
+	s.closed = true
 	if s.stopWatch != nil {
 		s.stopWatch()
+		s.stopWatch = nil
 	}
 	if s.watcher != nil {
 		_ = s.watcher.Stop()
+		s.watcher = nil
 	}
+	s.closeMu.Unlock()
+
+	s.watchWG.Wait()
+
+	s.closeMu.Lock()
 	if s.client != nil {
 		_ = s.client.Close()
+		s.client = nil
 	}
+	s.closeMu.Unlock()
 }
 
 // 根据ServerType和预先设定的RouterRule，获取一个ServerInstance
@@ -147,35 +167,76 @@ func (s *ServerInstanceMgr) GetAllSvrInsBySvrType(severType uint32) []uint32 {
 // -------------------------------- private --------------------------------
 
 func (s *ServerInstanceMgr) runWatch(serviceName string) {
+	defer s.watchWG.Done()
 	ctx, cancel := context.WithCancel(context.Background())
+
+	s.closeMu.Lock()
 	s.stopWatch = cancel
+	s.closeMu.Unlock()
 
 	for {
+		// Close 已触发：不再创建新 watcher。
+		s.closeMu.Lock()
+		if s.closed {
+			s.closeMu.Unlock()
+			return
+		}
+		s.closeMu.Unlock()
+
 		w, err := s.discovery.Watch(ctx, serviceName)
 		if err != nil {
 			if ctx.Err() != nil {
 				return
 			}
 			logger.Warningf("registry watch create failed: %v", err)
-			time.Sleep(time.Second)
+			// V4 P0-07：可被 Close 取消的退避，替代裸 time.Sleep。
+			if !sleepOrCancel(ctx, time.Second) {
+				return
+			}
 			continue
 		}
+
+		s.closeMu.Lock()
+		if s.closed {
+			s.closeMu.Unlock()
+			_ = w.Stop()
+			return
+		}
 		s.watcher = w
+		s.closeMu.Unlock()
 
 		for {
 			services, err := w.Next()
 			if err != nil {
-				_ = w.Stop()
-				s.watcher = nil
+				s.closeMu.Lock()
+				if s.watcher == w {
+					_ = w.Stop()
+					s.watcher = nil
+				}
+				s.closeMu.Unlock()
 				if ctx.Err() != nil {
 					return
 				}
 				logger.Warningf("registry watch next failed: %v", err)
-				time.Sleep(time.Second)
+				if !sleepOrCancel(ctx, time.Second) {
+					return
+				}
 				break // recreate watcher
 			}
 			s.refreshServices(services)
 		}
+	}
+}
+
+// sleepOrCancel 等待 d，ctx 取消时立即返回 false（V4 P0-07：替代裸 time.Sleep）。
+func sleepOrCancel(ctx context.Context, d time.Duration) bool {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
 	}
 }
 

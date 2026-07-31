@@ -1,6 +1,7 @@
 package bus_test
 
 import (
+	"context"
 	"log"
 	"testing"
 	"time"
@@ -46,11 +47,17 @@ func runBusSmoke(t *testing.T, addr string) {
 		t.Skipf("bus not available for %q: %v", addr, err)
 	}
 
+	// V4 P0-07：Start 同步等待首次连接；失败即跳过（中间件不可达）。
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := impl.Start(ctx); err != nil {
+		t.Skipf("bus Start failed for %q: %v", addr, err)
+	}
+
 	if err := impl.Send(impl.SelfBusId(), []byte("abc"), nil); err != nil {
 		t.Logf("Send error: %v", err)
 	}
 
-	time.Sleep(2 * time.Second)
 	_ = impl.Close()
 }
 

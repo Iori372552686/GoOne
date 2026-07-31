@@ -2,6 +2,7 @@ package router
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
@@ -13,13 +14,20 @@ type fakeBus struct {
 
 	sendCalls  int
 	closeCalls int
+	startCalls int
 	lastDst    uint32
 	lastData1  []byte
 	lastData2  []byte
+	startErr   error
 }
 
 func (b *fakeBus) SelfBusId() uint32 {
 	return b.selfBusID
+}
+
+func (b *fakeBus) Start(_ context.Context) error {
+	b.startCalls++
+	return b.startErr
 }
 
 func (b *fakeBus) Send(dstBusId uint32, data1 []byte, data2 []byte) error {

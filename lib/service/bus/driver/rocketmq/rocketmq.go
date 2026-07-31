@@ -64,6 +64,28 @@ func (b *BusImplRocketMQ) SelfBusId() uint32                    { return b.selfB
 func (b *BusImplRocketMQ) SetReceiver(onRecvMsg bus.MsgHandler) { b.onRecv = onRecvMsg }
 func (b *BusImplRocketMQ) Healthy() bool                        { return b.connected.Load() && !b.closed.Load() }
 
+// Start 等待后台 run goroutine 完成首次连接（V4 P0-07：IBus.Start 契约）。
+func (b *BusImplRocketMQ) Start(ctx context.Context) error {
+	if b.closed.Load() {
+		return bus.ErrBusClosed
+	}
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if b.Healthy() {
+			return nil
+		}
+		if b.closed.Load() {
+			return bus.ErrBusClosed
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("rocketmq bus start: %w", ctx.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
 func (b *BusImplRocketMQ) tagFor(busId uint32) string {
 	return wire.CalcQueueName(busId)
 }

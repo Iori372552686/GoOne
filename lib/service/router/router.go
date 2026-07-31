@@ -6,10 +6,12 @@
 package router
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 
@@ -60,21 +62,25 @@ func (r *Router) SelfSvrType() uint32 {
 	return (r.SelfBusId() >> 8) & 0xff
 }
 
-// InitAndRunWithBusCtor 初始化服务发现并连接 bus。cb 将由底层 bus 协程调用。
+// InitAndRunWithBusCtor 连接 bus 并初始化服务发现。cb 将由底层 bus 协程调用。
 // busCtor 接收 router 的 onRecvMsg 回调（在 router 设置好 cbOnRecvSSPacket 后传入），
 // 返回一个 bus.IBus。这让服务用 bus.DriverRegistry 显式装配只链接所需 MQ driver
 // （如只 rabbitmq），缩小二进制与漏洞面。bus 所有权移交 Router：Close 时由 Router 关闭。
+//
+// V4 P0-07 启动顺序（关键）：设置 receiver → 创建并 Start Bus（同步等首次连接）→
+// Bus 就绪后才注册服务发现 → 启动 discovery watch。任一步失败时逆序回滚已建立的步骤，
+// 确保不会被服务发现注册但 Bus 不可用。
 func (r *Router) InitAndRunWithBusCtor(selfBusId string, cb CbOnRecvSSPacket,
 	busCtor func(onRecvMsg bus.MsgHandler) (bus.IBus, error),
 	routeRules map[uint32]uint32, registerAddr string) error {
 	r.beginShutdownOnce = sync.Once{}
 	r.closeOnce = sync.Once{}
 	r.shuttingDown.Store(false)
-	if err := r.instanceMgr.InitAndRun(selfBusId, routeRules, registerAddr); err != nil {
-		return err
-	}
 
+	// 1) 设置 receiver（cb），使 Start 后立即能投递消息。
 	r.cbOnRecvSSPacket = cb
+
+	// 2) 创建并 Start Bus：同步等待首次连接/队列声明/consumer 注册。
 	busImpl, err := busCtor(r.onRecvBusMsg)
 	if err != nil {
 		return fmt.Errorf("failed to create bus implement: %w", err)
@@ -82,9 +88,25 @@ func (r *Router) InitAndRunWithBusCtor(selfBusId string, cb CbOnRecvSSPacket,
 	if busImpl == nil {
 		return errors.New("failed to create bus implement: nil bus")
 	}
+	startCtx, startCancel := context.WithTimeout(context.Background(), busStartTimeout)
+	defer startCancel()
+	if err := busImpl.Start(startCtx); err != nil {
+		_ = busImpl.Close()
+		return fmt.Errorf("failed to start bus: %w", err)
+	}
 	r.busImpl = busImpl
+
+	// 3) Bus 就绪后才注册服务发现 + 启动 watch。失败时回滚已起的 Bus。
+	if err := r.instanceMgr.InitAndRun(selfBusId, routeRules, registerAddr); err != nil {
+		r.busImpl = nil
+		_ = busImpl.Close()
+		return err
+	}
 	return nil
 }
+
+// busStartTimeout 是 Start 等待首次连接的兜底超时（调用方未传 ctx 时）。
+const busStartTimeout = 15 * time.Second
 
 func (r *Router) BeginShutdown() {
 	r.beginShutdownOnce.Do(func() {

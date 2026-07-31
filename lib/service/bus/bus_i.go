@@ -12,6 +12,7 @@
 package bus
 
 import (
+	"context"
 	"errors"
 )
 
@@ -20,8 +21,21 @@ type MsgHandler func(srcBusID uint32, data []byte) error
 
 // 需保证协程并发安全
 type IBus interface {
+	// Start 同步完成首次连接与 consumer 注册（V4 P0-07）。
+	//
+	// 契约：返回 nil 表示 MQ 已连接、消费队列已声明、consumer 已创建，且消费/重连
+	// goroutine 已启动。任一阶段失败按 ctx 返回 error，不启动后台 goroutine、不泄漏
+	// 连接。Router 必须在 Start 成功后才注册服务发现，避免「被发现但 Bus 不可用」。
+	// 已 Start 或已 Close 时返回 error。
+	Start(ctx context.Context) error
+
 	SelfBusId() uint32
+
+	// Send 的成功语义（V4 P0-07）：返回 nil 至少表示消息已被当前连接成功 publish。
+	// 不允许「记日志后返回 nil」的虚假成功。Close 后返回 ErrBusClosed。
 	Send(dstBusId uint32, data1 []byte, data2 []byte) error
+
+	// Close 取消并 join 全部后台 goroutine、关闭连接，幂等。
 	Close() error
 
 	// Healthy 返回当前与 MQ 的连接是否就绪（用于 readyz 健康检查）。

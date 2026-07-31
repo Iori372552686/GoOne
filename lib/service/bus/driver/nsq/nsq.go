@@ -3,6 +3,7 @@
 package nsq
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -19,14 +20,14 @@ import (
 *  @Description:
  */
 type BusImplNsqMQ struct {
-	selfBusId   uint32
-	lookupAddr  []string
-	NsqdAddr    string
-	topicPrefix string
-	chanName    string
-	concurrency int
-	maxInFlight          int
-	lookupdPollInterval  time.Duration
+	selfBusId           uint32
+	lookupAddr          []string
+	NsqdAddr            string
+	topicPrefix         string
+	chanName            string
+	concurrency         int
+	maxInFlight         int
+	lookupdPollInterval time.Duration
 
 	timeout   time.Duration
 	chanOut   chan wire.OutMsg
@@ -40,6 +41,28 @@ type BusImplNsqMQ struct {
 
 func (b *BusImplNsqMQ) Healthy() bool {
 	return b.connected.Load() && !b.closed.Load()
+}
+
+// Start 等待后台 run goroutine 完成首次连接（V4 P0-07：IBus.Start 契约）。
+func (b *BusImplNsqMQ) Start(ctx context.Context) error {
+	if b.closed.Load() {
+		return bus.ErrBusClosed
+	}
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if b.Healthy() {
+			return nil
+		}
+		if b.closed.Load() {
+			return bus.ErrBusClosed
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("nsq bus start: %w", ctx.Err())
+		case <-ticker.C:
+		}
+	}
 }
 
 /**

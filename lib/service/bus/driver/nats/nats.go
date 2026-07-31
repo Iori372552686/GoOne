@@ -3,6 +3,7 @@
 package nats
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -54,6 +55,28 @@ func NewBusImplNatsMQ(selfBusId uint32, onRecvMsg bus.MsgHandler, conf bus.NatsC
 func (b *BusImplNatsMQ) SelfBusId() uint32                    { return b.selfBusId }
 func (b *BusImplNatsMQ) SetReceiver(onRecvMsg bus.MsgHandler) { b.onRecv = onRecvMsg }
 func (b *BusImplNatsMQ) Healthy() bool                        { return b.connected.Load() && !b.closed.Load() }
+
+// Start 等待后台 run goroutine 完成首次连接（V4 P0-07：IBus.Start 契约）。
+func (b *BusImplNatsMQ) Start(ctx context.Context) error {
+	if b.closed.Load() {
+		return bus.ErrBusClosed
+	}
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if b.Healthy() {
+			return nil
+		}
+		if b.closed.Load() {
+			return bus.ErrBusClosed
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("nats bus start: %w", ctx.Err())
+		case <-ticker.C:
+		}
+	}
+}
 
 func (b *BusImplNatsMQ) subjectFor(busId uint32) string {
 	return b.subjectPrefix + "." + wire.CalcQueueName(busId)

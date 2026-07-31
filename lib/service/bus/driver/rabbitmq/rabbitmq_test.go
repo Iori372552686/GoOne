@@ -1,6 +1,7 @@
 package rabbitmq
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/url"
@@ -30,12 +31,10 @@ func TestDriverNameAndCtor(t *testing.T) {
 }
 
 // TestNewBusImplRabbitMQCloseIsIdempotent 验证 Close 幂等，且 Close 后 Send 返回
-// ErrBusClosed。不连接真实 RabbitMQ（run 会重试但 StopCh 关闭后退出）。
+// ErrBusClosed。不连接真实 RabbitMQ（V4 P0-07：NewBusImplRabbitMQ 不再自动连接，
+// Start 之前 connected 为 false）。
 func TestNewBusImplRabbitMQCloseIsIdempotent(t *testing.T) {
-	// 用一个不可达地址，避免真实连接；run goroutine 会重试但 stopCh 关闭即退出。
 	b := NewBusImplRabbitMQ(0x01010101, func(uint32, []byte) error { return nil }, "amqp://guest:guest@127.0.0.1:1/")
-	// 给 run 一点时间进入重试循环。
-	time.Sleep(100 * time.Millisecond)
 
 	if err := b.Close(); err != nil {
 		t.Fatalf("first Close: %v", err)
@@ -44,7 +43,7 @@ func TestNewBusImplRabbitMQCloseIsIdempotent(t *testing.T) {
 	if err := b.Close(); err != nil {
 		t.Fatalf("second Close should be idempotent: %v", err)
 	}
-	// Close 后 Send 返回 ErrBusClosed。
+	// Close 后 Send 返回 ErrBusClosed（V4 P0-07：关闭后绝不虚假成功）。
 	if err := b.Send(0x02020202, []byte("x"), nil); err != bus.ErrBusClosed {
 		t.Fatalf("Close 后 Send 应返回 ErrBusClosed，got %v", err)
 	}
@@ -53,19 +52,21 @@ func TestNewBusImplRabbitMQCloseIsIdempotent(t *testing.T) {
 	}
 }
 
-// TestRabbitMQReconnectRetryOnUnreachable 验证断线重连契约（V3-P1-05）：
-// broker 不可达时 run 进入重试循环（不立即放弃），Close 能干净中断重试 goroutine。
-// 不依赖真实 RabbitMQ。
-func TestRabbitMQReconnectRetryOnUnreachable(t *testing.T) {
-	// 不可达地址：run 的 process 会立即失败，进入指数退避重试循环。
+// TestRabbitMQStartFailsOnUnreachable 验证 V4 P0-07 故障契约：RabbitMQ 不可达时
+// Start 在 ctx 超时后返回 error，不启动后台 goroutine、不泄漏连接，服务发现中无
+// 当前实例（由调用方 Router 保证：Start 失败即返回、不进入注册）。
+func TestRabbitMQStartFailsOnUnreachable(t *testing.T) {
 	b := NewBusImplRabbitMQ(0x03030303, func(uint32, []byte) error { return nil }, "amqp://guest:guest@127.0.0.1:1/")
-	// 让 run 进入重试循环（process 失败 → retryCount 增长 → 退避）。
-	time.Sleep(300 * time.Millisecond)
-	// 不可达时 Healthy 应为 false（connected 未置位）。
-	if b.Healthy() {
-		t.Fatal("unreachable broker: Healthy should be false during retry")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	if err := b.Start(ctx); err == nil {
+		t.Fatal("Start 对不可达 RabbitMQ 应在 ctx 超时后返回 error")
 	}
-	// Close 必须能中断重试循环并返回（不阻塞、不泄漏 goroutine）。
+	if b.Healthy() {
+		t.Fatal("不可达时 Healthy 应为 false")
+	}
+	// Start 失败后未启动 goroutine，Close 必须立即返回（不阻塞、不泄漏）。
 	done := make(chan struct{})
 	go func() {
 		_ = b.Close()
@@ -73,13 +74,22 @@ func TestRabbitMQReconnectRetryOnUnreachable(t *testing.T) {
 	}()
 	select {
 	case <-done:
-		// Close 成功返回，重试 goroutine 已退出。
 	case <-time.After(3 * time.Second):
-		t.Fatal("Close 未在 3s 内中断重试循环（goroutine 泄漏）")
+		t.Fatal("Start 失败后 Close 未在 3s 内返回（goroutine 泄漏）")
 	}
-	// 重复 Close 仍幂等。
-	if err := b.Close(); err != nil {
-		t.Fatalf("repeat Close should be idempotent: %v", err)
+}
+
+// TestRabbitMQStartTwiceRejected 验证重复 Start 返回 error（V4 P0-07：已 Start）。
+// 不依赖真实 RabbitMQ：使用真实本地实例时由 itest 门控；这里用不可达地址覆盖失败路径。
+func TestRabbitMQStartTwiceRejected(t *testing.T) {
+	b := NewBusImplRabbitMQ(0x04040404, nil, "amqp://guest:guest@127.0.0.1:1/")
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	_ = b.Start(ctx) // 失败（不可达），不进入 started 状态
+	// 先 Close 清理，再 Start 应返回 ErrBusClosed。
+	_ = b.Close()
+	if err := b.Start(context.Background()); err == nil {
+		t.Fatal("Close 后 Start 应返回 error")
 	}
 }
 
@@ -109,13 +119,17 @@ func TestRabbitMQRealIntegration(t *testing.T) {
 	snd := NewBusImplRabbitMQ(sender, func(uint32, []byte) error { return nil }, addr)
 	defer snd.Close()
 
-	// 等待连接建立。
-	deadline := time.Now().Add(8 * time.Second)
-	for time.Now().Before(deadline) && !recv.Healthy() {
-		time.Sleep(100 * time.Millisecond)
+	// V4 P0-07：Start 同步等待首次连接。
+	startCtx, startCancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer startCancel()
+	if err := recv.Start(startCtx); err != nil {
+		t.Fatalf("receiver Start: %v", err)
+	}
+	if err := snd.Start(startCtx); err != nil {
+		t.Fatalf("sender Start: %v", err)
 	}
 	if !recv.Healthy() {
-		t.Fatal("receiver 未在 8s 内连接 RabbitMQ")
+		t.Fatal("receiver Start 成功后 Healthy 应为 true")
 	}
 
 	// 发送若干消息，验证接收。

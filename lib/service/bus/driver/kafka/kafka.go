@@ -60,6 +60,30 @@ func (b *BusImplKafkaMQ) SelfBusId() uint32                    { return b.selfBu
 func (b *BusImplKafkaMQ) SetReceiver(onRecvMsg bus.MsgHandler) { b.onRecv = onRecvMsg }
 func (b *BusImplKafkaMQ) Healthy() bool                        { return b.connected.Load() && !b.closed.Load() }
 
+// Start 等待后台 run goroutine 完成首次连接（V4 P0-07：IBus.Start 契约）。
+// Kafka driver 的连接仍由 run goroutine 异步建立，本方法轮询 Healthy 至 ctx 超时。
+// 已就绪或已关闭时立即返回。
+func (b *BusImplKafkaMQ) Start(ctx context.Context) error {
+	if b.closed.Load() {
+		return bus.ErrBusClosed
+	}
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if b.Healthy() {
+			return nil
+		}
+		if b.closed.Load() {
+			return bus.ErrBusClosed
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("kafka bus start: %w", ctx.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
 func (b *BusImplKafkaMQ) topicFor(busId uint32) string {
 	return b.topicPrefix + "." + wire.CalcQueueName(busId)
 }
