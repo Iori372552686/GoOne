@@ -18,7 +18,7 @@ type DefaultMWOptions struct {
 	MCPGuard  MCPGuardFunc
 	Extra     []Middleware
 
-	// InflightLimiter 控制 SSRPC 在途请求过载保护（V3-P1-01）。nil 时无 inflight 限流。
+	// InflightLimiter 控制 SSRPC 在途请求过载保护。nil 时无 inflight 限流。
 	InflightLimiter InflightLimiter
 	// MaxInflight 全局在途上限；MaxInflightPerMethod 按 method 名覆盖。0=不限。
 	MaxInflight          int
@@ -35,7 +35,7 @@ func DefaultMiddlewares(opts DefaultMWOptions) []Middleware {
 		Recover(),
 		Logging(),
 	}
-	// V3-P1-01：inflight admission 紧跟 Logging 之后、Auth/UIDLock 之前，
+	// inflight admission 紧跟 Logging 之后、Auth/UIDLock 之前，
 	// 使过载拒绝不占用认证/加锁资源。
 	if opts.InflightLimiter != nil && opts.MaxInflight > 0 {
 		mws = append(mws, AdmissionMiddleware(opts.InflightLimiter, opts.MaxInflight, opts.MaxInflightPerMethod))

@@ -14,7 +14,7 @@ import (
 
 // RunGinWs 同步绑定 HTTP 监听器并启动 Gin WebSocket 服务。
 //
-// P0-04 关键修复：
+// 关键修复：
 //   - 同步 net.Listen 使端口冲突在 Start 期（而非稍后的 goroutine 内）返回。
 //   - 删除包级全局 gin.Engine，改为实例字段，支持同进程多 WS 实例。
 //   - 保存 listener / http.Server，使 Quiesce 能关闭 listener 停止新 Upgrade、Stop 能

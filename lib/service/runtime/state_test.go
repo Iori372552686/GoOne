@@ -99,7 +99,7 @@ func TestShutdownObserverFailureDoesNotBlock(t *testing.T) {
 	}
 }
 
-// TestRejectedReadyTransitionDoesNotFlipGauge 验证 P0-02 修复：当 Ready 观察者拒绝
+// TestRejectedReadyTransitionDoesNotFlipGauge 验证 修复：当 Ready 观察者拒绝
 // 转换时，状态回滚到前一状态，且 goone_lifecycle_state gauge 不得翻转。
 //
 // 历史缺陷：setLifecycleState(from,to) 曾在 transition 内部于"提交成功之前"调用，
@@ -141,7 +141,7 @@ func TestNewStateStoreInitializesStartingGauge(t *testing.T) {
 	}
 }
 
-// TestAllocateSignatureReturnsErrorOnInvalidState 验证 P0-02：Allocate 接受
+// TestAllocateSignatureReturnsErrorOnInvalidState 验证 Allocate 接受
 // context.Context 并返回 error，对非法状态返回 ErrInvalidStateTransition，对已
 // Allocated 幂等返回 nil。
 func TestAllocateSignatureReturnsErrorOnInvalidState(t *testing.T) {

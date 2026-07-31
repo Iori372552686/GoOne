@@ -8,7 +8,7 @@ import (
 )
 
 // BenchmarkTaskIdle 度量空闲 Task（周期内无实际工作）的调度开销。这是“空闲服务不再
-// 每 10ms 唤醒”之后，单个精确周期 Task 的稳态成本基线（roadmap P1-02）。
+// 每 10ms 唤醒”之后，单个精确周期 Task 的稳态成本基线。
 func BenchmarkTaskIdle(b *testing.B) {
 	task := New("bench_idle", 10*time.Millisecond, func(context.Context) error {
 		return nil

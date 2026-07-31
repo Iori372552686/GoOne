@@ -2,7 +2,7 @@ module github.com/Iori372552686/GoOne
 
 go 1.25.4
 
-// V4 P0-01：固定工具链基线，避免从 go.mod 旧 patch 解析出不安全工具链。
+// 固定工具链基线，避免从 go.mod 旧 patch 解析出不安全工具链。
 // 语言版本（go 1.25.4）保留以维持兼容；toolchain 指定 CI/构建实际使用的补丁版本。
 toolchain go1.25.12
 

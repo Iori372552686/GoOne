@@ -13,7 +13,7 @@ import (
 )
 
 // freeUDPPort 向操作系统申请一个空闲 UDP 端口供 KCP 监听，避免窄随机端口窗口在
-// -count=N 下产生端口占用（V4 P0-04）。
+// -count=N 下产生端口占用。
 func freeUDPPort(t *testing.T) int {
 	t.Helper()
 	l, err := net.ListenPacket("udp", "127.0.0.1:0")
@@ -32,7 +32,7 @@ func TestKcpGatewaySession(t *testing.T) {
 	const uid = uint64(70001)
 
 	gw := NewKcpSvr()
-	// V3-P1-02：单路径化后业务方法始终走 hub，注入一个 hub 使端到端测试走真实路径。
+	// 单路径化后业务方法始终走 hub，注入一个 hub 使端到端测试走真实路径。
 	gw.SetHub(NewSessionHub(noopCounter{}))
 	// 网关回调：首包即绑定会话（真实路径由登录流程绑定）。
 	err := gw.CreateKcpServer(port, func(conn net.Conn, data []byte) {
@@ -41,7 +41,7 @@ func TestKcpGatewaySession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("kcp gateway start failed: %v", err)
 	}
-	// V4 P0-04：测试退出时 Stop 网关，关闭 listener 与连接，避免 goroutine/listener 泄漏。
+	// 测试退出时 Stop 网关，关闭 listener 与连接，避免 goroutine/listener 泄漏。
 	t.Cleanup(func() {
 		_ = gw.Stop(context.Background())
 	})

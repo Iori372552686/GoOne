@@ -7,7 +7,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 )
 
-// Registrar 是把一个服务的 binding 批次注册进 Registry 的生成器函数（P1-01）。生成
+// Registrar 是把一个服务的 binding 批次注册进 Registry 的生成器函数。生成
 // 器为每个服务生成 Register<Service>ToRegistry(r *Registry, srv SServer) error，其签名
 // 与本类型匹配。
 type Registrar func(*Registry) error
@@ -23,7 +23,7 @@ func WithTransactionManager(mgr transaction.ITransactionMgr) RegistryComponentOp
 	}
 }
 
-// RegistryComponent 把一个或多个生成 Registrar 装配为一个 runtime.Component（P1-01）。
+// RegistryComponent 把一个或多个生成 Registrar 装配为一个 runtime.Component。
 //
 // Start 固定顺序：
 //  1. 创建 App 实例级 Registry（每个 RegistryComponent 一个）。

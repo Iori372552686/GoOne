@@ -65,7 +65,7 @@ func TestLoadRejectsSecondCall(t *testing.T) {
 
 // mergeWhitelist applies only LogLevel and Tracing from candidate; everything
 // else (Port, Headers, Tags) stays at old. It reports Port as restart_required
-// when it differs. P1-06：返回 MergeResult，Applied 上报被应用字段。
+// when it differs. 返回 MergeResult，Applied 上报被应用字段。
 func mergeWhitelist(old, candidate *cfg) (MergeResult[cfg], error) {
 	effective := *old // shallow copy of scalar struct
 	effective.LogLevel = candidate.LogLevel
@@ -230,7 +230,7 @@ func TestConcurrentCurrentAndReload(t *testing.T) {
 	wg.Wait()
 }
 
-// TestConcurrentLoadOnlyPublishesOnce 验证 P1-06：writeMu 串行化 Load，并发调用只有
+// TestConcurrentLoadOnlyPublishesOnce 验证 writeMu 串行化 Load，并发调用只有
 // 一个成功发布，另一个返回 ErrAlreadyLoaded。
 func TestConcurrentLoadOnlyPublishesOnce(t *testing.T) {
 	s := New[cfg](
@@ -267,7 +267,7 @@ func TestConcurrentLoadOnlyPublishesOnce(t *testing.T) {
 	}
 }
 
-// TestConcurrentReloadIsSerialized 验证 P1-06：并发 Reload 被串行化，无部分提交/竞争。
+// TestConcurrentReloadIsSerialized 验证 并发 Reload 被串行化，无部分提交/竞争。
 func TestConcurrentReloadIsSerialized(t *testing.T) {
 	var loadCount atomic.Int64
 	s := New[cfg](
@@ -295,7 +295,7 @@ func TestConcurrentReloadIsSerialized(t *testing.T) {
 	// 不 panic、不 race 即通过（race 由 CI 承担）。
 }
 
-// TestReloadReportsAppliedAndRestartRequired 验证 P1-06：MergeResult.Applied 被正确上报
+// TestReloadReportsAppliedAndRestartRequired 验证 MergeResult.Applied 被正确上报
 //（历史实现 Applied 字段从未填充）。
 func TestReloadReportsAppliedAndRestartRequired(t *testing.T) {
 	first := true
@@ -340,7 +340,7 @@ func TestReloadReportsAppliedAndRestartRequired(t *testing.T) {
 	}
 }
 
-// TestMergerFailureKeepsOldSnapshot 验证 P1-06：merger 失败时保留旧快照，不发布无效候选。
+// TestMergerFailureKeepsOldSnapshot 验证 merger 失败时保留旧快照，不发布无效候选。
 func TestMergerFailureKeepsOldSnapshot(t *testing.T) {
 	first := true
 	s := New[cfg](

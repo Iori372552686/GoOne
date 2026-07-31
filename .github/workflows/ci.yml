@@ -10,15 +10,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-test:
-    name: Build & Test
+  # 每个 job 的失败含义可区分：
+  #   build-unit  — 编译 + vet + 全量单元测试（无中间件时集成测试自 Skip）
+  #   race        — 并发敏感包的 -race 覆盖
+  #   integration — 真实中间件下的集成用例（GOONE_INTEGRATION=1，用例数为 0 即失败）
+  #   generated   — 生成代码两次生成无 diff
+  #   security    — govulncheck 可达漏洞为 0 + gitleaks 凭据扫描
+  #   lint        — golangci-lint（仅新问题）+ 静态 API 门禁 + 依赖图
+  #   docs        — docs/ 全目录内部断链检查
+
+  build-unit:
+    name: Build & Unit Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          # V4 P0-01：固定到具体补丁版本，避免从 go.mod 旧 patch 解析出不安全工具链。
           go-version: '1.25.12'
           cache: true
 
@@ -31,33 +39,108 @@ jobs:
         run: go vet -composites=false ./...
 
       - name: Test
-        # Integration tests self-skip when local middleware (redis/consul/
-        # zookeeper/nacos/mysql) is unavailable.
-        # Excluded for now (tracked in docs/optimization_roadmap.md):
-        #   - tools/cfgtool/test: fixture xlsx incompatible with parser
-        #   - tools/tester: end-to-end client that dials a remote dev server
-        run: >
-          go test -count=1 -timeout 600s
-          ./lib/... ./src/... ./common/... ./module/...
-          ./tools/protoc-gen-goone/... ./tools/cmd/...
+        # V4 P0-09：运行完整 ./...，不再维护容易遗漏的手工 package 清单。
+        # 集成测试在无中间件时由 itest.Require 自 Skip，不会外部超时。
+        run: go test -count=1 -timeout 600s ./...
+
+  race:
+    name: Race Detector
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.12'
+          cache: true
 
       - name: Race (core packages)
-        # 包含 P0 迭代新增的生命周期/配置/调度/bus 注册表等并发敏感包。
+        # V4 P0-09：race 覆盖 runtime、net_mgr、router、svrinstmgr、bus、ssrpc、
+        # transaction、appconfig、scheduler、async 与 gamedata 等并发敏感包。
         run: >
-          go test -race -count=1 -timeout 300s
+          go test -race -count=1 -timeout 600s
           ./lib/net/...
-          ./lib/service/transaction/...
-          ./lib/service/router/...
-          ./lib/service/ssrpc/...
           ./lib/service/runtime/...
+          ./lib/service/router/...
+          ./lib/service/svrinstmgr/...
+          ./lib/service/bus/...
+          ./lib/service/ssrpc/...
+          ./lib/service/transaction/...
           ./lib/service/appconfig/...
           ./lib/service/scheduler/...
-          ./lib/service/bus/...
-          ./lib/util/safego/...
-          ./lib/util/bufpool/...
+          ./lib/service/async/...
+          ./common/gamedata/...
 
-  check-genproto:
-    name: Check generated proto
+  integration:
+    # V4 P0-09：真实中间件集成。GOONE_INTEGRATION=1 时依赖不可达必须失败
+    # （itest.Require 已改为 t.Fatal，不再静默 Skip）；用例数为 0 时 job 失败。
+    name: Integration (mysql/redis/zk/rabbitmq)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4.3
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-${{ github.run_id }}
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+      redis:
+        image: redis:7.4
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=12
+      zookeeper:
+        image: zookeeper:3.9
+        ports:
+          - 2181:2181
+        options: >-
+          --health-cmd="echo ruok | nc 127.0.0.1 2181" --health-interval=10s --health-timeout=5s --health-retries=12
+      rabbitmq:
+        image: rabbitmq:3.13-management
+        env:
+          RABBITMQ_DEFAULT_USER: goone
+          RABBITMQ_DEFAULT_PASS: ci-pass-${{ github.run_id }}
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd="rabbitmq-diagnostics -q ping" --health-interval=10s --health-timeout=5s --health-retries=12
+    env:
+      GOONE_INTEGRATION: "1"
+      GOONE_AMQP_ADDR: amqp://goone:ci-pass-${{ github.run_id }}@127.0.0.1:5672/
+      GOONE_ETCD_ADDR: 127.0.0.1:2379
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.12'
+          cache: true
+
+      - name: Integration tests
+        # 用 -v 输出实际执行用例；下方 step 校验用例数 > 0。
+        run: >
+          go test -count=1 -timeout 600s -v
+          ./lib/service/bus/... ./lib/service/router/... ./lib/service/svrinstmgr/...
+          ./lib/db/... ./lib/contrib/registry/...
+          2>&1 | tee integration.log
+
+      - name: Verify non-zero executed tests
+        # V4 P0-09：用例数为 0 视为失败（避免依赖全 Skip 的虚假绿灯）。
+        run: |
+          ran=$(grep -cE '^=== RUN' integration.log || true)
+          pass=$(grep -cE '^--- PASS' integration.log || true)
+          echo "executed tests: $ran, passed: $pass"
+          if [ "$ran" -eq 0 ]; then
+            echo "integration job ran 0 tests — failing (all skipped or none matched)"
+            exit 1
+          fi
+
+  generated:
+    # V4 P0-09：生成代码两次生成无 diff（含 game_protocol，用 --full）。
+    name: Generated Code (no drift)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -75,11 +158,50 @@ jobs:
           sudo apt-get install -y protobuf-compiler
           protoc --version
 
-      - name: check-genproto
-        run: ./main.sh check-genproto
+      - name: Generate twice, expect no diff
+        run: |
+          set -e
+          ./main.sh check-genproto --full
+          # 第二次生成后工作树必须无 diff（首次已校验格式与生成一致性）。
+          if ! git diff --quiet; then
+            echo "generated code differs after re-run — generation is non-idempotent"
+            git diff --stat
+            exit 1
+          fi
+
+  security:
+    # 供应链与凭据门禁。govulncheck 可达漏洞为 0；gitleaks 阻止真实凭据进入 diff。
+    # 工具版本固定以保证可复现：govulncheck v1.6.0、gitleaks v8.30.1。
+    name: Security (govulncheck + gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.12'
+          cache: true
+
+      - name: govulncheck
+        # 可达漏洞必须为 0；任一可达漏洞阻断合并。
+        run: |
+          set -e
+          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          govulncheck ./...
+
+      - name: gitleaks
+        # 扫描全部历史与工作区，禁止 Token、完整 DSN、Authorization、私钥进入仓库。
+        # 配置见仓库根 .gitleaks.toml（allowRules 仅放行 .env.example 中的 change-me 占位）。
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          version: v8.30.1
 
   lint:
-    name: golangci-lint (new issues only)
+    name: golangci-lint + static gates
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -93,7 +215,7 @@ jobs:
 
       - uses: golangci/golangci-lint-action@v6
         with:
-          # V4 P0-01：固定版本，避免浮动 latest 导致门禁不可复现。
+          # 固定版本，避免浮动 latest 导致门禁不可复现。
           version: v2.12.2
           # 只对本次改动引入的新问题失败；存量债务冻结在 origin/dev 基线。
           args: --new-from-rev=origin/${{ github.base_ref || 'dev' }}
@@ -166,46 +288,17 @@ jobs:
             echo "streadway/amqp still in module graph"; exit 1
           fi
 
-      - name: Docs link check
-        # 校验 README/CHANGELOG 引用的 docs/ 路径确实存在。
-        run: |
-          set -e
-          missing=0
-          for link in $(grep -oE "docs/[A-Za-z0-9_./-]+\.md" readme.md CHANGELOG.md 2>/dev/null | sort -u); do
-            if [ ! -f "$link" ]; then
-              echo "broken doc link: $link"
-              missing=1
-            fi
-          done
-          exit $missing
-
-  security:
-    # V4 P0-01：供应链与凭据门禁。govulncheck 可达漏洞为 0；gitleaks 阻止真实凭据进入 diff。
-    # 工具版本固定以保证可复现：govulncheck v1.6.0、gitleaks v8.30.1。
-    name: Security (govulncheck + gitleaks)
+  docs:
+    # V4 P0-09：docs/ 全目录内部断链检查（取代仅扫描 README/CHANGELOG 的旧逻辑）。
+    name: Docs link check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25.12'
           cache: true
 
-      - name: govulncheck
-        # 可达漏洞必须为 0；任一可达漏洞阻断合并。
-        run: |
-          set -e
-          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
-          govulncheck ./...
-
-      - name: gitleaks
-        # 扫描全部历史与工作区，禁止 Token、完整 DSN、Authorization、私钥进入仓库。
-        # 配置见仓库根 .gitleaks.toml（allowRules 仅放行 .env.example 中的 change-me 占位）。
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          version: v8.30.1
+      - name: Check docs links
+        run: go run ./tools/cmd/checkdocs ./docs

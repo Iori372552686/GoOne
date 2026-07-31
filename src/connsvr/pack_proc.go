@@ -51,7 +51,7 @@ func handleClientPacket(gw net_mgr.GatewayServer, transport string, conn net.Con
 		// 首次登录：该 uid 的会话尚未绑定到当前连接，先建立绑定。
 		// （GoOne 登录模型：uid 由外部预分配，客户端首包即携带 uid，
 		// connsvr 据此建立 uid↔conn 映射，后续请求才能路由与回包。）
-		// V3-P1-01：登录限速。admission 拒绝（enforce 模式超 login_rate）时丢弃首包，
+		// 登录限速。admission 拒绝（enforce 模式超 login_rate）时丢弃首包，
 		// 不建立绑定。
 		if a := globals.SessionHub.Admission(); a != nil && !a.TryAdmitLogin() {
 			logger.Warningf("login rejected by admission (uid: %d, transport: %s)", uid, transport)

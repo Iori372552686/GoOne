@@ -15,14 +15,14 @@ import (
 )
 
 func (t *ConnWsTcpSvr) initAndRun(implType, mode string, port int, cb func(conn net.Conn, data []byte)) error {
-	// V3-P1-02：本地 map 路径已删除，会话状态由 hub 拥有；这里只装配 handler。
+	// 本地 map 路径已删除，会话状态由 hub 拥有；这里只装配 handler。
 	t.handler = cb
 
 	return t.WsTcpSvr.InitAndRun(implType, mode, port, t)
 }
 
 func (t *ConnWsTcpSvr) OnConn(conn net.Conn) {
-	// V4 P0-04：原子 TryAcquireConnection；拒绝时不计数、不标记 admitted。
+	// 原子 TryAcquireConnection；拒绝时不计数、不标记 admitted。
 	t.ensureLease()
 	if t.hub != nil {
 		if a := t.hub.Admission(); a != nil && !a.TryAcquireConnection() {
@@ -47,7 +47,7 @@ func (self *ConnWsTcpSvr) OnRead(conn net.Conn, data []byte) int {
 
 func (t *ConnWsTcpSvr) OnClose(conn net.Conn) {
 	observeGatewayEvent("ws", "closed")
-	// V4 P0-04：仅为 admitted 连接释放计数与名额。
+	// 仅为 admitted 连接释放计数与名额。
 	if t.lease != nil && t.lease.takeIfAdmitted(conn) {
 		if t.hub != nil {
 			t.hub.DecConnection()
@@ -74,7 +74,7 @@ func (t *ConnWsTcpSvr) OnClose(conn net.Conn) {
 }
 
 func (t *ConnWsTcpSvr) SendByUid(uid uint64, data1 []byte, data2 []byte) error {
-	// P0-05：锁内取不可变 Client，锁外写。
+	// 锁内取不可变 Client，锁外写。
 	client := t.hub.ClientForSend(uid)
 	if client == nil {
 		logger.Debugf("uid doesn't exist {uid: %v}", uid)
@@ -93,7 +93,7 @@ func (t *ConnWsTcpSvr) SendByUid(uid uint64, data1 []byte, data2 []byte) error {
 }
 
 // BroadcastByZone 向指定 zone 的所有在线客户端广播；zone <= 0 表示全服广播。
-// P0-05：锁内快照、锁外写。
+// 锁内快照、锁外写。
 func (t *ConnWsTcpSvr) BroadcastByZone(zone int32, data1 []byte, data2 []byte) {
 	clients := t.hub.SnapshotByZone(zone)
 	for _, client := range clients {
@@ -150,7 +150,7 @@ func (t *ConnWsTcpSvr) kick(conn net.Conn, uid uint64, reason g1_protocol.EKickO
 		Cmd:     uint32(g1_protocol.CMD_SC_KICK_OUT),
 		BodyLen: uint32(len(msgData)),
 	}
-	// V3-P1-07：WS 下行热路径改用栈数组 + To（0-alloc），与 TCP/KCP 一致。
+	// WS 下行热路径改用栈数组 + To（0-alloc），与 TCP/KCP 一致。
 	var headerBuf [28]byte
 	header.To(headerBuf[:])
 	err = t.WriteData(conn, headerBuf[:], msgData)
@@ -162,7 +162,7 @@ func (t *ConnWsTcpSvr) kick(conn net.Conn, uid uint64, reason g1_protocol.EKickO
 }
 
 func (t *ConnWsTcpSvr) UpdateClientByUid(conn net.Conn, uid uint64, zone uint32) *Client {
-	// P0-05：原子绑定 + IPv6 兼容 + 锁外 kick 旧连接。
+	// 原子绑定 + IPv6 兼容 + 锁外 kick 旧连接。
 	newIns, oldCli, err := t.hub.BindClient(conn, uid, zone)
 	if err != nil {
 		logger.Errorf("BindClient failed {uid: %v}: %v", uid, err)

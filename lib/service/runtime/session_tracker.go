@@ -10,7 +10,7 @@ import (
 )
 
 // ErrSessionTrackerClosed 在 Close 后等待者（WaitIdle/WaitSessions）返回，表示计数未归
-// 零即被强制关闭（P0-06）。不得返回 nil 冒充成功排空。
+// 零即被强制关闭。不得返回 nil 冒充成功排空。
 var ErrSessionTrackerClosed = errors.New("session tracker closed before drain completed")
 
 // SessionTracker 跟踪网关的活跃连接数与活跃会话数，并在两者归零时通知等待者。
@@ -48,7 +48,7 @@ func (t *SessionTracker) IncConnection() {
 	t.connections.Add(1)
 }
 
-// DecConnection 在底层连接关闭时调用。P0-06：用 CAS 循环防止 underflow 覆盖并发 Inc
+// DecConnection 在底层连接关闭时调用。用 CAS 循环防止 underflow 覆盖并发 Inc
 //（旧实现 Add(-1) 后 Store(0) 会覆盖并发 +1）。
 func (t *SessionTracker) DecConnection() {
 	if t == nil {
@@ -67,7 +67,7 @@ func (t *SessionTracker) IncSession() {
 	t.sessions.Add(1)
 }
 
-// DecSession 在会话结束（连接关闭或登出解绑）时调用。P0-06：用 CAS 循环防止 underflow。
+// DecSession 在会话结束（连接关闭或登出解绑）时调用。用 CAS 循环防止 underflow。
 // 会话归零时广播，唤醒 WaitSessions（即便 connection 未归零）。
 func (t *SessionTracker) DecSession() {
 	if t == nil {
@@ -116,7 +116,7 @@ func (t *SessionTracker) ActiveSessions() int64 {
 }
 
 // WaitSessions 阻塞直到 ActiveSessions 归零，或 ctx 超时/取消，或 Close 被调用。
-// 网关 Drain 用它等待逻辑会话排空（P0-06）。返回 nil 表示会话已归零；ctx.Err() 表示
+// 网关 Drain 用它等待逻辑会话排空。返回 nil 表示会话已归零；ctx.Err 表示
 // 超时/取消；ErrSessionTrackerClosed 表示 Close 时仍有未归零会话。
 //
 // 用状态变更通知驱动，不轮询。
@@ -164,7 +164,7 @@ func (t *SessionTracker) WaitSessions(ctx context.Context) error {
 // ctx.Done 时 broadcast 唤醒，并在归零时也唤醒。该 goroutine 在 WaitIdle 返回前一定
 // 退出（通过 stop channel），不泄漏。
 //
-// P0-06：WaitIdle 保留给完整连接归零检查；网关 Drain 用 WaitSessions 只等逻辑会话。
+// WaitIdle 保留给完整连接归零检查；网关 Drain 用 WaitSessions 只等逻辑会话。
 // Close 后若计数未归零返回 ErrSessionTrackerClosed，不返回 nil 冒充成功排空。
 func (t *SessionTracker) WaitIdle(ctx context.Context) error {
 	if t == nil {
@@ -211,7 +211,7 @@ func (t *SessionTracker) WaitIdle(ctx context.Context) error {
 // Close 释放 tracker，唤醒所有 WaitIdle/WaitSessions 等待者。之后 Inc/Dec 仍可安全调
 // 用（计数继续）。
 //
-// P0-06：Close 后等待者根据计数是否归零返回 nil 或 ErrSessionTrackerClosed，绝不返回
+// Close 后等待者根据计数是否归零返回 nil 或 ErrSessionTrackerClosed，绝不返回
 // nil 冒充成功排空（历史实现无论计数都返回 nil）。
 func (t *SessionTracker) Close() {
 	if t == nil {

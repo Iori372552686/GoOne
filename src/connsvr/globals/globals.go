@@ -11,10 +11,10 @@ import (
 
 var (
 	TransMgr               = transaction.NewTransactionMgr()
-	// SessionTracker 跟踪网关活跃连接/会话（P0-06）。SessionHub 把它注入三传输，供
+	// SessionTracker 跟踪网关活跃连接/会话。SessionHub 把它注入三传输，供
 	// gatewayComponent.Drain 等待逻辑会话归零。
 	SessionTracker         = runtime.NewSessionTracker()
-	// SessionHub 是三传输共享的会话状态拥有者（P0-05）。同一 UID 跨 TCP/WS/KCP 重绑
+	// SessionHub 是三传输共享的会话状态拥有者。同一 UID 跨 TCP/WS/KCP 重绑
 	// 原子化；Drain 只等 ActiveSessions。
 	SessionHub             = net_mgr.NewSessionHub(SessionTracker)
 	ConnTcpSvr             = newTcpSvrWithHub()
@@ -25,7 +25,7 @@ var (
 	ClientPacketDispatcher = ssrpc.NewDispatcher()
 )
 
-// newTcpSvrWithHub 创建 TCP 网关并注入共享 SessionHub（P0-05）。
+// newTcpSvrWithHub 创建 TCP 网关并注入共享 SessionHub。
 func newTcpSvrWithHub() *net_mgr.ConnTcpSvr {
 	s := net_mgr.NewTcpSvr()
 	s.SetHub(SessionHub)

@@ -56,7 +56,7 @@ func (b *BusImplNatsMQ) SelfBusId() uint32                    { return b.selfBus
 func (b *BusImplNatsMQ) SetReceiver(onRecvMsg bus.MsgHandler) { b.onRecv = onRecvMsg }
 func (b *BusImplNatsMQ) Healthy() bool                        { return b.connected.Load() && !b.closed.Load() }
 
-// Start 等待后台 run goroutine 完成首次连接（V4 P0-07：IBus.Start 契约）。
+// Start 等待后台 run goroutine 完成首次连接（IBus.Start 契约）。
 func (b *BusImplNatsMQ) Start(ctx context.Context) error {
 	if b.closed.Load() {
 		return bus.ErrBusClosed

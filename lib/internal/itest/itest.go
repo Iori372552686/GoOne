@@ -29,7 +29,9 @@ func Enabled() bool {
 
 // Require 是中间件集成测试的统一门控：
 //  1. 未设置 GOONE_INTEGRATION=1 时 t.Skip（默认开发机快速跳过）。
-//  2. 设置后对 addr 做 TCP 预检（probeTimeout），不可达则 t.Skip。
+//  2. 设置后对 addr 做 TCP 预检（probeTimeout），不可达则 t.Fatal——硬失败而非
+//     静默 Skip（V4 P0-09：CI integration 环境下依赖不可达必须失败，否则会
+//     产生「用例数为 0 却通过」的虚假绿灯）。
 //
 // addr 为 "host:port" 形式。调用方应在连接中间件之前调用本函数。
 func Require(t *testing.T, addr string) {
@@ -39,7 +41,7 @@ func Require(t *testing.T, addr string) {
 	}
 	conn, err := net.DialTimeout("tcp", addr, probeTimeout)
 	if err != nil {
-		t.Skipf("integration dependency unavailable at %s: %v", addr, err)
+		t.Fatalf("integration dependency unavailable at %s (GOONE_INTEGRATION=1 set): %v", addr, err)
 	}
 	_ = conn.Close()
 }

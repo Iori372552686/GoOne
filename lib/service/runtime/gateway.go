@@ -10,8 +10,8 @@ import (
 // 与 lib/net/net_mgr.GatewayServer（session-facing：Send/Kick/GetClient）正交：后者
 // 描述会话面操作，本接口描述生命周期面操作。一个具体网关实现通常同时实现两者。
 //
-// 本契约在 P0-07 作为 runtime 层的新约定落地；现有 tcp/ws/kcp/gnet 传输在 P0-08 迁
-// 移时补齐 listener 字段与 Stop 能力，并实现本接口。在此之前的迁移期内，实现本接口
+// 本契约作为 runtime 层的新约定落地；现有 tcp/ws/kcp/gnet 传输在迁移
+// 时补齐 listener 字段与 Stop 能力，并实现本接口。在此之前的迁移期内，实现本接口
 // 的新网关代码可立即获得统一排空。
 type GatewayServer interface {
 	// ActiveConnections 返回底层已建立且未关闭的连接数。

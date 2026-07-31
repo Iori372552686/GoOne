@@ -8,14 +8,14 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// OverloadMode 控制过载保护策略（V3-P1-01）。
+// OverloadMode 控制过载保护策略。
 const (
 	OverloadModeOff     = "off"     // 不限制（向后兼容默认）。
 	OverloadModeShadow  = "shadow"  // 只统计上报，不拒绝。
 	OverloadModeEnforce = "enforce" // 超限拒绝。
 )
 
-// AdmissionController 是网关连接与登录的过载保护闸门（V3-P1-01）。
+// AdmissionController 是网关连接与登录的过载保护闸门。
 //
 // 它持有容量上限与令牌桶限速器，基于 SessionHub 的连接/会话计数做决策。
 // OverloadMode=off 时所有检查直通；shadow 时只记录指标不拒绝；enforce 时超限拒绝。
@@ -23,7 +23,7 @@ const (
 // Quiesce 语义协同：SessionHub 不再 Accepting 时（排空期），连接 admission 强制拒绝，
 // 等价于 max_connections=0，保证排空优先于普通 admission 判断。
 //
-// 原子租约（V4 P0-03 修复）：连接与 inflight 准入改为原子 Acquire/Release，避免历史
+// 原子租约（修复）：连接与 inflight 准入改为原子 Acquire/Release，避免历史
 // "检查后增加"在并发下超过上限。连接名额由 reservedConns 原子维护；inflight 名额由
 // 全局 inflight + 有界 per-method 计数器维护。shadow 模式执行相同决策计算但不拒绝，
 // 计数仍正确 Acquire/Release 以保证 shadow/enforce 可对账。
@@ -159,7 +159,7 @@ func (a *AdmissionController) TryAdmitLogin() bool {
 	return a.admitOrReject(admit)
 }
 
-// TryAcquireConnection 原子地占用一个连接名额（V4 P0-03）。返回 true 表示成功占用，
+// TryAcquireConnection 原子地占用一个连接名额。返回 true 表示成功占用，
 // 调用方在连接释放时必须配对调用 ReleaseConnection。
 //
 // 用 CAS 循环完成"检查上限 + 占位"，避免历史 check-then-act 在并发下超过上限。
@@ -250,7 +250,7 @@ func decisionFor(a *AdmissionController, within bool) string {
 
 // IncInflight / DecInflight 维护 SSRPC 在途请求计数（供 ssrpc admission 复用）。
 // Deprecated: 保留一个版本供旧调用方；新代码应使用 TryAcquireInflight/ReleaseInflight
-// 以获得原子检查与计数（V4 P0-03）。
+// 以获得原子检查与计数。
 func (a *AdmissionController) IncInflight() int64 { return atomic.AddInt64(&a.inflight, 1) }
 func (a *AdmissionController) DecInflight() int64 { return atomic.AddInt64(&a.inflight, -1) }
 func (a *AdmissionController) Inflight() int64    { return atomic.LoadInt64(&a.inflight) }
@@ -264,7 +264,7 @@ func (a *AdmissionController) InflightWouldReject(max int) bool {
 	return a.Inflight() >= int64(max)
 }
 
-// TryAcquireInflight 原子地占用一个在途请求名额（V4 P0-03）。
+// TryAcquireInflight 原子地占用一个在途请求名额。
 //
 // 同时检查全局上限 globalLimit 与本方法上限 methodLimit（任一 > 0 时启用）；两者都 <= 0
 // 表示不限。用 CAS 循环完成"检查 + 占位"，避免并发超限。成功后调用方必须配对调用

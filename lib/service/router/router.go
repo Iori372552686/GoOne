@@ -67,7 +67,7 @@ func (r *Router) SelfSvrType() uint32 {
 // 返回一个 bus.IBus。这让服务用 bus.DriverRegistry 显式装配只链接所需 MQ driver
 // （如只 rabbitmq），缩小二进制与漏洞面。bus 所有权移交 Router：Close 时由 Router 关闭。
 //
-// V4 P0-07 启动顺序（关键）：设置 receiver → 创建并 Start Bus（同步等首次连接）→
+// 启动顺序（关键）：设置 receiver → 创建并 Start Bus（同步等首次连接）→
 // Bus 就绪后才注册服务发现 → 启动 discovery watch。任一步失败时逆序回滚已建立的步骤，
 // 确保不会被服务发现注册但 Bus 不可用。
 func (r *Router) InitAndRunWithBusCtor(selfBusId string, cb CbOnRecvSSPacket,

@@ -14,7 +14,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 )
 
-// TestDriverNameAndCtor 验证 P1-05：Driver() 返回的描述符名与 ctor 行为符合契约。
+// TestDriverNameAndCtor 验证 Driver 返回的描述符名与 ctor 行为符合契约。
 func TestDriverNameAndCtor(t *testing.T) {
 	d := Driver()
 	if d.Name != DriverName {
@@ -31,7 +31,7 @@ func TestDriverNameAndCtor(t *testing.T) {
 }
 
 // TestNewBusImplRabbitMQCloseIsIdempotent 验证 Close 幂等，且 Close 后 Send 返回
-// ErrBusClosed。不连接真实 RabbitMQ（V4 P0-07：NewBusImplRabbitMQ 不再自动连接，
+// ErrBusClosed。不连接真实 RabbitMQ（NewBusImplRabbitMQ 不再自动连接，
 // Start 之前 connected 为 false）。
 func TestNewBusImplRabbitMQCloseIsIdempotent(t *testing.T) {
 	b := NewBusImplRabbitMQ(0x01010101, func(uint32, []byte) error { return nil }, "amqp://guest:guest@127.0.0.1:1/")
@@ -43,7 +43,7 @@ func TestNewBusImplRabbitMQCloseIsIdempotent(t *testing.T) {
 	if err := b.Close(); err != nil {
 		t.Fatalf("second Close should be idempotent: %v", err)
 	}
-	// Close 后 Send 返回 ErrBusClosed（V4 P0-07：关闭后绝不虚假成功）。
+	// Close 后 Send 返回 ErrBusClosed（关闭后绝不虚假成功）。
 	if err := b.Send(0x02020202, []byte("x"), nil); err != bus.ErrBusClosed {
 		t.Fatalf("Close 后 Send 应返回 ErrBusClosed，got %v", err)
 	}
@@ -52,7 +52,7 @@ func TestNewBusImplRabbitMQCloseIsIdempotent(t *testing.T) {
 	}
 }
 
-// TestRabbitMQStartFailsOnUnreachable 验证 V4 P0-07 故障契约：RabbitMQ 不可达时
+// TestRabbitMQStartFailsOnUnreachable 验证 故障契约：RabbitMQ 不可达时
 // Start 在 ctx 超时后返回 error，不启动后台 goroutine、不泄漏连接，服务发现中无
 // 当前实例（由调用方 Router 保证：Start 失败即返回、不进入注册）。
 func TestRabbitMQStartFailsOnUnreachable(t *testing.T) {
@@ -79,7 +79,7 @@ func TestRabbitMQStartFailsOnUnreachable(t *testing.T) {
 	}
 }
 
-// TestRabbitMQStartTwiceRejected 验证重复 Start 返回 error（V4 P0-07：已 Start）。
+// TestRabbitMQStartTwiceRejected 验证重复 Start 返回 error（已 Start）。
 // 不依赖真实 RabbitMQ：使用真实本地实例时由 itest 门控；这里用不可达地址覆盖失败路径。
 func TestRabbitMQStartTwiceRejected(t *testing.T) {
 	b := NewBusImplRabbitMQ(0x04040404, nil, "amqp://guest:guest@127.0.0.1:1/")
@@ -101,7 +101,7 @@ func amqpTestAddr() string {
 	return "amqp://guest:guest@127.0.0.1:5672/"
 }
 
-// TestRabbitMQRealIntegration 验证 P1-05：真实 RabbitMQ 联调——两个不同 bus ID 的实例
+// TestRabbitMQRealIntegration 验证 真实 RabbitMQ 联调——两个不同 bus ID 的实例
 // 经 amqp091-go 互通（A→B 收发）。需要真实 RabbitMQ；无中间件时跳过。
 func TestRabbitMQRealIntegration(t *testing.T) {
 	addr := amqpTestAddr()
@@ -119,7 +119,7 @@ func TestRabbitMQRealIntegration(t *testing.T) {
 	snd := NewBusImplRabbitMQ(sender, func(uint32, []byte) error { return nil }, addr)
 	defer snd.Close()
 
-	// V4 P0-07：Start 同步等待首次连接。
+	// Start 同步等待首次连接。
 	startCtx, startCancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer startCancel()
 	if err := recv.Start(startCtx); err != nil {

@@ -118,7 +118,7 @@ type ConnRuntimeConfig struct {
 	KcpPort int `json:"kcp_port" yaml:"kcp_port"`
 }
 
-// ConnCapacityConfig 定义 connsvr 网关的过载保护参数（V3-P1-01）。
+// ConnCapacityConfig 定义 connsvr 网关的过载保护参数。
 // 所有字段 0 值表示"不限制"（向后兼容）；生产配置应显式设置。
 // OverloadMode 控制策略：off（不限）、shadow（只统计不拒绝）、enforce（拒绝）。
 type ConnCapacityConfig struct {
@@ -326,25 +326,25 @@ func (c *ConnSvr) validate() error {
 	if c.Runtime.ListenPort <= 0 {
 		return fmt.Errorf("connsvr.runtime.listen_port must be > 0")
 	}
-	// V3-P1-01：capacity 字段校验。
+	// capacity 字段校验。
 	cap := &c.Capacity
 	if cap.MaxConnections < 0 || cap.MaxUnauthenticatedConnections < 0 ||
 		cap.ConnectionRate < 0 || cap.LoginRate < 0 || cap.MaxInflight < 0 {
 		return fmt.Errorf("connsvr.capacity 字段不得为负")
 	}
-	// V4 P0-03：per-method inflight 上限必须 >= 0。
+	// per-method inflight 上限必须 >= 0。
 	for method, m := range cap.MaxInflightPerMethod {
 		if m < 0 {
 			return fmt.Errorf("connsvr.capacity.max_inflight_per_method[%q] 不得为负", method)
 		}
 	}
-	// V4 P0-03：未认证上限不得超过总连接上限（总上限为 0 表示不限，例外）。
+	// 未认证上限不得超过总连接上限（总上限为 0 表示不限，例外）。
 	if cap.MaxConnections > 0 && cap.MaxUnauthenticatedConnections > 0 &&
 		cap.MaxUnauthenticatedConnections > cap.MaxConnections {
 		return fmt.Errorf("connsvr.capacity.max_unauthenticated_connections (%d) 不得超过 max_connections (%d)",
 			cap.MaxUnauthenticatedConnections, cap.MaxConnections)
 	}
-	// V4 P0-03：生产 enforce 模式不得把全部限制都配置为 0（等于没有过载保护）。
+	// 生产 enforce 模式不得把全部限制都配置为 0（等于没有过载保护）。
 	if cap.OverloadMode == "enforce" &&
 		cap.MaxConnections == 0 && cap.MaxUnauthenticatedConnections == 0 &&
 		cap.ConnectionRate == 0 && cap.LoginRate == 0 && cap.MaxInflight == 0 &&
@@ -427,7 +427,7 @@ func (c *WebSvr) validate() error {
 func (c *ConnConfig) normalize() {
 	c.BaseCfg.normalize()
 	c.ConnSvr.normalize()
-	// P0-03：admin port 为 0 时按服务类型回退到默认端口（connsvr=8101）。
+	// admin port 为 0 时按服务类型回退到默认端口（connsvr=8101）。
 	c.BaseCfg.CommonRuntime.AdminServer.Port = resolveAdminPort(
 		c.BaseCfg.CommonRuntime.AdminServer.Port, 1)
 }
@@ -445,7 +445,7 @@ func (c *ConnConfig) validate() error {
 func (c *InfoConfig) normalize() {
 	c.BaseCfg.normalize()
 	c.InfoSvr.normalize()
-	// P0-03：admin port 为 0 时按服务类型回退（infosvr=8103）。
+	// admin port 为 0 时按服务类型回退（infosvr=8103）。
 	c.BaseCfg.CommonRuntime.AdminServer.Port = resolveAdminPort(
 		c.BaseCfg.CommonRuntime.AdminServer.Port, 3)
 }
@@ -469,7 +469,7 @@ func (c *InfoConfig) validate() error {
 func (c *MainSvrConfig) normalize() {
 	c.BaseCfg.normalize()
 	c.MainSvr.normalize()
-	// P0-03：admin port 为 0 时按服务类型回退（mainsvr=8102）。
+	// admin port 为 0 时按服务类型回退（mainsvr=8102）。
 	c.BaseCfg.CommonRuntime.AdminServer.Port = resolveAdminPort(
 		c.BaseCfg.CommonRuntime.AdminServer.Port, 2)
 }
@@ -493,7 +493,7 @@ func (c *MainSvrConfig) validate() error {
 func (c *MySqlSvrConfig) normalize() {
 	c.BaseCfg.normalize()
 	c.MySqlSvr.normalize()
-	// P0-03：admin port 为 0 时按服务类型回退（mysqlsvr=8104）。
+	// admin port 为 0 时按服务类型回退（mysqlsvr=8104）。
 	c.BaseCfg.CommonRuntime.AdminServer.Port = resolveAdminPort(
 		c.BaseCfg.CommonRuntime.AdminServer.Port, 4)
 }
@@ -517,7 +517,7 @@ func (c *MySqlSvrConfig) validate() error {
 func (c *RoomCenterConfig) normalize() {
 	c.BaseCfg.normalize()
 	c.RoomCenterSvr.normalize()
-	// P0-03：admin port 为 0 时按服务类型回退（roomcentersvr=8111）。
+	// admin port 为 0 时按服务类型回退（roomcentersvr=8111）。
 	c.BaseCfg.CommonRuntime.AdminServer.Port = resolveAdminPort(
 		c.BaseCfg.CommonRuntime.AdminServer.Port, 11)
 }
@@ -535,7 +535,7 @@ func (c *RoomCenterConfig) validate() error {
 func (c *webSvrConfig) normalize() {
 	c.BaseCfg.normalize()
 	c.WebSvr.normalize()
-	// P0-03：admin port 为 0 时按服务类型回退（websvr=8112）。
+	// admin port 为 0 时按服务类型回退（websvr=8112）。
 	c.BaseCfg.CommonRuntime.AdminServer.Port = resolveAdminPort(
 		c.BaseCfg.CommonRuntime.AdminServer.Port, 12)
 }

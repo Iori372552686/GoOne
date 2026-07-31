@@ -67,7 +67,7 @@ func WithStopTimeout(d time.Duration) Option {
 // error（若非 nil）会被记录但绝不中止进程。可为 nil。
 //
 // Deprecated: GoOne 生产配置采用启动不可变模型（仅 gamedata 热更）。通用运行配置
-// 热更不在生产路径上，WithReload 仅测试使用；下一主版本将删除（V3-P1-04）。
+// 热更不在生产路径上，WithReload 仅测试使用；下一主版本将删除。
 func WithReload(fn func(ctx context.Context) error) Option {
 	return func(a *App) {
 		a.onReload = fn
@@ -121,7 +121,7 @@ type App struct {
 	onLoadConfig func(ctx context.Context) error
 	onReload     func(ctx context.Context) error
 
-	// 生命周期状态。P0-02 后，phase/ready/alive/drainReason 全部从 StateStore 派生，
+	// 生命周期状态。之后，phase/ready/alive/drainReason 全部从 StateStore 派生，
 	// App 不再维护第二份副本，使 State()、Phase()、Ready()、Alive()、admin JSON 与
 	// Prometheus gauge 始终出自同一事实源。
 	stateMu     sync.RWMutex
@@ -153,7 +153,7 @@ type App struct {
 
 // New 用给定服务名与 options 构建 App。名字必须非空；用于日志、指标与 admin 端点。
 //
-// P0-03：默认创建一个 ComponentTracker（app.tracker），使 /components 端点在任何接线
+// 默认创建一个 ComponentTracker（app.tracker），使 /components 端点在任何接线
 // 下都能列出 pending/running 组件，无需调用方手动传入。Register 同步把组件名登记为
 // pending。可用 WithComponentTracker 覆盖（主要用于测试）。
 func New(name string, opts ...Option) (*App, error) {
@@ -209,7 +209,7 @@ func (a *App) Register(c Component) error {
 	}
 	a.names[name] = struct{}{}
 	a.components = append(a.components, c)
-	// P0-03：登记组件名为 pending，使 /components 在 Start 前就能列出全部组件。
+	// 登记组件名为 pending，使 /components 在 Start 前就能列出全部组件。
 	if a.tracker != nil {
 		a.tracker.MarkPending(name)
 	}
@@ -217,7 +217,7 @@ func (a *App) Register(c Component) error {
 }
 
 // MustRegister 是在 Register 出错时 panic 的便捷方法。仅在装配错误即程序员错误的装
-// 配代码（src/<service>/app.go）中使用。P1-07：支持可变参数，便于
+// 配代码（src/<service>/app.go）中使用。支持可变参数，便于
 // app.MustRegister(datetime, logger, admin, ...) 一次注册多个组件。
 func (a *App) MustRegister(components ...Component) {
 	for _, c := range components {
@@ -238,7 +238,7 @@ func componentName(c Component) string {
 // Ready 上报 App 是否已完成启动并正在服务。它在 Run 进入 Draining 阶段时立即翻
 // 转为 false。
 //
-// P0-02：从 StateStore 派生（Ready 当且仅当 State 为 Ready 或 Allocated），不再读
+// 从 StateStore 派生（Ready 当且仅当 State 为 Ready 或 Allocated），不再读
 // App 自维护的标志，避免与 State()/admin JSON 不一致。
 func (a *App) Ready() bool {
 	st, _ := a.state.Current()
@@ -268,7 +268,7 @@ func (a *App) State() State {
 // Ready->Allocated 转换；对已 Allocated 的实例幂等返回 nil；其他状态返回
 // ErrInvalidStateTransition。Allocate 永不改变就绪性：已分配实例继续服务既有流量。
 //
-// P0-02：签名从 Allocate() 改为 Allocate(ctx) error，使非法状态转换以明确哨兵错误
+// 签名从 Allocate 改为 Allocate(ctx) error，使非法状态转换以明确哨兵错误
 // 暴露，而非被静默忽略。
 func (a *App) Allocate(ctx context.Context) error {
 	current, _ := a.state.Current()
@@ -323,7 +323,7 @@ func (a *App) setInjectStartupSignal(fn func(os.Signal)) {
 // 模块注册失败时返回错误，且不构建 App。
 //
 // Deprecated: Module Registry 仅为测试场景保留；生产服务用 MustNew + MustRegister
-// 显式装配（V3-P1-04）。NewFromModules 下一主版本将删除。
+// 显式装配。NewFromModules 下一主版本将删除。
 func NewFromModules(name string, modules []Module, opts ...Option) (*App, error) {
 	a, err := New(name, opts...)
 	if err != nil {

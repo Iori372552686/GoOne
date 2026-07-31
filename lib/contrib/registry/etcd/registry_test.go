@@ -35,7 +35,7 @@ func newTestClient(t *testing.T) *clientv3.Client {
 }
 
 func TestRegistry(t *testing.T) {
-	// V3-P0-02：集成测试统一门控，未开启或 etcd 不可达时 t.Skip。
+	// 集成测试统一门控，未开启或 etcd 不可达时 t.Skip。
 	itest.Require(t, etcdAddr())
 	client := newTestClient(t)
 	defer client.Close()
@@ -96,7 +96,7 @@ func TestRegistry(t *testing.T) {
 }
 
 func TestHeartBeat(t *testing.T) {
-	// V3-P0-02：集成测试统一门控。
+	// 集成测试统一门控。
 	itest.Require(t, etcdAddr())
 	client := newTestClient(t)
 	defer client.Close()

@@ -9,7 +9,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// ErrOverloaded 是 SSRPC 过载拒绝的哨兵错误（V3-P1-01）。
+// ErrOverloaded 是 SSRPC 过载拒绝的哨兵错误。
 // admission middleware 在 enforce 模式超 max_inflight 时返回此错误，调用方可通过
 // errors.Is 判断是否为过载拒绝。
 var ErrOverloaded = ssrpcError("ssrpc: request rejected by admission control (overloaded)")
@@ -19,7 +19,7 @@ type ssrpcError string
 
 func (e ssrpcError) Error() string { return string(e) }
 
-// InflightLimiter 原子地占用与释放 SSRPC 在途请求名额（V4 P0-03）。
+// InflightLimiter 原子地占用与释放 SSRPC 在途请求名额。
 // net_mgr.AdmissionController 实现此接口，使 ssrpc 中间件无需 import net_mgr
 // （避免循环依赖）。
 //
@@ -33,7 +33,7 @@ type InflightLimiter interface {
 	ReleaseInflight(method string)
 }
 
-// rejectLogMu/rejectLogLastSeen 实现拒绝日志的按 reason 限频采样（V4 P0-03）。
+// rejectLogMu/rejectLogLastSeen 实现拒绝日志的按 reason 限频采样。
 // 过载时不再逐请求 Warning（会放大 I/O），改为每个 reason 至多每秒记录一次首个样本。
 var (
 	rejectLogMu      sync.Mutex
@@ -54,7 +54,7 @@ func logRejectSample(method string) {
 	rejectLogMu.Unlock()
 }
 
-// AdmissionMiddleware 构造一个 SSRPC 在途请求限流中间件（V3-P1-01；V4 P0-03 原子化）。
+// AdmissionMiddleware 构造一个 SSRPC 在途请求限流中间件（原子化）。
 //
 // limiter 为 nil 时直通（无 admission）。每个请求用 TryAcquireInflight 原子占位，处理完
 // 用 ReleaseInflight 释放；占位失败（enforce 满载）返回 ErrOverloaded，不调用下游 handler。

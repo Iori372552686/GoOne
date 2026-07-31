@@ -211,7 +211,7 @@ func TestRegistryMany(t *testing.T) {
 	time.Sleep(time.Second)
 }
 
-// TestNewRejectsNilClient 验证 nil naming client 在构造期返回 error（V3-P0-05）。
+// TestNewRejectsNilClient 验证 nil naming client 在构造期返回 error。
 func TestNewRejectsNilClient(t *testing.T) {
 	r, err := New(nil)
 	if err == nil {

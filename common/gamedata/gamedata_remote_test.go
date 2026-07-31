@@ -12,7 +12,7 @@ import (
 )
 
 // fakeConfigClient 是 contribconfig.Client 的桩，用于验证 gamedata 远端加载/热更/
-// 监听回收（V4 P0-06），不依赖真实配置中心。
+// 监听回收，不依赖真实配置中心。
 type fakeConfigClient struct {
 	mu sync.Mutex
 
@@ -134,7 +134,7 @@ func registerFakeSheet(name string, h *sheetHolder) {
 	})
 }
 
-// TestInitRemoteRejectsNilClient 验证 nil client 立即返回 error（V4 P0-06）。
+// TestInitRemoteRejectsNilClient 验证 nil client 立即返回 error。
 func TestInitRemoteRejectsNilClient(t *testing.T) {
 	resetGamedataForTest(t)
 	if err := InitRemote(nil); err == nil {
@@ -160,7 +160,7 @@ func TestInitRemoteLoadFailure(t *testing.T) {
 }
 
 // TestInitRemoteParseFailure 验证初始化严格模式：任一表解析失败即整体失败，
-// 且不启动 watcher（V4 P0-06：不留半启动状态）。
+// 且不启动 watcher（不留半启动状态）。
 func TestInitRemoteParseFailure(t *testing.T) {
 	resetGamedataForTest(t)
 	var gotA, gotB sheetHolder
@@ -194,7 +194,7 @@ func TestInitRemoteMissingSheet(t *testing.T) {
 }
 
 // TestHotReloadKeepsOldDataOnParseFailure 验证热更宽松模式：单表解析失败仅记日志，
-// 该表旧数据保留；后续好的更新仍可生效（V4 P0-06）。
+// 该表旧数据保留；后续好的更新仍可生效。
 func TestHotReloadKeepsOldDataOnParseFailure(t *testing.T) {
 	resetGamedataForTest(t)
 	var got sheetHolder
@@ -216,7 +216,7 @@ func TestHotReloadKeepsOldDataOnParseFailure(t *testing.T) {
 }
 
 // TestStopNetStopsWatcherAndClosesClient 验证 StopNet 停止 watcher、等待热更
-// goroutine 退出并 Close client（V4 P0-06：监听可回收）。
+// goroutine 退出并 Close client（监听可回收）。
 func TestStopNetStopsWatcherAndClosesClient(t *testing.T) {
 	resetGamedataForTest(t)
 	var got sheetHolder
@@ -247,7 +247,7 @@ func TestStopNetStopsWatcherAndClosesClient(t *testing.T) {
 	}
 }
 
-// TestStopNetIdempotent 验证 StopNet 幂等（V4 P0-06）。
+// TestStopNetIdempotent 验证 StopNet 幂等。
 func TestStopNetIdempotent(t *testing.T) {
 	resetGamedataForTest(t)
 	var got sheetHolder

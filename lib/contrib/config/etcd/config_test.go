@@ -37,7 +37,7 @@ func newTestClient(t *testing.T) *clientv3.Client {
 }
 
 func TestConfig(t *testing.T) {
-	// V3-P0-02：集成测试统一门控，未开启或 etcd 不可达时 t.Skip。
+	// 集成测试统一门控，未开启或 etcd 不可达时 t.Skip。
 	itest.Require(t, etcdAddr())
 	client := newTestClient(t)
 	defer func() { _ = client.Close() }()
@@ -86,7 +86,7 @@ func TestConfig(t *testing.T) {
 }
 
 func TestExtToFormat(t *testing.T) {
-	// V3-P0-02：集成测试统一门控。
+	// 集成测试统一门控。
 	itest.Require(t, etcdAddr())
 	client := newTestClient(t)
 	defer func() { _ = client.Close() }()

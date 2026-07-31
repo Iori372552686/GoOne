@@ -23,7 +23,7 @@ import (
 
 const kReadBufSize = 64 * 1024
 
-// kcpConnInfo 封装每连接的写 channel 与关闭标志（P0-04：消除 send-on-closed-channel
+// kcpConnInfo 封装每连接的写 channel 与关闭标志（消除 send-on-closed-channel
 // 竞态）。
 type kcpConnInfo struct {
 	chanWrite chan *bufpool.Buffer // passing 'nil' means close
@@ -81,7 +81,7 @@ func (s *KcpSvr) Quiesce() {
 
 // Stop 关闭 listener 与全部已建立连接，用于排空超时后的强制关停。幂等。
 //
-// P0-04：先在锁内快照连接列表并释放锁，再在锁外逐个 Close。禁止在连接表锁内执行
+// 先在锁内快照连接列表并释放锁，再在锁外逐个 Close。禁止在连接表锁内执行
 // 网络 Close。
 //
 // ctx 当前未使用（关闭是同步的），保留作为未来受 context 约束强制关闭的扩展点；
@@ -187,7 +187,7 @@ func (s *KcpSvr) runConnRead(conn net.Conn) {
 	readBuf := make([]byte, kReadBufSize)
 
 	for {
-		// P0-04：socket deadline 用 time.Now()，不用 datetime.NowT()（缓存时间会陈旧）。
+		// socket deadline 用 time.Now，不用 datetime.NowT（缓存时间会陈旧）。
 		_ = conn.SetReadDeadline(time.Now().Add(s.KcpReadTimeout))
 		readLen, err := conn.Read(readBuf)
 
@@ -209,7 +209,7 @@ func (s *KcpSvr) runConnRead(conn net.Conn) {
 	s.destroyConn(conn)
 }
 
-// destroyConn 拆除一个连接。P0-04：锁内置 closed=true 并删除；不调用 close(chanWrite)
+// destroyConn 拆除一个连接。锁内置 closed=true 并删除；不调用 close(chanWrite)
 //（直接 close channel 会与并发 WriteData 的 send 产生 send-on-closed-channel 竞态）。
 // 改为向 chanWrite 投递一个 nil（关闭信号）：写协程收到 nil 即退出循环并 Close 底层
 // conn。chan 本身随 entry 一起被 GC。
@@ -244,7 +244,7 @@ func (s *KcpSvr) runConnWrite(conn net.Conn, chanWrite <-chan *bufpool.Buffer) {
 			break
 		}
 
-		// P0-04：socket deadline 用 time.Now()。
+		// socket deadline 用 time.Now。
 		_ = conn.SetWriteDeadline(time.Now().Add(s.KcpWriteTimeout))
 		sentLen, err := conn.Write(buf.Bytes)
 		dataLen := len(buf.Bytes)

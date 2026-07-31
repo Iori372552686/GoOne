@@ -3,7 +3,7 @@ package marshal
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -42,7 +42,7 @@ func LoadConfFile(fileName string, object interface{}) error {
 * @Date: 2022-02-15 15:11:09
 **/
 func LoadJson(filePath string, object interface{}) error {
-	contents, err := ioutil.ReadFile(filePath)
+	contents, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %v | %w", filePath, err)
 	}
@@ -64,7 +64,7 @@ func LoadJson(filePath string, object interface{}) error {
 * @Date: 2022-02-15 15:11:42
 **/
 func LoadYaml(filePath string, object interface{}) error {
-	contents, err := ioutil.ReadFile(filePath)
+	contents, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %v | %w", filePath, err)
 	}

@@ -106,7 +106,7 @@ func TestSessionTrackerWaitIdleContextCancel(t *testing.T) {
 	}
 }
 
-// TestSessionTrackerCloseReturnsErrorWhenNonZero 验证 P0-06：Close 在计数非零时让等待
+// TestSessionTrackerCloseReturnsErrorWhenNonZero 验证 Close 在计数非零时让等待
 // 者返回 ErrSessionTrackerClosed，不返回 nil 冒充成功排空。
 //
 // 历史缺陷：Close 无论计数都让 WaitIdle 返回 nil，使排空未完成时上层误判成功。
@@ -172,7 +172,7 @@ func TestSessionTrackerWaitSessionsWaitsForSessionsOnly(t *testing.T) {
 	cancel()
 }
 
-// TestSessionTrackerDecCASDoesNotOverwriteConcurrentInc 验证 P0-06：Dec 用 CAS 防止
+// TestSessionTrackerDecCASDoesNotOverwriteConcurrentInc 验证 Dec 用 CAS 防止
 // underflow 覆盖并发 Inc。旧实现 Add(-1) 后 Store(0) 会丢失并发 +1。
 func TestSessionTrackerDecCASDoesNotOverwriteConcurrentInc(t *testing.T) {
 	tr := NewSessionTracker()

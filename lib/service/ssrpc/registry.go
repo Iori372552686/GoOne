@@ -164,7 +164,7 @@ type Registry struct {
 	wsOrder   []uint32
 	grpcOrder []grpcMethodEntry
 
-	// sealedDispatcher 缓存首次 Seal 的结果，使 Seal 真正幂等（P1-01：后续调用返回
+	// sealedDispatcher 缓存首次 Seal 的结果，使 Seal 真正幂等（后续调用返回
 	// 同一个 Dispatcher）。历史实现二次 Seal 返回 ErrRegistrySealed，与文档承诺矛盾。
 	sealedDispatcher *Dispatcher
 }
@@ -180,7 +180,7 @@ func NewRegistry() *Registry {
 //
 // service 必须非空，是逻辑服务名（用于错误消息与未来指标）。
 //
-// P1-01：nil 接收者返回 ErrNilRegistry（历史返回 ErrNilDispatcher，语义不准）。
+// nil 接收者返回 ErrNilRegistry（历史返回 ErrNilDispatcher，语义不准）。
 func (r *Registry) Register(service string, bindings ...Binding) error {
 	if r == nil {
 		return ErrNilRegistry
@@ -264,7 +264,7 @@ func (r *Registry) Register(service string, bindings ...Binding) error {
 // Seal 冻结 Registry，并从已注册 binding 构建一个不可变 Dispatcher。返回的
 // Dispatcher 已 Seal，故其热路径无锁。
 //
-// P1-01：Seal 真正幂等——缓存并重复返回同一个 Dispatcher（历史二次调用返回
+// Seal 真正幂等——缓存并重复返回同一个 Dispatcher（历史二次调用返回
 // ErrRegistrySealed，与文档承诺矛盾）。Seal 后再 Register 仍返回 ErrRegistrySealed。
 func (r *Registry) Seal() (*Dispatcher, error) {
 	if r == nil {

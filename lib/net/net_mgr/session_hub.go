@@ -10,12 +10,12 @@ import (
 )
 
 // ErrGatewayDraining 在网关排空（Quiesce）期间拒绝新会话绑定时返回。
-// pack_proc 据此拒绝首包登录，不向后端转发（P0-05）。
+// pack_proc 据此拒绝首包登录，不向后端转发。
 var ErrGatewayDraining = errors.New("gateway is draining")
 
 // ActivityCounter 是 SessionHub 上报给运行期的活跃度计数接口。SessionTracker 实现
 // 它；hub 在连接/会话建立与释放时调用对应方法。IncConnection 计底层连接，IncSession
-// 计已绑定 UID 的逻辑会话（P0-05/P0-06）。
+// 计已绑定 UID 的逻辑会话。
 type ActivityCounter interface {
 	IncConnection()
 	DecConnection()
@@ -50,7 +50,7 @@ func (noopCounter) ActiveSessions() int64    { return 0 }
 type SessionHub struct {
 	counter ActivityCounter
 
-	// admission 是可选的过载保护闸门（V3-P1-01）。nil 时直通（向后兼容）。
+	// admission 是可选的过载保护闸门。nil 时直通（向后兼容）。
 	// 三传输 OnConn 与 BindClient 通过 hub 间接调用，避免改传输接口。
 	admission *AdmissionController
 
@@ -64,7 +64,7 @@ type SessionHub struct {
 	remoteAddrKickMap map[string]bool
 }
 
-// SetAdmission 注入过载保护闸门（V3-P1-01）。必须在三传输 Start 前调用。
+// SetAdmission 注入过载保护闸门。必须在三传输 Start 前调用。
 // 传入 nil 等价于关闭 admission（直通）。
 func (h *SessionHub) SetAdmission(a *AdmissionController) {
 	h.mu.Lock()
@@ -93,7 +93,7 @@ func NewSessionHub(counter ActivityCounter) *SessionHub {
 		remoteAddrConnMap: make(map[string]net.Conn),
 		remoteAddrKickMap: make(map[string]bool),
 	}
-	// V3-P1-02：hub 作为 gateway 连接计数源注册到 Prometheus。
+	// hub 作为 gateway 连接计数源注册到 Prometheus。
 	registerGatewayHub(h)
 	return h
 }
@@ -121,7 +121,7 @@ func (h *SessionHub) Accepting() bool {
 // Client（若有，调用方负责在锁外 kick 旧连接）。
 //
 // 关键不变量：
-//   - Quiesce 后返回 ErrGatewayDraining，不修改任何状态（P0-05：pack_proc 据此拒绝首
+//   - Quiesce 后返回 ErrGatewayDraining，不修改任何状态（pack_proc 据此拒绝首
 //     包登录，不向后端转发）。
 //   - 在一把 hub 锁内完成：查旧连接、写新索引（uid→client、conn→uid、remoteAddr→conn）。
 //     同一 UID 已有连接时，返回 oldCli 供调用方 kick，但会话计数不重复增加（
@@ -184,7 +184,7 @@ func (h *SessionHub) ClientForSend(uid uint64) *Client {
 }
 
 // SnapshotByZone 返回 zone 内（zone<=0 表示全部）的 Client 快照切片，供调用方在锁外
-// 逐个写网络。一个慢连接不得阻塞其它连接的发送（P0-05）。
+// 逐个写网络。一个慢连接不得阻塞其它连接的发送。
 func (h *SessionHub) SnapshotByZone(zone int32) []*Client {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -218,7 +218,7 @@ func (h *SessionHub) MarkKick(remoteAddr string) {
 //   - uid!=0 && kicked：该连接是因 kick 关闭，调用方不触发登出包。
 //   - uid!=0 && !kicked：正常关闭，调用方触发登出包。
 //
-// 关键不变量（P0-05）：旧连接的迟到 OnClose 不得删除新连接——通过 conn 标识比对保证
+// 关键不变量：旧连接的迟到 OnClose 不得删除新连接——通过 conn 标识比对保证
 //（uidConnMap[uid].Conn != conn 时说明已被替换，返回 uid=0）。DecSession 也只在真正
 // 移除当前 conn 时调用一次。
 func (h *SessionHub) RemoveConn(conn net.Conn) (uid uint64, kicked bool) {

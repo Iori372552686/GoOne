@@ -10,7 +10,7 @@ import (
 )
 
 // InitNacos 在 app init 时基于 lib/contrib/config/factory 构造 Nacos 后端 client，
-// 并接管 gamedata 的远端加载与热更（V4 P0-06）。
+// 并接管 gamedata 的远端加载与热更。
 //
 // 设计要点：
 //   - gamedata 核心只面向 contrib config.Client 抽象（见 InitRemote），后端由 factory

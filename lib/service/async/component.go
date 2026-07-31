@@ -7,7 +7,7 @@ import (
 )
 
 // WorkerComponent 把一组 Async worker 包装成 runtime.Component，使异步任务队列的生命周期
-// 由运行期统一管理（V4 P0-05）。
+// 由运行期统一管理。
 //
 // 它实现 Start、Quiesce、Drain、Stop：
 //   - Start：启动所有 worker goroutine；
@@ -50,7 +50,7 @@ func (w *WorkerComponent) Quiesce(_ context.Context) error {
 }
 
 // Drain 等待所有 worker 队列归零或 ctx 取消。任一 worker 在 ctx 取消时仍有残余任务，
-// 返回聚合 error（V4 P0-05：持久化失败必须使 Drain 返回 error）。
+// 返回聚合 error（持久化失败必须使 Drain 返回 error）。
 func (w *WorkerComponent) Drain(ctx context.Context) error {
 	var errs []error
 	for i, a := range w.workers {

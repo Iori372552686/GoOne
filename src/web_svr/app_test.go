@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// TestWebHTTPDrainSuccessClearsServer 验证 P0-07：Drain（shutdown）成功时清空 httpSrv
+// TestWebHTTPDrainSuccessClearsServer 验证 Drain（shutdown）成功时清空 httpSrv
 // 指针；空 server 的 Shutdown 立即成功。
 func TestWebHTTPDrainSuccessClearsServer(t *testing.T) {
 	w := &webRuntimeComponent{}
@@ -30,7 +30,7 @@ func TestWebHTTPDrainSuccessClearsServer(t *testing.T) {
 	}
 }
 
-// TestWebHTTPDrainTimeoutKeepsServerWhenShutdownBlocks 验证 P0-07：当 Shutdown 因 ctx
+// TestWebHTTPDrainTimeoutKeepsServerWhenShutdownBlocks 验证 当 Shutdown 因 ctx
 // 超时返回错误时，保留 httpSrv 指针供 Stop 强制 Close。
 //
 // 通过一个挂起连接的真实 server 模拟 Shutdown 阻塞：起一个 listener + 慢 handler，
@@ -92,7 +92,7 @@ func TestWebHTTPDrainTimeoutKeepsServerWhenShutdownBlocks(t *testing.T) {
 	}
 }
 
-// TestWebStopForceClosesRemainingConnections 验证 P0-07：Stop 对仍存在的 server 调用
+// TestWebStopForceClosesRemainingConnections 验证 Stop 对仍存在的 server 调用
 // Close 强制关闭。
 func TestWebStopForceClosesRemainingConnections(t *testing.T) {
 	w := &webRuntimeComponent{}
@@ -106,7 +106,7 @@ func TestWebStopForceClosesRemainingConnections(t *testing.T) {
 	}
 }
 
-// TestWebGRPCStopForcesAfterDrainTimeout 验证 P0-07：gRPC Drain 超时保留指针，Stop 调
+// TestWebGRPCStopForcesAfterDrainTimeout 验证 gRPC Drain 超时保留指针，Stop 调
 // Stop 强制关闭。
 func TestWebGRPCStopForcesAfterDrainTimeout(t *testing.T) {
 	w := &webRuntimeComponent{}

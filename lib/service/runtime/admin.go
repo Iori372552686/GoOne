@@ -97,7 +97,7 @@ func WithAdminReadyCheck(fn func() error) AdminOption {
 //
 // Start 同步绑定监听器，使端口冲突在启动期而非稍后暴露。Stop 带超时关闭 server。
 //
-// P0-03：tracker 直接取自 app.tracker（runtime.New 默认创建），不再由调用方外部传
+// tracker 直接取自 app.tracker（runtime.New 默认创建），不再由调用方外部传
 // 入，使 /components 在任何接线上都能列出 pending/running 组件。
 type AdminComponent struct {
 	cfg     adminConfig
@@ -116,7 +116,7 @@ type AdminComponent struct {
 // NewAdminComponent 构建一个绑定到给定 App 的 state store 与 component tracker
 // 的 admin Component。必须在 Run 之前构造。
 //
-// P0-03：tracker 参数已移除；admin 直接使用 app.tracker（runtime.New 默认创建）。
+// tracker 参数已移除；admin 直接使用 app.tracker（runtime.New 默认创建）。
 // 旧的 NewAdminComponent(app, tracker, ...) 调用方改为 NewAdminComponent(app, ...)。
 func NewAdminComponent(app *App, opts ...AdminOption) *AdminComponent {
 	cfg := adminConfig{serviceName: app.Name()}
@@ -147,7 +147,7 @@ func (a *AdminComponent) RuntimeErrors() <-chan error {
 
 // Start 实现 Component。它同步绑定监听器。
 //
-// P0-03：若设置了 WithAdminConfig 的 source，在 Start 时调用一次以读取 LoadConfig
+// 若设置了 WithAdminConfig 的 source，在 Start 时调用一次以读取 LoadConfig
 // 之后才生效的端口/IP/Enabled/Pprof，覆盖构造期的静态值。这修正了历史上"构造期冻结
 // cfg.ip/cfg.port、无法反映 LoadConfig 后配置"的问题。
 func (a *AdminComponent) Start(_ context.Context) error {

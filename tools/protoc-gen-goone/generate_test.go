@@ -1766,7 +1766,7 @@ func typePtr(v descriptorpb.FieldDescriptorProto_Type) *descriptorpb.FieldDescri
 	return &v
 }
 
-// TestGenerate_RegistryBinding 验证 P1-01：generator 为 cmd-bound 服务生成
+// TestGenerate_RegistryBinding 验证 generator 为 cmd-bound 服务生成
 // RegisterSvcToRegistry(r *ssrpc.Registry, srv) error。
 func TestGenerate_RegistryBinding(t *testing.T) {
 	descFD := protodesc.ToFileDescriptorProto(descriptorpb.File_google_protobuf_descriptor_proto)

@@ -62,7 +62,7 @@ type Registry struct {
 }
 
 // New new a nacos registry. 返回 error 使 nil client 在构造期而非使用期暴露
-//（V3-P0-05：Nacos client 创建返回 (client, error)）。
+//（Nacos client 创建返回 (client, error)）。
 func New(cli naming_client.INamingClient, opts ...Option) (*Registry, error) {
 	if cli == nil {
 		return nil, errors.New("nacos: nil naming client")

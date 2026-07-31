@@ -145,7 +145,7 @@ websvr:
 	}
 }
 
-// TestAdminDefaultPortByServiceType 验证 P0-03：当 admin_server.port 为 0 时，按服务
+// TestAdminDefaultPortByServiceType 验证 当 admin_server.port 为 0 时，按服务
 // 类型回退到默认端口（connsvr=8101 等）。显式非 0 端口保持不变。
 func TestAdminDefaultPortByServiceType(t *testing.T) {
 	cases := []struct {
@@ -178,7 +178,7 @@ func TestAdminDefaultPortByServiceType(t *testing.T) {
 	}
 }
 
-// TestLoadConnConfigResolvesAdminDefaultPort 验证 P0-03 端到端：当配置文件中
+// TestLoadConnConfigResolvesAdminDefaultPort 验证 端到端：当配置文件中
 // admin_server.port 为 0 时，LoadConnConfig 后端口回退到 connsvr 默认端口 8101。
 func TestLoadConnConfigResolvesAdminDefaultPort(t *testing.T) {
 	path := writeTempConfig(t, `

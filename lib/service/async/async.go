@@ -13,9 +13,9 @@ import (
 const (
 	STATUS_RUN     = 1
 	STATUS_STOP    = 2
-	STATUS_QUIESCE = 3 // V4 P0-05：Quiesce 后停止接收新任务，既有任务继续完成。
+	STATUS_QUIESCE = 3 // Quiesce 后停止接收新任务，既有任务继续完成。
 
-	// defaultCapacity 是未显式设置容量时的上限（V4 P0-05）。避免历史无界增长。
+	// defaultCapacity 是未显式设置容量时的上限。避免历史无界增长。
 	defaultCapacity int64 = 1 << 16
 )
 
@@ -35,7 +35,7 @@ type Async struct {
 	tasks    *Queue        // 任务队列
 	pushCh   chan struct{} // 消耗通知
 	exitCh   chan struct{} // 退出
-	capacity int64         // 队列容量上限（V4 P0-05），<=0 用 defaultCapacity
+	capacity int64         // 队列容量上限，<=0 用 defaultCapacity
 }
 
 // NewAsync 构造一个默认容量（defaultCapacity）的 worker。
@@ -43,7 +43,7 @@ func NewAsync() *Async {
 	return NewAsyncWithCapacity(defaultCapacity)
 }
 
-// NewAsyncWithCapacity 构造一个显式容量的 worker（V4 P0-05）。capacity<=0 时用默认值。
+// NewAsyncWithCapacity 构造一个显式容量的 worker。capacity<=0 时用默认值。
 func NewAsyncWithCapacity(capacity int64) *Async {
 	if capacity <= 0 {
 		capacity = defaultCapacity
@@ -65,7 +65,7 @@ func NewAsyncPool(size int) (rets []*Async) {
 	return
 }
 
-// NewAsyncPoolWithCapacity 构造一个显式容量的 worker 切片（V4 P0-05）。
+// NewAsyncPoolWithCapacity 构造一个显式容量的 worker 切片。
 func NewAsyncPoolWithCapacity(size int, capacity int64) (rets []*Async) {
 	for i := 0; i < size; i++ {
 		rets = append(rets, NewAsyncWithCapacity(capacity))
@@ -73,13 +73,13 @@ func NewAsyncPoolWithCapacity(size int, capacity int64) (rets []*Async) {
 	return
 }
 
-// Push 添加任务。Deprecated（V4 P0-05）：保留兼容签名，内部调用 PushE 并丢弃 error。
+// Push 添加任务。Deprecated：保留兼容签名，内部调用 PushE 并丢弃 error。
 // 新代码应使用 PushE 以获得 stopped/quiescing/queue full 的明确错误。
 func (d *Async) Push(task func()) {
 	_ = d.PushE(task)
 }
 
-// PushE 添加任务并返回错误（V4 P0-05）。至少区分：
+// PushE 添加任务并返回错误。至少区分：
 //   - ErrWorkerStopped：worker 已 Stop；
 //   - ErrWorkerQuiescing：worker 处于 Quiesce；
 //   - ErrQueueFull：队列达到容量上限（有界，不再无界增长）。
@@ -116,12 +116,12 @@ func (d *Async) Start() {
 }
 
 // Quiesce 标记 worker 进入排空期：停止接收新任务（PushE 返回 ErrWorkerQuiescing），
-// 但既有任务继续完成（V4 P0-05）。幂等。
+// 但既有任务继续完成。幂等。
 func (d *Async) Quiesce() {
 	atomic.CompareAndSwapInt32(&d.status, STATUS_RUN, STATUS_QUIESCE)
 }
 
-// Drain 阻塞等待队列排空或 ctx 取消（V4 P0-05）。仅在 Quiesce 后调用语义明确。
+// Drain 阻塞等待队列排空或 ctx 取消。仅在 Quiesce 后调用语义明确。
 // 返回 nil 表示队列已归零；返回 ctx.Err() 表示等待被取消时仍有残余任务。
 func (d *Async) Drain(ctx context.Context) error {
 	ticker := time.NewTicker(time.Millisecond)

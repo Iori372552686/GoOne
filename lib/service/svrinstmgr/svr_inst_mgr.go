@@ -43,7 +43,7 @@ type ServerInstanceMgr struct {
 	reg                registry.Registrar
 	discovery          registry.Discovery
 
-	// V4 P0-07：watcher/cancel/registry 的创建与 Close 全部在 closeMu 下进行，
+	// watcher/cancel/registry 的创建与 Close 全部在 closeMu 下进行，
 	// 消除「Close 与 watcher 创建并发」的迟到 watcher / use-after-close 竞态。
 	closeMu   sync.Mutex
 	watcher   registry.Watcher
@@ -92,7 +92,7 @@ func (s *ServerInstanceMgr) InitAndRun(selfBusID string, routeRules map[uint32]u
 	return nil
 }
 
-// Close 取消 watch context、join runWatch goroutine 并关闭 registry client（V4 P0-07）。
+// Close 取消 watch context、join runWatch goroutine 并关闭 registry client。
 // 与 runWatch 的 watcher 创建互斥，避免迟到 watcher 与 use-after-close。
 func (s *ServerInstanceMgr) Close() {
 	s.closeMu.Lock()
@@ -189,7 +189,7 @@ func (s *ServerInstanceMgr) runWatch(serviceName string) {
 				return
 			}
 			logger.Warningf("registry watch create failed: %v", err)
-			// V4 P0-07：可被 Close 取消的退避，替代裸 time.Sleep。
+			// 可被 Close 取消的退避，替代裸 time.Sleep。
 			if !sleepOrCancel(ctx, time.Second) {
 				return
 			}
@@ -228,7 +228,7 @@ func (s *ServerInstanceMgr) runWatch(serviceName string) {
 	}
 }
 
-// sleepOrCancel 等待 d，ctx 取消时立即返回 false（V4 P0-07：替代裸 time.Sleep）。
+// sleepOrCancel 等待 d，ctx 取消时立即返回 false（替代裸 time.Sleep）。
 func sleepOrCancel(ctx context.Context, d time.Duration) bool {
 	t := time.NewTimer(d)
 	defer t.Stop()

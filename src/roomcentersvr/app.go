@@ -62,7 +62,7 @@ func NewApp() *runtime.App {
 			}
 			if gconf.RoomCenterSvrCfg.Dependencies.NacosConf.IPAddr != "" {
 				logger.Infof("Loading remote gameconf by Nacos group: %v ", gconf.RoomCenterSvrCfg.Dependencies.NacosConf.GroupName)
-				// V4 P0-06：经 lib/contrib/config/factory 构造配置中心 client，
+				// 经 lib/contrib/config/factory 构造配置中心 client，
 				// 由 gamedata.InitRemote 统一加载+热更；构造/拉取失败返回 error。
 				if err := gamedata.InitNacos(gconf.RoomCenterSvrCfg.Dependencies.NacosConf); err != nil {
 					return err
@@ -70,15 +70,15 @@ func NewApp() *runtime.App {
 			}
 			return nil
 		},
-		// V4 P0-05：Stop 时关闭 Redis 连接池，消除连接泄漏。
-		// V4 P0-06：同时取消 Nacos gamedata 监听，回收监听 goroutine。
+		// Stop 时关闭 Redis 连接池，消除连接泄漏。
+		// 同时取消 Nacos gamedata 监听，回收监听 goroutine。
 		OnStop: func(_ context.Context) error {
 			gamedata.StopNet()
 			return rds.RedisMgr.Close()
 		},
 	}
 
-	// P1-03：用 RegistryComponent 替代 "NewDispatcher→ToDispatcher→丢弃" 闭包。
+	// 用 RegistryComponent 替代 "NewDispatcher→ToDispatcher→丢弃" 闭包。
 	// logger.RegisterCmdBacklist 是 roomcenter 特有的日志黑名单，作为独立 FuncComponent
 	// 在 RegistryComponent 之后注册（注册顺序即 Start 顺序，故 TransMgr 绑定先于黑名单）。
 	registerHandlers := ssrpc.NewRegistryComponent(
@@ -97,7 +97,7 @@ func NewApp() *runtime.App {
 		},
 	}
 
-	// P1-04：显式 DriverRegistry，只注册 rabbitmq。
+	// 显式 DriverRegistry，只注册 rabbitmq。
 	drivers := bus.NewDriverRegistry()
 	drivers.MustRegister(rabbitmq.Driver())
 	routerComp := &bussvc.RouterComponent{
@@ -163,7 +163,7 @@ func NewApp() *runtime.App {
 		}),
 	)
 
-	// P0-03：admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
+	// admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
 	// app.tracker。
 	adminComp := runtime.NewAdminComponent(app,
 		runtime.WithAdminConfig(func() runtime.AdminConfig {
@@ -179,10 +179,10 @@ func NewApp() *runtime.App {
 		runtime.WithAdminReadyCheck(router.ReadyCheck),
 	)
 
-	// Start 顺序（P0-03）：datetime → logger → admin → tracing → 业务依赖 → SSRPC 注册
+	// Start 顺序：datetime → logger → admin → tracing → 业务依赖 → SSRPC 注册
 	// → TransMgr → router/bus → 房间初始化 → roomTick → roomPersist → roomFlush(Drainer)。
 	// datetime_tick 放最前：room tick/房间初始化都依赖 datetime.NowMs()。
-	// P1-07：用 MustRegister 一次注册全部组件。
+	// 用 MustRegister 一次注册全部组件。
 	app.MustRegister(
 		scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing,
 		businessDeps, registerHandlers, cmdBacklist, transMgr, routerComp,

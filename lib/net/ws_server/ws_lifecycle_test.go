@@ -34,7 +34,7 @@ func wsFreePort(t *testing.T) int {
 	return port
 }
 
-// TestWsRunGinWsReportsPortConflictAtStart 验证 P0-04：RunGinWs 同步 net.Listen，端口冲突
+// TestWsRunGinWsReportsPortConflictAtStart 验证 RunGinWs 同步 net.Listen，端口冲突
 // 必须在 Start（而非稍后的 goroutine 内）返回。
 func TestWsRunGinWsReportsPortConflictAtStart(t *testing.T) {
 	port := wsFreePort(t)
@@ -59,7 +59,7 @@ func TestWsRunGinWsReportsPortConflictAtStart(t *testing.T) {
 	}
 }
 
-// TestWsQuiesceClosesListenerKeepsUpgradeRejecting 验证 P0-04：Quiesce 关闭 HTTP listener
+// TestWsQuiesceClosesListenerKeepsUpgradeRejecting 验证 Quiesce 关闭 HTTP listener
 // 后新 Upgrade 被拒绝（accepting=false），既有 WS 连接保留。
 func TestWsQuiesceClosesListenerKeepsUpgradeRejecting(t *testing.T) {
 	port := wsFreePort(t)
@@ -87,7 +87,7 @@ func TestWsQuiesceClosesListenerKeepsUpgradeRejecting(t *testing.T) {
 	svr.Stop(context.Background())
 }
 
-// TestWsStopForceClosesHttpServer 验证 P0-04：Stop 强制 Close httpServer 并清空指针。
+// TestWsStopForceClosesHttpServer 验证 Stop 强制 Close httpServer 并清空指针。
 func TestWsStopForceClosesHttpServer(t *testing.T) {
 	port := wsFreePort(t)
 	svr := &WsTcpSvr{handler: &noopWsHandler{}}
@@ -108,7 +108,7 @@ func TestWsStopForceClosesHttpServer(t *testing.T) {
 	_ = relisten.Close()
 }
 
-// TestWsDestroyConnDoesNotCloseChannel 验证 P0-04：destroyConn 不调用 close(chanWrite)，
+// TestWsDestroyConnDoesNotCloseChannel 验证 destroyConn 不调用 close(chanWrite)，
 // 而是向 chanWrite 投递 nil（关闭信号）。这从根上消除 send-on-closed-channel 竞态——
 // 即使并发 WriteData 正在 send，channel 也永远不会被 close。
 func TestWsDestroyConnDoesNotCloseChannel(t *testing.T) {

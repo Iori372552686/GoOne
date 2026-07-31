@@ -247,7 +247,7 @@ func TestRegistryBindingKeyRoundTrip(t *testing.T) {
 	}
 }
 
-// TestRegistrySealIsIdempotent 验证 P1-01：Seal 真正幂等——二次调用返回同一个
+// TestRegistrySealIsIdempotent 验证 Seal 真正幂等——二次调用返回同一个
 // Dispatcher（历史返回 ErrRegistrySealed，与文档矛盾）。
 func TestRegistrySealIsIdempotent(t *testing.T) {
 	r := NewRegistry()
@@ -267,7 +267,7 @@ func TestRegistrySealIsIdempotent(t *testing.T) {
 	}
 }
 
-// TestRegistryRegisterNilReturnsErrNilRegistry 验证 P1-01：nil 接收者返回
+// TestRegistryRegisterNilReturnsErrNilRegistry 验证 nil 接收者返回
 // ErrNilRegistry（历史返回 ErrNilDispatcher）。
 func TestRegistryRegisterNilReturnsErrNilRegistry(t *testing.T) {
 	var r *Registry
@@ -279,7 +279,7 @@ func TestRegistryRegisterNilReturnsErrNilRegistry(t *testing.T) {
 	}
 }
 
-// TestDispatcherRegisterBindings 验证 P1-01：RegisterBindings 按 Kind 批量注册。
+// TestDispatcherRegisterBindings 验证 RegisterBindings 按 Kind 批量注册。
 func TestDispatcherRegisterBindings(t *testing.T) {
 	d := NewDispatcher()
 	bindings := []Binding{

@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// TestPushERejectsWhenStopped 验证 worker 未 Start 时 PushE 返回 ErrWorkerStopped（V4 P0-05）。
+// TestPushERejectsWhenStopped 验证 worker 未 Start 时 PushE 返回 ErrWorkerStopped。
 func TestPushERejectsWhenStopped(t *testing.T) {
 	a := NewAsync()
 	if err := a.PushE(func() {}); !errors.Is(err, ErrWorkerStopped) {
@@ -16,7 +16,7 @@ func TestPushERejectsWhenStopped(t *testing.T) {
 	}
 }
 
-// TestPushERejectsAfterQuiesce 验证 Quiesce 后 PushE 返回 ErrWorkerQuiescing（V4 P0-05）。
+// TestPushERejectsAfterQuiesce 验证 Quiesce 后 PushE 返回 ErrWorkerQuiescing。
 func TestPushERejectsAfterQuiesce(t *testing.T) {
 	a := NewAsync()
 	a.Start()
@@ -27,7 +27,7 @@ func TestPushERejectsAfterQuiesce(t *testing.T) {
 	}
 }
 
-// TestPushERejectsWhenQueueFull 验证队列满时 PushE 返回 ErrQueueFull（V4 P0-05）。
+// TestPushERejectsWhenQueueFull 验证队列满时 PushE 返回 ErrQueueFull。
 // 用极小容量 + 阻塞任务填满队列触发。
 func TestPushERejectsWhenQueueFull(t *testing.T) {
 	a := NewAsyncWithCapacity(2)
@@ -54,7 +54,7 @@ func TestPushERejectsWhenQueueFull(t *testing.T) {
 	}
 }
 
-// TestDrainWaitsForQueueEmpty 验证 Drain 在队列归零后返回 nil（V4 P0-05）。
+// TestDrainWaitsForQueueEmpty 验证 Drain 在队列归零后返回 nil。
 func TestDrainWaitsForQueueEmpty(t *testing.T) {
 	a := NewAsync()
 	a.Start()
@@ -76,7 +76,7 @@ func TestDrainWaitsForQueueEmpty(t *testing.T) {
 	}
 }
 
-// TestDrainReturnsErrorOnCtxCancel 验证 ctx 取消时 Drain 返回 ctx.Err（V4 P0-05）。
+// TestDrainReturnsErrorOnCtxCancel 验证 ctx 取消时 Drain 返回 ctx.Err。
 // 关键：Drain 等待的是队列深度归零，而非在途任务完成。因此需要让队列保持非空：
 // worker 正在处理第一个阻塞任务时，第二个阻塞任务仍排在队列里。
 func TestDrainReturnsErrorOnCtxCancel(t *testing.T) {
@@ -102,7 +102,7 @@ func TestDrainReturnsErrorOnCtxCancel(t *testing.T) {
 	}
 }
 
-// TestPushDeprecatedWrapperNoError 验证旧 Push 签名仍可用（兼容，V4 P0-05）。
+// TestPushDeprecatedWrapperNoError 验证旧 Push 签名仍可用（兼容，）。
 func TestPushDeprecatedWrapperNoError(t *testing.T) {
 	a := NewAsync()
 	a.Start()

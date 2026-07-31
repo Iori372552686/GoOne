@@ -7,7 +7,7 @@ import (
 )
 
 // TestNotifyDisabledWithoutEndpoint 验证未配置通知地址时 UploadFatalToDingHook 不得发起
-// 任何网络请求，也不得回退到任何内置地址。这是 V4 P0-01 的安全不变量。
+// 任何网络请求，也不得回退到任何内置地址。这是 的安全不变量。
 func TestNotifyDisabledWithoutEndpoint(t *testing.T) {
 	// 重置为干净状态：未配置地址。
 	ConfigureFatalHook("")

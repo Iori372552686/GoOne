@@ -9,8 +9,7 @@ const (
 	ASYNC_COUNT = 15
 )
 
-// tables 是 ORM 需要同步的表清单。包级变量初始化时填充，无需 init()（V3-P0-05：
-// 移除 package init 中的表注册，改为声明式）。
+// tables 是 ORM 需要同步的表清单。包级变量初始化时填充，无需 init（// 移除 package init 中的表注册，改为声明式）。
 var tables = []interface{}{
 	new(g1_protocol.MysqlTexasRoomInfo),
 	new(g1_protocol.MysqlTexasPlayerInfo),
@@ -18,7 +17,7 @@ var tables = []interface{}{
 }
 
 // handlers 是异步写库 worker 池。NewAsyncPool 仅创建对象（status=STOP），不启动
-// goroutine；必须由 Start 显式启动（V3-P0-05：移除 package init 中的 worker 启动）。
+// goroutine；必须由 Start 显式启动（移除 package init 中的 worker 启动）。
 var handlers = async.NewAsyncPool(ASYNC_COUNT)
 
 type IUpdate interface {

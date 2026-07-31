@@ -31,7 +31,7 @@ type Meta struct {
 }
 
 // Write 生成报告文件，返回 Markdown 文件路径。
-// 同时输出同名的 JSON 原始数据文件（V3-P1-06：便于程序化分析与 benchstat 对比）。
+// 同时输出同名的 JSON 原始数据文件（便于程序化分析与 benchstat 对比）。
 func Write(dir string, meta Meta, snap *stats.Snapshot) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("create report dir: %w", err)
@@ -47,7 +47,7 @@ func Write(dir string, meta Meta, snap *stats.Snapshot) (string, error) {
 		return "", fmt.Errorf("write report: %w", err)
 	}
 
-	// V3-P1-06：输出 JSON 原始数据（与 Markdown 同名，.json 扩展名）。
+	// 输出 JSON 原始数据（与 Markdown 同名，.json 扩展名）。
 	if err := writeJSON(dir, stamp, meta, snap); err != nil {
 		// JSON 失败不阻断 Markdown 报告（非关键路径）。
 		fmt.Fprintf(os.Stderr, "warn: write json: %v\n", err)

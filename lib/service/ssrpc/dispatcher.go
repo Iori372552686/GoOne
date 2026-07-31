@@ -158,7 +158,7 @@ func (d *Dispatcher) RegisterCmdE(cmd g1_protocol.CMD, h cmd_handler.CmdHandlerF
 	return nil
 }
 
-// RegisterBindings 按 Kind 把一组 Binding 注册到 Dispatcher（P1-01）。对 CMD/HTTP/WS/
+// RegisterBindings 按 Kind 把一组 Binding 注册到 Dispatcher。对 CMD/HTTP/WS/
 // gRPC 使用与单方法 Register* 相同的底层写入。任一 binding 非法（handler nil、key 缺
 // 失）即返回 error 并中止（已写入的不回滚——装配期失败应直接中止启动）。
 //
@@ -234,7 +234,7 @@ func (d *Dispatcher) MountGin(r gin.IRoutes) {
 
 // RegisterToTransactionMgr registers all known cmd handlers into the TransactionMgr.
 //
-// P1-02：返回 error，任一注册失败（重复 cmd、nil handler、启动后注册）即中止并返回，
+// 返回 error，任一注册失败（重复 cmd、nil handler、启动后注册）即中止并返回，
 // 不静默覆盖。历史实现为 void，丢弃所有错误。
 func (d *Dispatcher) RegisterToTransactionMgr(mgr transaction.ITransactionMgr) error {
 	if d == nil {

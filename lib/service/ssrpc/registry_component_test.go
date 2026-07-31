@@ -8,7 +8,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 )
 
-// TestRegistryComponentStartSealsAndBindsTransMgr 验证 P1-01：RegistryComponent.Start
+// TestRegistryComponentStartSealsAndBindsTransMgr 验证 RegistryComponent.Start
 // 完成 Register→Seal→TransMgr 绑定，Dispatcher 已 Seal。
 func TestRegistryComponentStartSealsAndBindsTransMgr(t *testing.T) {
 	mgr := transaction.NewTransactionMgr()
@@ -28,7 +28,7 @@ func TestRegistryComponentStartSealsAndBindsTransMgr(t *testing.T) {
 	}
 }
 
-// TestRegistryComponentStartWithoutTransMgr 验证 P1-01：不注入 TransMgr（web 服务）时
+// TestRegistryComponentStartWithoutTransMgr 验证 不注入 TransMgr（web 服务）时
 // Start 仍完成 Register→Seal，Dispatcher 可用。
 func TestRegistryComponentStartWithoutTransMgr(t *testing.T) {
 	register := func(r *Registry) error {
@@ -48,7 +48,7 @@ func TestRegistryComponentStartWithoutTransMgr(t *testing.T) {
 	}
 }
 
-// TestRegistryComponentStartFailsOnRegisterError 验证 P1-01：register 返回 error 时
+// TestRegistryComponentStartFailsOnRegisterError 验证 register 返回 error 时
 // Start 中止并返回该 error。
 func TestRegistryComponentStartFailsOnRegisterError(t *testing.T) {
 	sentinel := errors.New("bad binding")
@@ -62,7 +62,7 @@ func TestRegistryComponentStartFailsOnRegisterError(t *testing.T) {
 	}
 }
 
-// TestRegistryComponentStartFailsOnDuplicateBinding 验证 P1-01：批次内重复 binding 使
+// TestRegistryComponentStartFailsOnDuplicateBinding 验证 批次内重复 binding 使
 // Start 失败（Registry.Register 原子拒绝）。
 func TestRegistryComponentStartFailsOnDuplicateBinding(t *testing.T) {
 	register := func(r *Registry) error {

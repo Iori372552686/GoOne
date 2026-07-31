@@ -47,7 +47,7 @@ func (self *RedisMgr) InitAndRun(dbIns []Config) error {
 	}
 	logger.Infof("RedisMgr   InsInit.. | %v", safe)
 
-	// 记录已成功添加的实例 ID，用于中途失败时逆序关闭（V3-P0-05：多实例初始化失败
+	// 记录已成功添加的实例 ID，用于中途失败时逆序关闭（多实例初始化失败
 	// 必须回滚已成功实例，避免连接泄漏）。
 	added := make([]uint32, 0, len(dbIns))
 	for _, ds := range dbIns {
@@ -68,9 +68,9 @@ func (self *RedisMgr) InitAndRun(dbIns []Config) error {
 }
 
 // Close 关闭所有 Redis 实例的连接池。幂等：重复调用不 panic、不重复释放
-// （V3-P0-05：Redis Manager 增加 Close，使资源由 Component 统一关闭）。
+// （Redis Manager 增加 Close，使资源由 Component 统一关闭）。
 //
-// 错误聚合（V4 P0-05）：聚合每个实例 Close 的 error，不再静默忽略。任一实例关闭失败时
+// 错误聚合：聚合每个实例 Close 的 error，不再静默忽略。任一实例关闭失败时
 // 返回 errors.Join 的聚合错误；全部成功返回 nil。
 func (m *RedisMgr) Close() error {
 	var errs []error
@@ -84,7 +84,7 @@ func (m *RedisMgr) Close() error {
 }
 
 // closeInstance 关闭并移除指定实例。已不存在时安全返回。返回 client.Close 的 error
-// （V4 P0-05）。
+// 。
 func (m *RedisMgr) closeInstance(instID uint32) error {
 	v, ok := m.clients.LoadAndDelete(instID)
 	if !ok {

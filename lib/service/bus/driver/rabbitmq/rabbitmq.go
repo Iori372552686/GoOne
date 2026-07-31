@@ -17,13 +17,13 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-// DefaultStartTimeout 是 Start 等待首次连接的兜底上限（V4 P0-07：Start 不再
+// DefaultStartTimeout 是 Start 等待首次连接的兜底上限（Start 不再
 // fire-and-forget）。当调用方未在 context 上设置 deadline 时采用。
 const DefaultStartTimeout = 10 * time.Second
 
 // BusImplRabbitMQ 实现 bus.IBus 与可选的 bus.Starter / RuntimeErrorSource。
 //
-// V4 P0-07 生命周期契约：
+// 生命周期契约：
 //   - NewBusImplRabbitMQ 不启动后台 goroutine、不连接；Start 同步完成
 //     「Dial → Channel → QueueDeclare → Consume」，返回 nil 即表示 RabbitMQ 已连接、
 //     队列已声明、consumer 已注册，并已启动消费+重连 goroutine；
@@ -55,7 +55,7 @@ type BusImplRabbitMQ struct {
 	runtimeErrors chan error // 容量 1：断线事件在订阅前发生也不丢失
 }
 
-// NewBusImplRabbitMQ 构造实例但不连接（V4 P0-07：连接延迟到 Start）。
+// NewBusImplRabbitMQ 构造实例但不连接（连接延迟到 Start）。
 func NewBusImplRabbitMQ(selfBusId uint32, onRecvMsg bus.MsgHandler, addr string) *BusImplRabbitMQ {
 	return &BusImplRabbitMQ{
 		selfBusId: selfBusId,
@@ -84,7 +84,7 @@ func (b *BusImplRabbitMQ) Healthy() bool {
 	return b.connected.Load() && !b.closed.Load()
 }
 
-// Start 同步完成首次连接与 consumer 创建（V4 P0-07）。
+// Start 同步完成首次连接与 consumer 创建。
 //
 // 契约：返回 nil 表示 RabbitMQ 已连接、队列已声明、consumer 已注册，且消费/重连
 // goroutine 已启动。任一阶段失败按 ctx 返回 error，不启动后台 goroutine、不泄漏连接。
@@ -170,7 +170,7 @@ func (b *BusImplRabbitMQ) setup(ctx context.Context) (*amqp.Connection, *amqp.Ch
 	return conn, ch, deliveries, nil
 }
 
-// run 是唯一的消费+重连 goroutine（V4 P0-07）。
+// run 是唯一的消费+重连 goroutine。
 //
 // 阻塞在当前 channel 的 deliveries / close 通知上分发消息；channel 关闭（断线）时
 // 标记未就绪、上报 runtime error，按可取消退避重连（重建 conn/channel/deliveries
@@ -295,7 +295,7 @@ func (b *BusImplRabbitMQ) reconnect(ctx context.Context, retry *int) bool {
 	}
 }
 
-// Send 同步 publish（V4 P0-07：成功表示已被当前连接成功 publish，失败回传 error）。
+// Send 同步 publish（成功表示已被当前连接成功 publish，失败回传 error）。
 //
 //   - closed 时立即返回 ErrBusClosed；
 //   - 非就绪时返回带明确语义的 error（调用方可重试或降级）；
@@ -333,7 +333,7 @@ func (b *BusImplRabbitMQ) Send(dstBusId uint32, data1 []byte, data2 []byte) erro
 	return nil
 }
 
-// Close 关闭连接、取消所有 goroutine 并 join（V4 P0-07）。幂等。
+// Close 关闭连接、取消所有 goroutine 并 join。幂等。
 func (b *BusImplRabbitMQ) Close() error {
 	b.closeOnce.Do(func() {
 		b.closed.Store(true)
@@ -356,7 +356,7 @@ func (b *BusImplRabbitMQ) Close() error {
 }
 
 // RuntimeErrors 实现 RuntimeErrorSource：运行期连接断开时投递非 nil error
-// （V4 P0-07：Bus 运行期失败进入 RuntimeErrors，触发标准 Drain/Failed）。
+// （Bus 运行期失败进入 RuntimeErrors，触发标准 Drain/Failed）。
 func (b *BusImplRabbitMQ) RuntimeErrors() <-chan error {
 	return b.runtimeErrors
 }
@@ -377,7 +377,7 @@ func (b *BusImplRabbitMQ) reportRuntimeError(err error) {
 	}
 }
 
-// redactedAddr 返回去掉用户名密码的 host:port，供日志使用（V4 P0-07：地址脱敏）。
+// redactedAddr 返回去掉用户名密码的 host:port，供日志使用（地址脱敏）。
 func (b *BusImplRabbitMQ) redactedAddr() string {
 	return redactAMQPAddr(b.addr)
 }

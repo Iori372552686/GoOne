@@ -27,7 +27,7 @@ func NewApp() *runtime.App {
 	// SSRPC 注册：必须在 Seal（于 router/bus Start 之前）完成，且在 TransMgr Start
 	// 之后（RegisterToTransactionMgr 依赖已 InitAndRun 的 TransMgr）。这里作为
 	// FuncComponent，注册顺序置于 TransMgr 之后、Router 之前。
-	// P1-03：用 RegistryComponent 替代 "NewDispatcher→ToDispatcher→丢弃" 闭包。
+	// 用 RegistryComponent 替代 "NewDispatcher→ToDispatcher→丢弃" 闭包。
 	registerHandlers := ssrpc.NewRegistryComponent(
 		"ssrpc_registry",
 		func(r *ssrpc.Registry) error {
@@ -38,7 +38,7 @@ func NewApp() *runtime.App {
 	)
 
 	// ORM 依赖：Start 初始化（启动异步 worker + 初始化 ORM Engine）；Stop 关闭。
-	// V3-P0-05：worker 启动从 package init 移到显式 manager.Start，使 import 不再
+	// worker 启动从 package init 移到显式 manager.Start，使 import 不再
 	// 产生 goroutine，生命周期由 Component 统一管理。
 	ormDeps := &bussvc.FuncComponent{
 		ComponentName: "orm_deps",
@@ -48,14 +48,14 @@ func NewApp() *runtime.App {
 		},
 		OnStop: func(_ context.Context) error {
 			manager.Close()
-			// V3-P0-05：同时关闭 ORM Engine（此前只关 async worker，Engine 靠 OS 回收）。
+			// 同时关闭 ORM Engine（此前只关 async worker，Engine 靠 OS 回收）。
 			_ = globals.OrmMgr.Close()
 			logger.Infof("================== mysqlsvr Stop =========================")
 			return nil
 		},
 	}
 
-	// P1-04：显式 DriverRegistry，只注册 rabbitmq。
+	// 显式 DriverRegistry，只注册 rabbitmq。
 	drivers := bus.NewDriverRegistry()
 	drivers.MustRegister(rabbitmq.Driver())
 	routerComp := &bussvc.RouterComponent{
@@ -85,7 +85,7 @@ func NewApp() *runtime.App {
 		}),
 	)
 
-	// P0-03：admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
+	// admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
 	// app.tracker。
 	adminComp := runtime.NewAdminComponent(app,
 		runtime.WithAdminConfig(func() runtime.AdminConfig {
@@ -101,10 +101,10 @@ func NewApp() *runtime.App {
 		runtime.WithAdminReadyCheck(router.ReadyCheck),
 	)
 
-	// 注册顺序即 Start 顺序（P0-03）：datetime 周期刷新 → logger → admin → tracing →
+	// 注册顺序即 Start 顺序：datetime 周期刷新 → logger → admin → tracing →
 	// orm 依赖 → SSRPC 注册（必须在 TransMgr.InitAndRun 之前，因
 	// RegisterToTransactionMgr 调 RegisterCmd）→ TransMgr → router/bus。
-	// P1-07：用 MustRegister 一次注册全部组件。
+	// 用 MustRegister 一次注册全部组件。
 	app.MustRegister(
 		scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing,
 		ormDeps, registerHandlers, transMgr, routerComp,

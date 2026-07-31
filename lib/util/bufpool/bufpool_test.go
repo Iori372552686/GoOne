@@ -44,7 +44,7 @@ func BenchmarkGetPut(b *testing.B) {
 	}
 }
 
-// BenchmarkAcquireRelease 度量 Lease 池化的稳态开销。目标：0 alloc（roadmap P1-01）。
+// BenchmarkAcquireRelease 度量 Lease 池化的稳态开销。目标：0 alloc。
 // 与 BenchmarkGetPut 对照：Get/Put 因丢失 *Buffer 关联仍有 1 alloc，Acquire/Release
 // 应为 0。
 func BenchmarkAcquireRelease(b *testing.B) {

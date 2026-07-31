@@ -7,7 +7,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// fakeLimiter 是测试用的 InflightLimiter，实现 V4 P0-03 的原子占位/释放语义。
+// fakeLimiter 是测试用的 InflightLimiter，实现 的原子占位/释放语义。
 // 它用一个全局计数（不区分 method）模拟；per-method 上限通过 TryAcquireInflight 的
 // methodLimit 参数传入，本桩取 globalLimit 与 methodLimit 中生效的较小值。
 type fakeLimiter struct {

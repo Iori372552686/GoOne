@@ -32,7 +32,7 @@ type TcpConnInfo struct {
 }
 
 // wsConnEntry 封装每连接的写 channel 与关闭标志，使 destroyConn 能在锁内原子地标记
-// 关闭，消除 send-on-closed-channel 竞态（P0-04）。
+// 关闭，消除 send-on-closed-channel 竞态。
 type wsConnEntry struct {
 	chanWrite chan *bufpool.Buffer
 	closed    bool
@@ -51,7 +51,7 @@ type WsTcpSvr struct {
 	// 置 false 后新连接被拒绝，既有连接保留处理在途工作。
 	accepting atomic.Bool
 
-	// httpListener / httpServer / serveErr 由 RunGinWs 保存（P0-04）：同步 net.Listen 使
+	// httpListener / httpServer / serveErr 由 RunGinWs 保存：同步 net.Listen 使
 	// 端口冲突在 Start 期返回；保存 server 使 Stop 能强制 Close。删除包级全局 Gin
 	// router，支持同进程多 WS 实例。serveErr 缓存 Serve goroutine 的非预期退出错误。
 	httpListener net.Listener
@@ -82,7 +82,7 @@ func (s *WsTcpSvr) InitAndRun(implType, mod string, port int, handler IWsTcpSvrE
 
 // Quiesce 停止接受新 WS Upgrade，保留既有连接处理在途工作。幂等。
 //
-// P0-04：关闭 HTTP listener 以停止新 Upgrade（gin 的 Serve 会退出），但保留已升级的
+// 关闭 HTTP listener 以停止新 Upgrade（gin 的 Serve 会退出），但保留已升级的
 // WebSocket 连接；它们的拆除留给 Stop 强制执行。
 func (s *WsTcpSvr) Quiesce() {
 	s.accepting.Store(false)
@@ -94,7 +94,7 @@ func (s *WsTcpSvr) Quiesce() {
 
 // Stop 拒绝新 Upgrade 并关闭全部已建立连接，用于排空超时后的强制关停。幂等。
 //
-// P0-04：先在锁内快照连接列表并释放锁，再在锁外逐个 Close。禁止在连接表锁内执行
+// 先在锁内快照连接列表并释放锁，再在锁外逐个 Close。禁止在连接表锁内执行
 // 网络 Close。同时关闭 HTTP server 强制拆除底层监听器。
 //
 // ctx 当前未使用（关闭是同步的），保留作为未来受 context 约束强制关闭的扩展点；
@@ -110,7 +110,7 @@ func (s *WsTcpSvr) Stop(_ context.Context) error {
 	for _, conn := range conns {
 		_ = conn.Close()
 	}
-	// P0-04：强制关闭 HTTP server（Quiesce 只关闭 listener 停止新 Upgrade）。
+	// 强制关闭 HTTP server（Quiesce 只关闭 listener 停止新 Upgrade）。
 	if s.httpServer != nil {
 		_ = s.httpServer.Close()
 		s.httpServer = nil
@@ -189,7 +189,7 @@ func (s *WsTcpSvr) runConnRead(conn *websocket.Conn) {
 	conn.SetReadLimit(4 * 1024 * 1024) // 单条消息最大 4MB（防止内存耗尽攻击）
 
 	for {
-		// P0-04：socket deadline 用 time.Now()，不用 datetime.NowT()（缓存时间会陈旧）。
+		// socket deadline 用 time.Now，不用 datetime.NowT（缓存时间会陈旧）。
 		conn.SetReadDeadline(time.Now().Add(s.wsReadTimeout)) // 防止慢连接占用资源
 		_, data, err := conn.ReadMessage()
 		//logger.Debugf("read ws type:%v  datalen: %d", dtype, len(data))
@@ -206,7 +206,7 @@ func (s *WsTcpSvr) runConnRead(conn *websocket.Conn) {
 	s.destroyConn(conn.NetConn())
 }
 
-// destroyConn 拆除一个连接。P0-04：锁内置 closed=true 并删除；不调用
+// destroyConn 拆除一个连接。锁内置 closed=true 并删除；不调用
 // close(chanWrite)（直接 close channel 会与并发 WriteData 的 send 产生
 // send-on-closed-channel 竞态）。改为向 chanWrite 投递一个 nil（关闭信号）：写协程
 // 收到 nil 即退出循环并 Close 底层 conn。chan 本身随 entry 一起被 GC。
@@ -244,7 +244,7 @@ func (s *WsTcpSvr) runConnWrite(conn *websocket.Conn, chanWrite <-chan *bufpool.
 			break
 		}
 
-		// P0-04：socket deadline 用 time.Now()。
+		// socket deadline 用 time.Now。
 		conn.SetWriteDeadline(time.Now().Add(s.wsWriteTimeout))
 		dataLen := len(buf.Bytes)
 		err := conn.WriteMessage(websocket.BinaryMessage, buf.Bytes)

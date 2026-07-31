@@ -9,7 +9,7 @@ import (
 
 // BenchmarkDispatchWS_Sealed 度量已 Seal dispatcher 上 WS 查找的热路径（无锁只读
 // map 读）。这是生产中使用的 Seal 后路径。与 BenchmarkDispatchWS_Unsealed 对比，以
-// 确认热路径已移除 RWMutex（P0-04 / P1-02 门禁）。
+// 确认热路径已移除 RWMutex（门禁）。
 func BenchmarkDispatchWS_Sealed(b *testing.B) {
 	d := NewDispatcher()
 	d.RegisterWS(1, func(cmd_handler.IContext, []byte) g1_protocol.ErrorCode {
@@ -39,7 +39,7 @@ func BenchmarkDispatchWS_Unsealed(b *testing.B) {
 	}
 }
 
-// BenchmarkRegistrySeal100Bindings 测量 P1-01：Registry.Seal 100 个 binding 的成本。
+// BenchmarkRegistrySeal100Bindings 测量 Registry.Seal 100 个 binding 的成本。
 func BenchmarkRegistrySeal100Bindings(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {

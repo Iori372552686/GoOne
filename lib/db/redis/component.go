@@ -8,7 +8,7 @@ import (
 )
 
 // Component 把一个 RedisMgr 包装成 runtime.Component，使其资源生命周期由运行期统一管理
-// （V4 P0-05）。
+// 。
 //
 // 历史缺陷：多个服务通过只有 OnStart 的 FuncComponent 初始化 Redis，Stop 不关闭，连接池在
 // 进程生命周期内泄漏。Component 在 Stop 时调用 RedisMgr.Close，并返回聚合的 Close error，

@@ -88,7 +88,7 @@ func (self *OrmSql) AddInstance(conf Config, tables ...interface{}) (*xorm.Engin
 
 	err = self.SyncTables(tables...)
 	if err != nil {
-		// SyncTables 失败时关闭已创建的 Engine，避免连接泄漏（V3-P0-05）。
+		// SyncTables 失败时关闭已创建的 Engine，避免连接泄漏。
 		_ = impl.Close()
 		return nil, err
 	}
@@ -172,7 +172,7 @@ func (self *OrmSql) SyncTables(tables ...interface{}) error {
 }
 
 // Close 关闭 Engine 与 Session，释放数据库连接。幂等：Engine 为 nil 时安全返回
-//（V3-P0-05：OrmSql 增加显式 Close，使资源由 Component 统一关闭）。
+//（OrmSql 增加显式 Close，使资源由 Component 统一关闭）。
 func (self *OrmSql) Close() error {
 	if self.Session != nil {
 		self.Session.Close()

@@ -10,7 +10,7 @@ import (
 )
 
 // TestDefaultTransportVerifiesTLSCertificate 验证默认 HttpConnectPool 严格校验 TLS 证书：
-// 访问仅持有自签名证书的 HTTPS server 时，默认配置必须失败（V4 P0-01 安全不变量）。
+// 访问仅持有自签名证书的 HTTPS server 时，默认配置必须失败（安全不变量）。
 //
 // 历史版本中 HttpConnectPool 设置了 InsecureSkipVerify: true，会接受任意不受信证书；
 // 本测试确保该不安全默认已被移除。

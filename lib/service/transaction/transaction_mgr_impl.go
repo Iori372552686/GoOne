@@ -91,14 +91,14 @@ func (m *TransactionMgr) InitAndRunWithConfig(cfg TransactionMgrConfig) {
 	}
 }
 
-// RegisterCmd 是兼容入口：委托 RegisterCmdE 并仅记录错误（不 Fatal、不覆盖，P1-02）。
+// RegisterCmd 是兼容入口：委托 RegisterCmdE 并仅记录错误（不 Fatal、不覆盖，）。
 func (m *TransactionMgr) RegisterCmd(cmd g1_protocol.CMD, cmdHandler cmd_handler.CmdHandlerFunc) {
 	if err := m.RegisterCmdE(cmd, cmdHandler); err != nil {
 		logger.Errorf("RegisterCmd(%d) failed: %v", cmd, err)
 	}
 }
 
-// RegisterCmdE 注册一个 cmd handler，返回明确哨兵错误（P1-02）：
+// RegisterCmdE 注册一个 cmd handler，返回明确哨兵错误：
 //   - nil handler → ErrNilCmdHandler
 //   - 重复 cmd → ErrDuplicateCmd（不再 last-write-wins 静默覆盖）
 //   - InitAndRun 之后注册 → ErrRegisterAfterStart

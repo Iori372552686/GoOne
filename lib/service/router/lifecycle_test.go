@@ -11,7 +11,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 )
 
-// startableFakeBus 是带显式 Start 的 fake IBus，用于 V4 P0-07 生命周期契约测试。
+// startableFakeBus 是带显式 Start 的 fake IBus，用于 生命周期契约测试。
 type startableFakeBus struct {
 	selfBusID  uint32
 	startErr   error
@@ -54,7 +54,7 @@ func (b *startableFakeBus) isClosed() bool {
 	return b.closed
 }
 
-// TestInitAndRunStartsBusBeforeRegister 验证 V4 P0-07：Bus 必须先 Start 成功，
+// TestInitAndRunStartsBusBeforeRegister 验证 Bus 必须先 Start 成功，
 // 再注册服务发现；Bus Start 失败时不注册、回滚并关闭 Bus。
 func TestInitAndRunStartsBusBeforeRegister(t *testing.T) {
 	r := New()
@@ -82,7 +82,7 @@ func TestInitAndRunStartsBusBeforeRegister(t *testing.T) {
 	}
 }
 
-// TestInitAndRunBusStartFailureClosesBus 验证 V4 P0-07：Bus Start 失败时，
+// TestInitAndRunBusStartFailureClosesBus 验证 Bus Start 失败时，
 // Router 返回 error 且不进入注册发现；已构造的 Bus 被 Close。
 func TestInitAndRunBusStartFailureClosesBus(t *testing.T) {
 	r := New()
@@ -101,7 +101,7 @@ func TestInitAndRunBusStartFailureClosesBus(t *testing.T) {
 	}
 }
 
-// TestInitAndRunBusStartFailureDoesNotRegister 验证 V4 P0-07 故障契约：
+// TestInitAndRunBusStartFailureDoesNotRegister 验证 故障契约：
 // Bus 不可达 → Start 超时 → 服务发现中无当前实例（注册路径未被触达）。
 //
 // 这里用 registry 不可达验证「注册路径未执行」较难隔离；改为断言 Bus Start 失败

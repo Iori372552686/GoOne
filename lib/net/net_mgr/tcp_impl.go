@@ -44,13 +44,13 @@ func (t *ConnTcpSvr) initAndRunGnet(ip string, port int, cb func(conn net.Conn, 
 }
 
 func (t *ConnTcpSvr) initSessionMaps(cb func(conn net.Conn, data []byte)) {
-	// V3-P1-02：本地 map 路径已删除，会话状态由 hub 拥有；这里只装配 handler。
+	// 本地 map 路径已删除，会话状态由 hub 拥有；这里只装配 handler。
 	t.handler = cb
 }
 
 // 被Listener协程调用，一个TcpSvr对应一个Listener协程
 func (t *ConnTcpSvr) OnConn(conn net.Conn) {
-	// V4 P0-04：admission 用原子 TryAcquireConnection 占用名额；拒绝（enforce 超限/排空期）
+	// admission 用原子 TryAcquireConnection 占用名额；拒绝（enforce 超限/排空期）
 	// 时立即关闭连接，不增加计数，且不标记 admitted，使 OnClose 不释放。
 	t.ensureLease()
 	if t.hub != nil {
@@ -79,7 +79,7 @@ func (t *ConnTcpSvr) OnPacket(conn net.Conn, data []byte) {
 // 被Read协程调用，每个Connection对应一个Read协调
 func (t *ConnTcpSvr) OnClose(conn net.Conn) {
 	observeGatewayEvent("tcp", "closed")
-	// V4 P0-04：仅为 admitted 连接释放计数与 admission 名额，避免被拒绝的连接误减计数。
+	// 仅为 admitted 连接释放计数与 admission 名额，避免被拒绝的连接误减计数。
 	if t.lease != nil && t.lease.takeIfAdmitted(conn) {
 		if t.hub != nil {
 			t.hub.DecConnection()
@@ -107,7 +107,7 @@ func (t *ConnTcpSvr) OnClose(conn net.Conn) {
 }
 
 func (t *ConnTcpSvr) SendByUid(uid uint64, data1 []byte, data2 []byte) error {
-	// P0-05：锁内取不可变 Client，锁外写网络。
+	// 锁内取不可变 Client，锁外写网络。
 	client := t.hub.ClientForSend(uid)
 	if client == nil {
 		logger.Debugf("uid doesn't exist {uid: %v}", uid)
@@ -127,7 +127,7 @@ func (t *ConnTcpSvr) SendByUid(uid uint64, data1 []byte, data2 []byte) error {
 
 // BroadcastByZone 向指定 zone 的所有在线客户端广播；zone <= 0 表示全服广播。
 //
-// P0-05：锁内构造目标快照，锁外逐个写——一个慢连接不得阻塞其它连接发送。
+// 锁内构造目标快照，锁外逐个写——一个慢连接不得阻塞其它连接发送。
 func (t *ConnTcpSvr) BroadcastByZone(zone int32, data1 []byte, data2 []byte) {
 	clients := t.hub.SnapshotByZone(zone)
 	for _, client := range clients {
@@ -140,7 +140,7 @@ func (t *ConnTcpSvr) BroadcastByZone(zone int32, data1 []byte, data2 []byte) {
 }
 
 func (t *ConnTcpSvr) Kick(uid uint64, reason g1_protocol.EKickOutReason) {
-	// P0-05：锁内取 conn，锁外 marshal/write/close。
+	// 锁内取 conn，锁外 marshal/write/close。
 	client := t.hub.ClientForSend(uid)
 	if client == nil {
 		logger.Infof("Can't find conn to kick. {uid:%v, reason:%v}", uid, reason)
@@ -160,7 +160,7 @@ func (t *ConnTcpSvr) KickByRemoteAddr(uid uint64, reason g1_protocol.EKickOutRea
 }
 
 func (t *ConnTcpSvr) removeConn(conn net.Conn) uint64 {
-	// P0-05：委托 hub.RemoveConn；返回 uid=0 表示未绑定或被替换（不触发登出）。
+	// 委托 hub.RemoveConn；返回 uid=0 表示未绑定或被替换（不触发登出）。
 	// kicked=true 表示是 kick 导致的关闭，不触发登出包。
 	uid, kicked := t.hub.RemoveConn(conn)
 	if kicked {
@@ -198,7 +198,7 @@ func (t *ConnTcpSvr) kick(conn net.Conn, uid uint64, reason g1_protocol.EKickOut
 }
 
 func (t *ConnTcpSvr) UpdateClientByUid(conn net.Conn, uid uint64, zone uint32) *Client {
-	// P0-05：用 BindClient 原子完成查旧+写新索引，IPv6 兼容（net.SplitHostPort），
+	// 用 BindClient 原子完成查旧+写新索引，IPv6 兼容（net.SplitHostPort），
 	// 锁外 kick 旧连接。
 	newIns, oldCli, err := t.hub.BindClient(conn, uid, zone)
 	if err != nil {

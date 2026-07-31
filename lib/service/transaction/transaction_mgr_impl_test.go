@@ -198,7 +198,7 @@ func waitFor(t *testing.T, cond func() bool, desc string) {
 	t.Fatalf("timed out waiting for %s", desc)
 }
 
-// TestRegisterCmdERejectsNil 验证 P1-02：RegisterCmdE 对 nil handler 返回
+// TestRegisterCmdERejectsNil 验证 RegisterCmdE 对 nil handler 返回
 // ErrNilCmdHandler。
 func TestRegisterCmdERejectsNil(t *testing.T) {
 	mgr := &TransactionMgr{}
@@ -207,7 +207,7 @@ func TestRegisterCmdERejectsNil(t *testing.T) {
 	}
 }
 
-// TestRegisterCmdERejectsDuplicate 验证 P1-02：重复 cmd 返回 ErrDuplicateCmd（不再
+// TestRegisterCmdERejectsDuplicate 验证 重复 cmd 返回 ErrDuplicateCmd（不再
 // last-write-wins 静默覆盖）。
 func TestRegisterCmdERejectsDuplicate(t *testing.T) {
 	mgr := &TransactionMgr{}
@@ -222,7 +222,7 @@ func TestRegisterCmdERejectsDuplicate(t *testing.T) {
 	}
 }
 
-// TestRegisterCmdERejectsAfterStart 验证 P1-02：InitAndRun 之后注册返回
+// TestRegisterCmdERejectsAfterStart 验证 InitAndRun 之后注册返回
 // ErrRegisterAfterStart（历史为 logger.Fatalf 杀进程）。
 func TestRegisterCmdERejectsAfterStart(t *testing.T) {
 	mgr := &TransactionMgr{}
@@ -240,7 +240,7 @@ func TestRegisterCmdERejectsAfterStart(t *testing.T) {
 	}
 }
 
-// TestLegacyRegisterCmdDoesNotFatalOrOverwrite 验证 P1-02：兼容 RegisterCmd 不 Fatal、
+// TestLegacyRegisterCmdDoesNotFatalOrOverwrite 验证 兼容 RegisterCmd 不 Fatal、
 // 不静默覆盖（重复注册时第二个被拒绝，第一个保留）。
 func TestLegacyRegisterCmdDoesNotFatalOrOverwrite(t *testing.T) {
 	mgr := &TransactionMgr{}

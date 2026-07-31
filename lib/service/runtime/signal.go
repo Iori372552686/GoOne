@@ -34,7 +34,7 @@ type signalSource struct {
 // 个必须在 Run 返回时调用的清理函数（它调用 signal.Stop 并关闭内部 dispatcher
 // goroutine）。
 //
-// 关键不变量（P0-01 修复）：整个进程只对 SIGINT/SIGTERM 调用**一次** signal.Notify，
+// 关键不变量（修复）：整个进程只对 SIGINT/SIGTERM 调用**一次** signal.Notify，
 // 指向单一原始 channel；由单一 dispatcher goroutine 计数并据此分别发送 first/second
 // 事件。
 //

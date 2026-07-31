@@ -37,7 +37,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// 阶段 2：安装信号源。提前到 onLoadConfig/Start 之前，使启动阶段收到 SIGTERM/
-	// SIGINT 能立即取消进行中的 Component.Start（V3-P0-03）。signalCtx 由第一个终止
+	// SIGINT 能立即取消进行中的 Component.Start。signalCtx 由第一个终止
 	// 信号取消，传给 onLoadConfig 与 startComponents；startupDone 用于在启动成功后把
 	// termCh 的消费权从启动监督 goroutine 交接给 serveReady 内部的 awaitRunReason。
 	src := installSignals()
@@ -77,7 +77,7 @@ func (a *App) Run(ctx context.Context) error {
 		return errors.Join(startErr, stopErr)
 	}
 
-	// P0-02：启动 cause 检查。只有全部 Start 成功且启动期终止信号未到达（signalCtx 仍
+	// 启动 cause 检查。只有全部 Start 成功且启动期终止信号未到达（signalCtx 仍
 	// 未被取消）时才允许进入 Ready。不遵守 context、在取消后仍返回 nil 的 Start 不得让
 	// App 进入 Ready。
 	if cause := context.Cause(signalCtx); cause != nil {
@@ -97,7 +97,7 @@ func (a *App) Run(ctx context.Context) error {
 		a.markFailed(err)
 		return errors.Join(err, stopErr)
 	}
-	// P0-03：监督实现 RuntimeErrorSource 的组件（HTTP/gRPC listener 等）。首个非 nil
+	// 监督实现 RuntimeErrorSource 的组件（HTTP/gRPC listener 等）。首个非 nil
 	// 运行期错误触发标准 Quiesce/Drain/Stop 关停，终态 Failed。watcher 返回的错误
 	// 会作为排空原因并最终使 Run 返回带组件名的 error。
 	runtimeErr := a.serveReady(ctx, src)
@@ -115,7 +115,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.enterStopping(ctx)
 	stopErr := a.stopComponents(started, a.stopTimeout)
 
-	// 终态（P0-02 修复）：runtimeErr、drainErr、stopErr 任一非 nil 都走 Failed，且每个
+	// 终态（修复）：runtimeErr、drainErr、stopErr 任一非 nil 都走 Failed，且每个
 	// 终态错误都包含组件名与阶段名（由 errors.Join 保持 %w/Unwrap 链）。
 	// 关键不变量：不得先提交 Stopped 再改成 Failed。
 	terminalErr := errors.Join(runtimeErr, drainErr, stopErr)
@@ -179,7 +179,7 @@ func (a *App) startComponents(ctx context.Context) ([]Component, error) {
 // serveReady 在 Ready 阶段阻塞。当父 context 取消、终止信号到达、重载（处理后循
 // 环）或运行期错误到达时返回。
 //
-// P0-03：返回值 runtimeErr 非 nil 表示由 RuntimeErrorSource 监督触发的关停（如
+// 返回值 runtimeErr 非 nil 表示由 RuntimeErrorSource 监督触发的关停（如
 // HTTP/gRPC listener 意外死亡）；调用方据此走 Failed 终态。nil 表示正常信号/ctx 关
 // 停，走 Stopped 终态。
 func (a *App) serveReady(ctx context.Context, src signalSource) error {
@@ -268,7 +268,7 @@ func (a *App) handleReload(ctx context.Context) {
 // 超时约束；第二次终止信号（src.secondCh 关闭）会立即取消它。返回所有
 // Quiesce/Drain 失败的 joined error。
 //
-// 取消原因（P0-01 修复）：
+// 取消原因（修复）：
 //   - 排空时间耗尽：drainCtx 的根因是 context.DeadlineExceeded；计入
 //     drain_timeouts_total。
 //   - 第二次终止信号升级：drainCtx 的根因是 ErrDrainEscalated；不计入超时。
@@ -369,7 +369,7 @@ func (a *App) stopComponents(started []Component, timeout time.Duration) error {
 	return errors.Join(errs...)
 }
 
-// --- 阶段转换（P0-02：状态机为唯一事实源，不再维护重复的 phase/ready/alive 副本）---
+// --- 阶段转换（状态机为唯一事实源，不再维护重复的 phase/ready/alive 副本）---
 
 func (a *App) markStarting() {
 	// state store 已在 NewStateStore 构造时起始为 Starting 且上报了 gauge。

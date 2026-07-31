@@ -10,7 +10,7 @@ import (
 )
 
 // slowStartComponent 在 Start 中阻塞直到 ctx 被取消，用于测试启动期信号能否中断
-// 进行中的 Component.Start（V3-P0-03）。
+// 进行中的 Component.Start。
 type slowStartComponent struct {
 	name      string
 	startedCh chan struct{} // Start 被调用时关闭
@@ -44,7 +44,7 @@ func (s *slowStartComponent) Stop(ctx context.Context) error {
 
 // TestStartupSignalCancelsStartComponents 验证启动阶段收到终止信号时，
 // signalCtx 被取消，进行中的 Component.Start 立即返回，已成功启动的组件逆序 Stop，
-// Run 返回 error 且终态 Failed（V3-P0-03）。
+// Run 返回 error 且终态 Failed。
 func TestStartupSignalCancelsStartComponents(t *testing.T) {
 	a := MustNew("svc")
 	// 第一个组件正常启动；第二个是慢 Start，会被信号中断。
@@ -160,7 +160,7 @@ func (r *runtimeErrComponent) Stop(ctx context.Context) error { return nil }
 func (r *runtimeErrComponent) RuntimeErrors() <-chan error    { return r.errCh }
 
 // TestRuntimeErrorWrappedWithComponentName 验证 RuntimeErrorSource 组件上报的运行期
-// 错误在 Run 返回值中带组件名（V3-P0-03：错误中包含组件名）。
+// 错误在 Run 返回值中带组件名（错误中包含组件名）。
 func TestRuntimeErrorWrappedWithComponentName(t *testing.T) {
 	a := MustNew("svc")
 	mustRegister(a, newRecordingComponent("dep", &[]string{}, &sync.Mutex{}))

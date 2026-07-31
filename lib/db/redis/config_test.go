@@ -6,7 +6,7 @@ import (
 )
 
 // TestConfigSafeStringRedactsPassword 验证 Redis 配置的可日志表示不含密码，
-// 仅保留实例 ID、地址、DB 与集群标记（V3-P0-01 敏感信息治理）。
+// 仅保留实例 ID、地址、DB 与集群标记（敏感信息治理）。
 func TestConfigSafeStringRedactsPassword(t *testing.T) {
 	const secret = "super-secret-pass-123"
 	c := Config{

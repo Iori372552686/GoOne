@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// TestRunGeneratesCompilableLayout 验证 P1-08：run 在 t.TempDir 生成
+// TestRunGeneratesCompilableLayout 验证 run 在 t.TempDir 生成
 // cmd/<service>/main.go 与 src/<service>/app.go，main.go 调用 NewApp()，且文件为合法 Go
 // 语法。
 func TestRunGeneratesCompilableLayout(t *testing.T) {
@@ -47,7 +47,7 @@ func TestRunGeneratesCompilableLayout(t *testing.T) {
 	}
 }
 
-// TestRunRejectsEmptyName 验证 P1-08：空 name 返回非 0 exit code。
+// TestRunRejectsEmptyName 验证 空 name 返回非 0 exit code。
 func TestRunRejectsEmptyName(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"-name", "", "-root", t.TempDir()}, &stdout, &stderr)
@@ -56,7 +56,7 @@ func TestRunRejectsEmptyName(t *testing.T) {
 	}
 }
 
-// TestRunRejectsInvalidName 验证 P1-08：非法服务名（含路径分隔符）被拒绝。
+// TestRunRejectsInvalidName 验证 非法服务名（含路径分隔符）被拒绝。
 func TestRunRejectsInvalidName(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"-name", "../evil", "-root", t.TempDir()}, &stdout, &stderr)
@@ -65,7 +65,7 @@ func TestRunRejectsInvalidName(t *testing.T) {
 	}
 }
 
-// TestRunRefusesOverwrite 验证 P1-08：已存在的文件拒绝覆盖。
+// TestRunRefusesOverwrite 验证 已存在的文件拒绝覆盖。
 func TestRunRefusesOverwrite(t *testing.T) {
 	root := t.TempDir()
 	// 第一次成功。

@@ -41,12 +41,12 @@ func newTestEngine(t *testing.T, tables ...interface{}) *xorm.Engine {
 	return cnn
 }
 
-// V3-P0-02：删除原 TestMain 的 os.Exit(0) 跳过整个包的做法（它会掩盖真实失败，
+// 删除原 TestMain 的 os.Exit(0) 跳过整个包的做法（它会掩盖真实失败，
 // 且让 CI 无法区分"跳过"与"通过"）。改为每个集成测试函数独立用 itest.Require 门控：
 // 未开启集成模式或 mysql 不可达时 t.Skip，而非以 0 退出码退出进程。
 
 func TestXorm(t *testing.T) {
-	// V3-P0-02：集成测试统一门控。
+	// 集成测试统一门控。
 	itest.Require(t, "127.0.0.1:3306")
 	engine := newTestEngine(t, new(g1_protocol.MysqlTexasRoomInfo))
 	defer engine.Close()
@@ -71,7 +71,7 @@ type User struct {
 }
 
 func TestUser(t *testing.T) {
-	// V3-P0-02：集成测试统一门控。
+	// 集成测试统一门控。
 	itest.Require(t, "127.0.0.1:3306")
 	engine := newTestEngine(t, new(User))
 	defer engine.Close()

@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// TestTcpDeadlineUsesRealTimeNotCachedDatetime 验证 P0-04：TCP 读写 deadline 必须用
+// TestTcpDeadlineUsesRealTimeNotCachedDatetime 验证 TCP 读写 deadline 必须用
 // time.Now() 而非 datetime.NowT()（100ms tick 刷新的缓存时间）。
 //
 // 复现方式：让一个连接的读循环在 "sleep 超过缓存刷新间隔" 后仍能正常读到数据。历史上
@@ -56,7 +56,7 @@ func TestTcpDeadlineUsesRealTimeNotCachedDatetime(t *testing.T) {
 	}
 }
 
-// TestTcpStopReleasesConnTableLockQuickly 验证 P0-04：Stop 不在连接表锁内执行网络
+// TestTcpStopReleasesConnTableLockQuickly 验证 Stop 不在连接表锁内执行网络
 // Close。这里用大量连接 + Stop 计时，若锁内逐个 Close 会显著变慢（回归保护）。
 //
 // 注意：本测试是行为级回归保护，断言 Stop 在合理时间内完成（不卡死），而非精确计时。

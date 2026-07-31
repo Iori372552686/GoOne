@@ -22,7 +22,7 @@ import (
 // store 绝不在发布后原地修改其结果。
 type Loader[T any] func(ctx context.Context) (*T, error)
 
-// MergeResult 是 Merger 的显式结果（P1-06）。Effective 是合并后的不可变快照（不得
+// MergeResult 是 Merger 的显式结果。Effective 是合并后的不可变快照（不得
 // 别名 old/candidate，必须深拷贝其 map/slice）；Applied 是本次真正被热更应用的字段
 // 名；RestartRequired 是差异但未应用、需重启才生效的字段名。
 type MergeResult[T any] struct {
@@ -34,7 +34,7 @@ type MergeResult[T any] struct {
 // Merger 把候选配置折叠进 effective 配置。它接收先前的 effective 快照（oldConfig）
 // 与刚解析的候选（candidate）。
 //
-// P1-06 契约修正：
+// 契约修正：
 //   - Merger 必须构造一个**不别名** old/candidate 的新 effective 对象，并深拷贝其
 //     map/slice。Store **不**自动深拷贝 oldConfig（历史文档谎称 store 会深拷贝）。
 //   - 只把候选中可热更（白名单）字段拷进 effective 结果；需重启字段保留旧值。
@@ -52,7 +52,7 @@ type Merger[T any] func(oldConfig, candidate *T) (MergeResult[T], error)
 //
 // Deprecated: appconfig.Store 是通用配置热更抽象，但 GoOne 生产配置采用启动不可变
 // 模型（仅 gamedata 热更）。当前无生产代码使用 Store；通用 Reload 能力将在下一主
-// 版本删除（V3-P1-04）。需要配置读取的服务应通过构造参数接收已 Normalize/Validate
+// 版本删除。需要配置读取的服务应通过构造参数接收已 Normalize/Validate
 // 的配置快照。
 type Store[T any] struct {
 	current atomic.Pointer[T]
@@ -79,7 +79,7 @@ func (s *Store[T]) Current() *T {
 // Load 执行初始加载并发布快照。若快照已发布则失败（后续更新用 Reload），或 loader
 // 出错。出错时不发布任何快照。
 //
-// P1-06：writeMu 串行化，使并发 Load 只有一个成功发布，另一个返回 ErrAlreadyLoaded
+// writeMu 串行化，使并发 Load 只有一个成功发布，另一个返回 ErrAlreadyLoaded
 //（历史 current.Load() 检查存在 TOCTOU，并发 Load 可能双发）。
 func (s *Store[T]) Load(ctx context.Context) error {
 	if s == nil {
@@ -115,7 +115,7 @@ type ReloadResult[T any] struct {
 // 若未配置 merger，候选原样发布（仍为原子）。配置 merger 时，只取候选的白名单字
 // 段；Applied/RestartRequired 分别列出被应用与需重启的字段。
 //
-// P1-06：writeMu 串行化并发 Reload（后一次基于前一次 effective）；Current() 仍无锁读。
+// writeMu 串行化并发 Reload（后一次基于前一次 effective）；Current 仍无锁读。
 func (s *Store[T]) Reload(ctx context.Context) (*ReloadResult[T], error) {
 	if s == nil {
 		return nil, ErrNilStore

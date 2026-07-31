@@ -11,7 +11,7 @@ import (
 
 // BuildWebDispatcher wires the generated ssrpc bindings used by both HTTP and gRPC.
 //
-// P1-03：经 Registry 装配（RegisterWebApiServiceToRegistry）后 Seal，使 HTTP 与 gRPC 共
+// 经 Registry 装配（RegisterWebApiServiceToRegistry）后 Seal，使 HTTP 与 gRPC 共
 // 享同一个已 Seal 的 Dispatcher，并复用 Registry 的原子校验/查重。Seal 后的 Dispatcher
 // 热路径无锁。
 func BuildWebDispatcher() (*ssrpc.Dispatcher, websvrv1.WebApiServiceSServer) {

@@ -20,7 +20,7 @@ import (
 	"github.com/Iori372552686/GoOne/module/misc"
 )
 
-// ErrDriversNotConfigured 在 RouterComponent.Drivers 为 nil 时由 Start 返回（P1-04）。
+// ErrDriversNotConfigured 在 RouterComponent.Drivers 为 nil 时由 Start 返回。
 // 历史实现回退到 driver/all 的包级 bus.CreateBus，使所有 bus 服务都隐式链接全部 5 类
 // MQ SDK。生产 bus 服务必须显式装配 DriverRegistry（通常只注册 rabbitmq）；websvr 不装
 // 配任何 bus。
@@ -153,7 +153,7 @@ type RouterComponent struct {
 	Common         func() Common
 	OnRecvSSPacket func(*sharedstruct.SSPacket) // 可选；为 nil 时默认投到 TransMgr。
 	TransMgr       transaction.ITransactionMgr
-	// Drivers 是显式 Driver 注册表（P1-04：必填）。bus 服务在装配期创建
+	// Drivers 是显式 Driver 注册表（必填）。bus 服务在装配期创建
 	// bus.NewDriverRegistry() 并 MustRegister 所需 driver（通常仅 rabbitmq）；Start 用它
 	// 创建 bus，只链接注册的 driver。nil 时 Start 返回 ErrDriversNotConfigured（不再
 	// 回退到 driver/all）。websvr 不装配 bus，故不创建 RouterComponent。
@@ -165,7 +165,7 @@ func (r *RouterComponent) Name() string { return "router_bus" }
 
 // Start 实现 runtime.Component：启动 router（含 bus 连接与服务注册）。
 //
-// P1-04：Drivers 必须显式装配（bus 服务只链接选定的 driver，通常 rabbitmq）。nil
+// Drivers 必须显式装配（bus 服务只链接选定的 driver，通常 rabbitmq）。nil
 // Drivers 返回 ErrDriversNotConfigured。历史实现的 driver/all 回退已删除。
 func (r *RouterComponent) Start(_ context.Context) error {
 	if r.Drivers == nil {

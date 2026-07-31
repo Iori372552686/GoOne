@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestRedactDSNRemovesPassword 验证 DSN 脱敏后不含明文密码（V3-P0-01 敏感信息治理）。
+// TestRedactDSNRemovesPassword 验证 DSN 脱敏后不含明文密码（敏感信息治理）。
 func TestRedactDSNRemovesPassword(t *testing.T) {
 	const secret = "p@ss-w0rd-2026"
 	cases := []struct {

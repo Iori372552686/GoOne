@@ -6,7 +6,7 @@ import (
 )
 
 // connLease 跟踪已被 admission 接受（admitted）的底层连接，使 OnClose 只为已 admitted
-// 的连接配对释放计数与名额（V4 P0-04）。
+// 的连接配对释放计数与名额。
 //
 // 历史缺陷：被 Admission 拒绝的连接不增加计数，但 OnClose 可能被无条件调用并减少计数，
 // 造成计数漂移与负数。connLease 用一个以 net.Conn 为键的集合记录"已 admitted"，OnClose
@@ -49,7 +49,7 @@ func (l *connLease) size() int {
 }
 
 // ensureLease 用于三种传输的 OnConn：若 lease 因兼容路径（如 &ConnTcpSvr{} + SetHub）
-// 未初始化，则懒创建，保证 OnConn/OnClose 不会因 nil lease panic（V4 P0-04）。
+// 未初始化，则懒创建，保证 OnConn/OnClose 不会因 nil lease panic。
 func (t *ConnTcpSvr) ensureLease() {
 	if t.lease == nil {
 		t.lease = newConnLease()

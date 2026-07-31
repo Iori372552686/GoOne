@@ -28,13 +28,13 @@ func NewApp() *runtime.App {
 		OnStart: func(_ context.Context) error {
 			return globals.InfoMgr.RedisMgr.InitAndRun(gconf.InfoSvrCfg.Dependencies.DbInstances)
 		},
-		// V4 P0-05：Stop 时关闭 Redis 连接池，消除连接泄漏。
+		// Stop 时关闭 Redis 连接池，消除连接泄漏。
 		OnStop: func(_ context.Context) error {
 			return globals.InfoMgr.RedisMgr.Close()
 		},
 	}
 
-	// P1-03：用 RegistryComponent 替代 "NewDispatcher→ToDispatcher→丢弃" 闭包。
+	// 用 RegistryComponent 替代 "NewDispatcher→ToDispatcher→丢弃" 闭包。
 	registerHandlers := ssrpc.NewRegistryComponent(
 		"ssrpc_registry",
 		func(r *ssrpc.Registry) error {
@@ -44,7 +44,7 @@ func NewApp() *runtime.App {
 		ssrpc.WithTransactionManager(globals.TransMgr),
 	)
 
-	// P1-04：显式 DriverRegistry，只注册 rabbitmq。
+	// 显式 DriverRegistry，只注册 rabbitmq。
 	drivers := bus.NewDriverRegistry()
 	drivers.MustRegister(rabbitmq.Driver())
 	routerComp := &bussvc.RouterComponent{
@@ -73,7 +73,7 @@ func NewApp() *runtime.App {
 		}),
 	)
 
-	// P0-03：admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
+	// admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
 	// app.tracker。
 	adminComp := runtime.NewAdminComponent(app,
 		runtime.WithAdminConfig(func() runtime.AdminConfig {
@@ -89,9 +89,9 @@ func NewApp() *runtime.App {
 		runtime.WithAdminReadyCheck(router.ReadyCheck),
 	)
 
-	// Start 顺序（P0-03）：datetime_tick → logger → admin → tracing → dependencies →
+	// Start 顺序：datetime_tick → logger → admin → tracing → dependencies →
 	// ssrpc_registry → transaction_mgr → router。datetime_tick 放最前。
-	// P1-07：用 MustRegister 一次注册全部组件。
+	// 用 MustRegister 一次注册全部组件。
 	app.MustRegister(
 		scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing,
 		redisDeps, registerHandlers, transMgr, routerComp,

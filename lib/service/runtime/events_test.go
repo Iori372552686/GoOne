@@ -2,7 +2,7 @@ package runtime
 
 import "testing"
 
-// TestEventNamesDefined 验证 roadmap P1-03 要求的结构化事件名常量都已定义且拼写正确。
+// TestEventNamesDefined 验证 roadmap 要求的结构化事件名常量都已定义且拼写正确。
 // 这些事件名用于日志前缀 [event:xxx]，运维按名 grep/告警。
 func TestEventNamesDefined(t *testing.T) {
 	want := []string{

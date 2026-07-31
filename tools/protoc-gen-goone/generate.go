@@ -100,7 +100,7 @@ func Generate(req *pluginpb.CodeGeneratorRequest) (*pluginpb.CodeGeneratorRespon
 		if err != nil {
 			return nil, err
 		}
-		// V3-P0-07：生成代码写入前执行 go/format，保证二次生成无 diff，
+		// 生成代码写入前执行 go/format，保证二次生成无 diff，
 		// 避免手工拼接的缩进/空白飘动引入无语义变更。
 		if formatted, fmtErr := format.Source([]byte(content)); fmtErr == nil {
 			content = string(formatted)
@@ -946,7 +946,7 @@ func renderSSRPC(fd *descriptorpb.FileDescriptorProto, goPkgName string, curImpo
 		}
 
 		// ---------------------------------------------------------------------
-		// P1-01: Registry binding. Generate <Service>Bindings(srv) []ssrpc.Binding
+		// Registry binding. Generate <Service>Bindings(srv) []ssrpc.Binding
 		// (the authoritative binding list) and Register<Service>ToRegistry, which
 		// atomically registers the whole batch into a ssrpc.Registry. Production
 		// code uses RegistryComponent + Register<Service>ToRegistry; the legacy

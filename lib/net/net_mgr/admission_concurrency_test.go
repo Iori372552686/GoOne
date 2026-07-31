@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// TestAtomicConnectionAcquireNeverExceedsLimit 验证 P0-03 修复：1000 个 goroutine 并发
+// TestAtomicConnectionAcquireNeverExceedsLimit 验证 修复：1000 个 goroutine 并发
 // 申请 10 个连接名额，enforce 模式下成功获取的次数必须恰好为 10，不得超过上限。
 //
 // 历史缺陷：连接准入是"检查 hub.ActiveConnections() 后再 IncConnection()"的 check-then-act，
@@ -88,7 +88,7 @@ func TestAcquireFailsAfterQuiesce(t *testing.T) {
 	}
 }
 
-// TestInflightAcquireAtomicPerMethod 验证 P0-03 修复：两个方法各自上限为 2，方法 A 满载
+// TestInflightAcquireAtomicPerMethod 验证 修复：两个方法各自上限为 2，方法 A 满载
 // 不得阻断尚有名额的方法 B。
 //
 // 历史缺陷：max_inflight_per_method 实际与全局 inflight 比较，方法 A 占满后方法 B 也被拒。

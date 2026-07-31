@@ -5,7 +5,7 @@
 //	go run tools/cmd/scaffold -name mysvr
 //	go run tools/cmd/scaffold -name mysvr -root . -module github.com/Iori372552686/GoOne
 //
-// P1-08：命令逻辑拆为可测试的 run(args, stdout, stderr) error；main 只负责 exit code。
+// 命令逻辑拆为可测试的 run(args, stdout, stderr) error；main 只负责 exit code。
 // 默认在仓库根目录下生成标准结构 cmd/<service>/main.go 与 src/<service>/app.go；main.go
 // 调用 NewApp()（与 app.go 一致）。最小 app 只调用 runtime.MustNew("<service>")，不伪
 // 造尚不存在的配置/bus/Handler/manager。
@@ -149,7 +149,7 @@ func toPascalCase(s string) string {
 }
 
 // ---------------------------------------------------------------------------
-// Templates (P1-08)
+// Templates
 // ---------------------------------------------------------------------------
 
 // tplMainGo 生成 cmd/<service>/main.go，调用 NewApp()（与 app.go 一致）。

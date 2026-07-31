@@ -2,7 +2,7 @@ package gamedata
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -30,7 +30,7 @@ func InitLocal(dir string) error {
 	for sheet, f := range fileMgr {
 		fileName := sheet + ".conf"
 		// 加载整个文件
-		buf, err := ioutil.ReadFile(filepath.Join(configureDir, fileName))
+		buf, err := os.ReadFile(filepath.Join(configureDir, fileName))
 		if err != nil {
 			return uerror.New(1, -1, "%s", err.Error())
 		}
@@ -43,7 +43,7 @@ func InitLocal(dir string) error {
 }
 
 // SheetFiles 返回按字典序排列的远端配置文件名（"<sheet>.conf"），
-// 供 app init 时构造 lib/contrib/config/factory 的 DataIDs（V4 P0-06）。
+// 供 app init 时构造 lib/contrib/config/factory 的 DataIDs。
 func SheetFiles() []string {
 	sheets := sortedSheets()
 	files := make([]string, 0, len(sheets))
@@ -55,7 +55,7 @@ func SheetFiles() []string {
 
 // remoteState 持有远端配置的运行时状态：contrib config client、watcher 与热更 goroutine。
 //
-// V4 P0-06 历史缺陷：旧 InitNet 直接用 nacos ListenConfig 且不保存句柄，监听 goroutine
+// 历史缺陷：旧 InitNet 直接用 nacos ListenConfig 且不保存句柄，监听 goroutine
 // 在进程生命周期内泄漏，也无法取消。现统一走 lib/contrib/config 抽象（Source/Watch），
 // 后端由 lib/contrib/config/factory 在 app init 时构造（nacos/etcd/consul/k8s/apollo 均可）。
 type remoteState struct {
@@ -69,7 +69,7 @@ var (
 	remote   *remoteState
 )
 
-// InitRemote 基于 contrib config Client 加载全部表并启动热更监听（V4 P0-06）。
+// InitRemote 基于 contrib config Client 加载全部表并启动热更监听。
 //
 // 语义：
 //   - Load 一次性拉取所有 DataID，按字典序逐表解析（消除 map 迭代随机性的跨表混合版本窗口）；
@@ -113,7 +113,7 @@ func InitRemote(cli contribconfig.Client) error {
 	return nil
 }
 
-// StopNet 停止远端配置热更并释放 config client（V4 P0-06）。幂等。
+// StopNet 停止远端配置热更并释放 config client。幂等。
 // 用于服务关闭时回收监听 goroutine 与后端连接，避免泄漏。
 func StopNet() {
 	remoteMu.Lock()
@@ -179,7 +179,7 @@ func applyKVs(kvs []*contribconfig.KeyValue, sheets []string, strict bool) error
 }
 
 // sortedSheets 返回按字典序排列的 sheet 名，消除 map 迭代随机性带来的跨表混合版本窗口
-// （V4 P0-06）。
+// 。
 func sortedSheets() []string {
 	sheets := make([]string, 0, len(fileMgr))
 	for sheet := range fileMgr {

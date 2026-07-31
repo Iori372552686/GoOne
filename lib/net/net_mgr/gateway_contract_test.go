@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// TestConstructorsNeverProduceNilHub 验证 V4 P0-04：三个旧构造器默认创建非 nil hub，
+// TestConstructorsNeverProduceNilHub 验证 三个旧构造器默认创建非 nil hub，
 // 兼容调用方不再因 nil hub 触发空指针或跳过 admission。
 func TestConstructorsNeverProduceNilHub(t *testing.T) {
 	if tcp := NewTcpSvr(); tcp.hub == nil {
@@ -25,7 +25,7 @@ func TestConstructorsNeverProduceNilHub(t *testing.T) {
 	}
 }
 
-// TestWithHubConstructorsRejectNilHub 验证 V4 P0-04：显式 *WithHub 构造器拒绝 nil hub。
+// TestWithHubConstructorsRejectNilHub 验证 显式 *WithHub 构造器拒绝 nil hub。
 func TestWithHubConstructorsRejectNilHub(t *testing.T) {
 	if _, err := NewTcpSvrWithHub(nil); !errors.Is(err, errNilHub) {
 		t.Fatalf("NewTcpSvrWithHub(nil) err=%v, want errNilHub", err)
@@ -62,7 +62,7 @@ func (c *connTracker) DecConnection()           { c.conns-- }
 func (c *connTracker) IncSession()              { c.sess++ }
 func (c *connTracker) DecSession()              { c.sess-- }
 
-// TestRejectedConnectionDoesNotDecrement 验证 V4 P0-04：被 admission 拒绝的连接不增加计数，
+// TestRejectedConnectionDoesNotDecrement 验证 被 admission 拒绝的连接不增加计数，
 // OnClose 也不释放；只有 admitted 连接的 OnClose 才 DecConnection/Release。
 //
 // 这是 TCP/WS/KCP 三传输共享的 admission lease 契约。这里直接驱动 OnConn/OnClose 验证

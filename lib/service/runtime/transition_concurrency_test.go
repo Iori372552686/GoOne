@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// TestReadyObserverWindowDoesNotAllowDrainRegression 验证 P0-02 修复：当 Ready 观察者
+// TestReadyObserverWindowDoesNotAllowDrainRegression 验证 修复：当 Ready 观察者
 // 阻塞（慢就绪闸门）时，并发的 Drain 与 Ready 不得交错提交造成状态回退。
 //
 // 历史缺陷：transition 在 Ready/Allocated 路径上执行观察者之前释放 s.mu。一个并发 Drain
@@ -156,7 +156,7 @@ func (c *contextIgnoringStart) Start(ctx context.Context) error {
 }
 func (c *contextIgnoringStart) Stop(context.Context) error { return nil }
 
-// TestStartupSignalWithContextIgnoringStart 验证 P0-02 修复：组件收到启动期取消信号但
+// TestStartupSignalWithContextIgnoringStart 验证 修复：组件收到启动期取消信号但
 // 返回 nil（忽略 ctx）时，App 不得进入 Ready。
 //
 // 历史缺陷：startComponents 用 signalCtx 调 Start，但若 Start 忽略 ctx 返回 nil，Run 仍会
@@ -218,7 +218,7 @@ func (f *failingStopComponent) Start(context.Context) error {
 }
 func (f *failingStopComponent) Stop(context.Context) error { return f.stopErr }
 
-// TestStopErrorMarksFailed 验证 P0-02 修复：正常信号关停路径下，若任一组件 Stop 失败，
+// TestStopErrorMarksFailed 验证 修复：正常信号关停路径下，若任一组件 Stop 失败，
 // 终态必须是 Failed（而非 Stopped）。
 func TestStopErrorMarksFailed(t *testing.T) {
 	a := MustNew("svc")
@@ -250,7 +250,7 @@ func (f *failingDrainer) Start(context.Context) error { return nil }
 func (f *failingDrainer) Drain(context.Context) error { return f.drainEr }
 func (f *failingDrainer) Stop(context.Context) error  { return nil }
 
-// TestDrainErrorMarksFailed 验证 P0-02 修复：正常信号关停路径下，若任一组件 Drain 失败，
+// TestDrainErrorMarksFailed 验证 修复：正常信号关停路径下，若任一组件 Drain 失败，
 // 终态必须是 Failed（而非 Stopped）。
 func TestDrainErrorMarksFailed(t *testing.T) {
 	a := MustNew("svc")

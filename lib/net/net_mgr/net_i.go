@@ -52,12 +52,12 @@ type ConnTcpSvr struct {
 	// gnet 时为事件驱动 server。所有下行写与关闭必须经 transport。
 	transport gatewayTransport
 
-	// hub 是共享会话状态拥有者（P0-05）。必须非 nil（生产由 connsvr globals 注入
-	// 单一 SessionHub），使 TCP/WS/KCP 共享会话状态。V3-P1-02：本地 map 路径已删除，
+	// hub 是共享会话状态拥有者。必须非 nil（生产由 connsvr globals 注入
+	// 单一 SessionHub），使 TCP/WS/KCP 共享会话状态。本地 map 路径已删除，
 	// 三传输内部始终走 hub。
 	hub *SessionHub
 
-	// lease 跟踪已 admitted 连接，使 OnClose 只为 admitted 连接释放计数（V4 P0-04）。
+	// lease 跟踪已 admitted 连接，使 OnClose 只为 admitted 连接释放计数。
 	lease *connLease
 
 	handler func(conn net.Conn, data []byte)
@@ -69,7 +69,7 @@ type ConnWsTcpSvr struct {
 	// hub 同 ConnTcpSvr。必须非 nil（生产由 connsvr globals 注入）。
 	hub *SessionHub
 
-	// lease 同 ConnTcpSvr（V4 P0-04）。
+	// lease 同 ConnTcpSvr。
 	lease *connLease
 
 	handler func(conn net.Conn, data []byte)
@@ -84,7 +84,7 @@ type ConnKcpSvr struct {
 	// hub 同 ConnTcpSvr。必须非 nil（生产由 connsvr globals 注入）。
 	hub *SessionHub
 
-	// lease 同 ConnTcpSvr（V4 P0-04）。
+	// lease 同 ConnTcpSvr。
 	lease *connLease
 
 	handler func(conn net.Conn, data []byte)
@@ -108,7 +108,7 @@ func NewKcpSvr() *ConnKcpSvr {
 	return svr
 }
 
-// NewTcpSvrWithHub 构造一个显式注入共享 SessionHub 的 TCP 网关（V4 P0-04）。
+// NewTcpSvrWithHub 构造一个显式注入共享 SessionHub 的 TCP 网关。
 // hub 为 nil 时返回 error，保证生产装配不会遗留 nil hub 导致后续 OnConn 跳过 admission。
 func NewTcpSvrWithHub(hub *SessionHub) (*ConnTcpSvr, error) {
 	if hub == nil {
@@ -119,7 +119,7 @@ func NewTcpSvrWithHub(hub *SessionHub) (*ConnTcpSvr, error) {
 	return svr, nil
 }
 
-// NewWsTcpSvrWithHub 构造一个显式注入共享 SessionHub 的 WS 网关（V4 P0-04）。
+// NewWsTcpSvrWithHub 构造一个显式注入共享 SessionHub 的 WS 网关。
 // hub 为 nil 时返回 error。
 func NewWsTcpSvrWithHub(hub *SessionHub) (*ConnWsTcpSvr, error) {
 	if hub == nil {
@@ -130,7 +130,7 @@ func NewWsTcpSvrWithHub(hub *SessionHub) (*ConnWsTcpSvr, error) {
 	return svr, nil
 }
 
-// NewKcpSvrWithHub 构造一个显式注入共享 SessionHub 的 KCP 网关（V4 P0-04）。
+// NewKcpSvrWithHub 构造一个显式注入共享 SessionHub 的 KCP 网关。
 // hub 为 nil 时返回 error。
 func NewKcpSvrWithHub(hub *SessionHub) (*ConnKcpSvr, error) {
 	if hub == nil {
@@ -141,7 +141,7 @@ func NewKcpSvrWithHub(hub *SessionHub) (*ConnKcpSvr, error) {
 	return svr, nil
 }
 
-// errNilHub 在显式构造器收到 nil hub 时返回（V4 P0-04）。
+// errNilHub 在显式构造器收到 nil hub 时返回。
 var errNilHub = newHubError("net_mgr: hub must not be nil; use NewSessionHub or inject the shared hub")
 
 type hubError string
@@ -150,7 +150,7 @@ func (e hubError) Error() string { return string(e) }
 
 func newHubError(msg string) error { return hubError(msg) }
 
-// SetHub 注入共享 SessionHub（P0-05）。三种传输（TCP/WS/KCP）必须注入同一个 hub 实
+// SetHub 注入共享 SessionHub。三种传输（TCP/WS/KCP）必须注入同一个 hub 实
 // 例，使同一 UID 跨传输重绑原子化。必须在 Start 前调用。
 //
 // Deprecated: 新代码应在构造时注入 hub（NewTcpSvrWithHub 等）；本方法保留兼容 connsvr

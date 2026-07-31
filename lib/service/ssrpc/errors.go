@@ -17,7 +17,7 @@ var (
 	ErrDispatcherSealed = errors.New("ssrpc: dispatcher 已 seal")
 	// ErrNilDispatcher 在注册目标 Dispatcher 为 nil 时返回。
 	ErrNilDispatcher = errors.New("ssrpc: nil dispatcher")
-	// ErrNilRegistry 在 Registry 方法（Register/Seal）的接收者为 nil 时返回（P1-01）。
+	// ErrNilRegistry 在 Registry 方法（Register/Seal）的接收者为 nil 时返回。
 	ErrNilRegistry = errors.New("ssrpc: nil registry")
 	// ErrNilHandler 在注册 nil handler 时返回。
 	ErrNilHandler = errors.New("ssrpc: nil handler")

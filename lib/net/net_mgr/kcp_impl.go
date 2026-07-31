@@ -16,7 +16,7 @@ import (
 )
 
 func (t *ConnKcpSvr) initAndRun(ip string, port int, cb func(conn net.Conn, data []byte)) error {
-	// V3-P1-02：本地 map 路径已删除，会话状态由 hub 拥有；这里只装配 handler。
+	// 本地 map 路径已删除，会话状态由 hub 拥有；这里只装配 handler。
 	t.handler = cb
 
 	packetInfo := kcp_server.KcpPacketInfo{
@@ -29,7 +29,7 @@ func (t *ConnKcpSvr) initAndRun(ip string, port int, cb func(conn net.Conn, data
 
 // 被Listener协程调用，一个KcpSvr对应一个Listener协程
 func (t *ConnKcpSvr) OnConn(conn net.Conn) {
-	// V4 P0-04：原子 TryAcquireConnection；拒绝时不计数、不标记 admitted。
+	// 原子 TryAcquireConnection；拒绝时不计数、不标记 admitted。
 	t.ensureLease()
 	if t.hub != nil {
 		if a := t.hub.Admission(); a != nil && !a.TryAcquireConnection() {
@@ -56,7 +56,7 @@ func (t *ConnKcpSvr) OnPacket(conn net.Conn, data []byte) {
 // 被Read协程调用
 func (t *ConnKcpSvr) OnClose(conn net.Conn) {
 	observeGatewayEvent("kcp", "closed")
-	// V4 P0-04：仅为 admitted 连接释放计数与名额。
+	// 仅为 admitted 连接释放计数与名额。
 	if t.lease != nil && t.lease.takeIfAdmitted(conn) {
 		if t.hub != nil {
 			t.hub.DecConnection()
@@ -83,7 +83,7 @@ func (t *ConnKcpSvr) OnClose(conn net.Conn) {
 }
 
 func (t *ConnKcpSvr) SendByUid(uid uint64, data1 []byte, data2 []byte) error {
-	// P0-05：锁内取 Client，锁外写。
+	// 锁内取 Client，锁外写。
 	client := t.hub.ClientForSend(uid)
 	if client == nil {
 		logger.Debugf("uid doesn't exist {uid: %v}", uid)
@@ -102,7 +102,7 @@ func (t *ConnKcpSvr) SendByUid(uid uint64, data1 []byte, data2 []byte) error {
 }
 
 // BroadcastByZone 向指定 zone 的所有在线客户端广播；zone <= 0 表示全服广播。
-// P0-05：锁内快照、锁外写。
+// 锁内快照、锁外写。
 func (t *ConnKcpSvr) BroadcastByZone(zone int32, data1 []byte, data2 []byte) {
 	clients := t.hub.SnapshotByZone(zone)
 	for _, client := range clients {
@@ -168,7 +168,7 @@ func (t *ConnKcpSvr) kick(conn net.Conn, uid uint64, reason g1_protocol.EKickOut
 }
 
 func (t *ConnKcpSvr) UpdateClientByUid(conn net.Conn, uid uint64, zone uint32) *Client {
-	// P0-05：原子绑定 + IPv6 兼容 + 锁外 kick 旧连接。
+	// 原子绑定 + IPv6 兼容 + 锁外 kick 旧连接。
 	newIns, oldCli, err := t.hub.BindClient(conn, uid, zone)
 	if err != nil {
 		logger.Errorf("BindClient failed {uid: %v}: %v", uid, err)

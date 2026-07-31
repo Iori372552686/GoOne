@@ -1,4 +1,4 @@
-# gitleaks 配置（V4 P0-01）
+# gitleaks 配置
 #
 # 目标：阻止真实凭据（钉钉 access_token、数据库口令、完整 DSN、Authorization、私钥）
 # 进入仓库，同时放行：

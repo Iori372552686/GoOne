@@ -12,7 +12,7 @@ var gatewayEventsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 	Help: "Total gateway connection lifecycle and IO events by transport.",
 }, []string{"transport", "event"})
 
-// V3-P1-02：gateway_connections 改为全局指标（不再按 transport 拆分）。
+// gateway_connections 改为全局指标（不再按 transport 拆分）。
 // SessionHub 是三传输合一的会话状态拥有者，无法按 tcp/ws/kcp 拆分会话计数；
 // 单路径化后从 hub 的 ActiveSessions/ActiveConnections 取全局值。
 var gatewayConnectionsDesc = prometheus.NewDesc(
@@ -39,7 +39,7 @@ func registerGatewaySource(transport string, source any) {
 	_ = transport
 }
 
-// registerGatewayHub 注册共享 SessionHub 作为连接计数源（V3-P1-02）。
+// registerGatewayHub 注册共享 SessionHub 作为连接计数源。
 func registerGatewayHub(hub *SessionHub) {
 	if hub == nil {
 		return
