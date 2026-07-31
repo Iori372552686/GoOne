@@ -3,10 +3,10 @@
 package connsvrv1
 
 import (
+	cmd_handler "github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
-	cmd_handler "github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"time"
 )
 
@@ -41,7 +41,7 @@ func NewConnServiceSServer(impl ConnServiceSS, opts ssrpc.DefaultMWOptions) Conn
 
 type ConnServiceSServer struct {
 	Impl ConnServiceSS
-	MW []ssrpc.Middleware
+	MW   []ssrpc.Middleware
 }
 
 // RegisterConnServiceToTransactionMgr binds SSPacket cmd -> handler wrappers.
@@ -52,10 +52,10 @@ func RegisterConnServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv Co
 
 	mgr.RegisterCmd(g1_protocol.CMD_CONN_KICK_OUT_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_CONN_KICK_OUT_REQ,
-			OneWay: true,
+			Cmd:     g1_protocol.CMD_CONN_KICK_OUT_REQ,
+			OneWay:  true,
 			Timeout: 5000 * time.Millisecond,
-			Name: "kick websocket session by remote addr",
+			Name:    "kick websocket session by remote addr",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.ConnKickOutReq) },
@@ -66,9 +66,9 @@ func RegisterConnServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv Co
 
 	mgr.RegisterCmd(g1_protocol.CMD_CONN_BROADCAST_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_CONN_BROADCAST_REQ,
+			Cmd:     g1_protocol.CMD_CONN_BROADCAST_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "broadcast CSPacket payload to websocket zone",
+			Name:    "broadcast CSPacket payload to websocket zone",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.ConnBroadcastReq) },
@@ -87,10 +87,10 @@ func RegisterConnServiceToDispatcher(d *ssrpc.Dispatcher, srv ConnServiceSServer
 
 	d.RegisterCmd(g1_protocol.CMD_CONN_KICK_OUT_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_CONN_KICK_OUT_REQ,
-			OneWay: true,
+			Cmd:     g1_protocol.CMD_CONN_KICK_OUT_REQ,
+			OneWay:  true,
 			Timeout: 5000 * time.Millisecond,
-			Name: "kick websocket session by remote addr",
+			Name:    "kick websocket session by remote addr",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.ConnKickOutReq) },
@@ -101,9 +101,9 @@ func RegisterConnServiceToDispatcher(d *ssrpc.Dispatcher, srv ConnServiceSServer
 
 	d.RegisterCmd(g1_protocol.CMD_CONN_BROADCAST_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_CONN_BROADCAST_REQ,
+			Cmd:     g1_protocol.CMD_CONN_BROADCAST_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "broadcast CSPacket payload to websocket zone",
+			Name:    "broadcast CSPacket payload to websocket zone",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.ConnBroadcastReq) },
@@ -123,10 +123,10 @@ func ConnServiceBindings(srv ConnServiceSServer) []ssrpc.Binding {
 	return []ssrpc.Binding{
 		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_CONN_KICK_OUT_REQ, CmdHandler: ssrpc.WrapUnary(
 			ssrpc.MethodDesc{
-				Cmd: g1_protocol.CMD_CONN_KICK_OUT_REQ,
-				OneWay: true,
+				Cmd:     g1_protocol.CMD_CONN_KICK_OUT_REQ,
+				OneWay:  true,
 				Timeout: 5000 * time.Millisecond,
-				Name: "ConnService.KickOut",
+				Name:    "ConnService.KickOut",
 			},
 			srv.MW,
 			func() any { return new(g1_protocol.ConnKickOutReq) },
@@ -136,9 +136,9 @@ func ConnServiceBindings(srv ConnServiceSServer) []ssrpc.Binding {
 		)},
 		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_CONN_BROADCAST_REQ, CmdHandler: ssrpc.WrapUnary(
 			ssrpc.MethodDesc{
-				Cmd: g1_protocol.CMD_CONN_BROADCAST_REQ,
+				Cmd:     g1_protocol.CMD_CONN_BROADCAST_REQ,
 				Timeout: 5000 * time.Millisecond,
-				Name: "ConnService.Broadcast",
+				Name:    "ConnService.Broadcast",
 			},
 			srv.MW,
 			func() any { return new(g1_protocol.ConnBroadcastReq) },
@@ -216,4 +216,3 @@ func (c *ConnServiceClient) BroadcastByRouter(ctx cmd_handler.IContext, routerId
 	}
 	return rsp, nil
 }
-

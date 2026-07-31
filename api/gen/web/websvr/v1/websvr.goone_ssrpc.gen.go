@@ -39,7 +39,7 @@ func NewWebApiServiceSServer(impl WebApiServiceSS, opts ssrpc.DefaultMWOptions) 
 
 type WebApiServiceSServer struct {
 	Impl WebApiServiceSS
-	MW []ssrpc.Middleware
+	MW   []ssrpc.Middleware
 }
 
 // RegisterWebApiServiceToGin binds HTTP routes -> service methods (Gin).
@@ -50,9 +50,9 @@ func RegisterWebApiServiceToGin(r gin.IRoutes, srv WebApiServiceSServer) {
 
 	r.Handle("GET", "/v1/web/ping", ssrpc.WrapHTTPGin(
 		ssrpc.MethodDesc{
-			Cmd: 0,
+			Cmd:     0,
 			Timeout: 8000 * time.Millisecond,
-			Name: "web ping",
+			Name:    "web ping",
 		},
 		srv.MW,
 		func() any { return new(PingReq) },
@@ -63,10 +63,10 @@ func RegisterWebApiServiceToGin(r gin.IRoutes, srv WebApiServiceSServer) {
 
 	r.Handle("POST", "/v1/web/msg-sec-check", ssrpc.WrapHTTPGin(
 		ssrpc.MethodDesc{
-			Cmd: 0,
-			Sign: true,
+			Cmd:     0,
+			Sign:    true,
 			Timeout: 8000 * time.Millisecond,
-			Name: "msg security check",
+			Name:    "msg security check",
 		},
 		srv.MW,
 		func() any { return new(MsgSecCheckReq) },
@@ -85,9 +85,9 @@ func RegisterWebApiServiceToDispatcher(d *ssrpc.Dispatcher, srv WebApiServiceSSe
 
 	d.RegisterHTTP("GET", "/v1/web/ping", ssrpc.WrapHTTPGin(
 		ssrpc.MethodDesc{
-			Cmd: 0,
+			Cmd:     0,
 			Timeout: 8000 * time.Millisecond,
-			Name: "web ping",
+			Name:    "web ping",
 		},
 		srv.MW,
 		func() any { return new(PingReq) },
@@ -98,10 +98,10 @@ func RegisterWebApiServiceToDispatcher(d *ssrpc.Dispatcher, srv WebApiServiceSSe
 
 	d.RegisterHTTP("POST", "/v1/web/msg-sec-check", ssrpc.WrapHTTPGin(
 		ssrpc.MethodDesc{
-			Cmd: 0,
-			Sign: true,
+			Cmd:     0,
+			Sign:    true,
 			Timeout: 8000 * time.Millisecond,
-			Name: "msg security check",
+			Name:    "msg security check",
 		},
 		srv.MW,
 		func() any { return new(MsgSecCheckReq) },
@@ -121,9 +121,9 @@ func WebApiServiceBindings(srv WebApiServiceSServer) []ssrpc.Binding {
 	return []ssrpc.Binding{
 		{Kind: ssrpc.BindingHTTP, HTTPMethod: "GET", HTTPPath: "/v1/web/ping", HTTPHandler: ssrpc.WrapHTTPGin(
 			ssrpc.MethodDesc{
-				Cmd: 0,
+				Cmd:     0,
 				Timeout: 8000 * time.Millisecond,
-				Name: "web ping",
+				Name:    "web ping",
 			},
 			srv.MW,
 			func() any { return new(PingReq) },
@@ -133,10 +133,10 @@ func WebApiServiceBindings(srv WebApiServiceSServer) []ssrpc.Binding {
 		)},
 		{Kind: ssrpc.BindingHTTP, HTTPMethod: "POST", HTTPPath: "/v1/web/msg-sec-check", HTTPHandler: ssrpc.WrapHTTPGin(
 			ssrpc.MethodDesc{
-				Cmd: 0,
-				Sign: true,
+				Cmd:     0,
+				Sign:    true,
 				Timeout: 8000 * time.Millisecond,
-				Name: "msg security check",
+				Name:    "msg security check",
 			},
 			srv.MW,
 			func() any { return new(MsgSecCheckReq) },
@@ -155,4 +155,3 @@ func RegisterWebApiServiceToRegistry(r *ssrpc.Registry, srv WebApiServiceSServer
 	}
 	return r.Register("WebApiService", WebApiServiceBindings(srv)...)
 }
-

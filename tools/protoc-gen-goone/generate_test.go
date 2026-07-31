@@ -486,11 +486,11 @@ func TestGenerate_SSRPCOption_AuthSignTraceTags(t *testing.T) {
 		t.Fatalf("Generate err: %v", err)
 	}
 	out := resp.File[0].GetContent()
-	if !contains(out, "Auth: true") || !contains(out, "Sign: true") {
+	if !contains(out, "Auth:      true") || !contains(out, "Sign:      true") {
 		t.Fatalf("expected Auth/Sign fields in MethodDesc, got:\n%s", out)
 	}
 	// Deterministic order should be a then b.
-	if !contains(out, "TraceTags: map[string]string{\"a\": \"1\", \"b\": \"2\", },") {
+	if !contains(out, "TraceTags: map[string]string{\"a\": \"1\", \"b\": \"2\"}") {
 		t.Fatalf("expected TraceTags map in deterministic order, got:\n%s", out)
 	}
 }
@@ -676,7 +676,7 @@ func TestGenerate_HTTPOnly_NoCmd_SkipsTransactionMgr(t *testing.T) {
 	if !contains(out, "d.RegisterHTTP(\"POST\", \"/v1/test/do2\", ssrpc.WrapHTTPGin") {
 		t.Fatalf("expected dispatcher http registration, got:\n%s", out)
 	}
-	if !contains(out, "Cmd: 0,") {
+	if !contains(out, "Cmd:     0,") {
 		t.Fatalf("expected Cmd: 0 for http-only binding, got:\n%s", out)
 	}
 }
@@ -983,13 +983,13 @@ func TestGenerate_SSRPCServiceTimeoutInheritanceAndDefault(t *testing.T) {
 	if !contains(out, "\"time\"") {
 		t.Fatalf("expected time import when effective timeout is emitted, got:\n%s", out)
 	}
-	if !contains(out, "Timeout: 5000 * time.Millisecond,\n\t\t\tName: \"SvcInherited.Inherit\"") {
+	if !contains(out, "Timeout: 5000 * time.Millisecond,\n\t\t\tName:    \"SvcInherited.Inherit\"") {
 		t.Fatalf("expected method without timeout_ms to inherit service timeout, got:\n%s", out)
 	}
-	if !contains(out, "Timeout: 1500 * time.Millisecond,\n\t\t\tName: \"SvcInherited.Override\"") {
+	if !contains(out, "Timeout: 1500 * time.Millisecond,\n\t\t\tName:    \"SvcInherited.Override\"") {
 		t.Fatalf("expected method timeout_ms to override service timeout, got:\n%s", out)
 	}
-	if !contains(out, "Timeout: 5000 * time.Millisecond,\n\t\t\tName: \"SvcDefault.Default\"") {
+	if !contains(out, "Timeout: 5000 * time.Millisecond,\n\t\t\tName:    \"SvcDefault.Default\"") {
 		t.Fatalf("expected built-in 5s timeout fallback when service/method timeout is absent, got:\n%s", out)
 	}
 }
@@ -1541,7 +1541,7 @@ func TestGenerate_GRPCOnly_NoCmd_SkipsTransactionMgr(t *testing.T) {
 	if contains(out, "type SvcClient struct") {
 		t.Fatalf("expected no cmd-based client stub for grpc-only method, got:\n%s", out)
 	}
-	if !contains(out, "Cmd: 0,") {
+	if !contains(out, "Cmd:     0,") {
 		t.Fatalf("expected grpc-only method to use Cmd: 0, got:\n%s", out)
 	}
 	if contains(out, "lib/service/transaction") || contains(out, "game_protocol/protocol") {

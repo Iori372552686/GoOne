@@ -3,12 +3,12 @@
 package mysqlsvrv1
 
 import (
+	cmd_handler "github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
-	cmd_handler "github.com/Iori372552686/GoOne/lib/api/cmd_handler"
-	"time"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	"time"
 )
 
 // MysqlServiceSS is the ssrpc service interface for MysqlService.
@@ -62,7 +62,7 @@ func NewMysqlServiceSServer(impl MysqlServiceSS, opts ssrpc.DefaultMWOptions) My
 
 type MysqlServiceSServer struct {
 	Impl MysqlServiceSS
-	MW []ssrpc.Middleware
+	MW   []ssrpc.Middleware
 }
 
 // RegisterMysqlServiceToTransactionMgr binds SSPacket cmd -> handler wrappers.
@@ -73,9 +73,9 @@ func RegisterMysqlServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv M
 
 	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "mysql update role info",
+			Name:    "mysql update role info",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.MysqlInnerUpdateRoleInfoReq) },
@@ -86,9 +86,9 @@ func RegisterMysqlServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv M
 
 	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_SEARCH_ROLE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_MYSQL_INNER_SEARCH_ROLE_REQ,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_SEARCH_ROLE_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "mysql search role",
+			Name:    "mysql search role",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.MysqlInnerSearchRoleReq) },
@@ -99,10 +99,10 @@ func RegisterMysqlServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv M
 
 	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ,
-			OneWay: true,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ,
+			OneWay:  true,
 			Timeout: 5000 * time.Millisecond,
-			Name: "mysql async update",
+			Name:    "mysql async update",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.MysqlInnerUpdateReq) },
@@ -113,9 +113,9 @@ func RegisterMysqlServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv M
 
 	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "mysql query room info",
+			Name:    "mysql query room info",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.QueryRoomInfoReq) },
@@ -126,9 +126,9 @@ func RegisterMysqlServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv M
 
 	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "mysql query player info",
+			Name:    "mysql query player info",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.QueryPlayerInfoReq) },
@@ -139,9 +139,9 @@ func RegisterMysqlServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv M
 
 	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "mysql query game info",
+			Name:    "mysql query game info",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.QueryGameInfoReq) },
@@ -160,9 +160,9 @@ func RegisterMysqlServiceToDispatcher(d *ssrpc.Dispatcher, srv MysqlServiceSServ
 
 	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "mysql update role info",
+			Name:    "mysql update role info",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.MysqlInnerUpdateRoleInfoReq) },
@@ -173,9 +173,9 @@ func RegisterMysqlServiceToDispatcher(d *ssrpc.Dispatcher, srv MysqlServiceSServ
 
 	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_SEARCH_ROLE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_MYSQL_INNER_SEARCH_ROLE_REQ,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_SEARCH_ROLE_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "mysql search role",
+			Name:    "mysql search role",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.MysqlInnerSearchRoleReq) },
@@ -186,10 +186,10 @@ func RegisterMysqlServiceToDispatcher(d *ssrpc.Dispatcher, srv MysqlServiceSServ
 
 	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ,
-			OneWay: true,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ,
+			OneWay:  true,
 			Timeout: 5000 * time.Millisecond,
-			Name: "mysql async update",
+			Name:    "mysql async update",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.MysqlInnerUpdateReq) },
@@ -200,9 +200,9 @@ func RegisterMysqlServiceToDispatcher(d *ssrpc.Dispatcher, srv MysqlServiceSServ
 
 	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "mysql query room info",
+			Name:    "mysql query room info",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.QueryRoomInfoReq) },
@@ -213,9 +213,9 @@ func RegisterMysqlServiceToDispatcher(d *ssrpc.Dispatcher, srv MysqlServiceSServ
 
 	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "mysql query player info",
+			Name:    "mysql query player info",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.QueryPlayerInfoReq) },
@@ -226,9 +226,9 @@ func RegisterMysqlServiceToDispatcher(d *ssrpc.Dispatcher, srv MysqlServiceSServ
 
 	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "mysql query game info",
+			Name:    "mysql query game info",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.QueryGameInfoReq) },
@@ -248,9 +248,9 @@ func MysqlServiceBindings(srv MysqlServiceSServer) []ssrpc.Binding {
 	return []ssrpc.Binding{
 		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
 			ssrpc.MethodDesc{
-				Cmd: g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ,
+				Cmd:     g1_protocol.CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQ,
 				Timeout: 5000 * time.Millisecond,
-				Name: "MysqlService.UpdateRoleInfo",
+				Name:    "MysqlService.UpdateRoleInfo",
 			},
 			srv.MW,
 			func() any { return new(g1_protocol.MysqlInnerUpdateRoleInfoReq) },
@@ -260,9 +260,9 @@ func MysqlServiceBindings(srv MysqlServiceSServer) []ssrpc.Binding {
 		)},
 		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_SEARCH_ROLE_REQ, CmdHandler: ssrpc.WrapUnary(
 			ssrpc.MethodDesc{
-				Cmd: g1_protocol.CMD_MYSQL_INNER_SEARCH_ROLE_REQ,
+				Cmd:     g1_protocol.CMD_MYSQL_INNER_SEARCH_ROLE_REQ,
 				Timeout: 5000 * time.Millisecond,
-				Name: "MysqlService.SearchRole",
+				Name:    "MysqlService.SearchRole",
 			},
 			srv.MW,
 			func() any { return new(g1_protocol.MysqlInnerSearchRoleReq) },
@@ -272,10 +272,10 @@ func MysqlServiceBindings(srv MysqlServiceSServer) []ssrpc.Binding {
 		)},
 		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ, CmdHandler: ssrpc.WrapUnary(
 			ssrpc.MethodDesc{
-				Cmd: g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ,
-				OneWay: true,
+				Cmd:     g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ,
+				OneWay:  true,
 				Timeout: 5000 * time.Millisecond,
-				Name: "MysqlService.Update",
+				Name:    "MysqlService.Update",
 			},
 			srv.MW,
 			func() any { return new(g1_protocol.MysqlInnerUpdateReq) },
@@ -285,9 +285,9 @@ func MysqlServiceBindings(srv MysqlServiceSServer) []ssrpc.Binding {
 		)},
 		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
 			ssrpc.MethodDesc{
-				Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ,
+				Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ,
 				Timeout: 5000 * time.Millisecond,
-				Name: "MysqlService.QueryRoomInfo",
+				Name:    "MysqlService.QueryRoomInfo",
 			},
 			srv.MW,
 			func() any { return new(g1_protocol.QueryRoomInfoReq) },
@@ -297,9 +297,9 @@ func MysqlServiceBindings(srv MysqlServiceSServer) []ssrpc.Binding {
 		)},
 		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
 			ssrpc.MethodDesc{
-				Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ,
+				Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ,
 				Timeout: 5000 * time.Millisecond,
-				Name: "MysqlService.QueryPlayerInfo",
+				Name:    "MysqlService.QueryPlayerInfo",
 			},
 			srv.MW,
 			func() any { return new(g1_protocol.QueryPlayerInfoReq) },
@@ -309,9 +309,9 @@ func MysqlServiceBindings(srv MysqlServiceSServer) []ssrpc.Binding {
 		)},
 		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
 			ssrpc.MethodDesc{
-				Cmd: g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ,
+				Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ,
 				Timeout: 5000 * time.Millisecond,
-				Name: "MysqlService.QueryGameInfo",
+				Name:    "MysqlService.QueryGameInfo",
 			},
 			srv.MW,
 			func() any { return new(g1_protocol.QueryGameInfoReq) },
@@ -461,4 +461,3 @@ func (c *MysqlServiceClient) QueryGameInfoByRouter(ctx cmd_handler.IContext, rou
 	}
 	return rsp, nil
 }
-

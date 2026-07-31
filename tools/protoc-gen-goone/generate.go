@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"go/format"
 	"path"
 	"path/filepath"
 	"sort"
@@ -98,6 +99,11 @@ func Generate(req *pluginpb.CodeGeneratorRequest) (*pluginpb.CodeGeneratorRespon
 		content, err := renderSSRPC(fd, pkgName, curImportPath, typeReg, extType, extMsgDesc, extNum, serviceExtType, serviceExtMsgDesc, serviceExtNum)
 		if err != nil {
 			return nil, err
+		}
+		// V3-P0-07：生成代码写入前执行 go/format，保证二次生成无 diff，
+		// 避免手工拼接的缩进/空白飘动引入无语义变更。
+		if formatted, fmtErr := format.Source([]byte(content)); fmtErr == nil {
+			content = string(formatted)
 		}
 		resp.File = append(resp.File, &pluginpb.CodeGeneratorResponse_File{
 			Name:    &outName,

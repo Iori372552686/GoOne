@@ -3,10 +3,10 @@
 package infosvrv1
 
 import (
+	cmd_handler "github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
-	cmd_handler "github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"time"
 )
 
@@ -46,7 +46,7 @@ func NewInfoServiceSServer(impl InfoServiceSS, opts ssrpc.DefaultMWOptions) Info
 
 type InfoServiceSServer struct {
 	Impl InfoServiceSS
-	MW []ssrpc.Middleware
+	MW   []ssrpc.Middleware
 }
 
 // RegisterInfoServiceToTransactionMgr binds SSPacket cmd -> handler wrappers.
@@ -57,9 +57,9 @@ func RegisterInfoServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv In
 
 	mgr.RegisterCmd(g1_protocol.CMD_INFO_GET_BRIEF_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_INFO_GET_BRIEF_INFO_REQ,
+			Cmd:     g1_protocol.CMD_INFO_GET_BRIEF_INFO_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "info get brief info",
+			Name:    "info get brief info",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.InfoGetBriefInfoReq) },
@@ -70,9 +70,9 @@ func RegisterInfoServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv In
 
 	mgr.RegisterCmd(g1_protocol.CMD_INFO_GET_ICON_DESC_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_INFO_GET_ICON_DESC_REQ,
+			Cmd:     g1_protocol.CMD_INFO_GET_ICON_DESC_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "info get icon desc",
+			Name:    "info get icon desc",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.InfoGetIconDescReq) },
@@ -83,10 +83,10 @@ func RegisterInfoServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv In
 
 	mgr.RegisterCmd(g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ,
-			OneWay: true,
+			Cmd:     g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ,
+			OneWay:  true,
 			Timeout: 5000 * time.Millisecond,
-			Name: "info set brief info",
+			Name:    "info set brief info",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.InfoSetBriefInfoReq) },
@@ -105,9 +105,9 @@ func RegisterInfoServiceToDispatcher(d *ssrpc.Dispatcher, srv InfoServiceSServer
 
 	d.RegisterCmd(g1_protocol.CMD_INFO_GET_BRIEF_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_INFO_GET_BRIEF_INFO_REQ,
+			Cmd:     g1_protocol.CMD_INFO_GET_BRIEF_INFO_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "info get brief info",
+			Name:    "info get brief info",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.InfoGetBriefInfoReq) },
@@ -118,9 +118,9 @@ func RegisterInfoServiceToDispatcher(d *ssrpc.Dispatcher, srv InfoServiceSServer
 
 	d.RegisterCmd(g1_protocol.CMD_INFO_GET_ICON_DESC_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_INFO_GET_ICON_DESC_REQ,
+			Cmd:     g1_protocol.CMD_INFO_GET_ICON_DESC_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name: "info get icon desc",
+			Name:    "info get icon desc",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.InfoGetIconDescReq) },
@@ -131,10 +131,10 @@ func RegisterInfoServiceToDispatcher(d *ssrpc.Dispatcher, srv InfoServiceSServer
 
 	d.RegisterCmd(g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd: g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ,
-			OneWay: true,
+			Cmd:     g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ,
+			OneWay:  true,
 			Timeout: 5000 * time.Millisecond,
-			Name: "info set brief info",
+			Name:    "info set brief info",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.InfoSetBriefInfoReq) },
@@ -154,9 +154,9 @@ func InfoServiceBindings(srv InfoServiceSServer) []ssrpc.Binding {
 	return []ssrpc.Binding{
 		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_INFO_GET_BRIEF_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
 			ssrpc.MethodDesc{
-				Cmd: g1_protocol.CMD_INFO_GET_BRIEF_INFO_REQ,
+				Cmd:     g1_protocol.CMD_INFO_GET_BRIEF_INFO_REQ,
 				Timeout: 5000 * time.Millisecond,
-				Name: "InfoService.GetBriefInfo",
+				Name:    "InfoService.GetBriefInfo",
 			},
 			srv.MW,
 			func() any { return new(g1_protocol.InfoGetBriefInfoReq) },
@@ -166,9 +166,9 @@ func InfoServiceBindings(srv InfoServiceSServer) []ssrpc.Binding {
 		)},
 		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_INFO_GET_ICON_DESC_REQ, CmdHandler: ssrpc.WrapUnary(
 			ssrpc.MethodDesc{
-				Cmd: g1_protocol.CMD_INFO_GET_ICON_DESC_REQ,
+				Cmd:     g1_protocol.CMD_INFO_GET_ICON_DESC_REQ,
 				Timeout: 5000 * time.Millisecond,
-				Name: "InfoService.GetIconDesc",
+				Name:    "InfoService.GetIconDesc",
 			},
 			srv.MW,
 			func() any { return new(g1_protocol.InfoGetIconDescReq) },
@@ -178,10 +178,10 @@ func InfoServiceBindings(srv InfoServiceSServer) []ssrpc.Binding {
 		)},
 		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
 			ssrpc.MethodDesc{
-				Cmd: g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ,
-				OneWay: true,
+				Cmd:     g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ,
+				OneWay:  true,
 				Timeout: 5000 * time.Millisecond,
-				Name: "InfoService.SetBriefInfo",
+				Name:    "InfoService.SetBriefInfo",
 			},
 			srv.MW,
 			func() any { return new(g1_protocol.InfoSetBriefInfoReq) },
@@ -277,4 +277,3 @@ func (c *InfoServiceClient) SetBriefInfoByBusIdSimple(busId uint32, uid uint64, 
 func (c *InfoServiceClient) SetBriefInfoByRouterSimple(routerId, uid uint64, zone uint32, req *g1_protocol.InfoSetBriefInfoReq) error {
 	return ssrpc.SendByCmdWithRouterSimple(routerId, uid, zone, g1_protocol.CMD_INFO_INNER_SET_BRIEF_INFO_REQ, req)
 }
-
