@@ -1,312 +1,54 @@
+// Package http_client 是 lib/api/http_client 的兼容代理。
+//
+// 历史上 lib/web/http_client 与 lib/api/http_client 是两份完全相同的重复实现，
+// 导致 TLS 配置、超时、响应上限三处需同步维护。起统一到
+// lib/api/http_client.Client；本包保留全部旧导出符号，内部委托 api 包，避免
+// rest_api 等调用方一次性大改。
+//
+// Deprecated: 请改 import "github.com/Iori372552686/GoOne/lib/api/http_client"
+// 并使用 Client.DoRequest。本包将在一个稳定版本后删除，不得新增使用。
 package http_client
 
 import (
-	"crypto/tls"
-	"crypto/x509"
-	"errors"
-	"fmt"
-	"io"
-	"net"
-	"net/http"
 	"net/url"
-	"strings"
-	"time"
 
-	"github.com/Iori372552686/GoOne/lib/api/logger"
+	apiclient "github.com/Iori372552686/GoOne/lib/api/http_client"
 )
 
-// HttpConnectPool 是包级默认 HTTP 传输层。
-//
-// 安全说明（V4 P0-01）：默认严格校验 TLS 证书（使用系统证书池），不再设置
-// InsecureSkipVerify: true。仅测试专用构造器可显式跳过校验，生产代码不得回退。
-var HttpConnectPool http.RoundTripper = func() http.RoundTripper {
-	pool, err := SystemCertPool()
-	if err != nil {
-		// 系统证书池不可用时退回 nil，由 crypto/tls 使用其内置根证书校验逻辑，
-		// 仍然校验证书链，绝不关闭校验。
-		pool = nil
-	}
-	return &http.Transport{
-		DialContext: (&net.Dialer{
-			Timeout:   10 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
-		MaxIdleConns:          1000,
-		IdleConnTimeout:       60 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-		TLSClientConfig: &tls.Config{
-			RootCAs: pool,
-		},
-	}
-}()
+// HttpConnectPool 透传 api 包的默认传输层（单一 Transport 来源）。
+var HttpConnectPool = apiclient.HttpConnectPool
 
-// SystemCertPool 返回系统证书池。抽为变量以便测试替换。
-var SystemCertPool = func() (*x509.CertPool, error) {
-	return x509.SystemCertPool()
-}
-
-/**
-* @Description:
-* @param: url
-* @return: []byte
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-15 17:16:28
-**/
+// Deprecated: 见 apiclient.GetRequest。
 func GetRequest(url string) ([]byte, error) {
-	logger.Infof(" GetRequest -- url:%v", url)
-	return HttpRequest("GET", url, "")
+	return apiclient.GetRequest(url)
 }
 
-/**
-* @Description:  http请求 ，支持传入方式, 带header
-* @param: method
-* @param: url
-* @param: requestBody
-* @return: []byte
-* @return: error
-* @Author: ken
-* @Date: 2025-03-12 17:16:03
-**/
-func HttpRequestByHeader(method string, url, requestBody string, header map[string]string) ([]byte, error) {
-	client := &http.Client{
-		Transport: HttpConnectPool,
-	}
-
-	req, err := http.NewRequest(method, url, strings.NewReader(requestBody))
-	if err != nil {
-		logger.Errorf("http Request err: %v", err)
-		return nil, err
-	}
-
-	for k, v := range header {
-		req.Header.Set(k, v)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	client.Timeout = 8 * time.Second
-	resp, err := client.Do(req)
-	if err != nil {
-		logger.Errorf("client do err: %v", err)
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != 200 {
-		logger.Errorf("Error response.StatusCode=%v urlstr=%s body=%s", resp.StatusCode, url, string(body))
-		return nil, errors.New("resp.Code != 200")
-	}
-
-	return body, err
+// Deprecated: 见 apiclient.HttpRequestByHeader。
+func HttpRequestByHeader(method, reqURL, requestBody string, header map[string]string) ([]byte, error) {
+	return apiclient.HttpRequestByHeader(method, reqURL, requestBody, header)
 }
 
-/**
-* @Description:  http请求 ，支持传入方式
-* @param: method
-* @param: url
-* @param: requestBody
-* @return: []byte
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-15 17:16:03
-**/
-func HttpRequest(method string, url, requestBody string) ([]byte, error) {
-	client := &http.Client{
-		Transport: HttpConnectPool,
-	}
-
-	req, err := http.NewRequest(method, url, strings.NewReader(requestBody))
-	if err != nil {
-		logger.Errorf("http Request err: %v", err)
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	client.Timeout = 8 * time.Second
-	resp, err := client.Do(req)
-	if err != nil {
-		logger.Errorf("client do err: %v", err)
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != 200 {
-		logger.Errorf("Error response.StatusCode=%v urlstr=%s", resp.StatusCode, url)
-		logger.Errorf("Error response.body=", string(body))
-		return nil, errors.New("resp.Code != 200")
-	}
-
-	return body, err
+// Deprecated: 见 apiclient.HttpRequest。
+func HttpRequest(method, reqURL, requestBody string) ([]byte, error) {
+	return apiclient.HttpRequest(method, reqURL, requestBody)
 }
 
-/**
-* @Description: 带token的http请求
-* @param: method
-* @param: value
-* @param: url
-* @param: token
-* @return: []byte
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-15 17:16:33
-**/
-func TokenHttpRequest(method string, value url.Values, url, token string) ([]byte, error) {
-	client := &http.Client{
-		Transport: HttpConnectPool,
-	}
-	requestBody := value.Encode()
-
-	req, err := http.NewRequest(method, url, strings.NewReader(requestBody))
-	if err != nil {
-		logger.Errorf("http post err: %v", err)
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Authorization", token)
-
-	logger.Infof("http post request url:%v", req.URL)
-	resp, err := client.Do(req)
-	if err != nil {
-		logger.Errorf("client do err: %v", err)
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		logger.Errorf("Error response.StatusCode=%v urlstr=%s", resp.StatusCode, url)
-		return nil, errors.New("resp.Code != 200")
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, err
+// Deprecated: 见 apiclient.TokenHttpRequest。
+func TokenHttpRequest(method string, value url.Values, reqURL, token string) ([]byte, error) {
+	return apiclient.TokenHttpRequest(method, value, reqURL, token)
 }
 
-/**
-* @Description: 不带授权get请求
-* @param: urlstr
-* @param: reqBody
-* @return: []byte
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-15 17:16:41
-**/
-func HttpGetRequest(urlstr string, reqBody string) ([]byte, error) {
-	client := &http.Client{
-		Transport: HttpConnectPool,
-	}
-	request, e := http.NewRequest("GET", urlstr, strings.NewReader(reqBody))
-	if e != nil {
-		return nil, e
-	}
-
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-
-	defer response.Body.Close()
-
-	if response.StatusCode != 200 {
-		return nil, fmt.Errorf("Error response.StatusCode=%v urlstr=%s", response.StatusCode, urlstr)
-	}
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-	return body, err
+// Deprecated: 见 apiclient.HttpGetRequest。
+func HttpGetRequest(urlstr, reqBody string) ([]byte, error) {
+	return apiclient.HttpGetRequest(urlstr, reqBody)
 }
 
-/**
-* @Description: 不带授权post请求
-* @param: urlstr
-* @param: msgbody
-* @return: []byte
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-15 17:17:05
-**/
-func HttpPostRequest(urlstr string, msgbody string) ([]byte, error) {
-	client := &http.Client{
-		Transport: HttpConnectPool,
-	}
-
-	logger.Debugf("HttpPostRequest url=%v | body= %v", urlstr, msgbody)
-	request, e := http.NewRequest("POST", urlstr, strings.NewReader(msgbody))
-	request.Header.Set("Content-type", "application/json")
-	if e != nil {
-		return nil, e
-	}
-
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-
-	defer response.Body.Close()
-	if response.StatusCode != 200 {
-		return nil, fmt.Errorf("Error response.StatusCode=%v urlstr=%s", response.StatusCode, urlstr)
-	}
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, err
+// Deprecated: 见 apiclient.HttpPostRequest。
+func HttpPostRequest(urlstr, msgbody string) ([]byte, error) {
+	return apiclient.HttpPostRequest(urlstr, msgbody)
 }
 
-/**
-* @Description: 自定义head的post请求
-* @param: urlstr
-* @param: msgbody
-* @param: headers
-* @return: []byte
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-15 17:17:05
-**/
-func HeaderHttpPostRequest(urlstr string, msgbody string, headers *map[string]string) ([]byte, error) {
-	client := &http.Client{
-		Transport: HttpConnectPool,
-	}
-	request, e := http.NewRequest("POST", urlstr, strings.NewReader(msgbody))
-	for k, v := range *headers {
-		request.Header.Set(k, v)
-	}
-	if e != nil {
-		return nil, e
-	}
-
-	logger.Infof("HttpPostRequest request |  url:%v", urlstr)
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-
-	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if response.StatusCode != 200 && response.StatusCode != 201 {
-		return body, fmt.Errorf("Error response.StatusCode=%v urlstr=%s", response.StatusCode, urlstr)
-	}
-
-	return body, err
+// Deprecated: 见 apiclient.HeaderHttpPostRequest。
+func HeaderHttpPostRequest(urlstr, msgbody string, headers *map[string]string) ([]byte, error) {
+	return apiclient.HeaderHttpPostRequest(urlstr, msgbody, headers)
 }

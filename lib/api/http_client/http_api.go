@@ -1,23 +1,18 @@
 package http_client
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
-	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
-
-	"github.com/Iori372552686/GoOne/lib/api/logger"
 )
 
 // HttpConnectPool 是包级默认 HTTP 传输层。
 //
-// 安全说明（V4 P0-01）：默认严格校验 TLS 证书（使用系统证书池），不再设置
+// 安全说明：默认严格校验 TLS 证书（使用系统证书池），不再设置
 // InsecureSkipVerify: true。仅测试专用构造器可显式跳过校验，生产代码不得回退。
 var HttpConnectPool http.RoundTripper = func() http.RoundTripper {
 	pool, err := SystemCertPool()
@@ -45,268 +40,81 @@ var SystemCertPool = func() (*x509.CertPool, error) {
 	return x509.SystemCertPool()
 }
 
-/**
-* @Description:
-* @param: url
-* @return: []byte
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-15 17:16:28
-**/
+// defaultClient 是旧包级函数共享的统一 Client。
+// 所有 Deprecated 函数内部委托它，获得 context 优先、LimitReader 上限与
+// NewRequest error 先检的安全语义。
+var defaultClient = NewClient(nil)
+
+// Deprecated: 请改用 Client.DoRequest。本函数保留以兼容旧调用方。
 func GetRequest(url string) ([]byte, error) {
-	logger.Infof(" GetRequest -- url:%v", url)
 	return HttpRequest("GET", url, "")
 }
 
-/**
-* @Description:  http请求 ，支持传入方式, 带header
-* @param: method
-* @param: url
-* @param: requestBody
-* @return: []byte
-* @return: error
-* @Author: ken
-* @Date: 2025-03-12 17:16:03
-**/
-func HttpRequestByHeader(method string, url, requestBody string, header map[string]string) ([]byte, error) {
-	client := &http.Client{
-		Transport: HttpConnectPool,
+// Deprecated: 请改用 Client.DoRequest（支持 context 与响应上限）。
+func HttpRequestByHeader(method, url, requestBody string, header map[string]string) ([]byte, error) {
+	if header == nil {
+		header = map[string]string{}
 	}
-
-	req, err := http.NewRequest(method, url, strings.NewReader(requestBody))
-	if err != nil {
-		logger.Errorf("http Request err: %v", err)
-		return nil, err
+	if _, ok := header["Content-Type"]; !ok {
+		header["Content-Type"] = "application/x-www-form-urlencoded"
 	}
-
-	for k, v := range header {
-		req.Header.Set(k, v)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	client.Timeout = 8 * time.Second
-	resp, err := client.Do(req)
-	if err != nil {
-		logger.Errorf("client do err: %v", err)
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != 200 {
-		logger.Errorf("Error response.StatusCode=%v urlstr=%s body=%s", resp.StatusCode, url, string(body))
-		return nil, errors.New("resp.Code != 200")
-	}
-
-	return body, err
+	ctx, cancel := defaultRequestCtx()
+	defer cancel()
+	return defaultClient.DoRequest(ctx, method, url, requestBody, header)
 }
 
-/**
-* @Description:  http请求 ，支持传入方式
-* @param: method
-* @param: url
-* @param: requestBody
-* @return: []byte
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-15 17:16:03
-**/
-func HttpRequest(method string, url, requestBody string) ([]byte, error) {
-	client := &http.Client{
-		Transport: HttpConnectPool,
-	}
-
-	req, err := http.NewRequest(method, url, strings.NewReader(requestBody))
-	if err != nil {
-		logger.Errorf("http Request err: %v", err)
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	client.Timeout = 8 * time.Second
-	resp, err := client.Do(req)
-	if err != nil {
-		logger.Errorf("client do err: %v", err)
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != 200 {
-		logger.Errorf("Error response.StatusCode=%v urlstr=%s", resp.StatusCode, url)
-		logger.Errorf("Error response.body=", string(body))
-		return nil, errors.New("resp.Code != 200")
-	}
-
-	return body, err
+// Deprecated: 请改用 Client.DoRequest（支持 context 与响应上限）。
+func HttpRequest(method, url, requestBody string) ([]byte, error) {
+	ctx, cancel := defaultRequestCtx()
+	defer cancel()
+	return defaultClient.DoRequest(ctx, method, url, requestBody, map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	})
 }
 
-/**
-* @Description: 带token的http请求
-* @param: method
-* @param: value
-* @param: url
-* @param: token
-* @return: []byte
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-15 17:16:33
-**/
+// Deprecated: 请改用 Client.DoRequest（支持 context 与响应上限）。
 func TokenHttpRequest(method string, value url.Values, url, token string) ([]byte, error) {
-	client := &http.Client{
-		Transport: HttpConnectPool,
-	}
-	requestBody := value.Encode()
-
-	req, err := http.NewRequest(method, url, strings.NewReader(requestBody))
-	if err != nil {
-		logger.Errorf("http post err: %v", err)
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Authorization", token)
-
-	logger.Infof("http post request url:%v", req.URL)
-	resp, err := client.Do(req)
-	if err != nil {
-		logger.Errorf("client do err: %v", err)
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		logger.Errorf("Error response.StatusCode=%v urlstr=%s", resp.StatusCode, url)
-		return nil, errors.New("resp.Code != 200")
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, err
+	ctx, cancel := defaultRequestCtx()
+	defer cancel()
+	return defaultClient.DoRequest(ctx, method, url, value.Encode(), map[string]string{
+		"Content-Type":  "application/x-www-form-urlencoded",
+		"Authorization": token,
+	})
 }
 
-/**
-* @Description: 不带授权get请求
-* @param: urlstr
-* @param: reqBody
-* @return: []byte
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-15 17:16:41
-**/
-func HttpGetRequest(urlstr string, reqBody string) ([]byte, error) {
-	client := &http.Client{
-		Transport: HttpConnectPool,
-	}
-	request, e := http.NewRequest("GET", urlstr, strings.NewReader(reqBody))
-	if e != nil {
-		return nil, e
-	}
-
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-
-	defer response.Body.Close()
-
-	if response.StatusCode != 200 {
-		return nil, fmt.Errorf("Error response.StatusCode=%v urlstr=%s", response.StatusCode, urlstr)
-	}
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-	return body, err
+// Deprecated: 请改用 Client.DoRequest（支持 context 与响应上限）。
+func HttpGetRequest(urlstr, reqBody string) ([]byte, error) {
+	ctx, cancel := defaultRequestCtx()
+	defer cancel()
+	return defaultClient.DoRequest(ctx, "GET", urlstr, reqBody, nil)
 }
 
-/**
-* @Description: 不带授权post请求
-* @param: urlstr
-* @param: msgbody
-* @return: []byte
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-15 17:17:05
-**/
-func HttpPostRequest(urlstr string, msgbody string) ([]byte, error) {
-	client := &http.Client{
-		Transport: HttpConnectPool,
-	}
-
-	logger.Debugf("HttpPostRequest url=%v | body= %v", urlstr, msgbody)
-	request, e := http.NewRequest("POST", urlstr, strings.NewReader(msgbody))
-	request.Header.Set("Content-type", "application/json")
-	if e != nil {
-		return nil, e
-	}
-
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-
-	defer response.Body.Close()
-	if response.StatusCode != 200 {
-		return nil, fmt.Errorf("Error response.StatusCode=%v urlstr=%s", response.StatusCode, urlstr)
-	}
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, err
+// Deprecated: 请改用 Client.DoRequest（支持 context 与响应上限）。
+func HttpPostRequest(urlstr, msgbody string) ([]byte, error) {
+	ctx, cancel := defaultRequestCtx()
+	defer cancel()
+	return defaultClient.DoRequest(ctx, "POST", urlstr, msgbody, map[string]string{
+		"Content-Type": "application/json",
+	})
 }
 
-/**
-* @Description: 自定义head的post请求
-* @param: urlstr
-* @param: msgbody
-* @param: headers
-* @return: []byte
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-15 17:17:05
-**/
-func HeaderHttpPostRequest(urlstr string, msgbody string, headers *map[string]string) ([]byte, error) {
-	client := &http.Client{
-		Transport: HttpConnectPool,
+// Deprecated: 请改用 Client.DoRequest（支持 context 与响应上限）。
+func HeaderHttpPostRequest(urlstr, msgbody string, headers *map[string]string) ([]byte, error) {
+	hdr := map[string]string{}
+	if headers != nil {
+		for k, v := range *headers {
+			hdr[k] = v
+		}
 	}
-	request, e := http.NewRequest("POST", urlstr, strings.NewReader(msgbody))
-	for k, v := range *headers {
-		request.Header.Set(k, v)
-	}
-	if e != nil {
-		return nil, e
-	}
+	ctx, cancel := defaultRequestCtx()
+	defer cancel()
+	// DoRequest 对 2xx 返回 (body, nil)，其余返回 (body, error)，与旧函数
+	// 「非 200/201 视为错误但回传 body」的语义兼容。
+	return defaultClient.DoRequest(ctx, "POST", urlstr, msgbody, hdr)
+}
 
-	logger.Infof("HttpPostRequest request |  url:%v", urlstr)
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-
-	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if response.StatusCode != 200 && response.StatusCode != 201 {
-		return body, fmt.Errorf("Error response.StatusCode=%v urlstr=%s", response.StatusCode, urlstr)
-	}
-
-	return body, err
+// defaultRequestCtx 提供旧函数的默认超时（与历史 8s 对齐），使旧调用方平滑获得
+// context 取消能力。
+func defaultRequestCtx() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), 8*time.Second)
 }

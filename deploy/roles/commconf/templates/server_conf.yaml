@@ -125,6 +125,13 @@ websvr:
       session_name: GoOne@Gin.Seeeion
       mode: debug
       auth_enable: false
+      # 输入保护——超时与大小上限。
+      read_header_timeout: 10s
+      read_timeout: 30s
+      write_timeout: 30s
+      idle_timeout: 120s
+      max_header_bytes: 1048576   # 1 MiB
+      max_body_bytes: 8388608     # 8 MiB
     grpc_server:
       enabled: false
       ip: ""
