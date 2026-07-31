@@ -1,10 +1,14 @@
 // Capacity load generator for GoOne connsvr.
 //
-// Opens N TCP connections, sends a login frame (binds UID), and keeps each
-// connection alive with periodic heartbeats. Reports login success rate.
-// Run against a full service stack (connsvr:11001 + mainsvr/mysqlsvr via bus).
+// Deprecated: V4 P1-03 起，容量测试的唯一主路径是 stress 工具
+// （tools/tester/cmd/stress）。本工具把 socket Write 成功误认为登录/心跳成功，
+// 不校验业务响应码，不能作为容量证据。保留仅为兼容历史脚本，新增容量测试请用：
 //
-//	go run ./tools/tester/cmd/capacity -addr 127.0.0.1:11001 -conns 1000 -duration 60s
+//	go run ./tools/tester/cmd/stress -config ./tools/tester/stress.toml
+//
+// 跑完后用 report.CapacityMatrix 把 stress_*.json 汇总为容量矩阵：
+//
+//	见 docs/benchmarks/capacity-matrix.md
 package main
 
 import (
@@ -19,6 +23,8 @@ import (
 )
 
 func main() {
+	fmt.Fprintln(os.Stderr, "[capacity] DEPRECATED (V4 P1-03): 本工具不校验业务响应码，不能作为容量证据。")
+	fmt.Fprintln(os.Stderr, "[capacity] 请改用 stress 工具（tools/tester/cmd/stress）作为容量测试主路径。")
 	addr := flag.String("addr", "127.0.0.1:11001", "connsvr TCP address")
 	conns := flag.Int("conns", 1000, "number of concurrent connections")
 	startUID := flag.Uint64("start-uid", 300001, "first UID (incremented per conn)")
@@ -46,9 +52,9 @@ func main() {
 		// CSPacketHeader login frame: minimal valid frame binding this UID.
 		// Layout matches sharedstruct.CSPacketHeader (28 bytes) + empty body.
 		var hdr [28]byte
-		binary.LittleEndian.PutUint64(hdr[0:], uid)   // Uid
+		binary.LittleEndian.PutUint64(hdr[0:], uid)        // Uid
 		binary.LittleEndian.PutUint32(hdr[8:], 0x00020001) // Cmd = login
-		binary.LittleEndian.PutUint32(hdr[24:], 0)    // BodyLen = 0
+		binary.LittleEndian.PutUint32(hdr[24:], 0)         // BodyLen = 0
 		if _, err := c.Write(hdr[:]); err != nil {
 			loginFail.Add(1)
 			c.Close()
