@@ -28,6 +28,14 @@ func (t *ConnWsTcpSvr) initAndRun(implType, mode string, port int, cb func(conn 
 }
 
 func (t *ConnWsTcpSvr) OnConn(conn net.Conn) {
+	// V3-P1-01：过载保护。
+	if t.hub != nil {
+		if a := t.hub.Admission(); a != nil && !a.TryAdmitConnection() {
+			observeGatewayEvent("ws", "rejected")
+			_ = conn.Close()
+			return
+		}
+	}
 	logger.Infof("new conn: %s", conn.RemoteAddr().String())
 	observeGatewayEvent("ws", "accepted")
 	if t.hub != nil {

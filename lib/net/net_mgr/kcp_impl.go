@@ -35,6 +35,14 @@ func (t *ConnKcpSvr) initAndRun(ip string, port int, cb func(conn net.Conn, data
 
 // 被Listener协程调用，一个KcpSvr对应一个Listener协程
 func (t *ConnKcpSvr) OnConn(conn net.Conn) {
+	// V3-P1-01：过载保护。
+	if t.hub != nil {
+		if a := t.hub.Admission(); a != nil && !a.TryAdmitConnection() {
+			observeGatewayEvent("kcp", "rejected")
+			_ = conn.Close()
+			return
+		}
+	}
 	logger.Infof("kcp new conn: %s", conn.RemoteAddr().String())
 	observeGatewayEvent("kcp", "accepted")
 	if t.hub != nil {

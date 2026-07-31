@@ -35,11 +35,11 @@ func (noopCounter) DecSession()          {}
 func (noopCounter) ActiveConnections() int64 { return 0 }
 func (noopCounter) ActiveSessions() int64    { return 0 }
 
-// SessionHub 是三种传输（TCP/WS/KCP）共享的会话状态拥有者（P0-05）。它消除三份重复
+// SessionHub 是三种传输（TCP/WS/KCP）共享的会话状态拥有者。它消除三份重复
 // 的 uidConnMap/connUidMap/remoteAddrConnMap/remoteAddrKickMap，并把"同一 UID 跨传输
 // 重绑"做成原子操作。
 //
-// 关键不变量（遵循方案 B P0-05）：
+// 关键不变量：
 //   - 所有 map 更新都在 hub 锁内完成。
 //   - 网络写、Marshal、Close、Kick 通知都在锁外执行（hub 方法只返回不可变快照/指针，
 //     调用方在锁外做 I/O）。
@@ -50,6 +50,10 @@ func (noopCounter) ActiveSessions() int64    { return 0 }
 type SessionHub struct {
 	counter ActivityCounter
 
+	// admission 是可选的过载保护闸门（V3-P1-01）。nil 时直通（向后兼容）。
+	// 三传输 OnConn 与 BindClient 通过 hub 间接调用，避免改传输接口。
+	admission *AdmissionController
+
 	mu sync.RWMutex
 	// accepting=false 后 BindClient 返回 ErrGatewayDraining（Quiesce）。
 	accepting bool
@@ -58,6 +62,21 @@ type SessionHub struct {
 	connUidMap        map[net.Conn]uint64
 	remoteAddrConnMap map[string]net.Conn
 	remoteAddrKickMap map[string]bool
+}
+
+// SetAdmission 注入过载保护闸门（V3-P1-01）。必须在三传输 Start 前调用。
+// 传入 nil 等价于关闭 admission（直通）。
+func (h *SessionHub) SetAdmission(a *AdmissionController) {
+	h.mu.Lock()
+	h.admission = a
+	h.mu.Unlock()
+}
+
+// Admission 上报当前闸门（可能为 nil），供三传输 OnConn 与 BindClient 决策。
+func (h *SessionHub) Admission() *AdmissionController {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.admission
 }
 
 // NewSessionHub 构建一个共享 hub。counter 为 nil 时用 noopCounter；生产由 connsvr

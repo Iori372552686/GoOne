@@ -56,9 +56,18 @@ func (t *ConnTcpSvr) initSessionMaps(cb func(conn net.Conn, data []byte)) {
 
 // 被Listener协程调用，一个TcpSvr对应一个Listener协程
 func (t *ConnTcpSvr) OnConn(conn net.Conn) {
+	// V3-P1-01：过载保护。admission 拒绝（enforce 模式超限/排空期）时立即关闭连接，
+	// 不计入连接数。
+	if t.hub != nil {
+		if a := t.hub.Admission(); a != nil && !a.TryAdmitConnection() {
+			observeGatewayEvent("tcp", "rejected")
+			_ = conn.Close()
+			return
+		}
+	}
 	logger.Infof("new conn: %s", conn.RemoteAddr().String())
 	observeGatewayEvent("tcp", "accepted")
-	// P0-06：底层连接计数。未认证连接只计入 connection，不计入 session。
+	// 底层连接计数。未认证连接只计入 connection，不计入 session。
 	if t.hub != nil {
 		t.hub.IncConnection()
 	}

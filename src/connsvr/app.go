@@ -6,6 +6,7 @@ import (
 
 	connsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/connsvr/v1"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/net/net_mgr"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
 	"github.com/Iori372552686/GoOne/lib/service/router"
@@ -142,6 +143,18 @@ func (gatewayComponent) Name() string { return "gateway_listeners" }
 // 合并原始启动错误与回滚错误，并在错误中标注传输名（tcp/ws/kcp），避免端口泄漏
 //（V3-P0-04）。
 func (gatewayComponent) Start(_ context.Context) error {
+	// V3-P1-01：用已加载的 capacity 配置构造过载保护闸门，注入共享 SessionHub。
+	// 三传输 OnConn 与 pack_proc 首次登录通过 hub 间接调用闸门。off 模式直通。
+	cap := gconf.ConnSvrCfg.Capacity
+	globals.SessionHub.SetAdmission(net_mgr.NewAdmissionController(globals.SessionHub, net_mgr.AdmissionLimits{
+		MaxConnections:                cap.MaxConnections,
+		MaxUnauthenticatedConnections: cap.MaxUnauthenticatedConnections,
+		ConnectionRate:                cap.ConnectionRate,
+		LoginRate:                     cap.LoginRate,
+		MaxInflight:                   cap.MaxInflight,
+		OverloadMode:                  cap.OverloadMode,
+	}))
+
 	// started 记录已成功启动的传输及其 Stop 函数，用于部分启动失败时逆序回滚。
 	started := make([]struct {
 		name string
