@@ -7,7 +7,6 @@ import (
 	roomcenterv1 "github.com/Iori372552686/GoOne/api/gen/game/roomcenter/v1"
 	"github.com/Iori372552686/GoOne/common/gamedata"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/lib/api/net_conf"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
 	"github.com/Iori372552686/GoOne/lib/service/router"
@@ -63,14 +62,18 @@ func NewApp() *runtime.App {
 			}
 			if gconf.RoomCenterSvrCfg.Dependencies.NacosConf.IPAddr != "" {
 				logger.Infof("Loading remote gameconf by Nacos group: %v ", gconf.RoomCenterSvrCfg.Dependencies.NacosConf.GroupName)
-				if err := gamedata.InitNet(net_conf.NewNacosConfigClient(gconf.RoomCenterSvrCfg.Dependencies.NacosConf), gconf.RoomCenterSvrCfg.Dependencies.NacosConf.GroupName); err != nil {
+				// V4 P0-06：经 lib/contrib/config/factory 构造配置中心 client，
+				// 由 gamedata.InitRemote 统一加载+热更；构造/拉取失败返回 error。
+				if err := gamedata.InitNacos(gconf.RoomCenterSvrCfg.Dependencies.NacosConf); err != nil {
 					return err
 				}
 			}
 			return nil
 		},
 		// V4 P0-05：Stop 时关闭 Redis 连接池，消除连接泄漏。
+		// V4 P0-06：同时取消 Nacos gamedata 监听，回收监听 goroutine。
 		OnStop: func(_ context.Context) error {
+			gamedata.StopNet()
 			return rds.RedisMgr.Close()
 		},
 	}

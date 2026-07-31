@@ -1,6 +1,8 @@
 package net_conf
 
 import (
+	"fmt"
+
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/config_client"
@@ -23,7 +25,13 @@ type NacosConf struct {
 	Password    string `json:"password" yaml:"password"`
 }
 
-func NewNacosConfigClient(conf NacosConf) config_client.IConfigClient {
+// NewNacosConfigClient 构造 Nacos 配置中心 client。
+//
+// Deprecated: V4 P0-06 起，gamedata 远端配置统一经 lib/contrib/config/factory 构造
+// 后端无关的 config.Client（见 common/gamedata.InitNacos/InitRemote），监听回收由
+// contrib watcher.Stop 负责。本函数保留仅供仍需裸 nacos IConfigClient 的旧代码使用。
+// 构造失败返回 error，不返回 nil client。
+func NewNacosConfigClient(conf NacosConf) (config_client.IConfigClient, error) {
 	//server conf
 	sc := []constant.ServerConfig{
 		*constant.NewServerConfig(conf.IPAddr, uint64(conf.Port)),
@@ -49,8 +57,9 @@ func NewNacosConfigClient(conf NacosConf) config_client.IConfigClient {
 		},
 	)
 	if err != nil {
-		logger.Infof("NewConfigClient err | ", err.Error())
+		logger.Errorf("NewConfigClient err | %v", err)
+		return nil, fmt.Errorf("nacos: new config client: %w", err)
 	}
 
-	return client
+	return client, nil
 }

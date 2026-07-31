@@ -130,6 +130,8 @@ func (w *webRuntimeComponent) Stop(_ context.Context) error {
 	if err := globals.RedisMgr.Close(); err != nil {
 		errs = append(errs, err)
 	}
+	// V4 P0-06：停止远端配置热更并释放 config client（未启用远端时为空操作）。
+	gamedata.StopNet()
 	return errors.Join(errs...)
 }
 
@@ -285,7 +287,13 @@ func NewApp() *runtime.App {
 				return err
 			}
 			logger.Infof("svr_conf loaded for websvr")
-			if gconf.WebSvrCfg.Dependencies.GameDataDir != "" {
+			// V4 P0-06：配置中心（nacos）优先；未配置时回退本地目录。
+			if gconf.WebSvrCfg.Dependencies.NacosConf.IPAddr != "" {
+				logger.Infof("Loading remote gameconf by Nacos group: %v ", gconf.WebSvrCfg.Dependencies.NacosConf.GroupName)
+				if err := gamedata.InitNacos(gconf.WebSvrCfg.Dependencies.NacosConf); err != nil {
+					return err
+				}
+			} else if gconf.WebSvrCfg.Dependencies.GameDataDir != "" {
 				logger.Infof("Loading local file by gameconf_dir: %v ", gconf.WebSvrCfg.Dependencies.GameDataDir)
 				if err := gamedata.InitLocal(gconf.WebSvrCfg.Dependencies.GameDataDir); err != nil {
 					return err
