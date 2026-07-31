@@ -303,12 +303,15 @@ func NewClient(cfg Config) (registry.Client, error) {
 		if err != nil {
 			return nil, err
 		}
-		r := reg_nacos.New(nc,
+		r, err := reg_nacos.New(nc,
 			reg_nacos.WithGroup(cfg.NacosGroup),
 			reg_nacos.WithCluster(cfg.NacosCluster),
 			reg_nacos.WithDefaultKind(cfg.NacosKind),
 			reg_nacos.WithWeight(cfg.NacosWeight),
 		)
+		if err != nil {
+			return nil, err
+		}
 		return &nacosClient{Registry: r}, nil
 
 	case BackendK8S:

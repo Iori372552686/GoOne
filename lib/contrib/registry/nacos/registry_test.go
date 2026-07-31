@@ -86,7 +86,7 @@ func TestRegistry(t *testing.T) {
 	t.Logf("is %#v", is)
 
 	time.Sleep(time.Second)
-	r := New(client)
+	r, _ := New(client)
 
 	go func() {
 		var (
@@ -209,4 +209,15 @@ func TestRegistryMany(t *testing.T) {
 	}
 
 	time.Sleep(time.Second)
+}
+
+// TestNewRejectsNilClient 验证 nil naming client 在构造期返回 error（V3-P0-05）。
+func TestNewRejectsNilClient(t *testing.T) {
+	r, err := New(nil)
+	if err == nil {
+		t.Fatal("expected error for nil client")
+	}
+	if r != nil {
+		t.Fatal("expected nil registry for nil client")
+	}
 }

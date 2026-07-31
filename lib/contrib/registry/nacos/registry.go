@@ -2,6 +2,7 @@ package nacos
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/Iori372552686/GoOne/lib/contrib/registry"
 	"net"
@@ -60,8 +61,12 @@ type Registry struct {
 	cli  naming_client.INamingClient
 }
 
-// New new a nacos registry.
-func New(cli naming_client.INamingClient, opts ...Option) (r *Registry) {
+// New new a nacos registry. 返回 error 使 nil client 在构造期而非使用期暴露
+//（V3-P0-05：Nacos client 创建返回 (client, error)）。
+func New(cli naming_client.INamingClient, opts ...Option) (*Registry, error) {
+	if cli == nil {
+		return nil, errors.New("nacos: nil naming client")
+	}
 	op := options{
 		prefix:  "/microservices",
 		cluster: "DEFAULT",
@@ -75,7 +80,7 @@ func New(cli naming_client.INamingClient, opts ...Option) (r *Registry) {
 	return &Registry{
 		opts: op,
 		cli:  cli,
-	}
+	}, nil
 }
 
 // Register the registration.
