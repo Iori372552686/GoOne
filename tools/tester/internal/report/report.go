@@ -5,6 +5,7 @@
 package report
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,12 +30,14 @@ type Meta struct {
 	Modules    []string
 }
 
-// Write 生成报告文件，返回文件路径。
+// Write 生成报告文件，返回 Markdown 文件路径。
+// 同时输出同名的 JSON 原始数据文件（V3-P1-06：便于程序化分析与 benchstat 对比）。
 func Write(dir string, meta Meta, snap *stats.Snapshot) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("create report dir: %w", err)
 	}
-	name := fmt.Sprintf("stress_%s.md", snap.TakenAt.Format("20060102_150405"))
+	stamp := snap.TakenAt.Format("20060102_150405")
+	name := fmt.Sprintf("stress_%s.md", stamp)
 	path := filepath.Join(dir, name)
 
 	var b strings.Builder
@@ -43,7 +46,28 @@ func Write(dir string, meta Meta, snap *stats.Snapshot) (string, error) {
 	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
 		return "", fmt.Errorf("write report: %w", err)
 	}
+
+	// V3-P1-06：输出 JSON 原始数据（与 Markdown 同名，.json 扩展名）。
+	if err := writeJSON(dir, stamp, meta, snap); err != nil {
+		// JSON 失败不阻断 Markdown 报告（非关键路径）。
+		fmt.Fprintf(os.Stderr, "warn: write json: %v\n", err)
+	}
 	return path, nil
+}
+
+// writeJSON 把报告元信息与快照序列化为 JSON 文件，供程序化分析。
+func writeJSON(dir, stamp string, meta Meta, snap *stats.Snapshot) error {
+	type reportData struct {
+		Meta     Meta            `json:"meta"`
+		Snapshot *stats.Snapshot `json:"snapshot"`
+	}
+	data := reportData{Meta: meta, Snapshot: snap}
+	raw, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(dir, fmt.Sprintf("stress_%s.json", stamp))
+	return os.WriteFile(path, raw, 0o644)
 }
 
 func render(b *strings.Builder, meta Meta, snap *stats.Snapshot) {
