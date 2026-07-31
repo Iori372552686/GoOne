@@ -310,11 +310,18 @@ CI race job 覆盖的全部包 `go test -race -count=2` **全绿，0 个 DATA RA
 | AdminComponent Serve goroutine 读 `a.srv` 与 Stop 写 `a.srv` | admin.go:195 读 / admin.go:229 写，无同步 | Start 启动 goroutine 前捕获 `srv` 局部变量，goroutine 不再读 `a.srv` 字段 |
 | TcpSvr 读 goroutine 读 `TcpReadTimeout` 与测试运行期写 | tcp_server.go:193 读 / tcp_deadline_test.go:32 写 | InitAndRun 仅零值时设默认（Start 后不可变）；测试在 InitAndRun 前设置 |
 
-### govulncheck（P0 门禁：可达漏洞为 0）
+### govulncheck（P0 门禁：可达漏洞为 0）✅
 
-`govulncheck ./...` 结果（EXIT=3）：
-- **18 个 Go 标准库可达漏洞**：全部来自 go1.26.0 标准库（crypto/tls、crypto/x509、net/http 等），修复版本 go1.26.1~1.26.5。**只能通过升级 Go 工具链修复**，非代码问题。
-- **12 个第三方包漏洞 + 2 个模块漏洞**：govulncheck 确认"代码未调用这些漏洞"（不可达），不影响。
+`govulncheck ./...` 升级 Go 工具链至 go1.26.5 后重跑：**EXIT=0，No vulnerabilities found**。
 
-结论：第三方依赖可达漏洞为 0（V3-P0-01 依赖升级生效）。标准库漏洞需 Go 官方补丁版本（go1.26.5+），属环境待办。
+- **可达漏洞：0 个**（"Your code is affected by 0 vulnerabilities"）。
+- **不可达漏洞**：6 个第三方包 + 1 个模块（govulncheck 确认代码未调用），不影响。
+
+演进过程：
+- 初次扫描（go1.26.0）：18 个 Go 标准库可达漏洞（crypto/tls、crypto/x509、net/http 等），全部来自 go1.26.0 基础版，修复版本 go1.26.1~1.26.5。
+- 升级 Go 至 1.26.5（WSL /usr/local/go）：18 个标准库漏洞全部修复。
+- 第三方依赖（V3-P0-01 升级的 gRPC1.82.1/OTel1.43/x-net0.56 等）可达漏洞为 0。
+
+**结论：P0 完成门禁"govulncheck 可达漏洞为 0"完全满足。**
+
 
