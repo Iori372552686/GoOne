@@ -83,4 +83,43 @@
 - **roomcenter 无每 10ms 双 goroutine**：原 `OnTick` 每 10ms 创建两个 goroutine（`RoomListMgr.Tick` + `TickPersist`）已替换为两个独立周期 Task（5s/10s，NonOverlap），不再每秒创建约 200 个短命 goroutine。
 - **Dispatcher 热路径无注册锁**：见上表 `DispatchWS (Sealed)`，Seal 后走只读 map 无锁直查。
   - 0-alloc 热路径不得引入新分配。
-- 后续 P1 会新增 Dispatcher lookup、Scheduler、Gateway encode/enqueue 等 benchmark，届时补入本表。
+  - 后续 P1 会新增 Dispatcher lookup、Scheduler、Gateway encode/enqueue 等 benchmark，届时补入本表。
+
+## V3 验证基线（2026-07-31，WSL Linux go1.26.5）
+
+> 与上方 Windows go1.25.10 基线**不可直接比较**（不同机器/Go 版本）。本节作为 V3
+> 现代化改造后的 Linux 验证基线，供后续同机对比。
+
+### 采集环境
+
+| 项 | 值 |
+|---|---|
+| 提交 | `0d54fd1` (dev) |
+| 平台 | WSL Ubuntu linux/amd64 |
+| Go | `go1.26.5` |
+| CGO | enabled（race 检测可用） |
+| 命令 | `go test -run '^$' -bench . -benchmem -count=10` |
+
+### 核心热路径 benchmark×10（中位数区间）
+
+| 项目 | ns/op | B/op | allocs/op | 包 |
+|---|---:|---:|---:|---|
+| SSPacketHeader.ToBytes | 3.00–3.05 | 0 | 0 | `lib/api/sharedstruct` |
+| SSPacketHeader.To | 2.44–2.47 | 0 | 0 | `lib/api/sharedstruct` |
+| SSPacketHeader.From | 2.65–2.68 | 0 | 0 | `lib/api/sharedstruct` |
+| CSPacketHeader.ToBytes | ~11（1-alloc，兼容接口） | 32 | 1 | `lib/api/sharedstruct` |
+| CSPacketHeader.From | ~2.7 | 0 | 0 | `lib/api/sharedstruct` |
+| Dispatcher DispatchWS (Sealed) | ~2.8 | 0 | 0 | `lib/service/ssrpc` |
+| TransactionMgr throughput | ~600–680 | ~440 | 7–8 | `lib/service/transaction` |
+| SessionHubLookup | ~11 | 0 | 0 | `lib/net/net_mgr` |
+| SessionHubBindReplace | ~2000–3800 | ~1800 | 17 | `lib/net/net_mgr` |
+
+### P0/P1 门禁验证结果（同次采集）
+
+| 门禁 | 结果 |
+|---|---|
+| race 检测（CI 全部包 count=2） | ✅ 0 DATA RACE（修复了 admin/tcp_server 2 个真实 race） |
+| govulncheck 可达漏洞 | ✅ 0（go1.26.5 + 依赖升级） |
+| 集成测试（redis/mysql/etcd 外网） | ✅ GOONE_INTEGRATION=1 真实通过 |
+| 0-alloc 热路径 | ✅ CS/SS Header.To、Dispatcher Sealed、SessionHubLookup 均 0-alloc |
+
