@@ -2,7 +2,6 @@ package net_mgr
 
 import (
 	"net"
-	"sync"
 
 	"github.com/Iori372552686/GoOne/lib/net/kcp_server"
 	"github.com/Iori372552686/GoOne/lib/net/tcp_server"
@@ -53,30 +52,21 @@ type ConnTcpSvr struct {
 	// gnet 时为事件驱动 server。所有下行写与关闭必须经 transport。
 	transport gatewayTransport
 
-	// hub 是共享会话状态拥有者（P0-05）。nil 时回退到下方本地 map（兼容旧测试）。
-	// 生产由 connsvr globals 注入单一 SessionHub，使 TCP/WS/KCP 共享会话状态。
+	// hub 是共享会话状态拥有者（P0-05）。必须非 nil（生产由 connsvr globals 注入
+	// 单一 SessionHub），使 TCP/WS/KCP 共享会话状态。V3-P1-02：本地 map 路径已删除，
+	// 三传输内部始终走 hub。
 	hub *SessionHub
 
-	uidConnMap        map[uint64]*Client
-	connUidMap        map[net.Conn]uint64
-	remoteAddrConnMap map[string]net.Conn
-	remoteAddrKickMap map[string]bool
-	lock              sync.RWMutex
-	handler           func(conn net.Conn, data []byte)
+	handler func(conn net.Conn, data []byte)
 }
 
 type ConnWsTcpSvr struct {
 	ws_server.WsTcpSvr
 
-	// hub 同 ConnTcpSvr（P0-05）。
+	// hub 同 ConnTcpSvr。必须非 nil（生产由 connsvr globals 注入）。
 	hub *SessionHub
 
-	uidConnMap        map[uint64]*Client
-	connUidMap        map[net.Conn]uint64
-	remoteAddrConnMap map[string]net.Conn
-	remoteAddrKickMap map[string]bool
-	lock              sync.RWMutex
-	handler           func(conn net.Conn, data []byte)
+	handler func(conn net.Conn, data []byte)
 }
 
 // ConnKcpSvr is the KCP gateway session layer; the underlying
@@ -85,15 +75,10 @@ type ConnWsTcpSvr struct {
 type ConnKcpSvr struct {
 	kcp_server.KcpPacketSvr
 
-	// hub 同 ConnTcpSvr（P0-05）。
+	// hub 同 ConnTcpSvr。必须非 nil（生产由 connsvr globals 注入）。
 	hub *SessionHub
 
-	uidConnMap        map[uint64]*Client
-	connUidMap        map[net.Conn]uint64
-	remoteAddrConnMap map[string]net.Conn
-	remoteAddrKickMap map[string]bool
-	lock              sync.RWMutex
-	handler           func(conn net.Conn, data []byte)
+	handler func(conn net.Conn, data []byte)
 }
 
 func NewTcpSvr() *ConnTcpSvr {
@@ -116,6 +101,8 @@ func NewKcpSvr() *ConnKcpSvr {
 
 // SetHub 注入共享 SessionHub（P0-05）。三种传输（TCP/WS/KCP）必须注入同一个 hub 实
 // 例，使同一 UID 跨传输重绑原子化。必须在 Start 前调用。
+//
+// Deprecated: 新代码应在构造时注入 hub；本方法保留兼容 connsvr globals 装配。
 func (t *ConnTcpSvr) SetHub(h *SessionHub)    { t.hub = h }
 func (t *ConnWsTcpSvr) SetHub(h *SessionHub)  { t.hub = h }
 func (t *ConnKcpSvr) SetHub(h *SessionHub)    { t.hub = h }

@@ -18,6 +18,8 @@ func TestKcpGatewaySession(t *testing.T) {
 	const uid = uint64(70001)
 
 	gw := NewKcpSvr()
+	// V3-P1-02：单路径化后业务方法始终走 hub，注入一个 hub 使端到端测试走真实路径。
+	gw.SetHub(NewSessionHub(noopCounter{}))
 	// 网关回调：首包即绑定会话（真实路径由登录流程绑定）。
 	err := gw.CreateKcpServer(port, func(conn net.Conn, data []byte) {
 		gw.UpdateClientByUid(conn, uid, 1)

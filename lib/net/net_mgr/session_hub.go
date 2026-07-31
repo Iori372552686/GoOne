@@ -85,7 +85,7 @@ func NewSessionHub(counter ActivityCounter) *SessionHub {
 	if counter == nil {
 		counter = noopCounter{}
 	}
-	return &SessionHub{
+	h := &SessionHub{
 		counter:           counter,
 		accepting:         true,
 		uidConnMap:        make(map[uint64]*Client),
@@ -93,6 +93,9 @@ func NewSessionHub(counter ActivityCounter) *SessionHub {
 		remoteAddrConnMap: make(map[string]net.Conn),
 		remoteAddrKickMap: make(map[string]bool),
 	}
+	// V3-P1-02：hub 作为 gateway 连接计数源注册到 Prometheus。
+	registerGatewayHub(h)
+	return h
 }
 
 // Quiesce 标记 hub 不再接受新会话绑定。既有的未认证连接仍可被处理，但 BindClient 拒
