@@ -9,6 +9,8 @@ build/*
 # docs/ is tracked; only raw benchmark/profile artifacts are ignored.
 /docs/benchmarks/raw/
 /docs/profiles/
+# V4 原始测试、profile 与容量 JSON 放入本地忽略目录，仓库只提交摘要与容量矩阵。
+/.artifacts/v4/
 deploy/hosts/host_dev.txt
 /.gocache
 /tools/cfgtool/gen
