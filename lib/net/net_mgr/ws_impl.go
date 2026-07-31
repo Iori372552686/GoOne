@@ -142,7 +142,10 @@ func (t *ConnWsTcpSvr) kick(conn net.Conn, uid uint64, reason g1_protocol.EKickO
 		Cmd:     uint32(g1_protocol.CMD_SC_KICK_OUT),
 		BodyLen: uint32(len(msgData)),
 	}
-	err = t.WriteData(conn, header.ToBytes(), msgData)
+	// V3-P1-07：WS 下行热路径改用栈数组 + To（0-alloc），与 TCP/KCP 一致。
+	var headerBuf [28]byte
+	header.To(headerBuf[:])
+	err = t.WriteData(conn, headerBuf[:], msgData)
 	if err != nil {
 		observeGatewayEvent("ws", "write_error")
 		logger.Errorf("Failed to write data in kick | %v", err)
