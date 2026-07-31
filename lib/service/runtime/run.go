@@ -77,6 +77,19 @@ func (a *App) Run(ctx context.Context) error {
 		return errors.Join(startErr, stopErr)
 	}
 
+	// P0-02：启动 cause 检查。只有全部 Start 成功且启动期终止信号未到达（signalCtx 仍
+	// 未被取消）时才允许进入 Ready。不遵守 context、在取消后仍返回 nil 的 Start 不得让
+	// App 进入 Ready。
+	if cause := context.Cause(signalCtx); cause != nil {
+		stopErr := a.stopComponents(started, a.stopTimeout)
+		interruptErr := cause
+		if errors.Is(interruptErr, context.Canceled) {
+			interruptErr = ErrStartupInterrupted
+		}
+		a.markFailed(interruptErr)
+		return errors.Join(interruptErr, stopErr)
+	}
+
 	// 阶段 4：Ready。阻塞直到被告知排空。重载会重新进入 Ready。
 	if err := a.enterReady(ctx); err != nil {
 		// Ready 观察者拒绝了转换：回滚启动。
@@ -102,16 +115,15 @@ func (a *App) Run(ctx context.Context) error {
 	a.enterStopping(ctx)
 	stopErr := a.stopComponents(started, a.stopTimeout)
 
-	// 终态：运行期错误（监督触发）关停走 Failed；正常信号关停走 Stopped。
+	// 终态（P0-02 修复）：runtimeErr、drainErr、stopErr 任一非 nil 都走 Failed，且每个
+	// 终态错误都包含组件名与阶段名（由 errors.Join 保持 %w/Unwrap 链）。
 	// 关键不变量：不得先提交 Stopped 再改成 Failed。
-	if runtimeErr != nil {
-		a.markFailed(runtimeErr)
-	} else {
-		a.markStopped()
+	terminalErr := errors.Join(runtimeErr, drainErr, stopErr)
+	if terminalErr != nil {
+		a.markFailed(terminalErr)
+		return terminalErr
 	}
-	if drainErr != nil || stopErr != nil {
-		return errors.Join(drainErr, stopErr)
-	}
+	a.markStopped()
 	return nil
 }
 

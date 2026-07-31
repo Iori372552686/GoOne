@@ -76,6 +76,10 @@ type StateChange struct {
 //   - 在 Ready/Allocated 时，返回 error 会中止转换并回滚到前一状态（故失败的
 //     就绪闸门会阻止服务）。
 //   - 在 Draining/Stopping/Stopped 时，错误会被记录但绝不阻断退出。
+//
+// 重入限制（P0-02）：transition 用 transitionMu 串行化整个迁移序列，派发观察者时仍持有
+// transitionMu。因此观察者**禁止**调用 Allocate、Drain 或任何会触发 transition 的方法，
+// 否则会自死锁 transitionMu。观察者可以安全调用只读的 Current/Snapshot。
 type StateObserver interface {
 	OnStateChange(ctx context.Context, change StateChange) error
 }
@@ -103,6 +107,14 @@ type StateStore struct {
 	deadline  time.Time
 	allocated bool
 	observers []StateObserver
+
+	// transitionMu 串行化完整的状态迁移序列"校验 → observer → 提交"（P0-02 修复）。
+	// observer 执行时只持有 transitionMu、不持有 s.mu，因此 observer 内仍可安全调用
+	// Current/Snapshot 等只读方法；但 observer 禁止递归发起迁移（会自死锁 transitionMu）。
+	// 历史缺陷：仅用 s.mu 保护，Ready/Allocated 路径在 observer 执行前释放 s.mu，并发
+	// Drain 可在该窗口提交 Draining，随后旧 Ready 决策的 observer 返回后又提交 Ready，
+	// 造成 Draining -> Ready 回退。
+	transitionMu sync.Mutex
 }
 
 // NewStateStore 构建一个处于 StateStarting 的 store，并在构造时把
@@ -145,12 +157,19 @@ func (s *StateStore) AddObserver(o StateObserver) {
 // 前一状态并返回该 error。对关停状态，观察者 error 被返回但转换已提交。非法转换
 // 返回 ErrInvalidStateTransition 且不派发。
 //
+// 串行化（P0-02 修复）：transitionMu 覆盖完整"校验 → observer → 提交"序列，确保两个
+// 并发 transition 不会交错提交（如 Ready observer 窗口期的 Drain）。observer 执行时
+// 不持有 s.mu，故 observer 内可调用 Current/Snapshot；但 observer 不得递归发起迁移。
+//
 // 指标时机（P0-02 修复）：goone_lifecycle_state gauge 的翻转发生在状态**提交成功之
 // 后**，而非之前。这样被 Ready/Allocated 观察者拒绝的转换不会留下错误的 gauge 值。
 // 关停状态（Draining/Stopping/Stopped/Failed）的转换总是提交，故其 gauge 在派发观察
 // 者（best-effort）之前翻转；若观察者返回 error，转换已提交，gauge 保持与新状态一
-// 臗。
+// 致。
 func (s *StateStore) transition(ctx context.Context, to State, reason string, deadline time.Time) error {
+	s.transitionMu.Lock()
+	defer s.transitionMu.Unlock()
+
 	s.mu.Lock()
 	from := s.current
 	if !canTransition(from, to) {
