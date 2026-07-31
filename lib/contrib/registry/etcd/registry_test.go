@@ -3,6 +3,7 @@ package etcd
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -12,11 +13,19 @@ import (
 	"google.golang.org/grpc"
 )
 
-// newTestClient 构造连接本地 etcd 的客户端。调用方需先通过 itest.Require 门控。
+// etcdAddr 返回 etcd 测试地址，可通过 GOONE_ETCD_ADDR 覆盖（默认本地 2379）。
+func etcdAddr() string {
+	if a := os.Getenv("GOONE_ETCD_ADDR"); a != "" {
+		return a
+	}
+	return "127.0.0.1:2379"
+}
+
+// newTestClient 构造连接 etcd 的客户端。调用方需先通过 itest.Require 门控。
 func newTestClient(t *testing.T) *clientv3.Client {
 	t.Helper()
 	client, err := clientv3.New(clientv3.Config{
-		Endpoints:   []string{"127.0.0.1:2379"},
+		Endpoints:   []string{etcdAddr()},
 		DialTimeout: time.Second, DialOptions: []grpc.DialOption{grpc.WithBlock()},
 	})
 	if err != nil {
@@ -27,7 +36,7 @@ func newTestClient(t *testing.T) *clientv3.Client {
 
 func TestRegistry(t *testing.T) {
 	// V3-P0-02：集成测试统一门控，未开启或 etcd 不可达时 t.Skip。
-	itest.Require(t, "127.0.0.1:2379")
+	itest.Require(t, etcdAddr())
 	client := newTestClient(t)
 	defer client.Close()
 
@@ -88,7 +97,7 @@ func TestRegistry(t *testing.T) {
 
 func TestHeartBeat(t *testing.T) {
 	// V3-P0-02：集成测试统一门控。
-	itest.Require(t, "127.0.0.1:2379")
+	itest.Require(t, etcdAddr())
 	client := newTestClient(t)
 	defer client.Close()
 
