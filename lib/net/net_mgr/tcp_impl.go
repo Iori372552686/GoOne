@@ -50,10 +50,11 @@ func (t *ConnTcpSvr) initSessionMaps(cb func(conn net.Conn, data []byte)) {
 
 // 被Listener协程调用，一个TcpSvr对应一个Listener协程
 func (t *ConnTcpSvr) OnConn(conn net.Conn) {
-	// V3-P1-01：过载保护。admission 拒绝（enforce 模式超限/排空期）时立即关闭连接，
-	// 不计入连接数。
+	// V4 P0-04：admission 用原子 TryAcquireConnection 占用名额；拒绝（enforce 超限/排空期）
+	// 时立即关闭连接，不增加计数，且不标记 admitted，使 OnClose 不释放。
+	t.ensureLease()
 	if t.hub != nil {
-		if a := t.hub.Admission(); a != nil && !a.TryAdmitConnection() {
+		if a := t.hub.Admission(); a != nil && !a.TryAcquireConnection() {
 			observeGatewayEvent("tcp", "rejected")
 			_ = conn.Close()
 			return
@@ -61,7 +62,8 @@ func (t *ConnTcpSvr) OnConn(conn net.Conn) {
 	}
 	logger.Infof("new conn: %s", conn.RemoteAddr().String())
 	observeGatewayEvent("tcp", "accepted")
-	// 底层连接计数。未认证连接只计入 connection，不计入 session。
+	// 仅在 admission 通过后记录 admitted 并增加底层连接计数。
+	t.lease.markAdmitted(conn)
 	if t.hub != nil {
 		t.hub.IncConnection()
 	}
@@ -77,11 +79,16 @@ func (t *ConnTcpSvr) OnPacket(conn net.Conn, data []byte) {
 // 被Read协程调用，每个Connection对应一个Read协调
 func (t *ConnTcpSvr) OnClose(conn net.Conn) {
 	observeGatewayEvent("tcp", "closed")
-	uid := t.removeConn(conn)
-	// P0-06：连接计数递减（hub 路径下 session 计数已在 hub.RemoveConn 内处理）。
-	if t.hub != nil {
-		t.hub.DecConnection()
+	// V4 P0-04：仅为 admitted 连接释放计数与 admission 名额，避免被拒绝的连接误减计数。
+	if t.lease != nil && t.lease.takeIfAdmitted(conn) {
+		if t.hub != nil {
+			t.hub.DecConnection()
+		}
+		if a := admissionOf(t.hub); a != nil {
+			a.ReleaseConnection()
+		}
 	}
+	uid := t.removeConn(conn)
 	if uid == 0 {
 		return
 	}

@@ -29,9 +29,10 @@ func (t *ConnKcpSvr) initAndRun(ip string, port int, cb func(conn net.Conn, data
 
 // 被Listener协程调用，一个KcpSvr对应一个Listener协程
 func (t *ConnKcpSvr) OnConn(conn net.Conn) {
-	// V3-P1-01：过载保护。
+	// V4 P0-04：原子 TryAcquireConnection；拒绝时不计数、不标记 admitted。
+	t.ensureLease()
 	if t.hub != nil {
-		if a := t.hub.Admission(); a != nil && !a.TryAdmitConnection() {
+		if a := t.hub.Admission(); a != nil && !a.TryAcquireConnection() {
 			observeGatewayEvent("kcp", "rejected")
 			_ = conn.Close()
 			return
@@ -39,6 +40,7 @@ func (t *ConnKcpSvr) OnConn(conn net.Conn) {
 	}
 	logger.Infof("kcp new conn: %s", conn.RemoteAddr().String())
 	observeGatewayEvent("kcp", "accepted")
+	t.lease.markAdmitted(conn)
 	if t.hub != nil {
 		t.hub.IncConnection()
 	}
@@ -54,10 +56,16 @@ func (t *ConnKcpSvr) OnPacket(conn net.Conn, data []byte) {
 // 被Read协程调用
 func (t *ConnKcpSvr) OnClose(conn net.Conn) {
 	observeGatewayEvent("kcp", "closed")
-	uid := t.removeConn(conn)
-	if t.hub != nil {
-		t.hub.DecConnection()
+	// V4 P0-04：仅为 admitted 连接释放计数与名额。
+	if t.lease != nil && t.lease.takeIfAdmitted(conn) {
+		if t.hub != nil {
+			t.hub.DecConnection()
+		}
+		if a := admissionOf(t.hub); a != nil {
+			a.ReleaseConnection()
+		}
 	}
+	uid := t.removeConn(conn)
 	if uid == 0 {
 		return
 	}

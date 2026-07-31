@@ -22,9 +22,10 @@ func (t *ConnWsTcpSvr) initAndRun(implType, mode string, port int, cb func(conn 
 }
 
 func (t *ConnWsTcpSvr) OnConn(conn net.Conn) {
-	// V3-P1-01：过载保护。
+	// V4 P0-04：原子 TryAcquireConnection；拒绝时不计数、不标记 admitted。
+	t.ensureLease()
 	if t.hub != nil {
-		if a := t.hub.Admission(); a != nil && !a.TryAdmitConnection() {
+		if a := t.hub.Admission(); a != nil && !a.TryAcquireConnection() {
 			observeGatewayEvent("ws", "rejected")
 			_ = conn.Close()
 			return
@@ -32,6 +33,7 @@ func (t *ConnWsTcpSvr) OnConn(conn net.Conn) {
 	}
 	logger.Infof("new conn: %s", conn.RemoteAddr().String())
 	observeGatewayEvent("ws", "accepted")
+	t.lease.markAdmitted(conn)
 	if t.hub != nil {
 		t.hub.IncConnection()
 	}
@@ -45,10 +47,16 @@ func (self *ConnWsTcpSvr) OnRead(conn net.Conn, data []byte) int {
 
 func (t *ConnWsTcpSvr) OnClose(conn net.Conn) {
 	observeGatewayEvent("ws", "closed")
-	uid := t.removeConn(conn)
-	if t.hub != nil {
-		t.hub.DecConnection()
+	// V4 P0-04：仅为 admitted 连接释放计数与名额。
+	if t.lease != nil && t.lease.takeIfAdmitted(conn) {
+		if t.hub != nil {
+			t.hub.DecConnection()
+		}
+		if a := admissionOf(t.hub); a != nil {
+			a.ReleaseConnection()
+		}
 	}
+	uid := t.removeConn(conn)
 	if uid == 0 {
 		return
 	}

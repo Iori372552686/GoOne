@@ -1,6 +1,7 @@
 package net_mgr
 
 import (
+	"context"
 	"net"
 	"strconv"
 	"testing"
@@ -11,10 +12,23 @@ import (
 	kcp "github.com/xtaci/kcp-go/v5"
 )
 
+// freeUDPPort 向操作系统申请一个空闲 UDP 端口供 KCP 监听，避免窄随机端口窗口在
+// -count=N 下产生端口占用（V4 P0-04）。
+func freeUDPPort(t *testing.T) int {
+	t.Helper()
+	l, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen udp for port probe: %v", err)
+	}
+	addr := l.LocalAddr().(*net.UDPAddr)
+	_ = l.Close()
+	return addr.Port
+}
+
 // TestKcpGatewaySession covers the full GatewayServer contract on KCP:
 // bind (UpdateClientByUid), downlink (SendByUid) and Kick.
 func TestKcpGatewaySession(t *testing.T) {
-	port := 35000 + int(time.Now().UnixNano()%1000)
+	port := freeUDPPort(t)
 	const uid = uint64(70001)
 
 	gw := NewKcpSvr()
@@ -27,6 +41,10 @@ func TestKcpGatewaySession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("kcp gateway start failed: %v", err)
 	}
+	// V4 P0-04：测试退出时 Stop 网关，关闭 listener 与连接，避免 goroutine/listener 泄漏。
+	t.Cleanup(func() {
+		_ = gw.Stop(context.Background())
+	})
 
 	sess, err := kcp.DialWithOptions(net.JoinHostPort("127.0.0.1", strconv.Itoa(port)), nil, 0, 0)
 	if err != nil {
