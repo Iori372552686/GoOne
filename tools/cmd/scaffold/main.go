@@ -188,12 +188,15 @@ import (
 // NewApp 装配 {{.Name}} 的最小 runtime.App。
 //
 // scaffold 生成的最小进程：启动到 Ready 并等待关停信号，不监听业务端口。增加真实组件
-// （logger/admin/tracing/dependencies/ssrpc_registry/transaction_mgr/router/domain）后，
-// 用 app.MustRegister(...) 按序注册。
+// 时用 bussvc 标准组件构造器（服务名取 app.Name()、Start 时自读 conf），再按
+// app.MustRegister(...) 顺序注册。
 func NewApp() *runtime.App {
 	app := runtime.MustNew("{{.Name}}")
 	// TODO: 增加组件后在此 MustRegister，例如：
-	// app.MustRegister(scheduler.DefaultDateTimeTick(), logComp, adminComp, ...)
+	// app := runtime.MustNew("{{.Name}}", bussvc.WithConfLoader())
+	// app.MustRegister(scheduler.DefaultDateTimeTick(),
+	//     bussvc.NewLoggerComponent(app), bussvc.NewAdminComponent(app, router.ReadyCheck),
+	//     bussvc.NewTracingComponent(app), ...)
 	return app
 }
 `

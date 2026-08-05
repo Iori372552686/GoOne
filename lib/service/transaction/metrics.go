@@ -140,7 +140,8 @@ func sumTransactionQueueMetric(read func(*transactionShard) int) float64 {
 }
 
 func transactionCmdLabel(cmd uint32) string {
-	label := strings.TrimSpace(g1_protocol.CMD(cmd).String())
+	//label := strings.TrimSpace(g1_protocol.CMD(cmd).String())
+	label := g1_protocol.CMD(cmd).String()
 	if label == "" || label == "0" {
 		return "UNKNOWN"
 	}

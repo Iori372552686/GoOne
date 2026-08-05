@@ -6,7 +6,7 @@ import (
 	roomcenterv1 "github.com/Iori372552686/GoOne/api/gen/game/roomcenter/v1"
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
-	"github.com/Iori372552686/GoOne/module/gconf"
+	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/room_mgr/texas_room"
 	pb "github.com/Iori372552686/game_protocol/protocol"
 )
@@ -53,7 +53,7 @@ func (impl *RoomMgr) Tick(nowMs int64) {
 				zone.Index,
 				0,
 				0,
-				&pb.InnerTickReq{NowMs: nowMs, SrcBusId: bus.IpStringToInt(gconf.RoomCenterSvrCfg.Identity.SelfBusId)},
+				&pb.InnerTickReq{NowMs: nowMs, SrcBusId: bus.IpStringToInt(conf.Get("roomcentersvr.identity.self_bus_id").String())},
 			)
 		}
 	}

@@ -5,29 +5,46 @@ import (
 	"fmt"
 
 	connsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/connsvr/v1"
-	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/net/net_mgr"
-	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
 	"github.com/Iori372552686/GoOne/lib/service/scheduler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
+	"github.com/Iori372552686/GoOne/lib/web/http_sign"
+	"github.com/Iori372552686/GoOne/lib/web/rest_api"
+	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/module/gconf"
 	"github.com/Iori372552686/GoOne/src/connsvr/globals"
 	"github.com/Iori372552686/GoOne/src/connsvr/service"
 )
 
-// NewApp 用 runtime.App + Component 装配 connsvr。
+// NewApp 用 runtime.App + Component 装配 connsvr。服务名只在 MustNew 出现一次；
+// 标准组件（logger/admin/tracing/router）由 bussvc 构造器自读 conf 装配。
 func NewApp() *runtime.App {
+	app := runtime.MustNew("connsvr", bussvc.WithConfLoader())
+
+	// 标准组件：服务名取 app.Name()，Start 时（LoadConfig 之后）自读 conf。
+	logComp := bussvc.NewLoggerComponent(app)
+	adminComp := bussvc.NewAdminComponent(app, router.ReadyCheck)
+	tracing := bussvc.NewTracingComponent(app)
+
 	transMgr := &bussvc.TransMgrComponent{Mgr: globals.TransMgr}
 
 	signRestDeps := &bussvc.FuncComponent{
 		ComponentName: "sign_rest_deps",
 		OnStart: func(_ context.Context) error {
-			globals.SignMgr.InitAndRun(gconf.ConnSvrCfg.Dependencies.HTTPSigns)
-			globals.RestMgr.Init(gconf.ConnSvrCfg.Dependencies.RestApiConf, globals.SignMgr)
+			var signs []http_sign.Config
+			if err := conf.Unmarshal("base_cfg.dependencies.http_sign", &signs); err != nil {
+				return err
+			}
+			globals.SignMgr.InitAndRun(signs)
+			var restConf []rest_api.Config
+			if err := conf.Unmarshal("base_cfg.dependencies.rest_api_config", &restConf); err != nil {
+				return err
+			}
+			globals.RestMgr.Init(restConf, globals.SignMgr)
 			return nil
 		},
 	}
@@ -44,57 +61,13 @@ func NewApp() *runtime.App {
 	)
 
 	// connsvr 特有：客户端下行包在 onRecvSSPacket 中短路回客户端，覆盖默认的
-	// TransMgr.ProcessSSPacket。
-	// 显式装配 DriverRegistry，只注册 rabbitmq（bus 服务不再隐式链接全部 5 类
-	// MQ SDK；websvr 不链接任何 driver）。
-	drivers := bus.NewDriverRegistry()
-	drivers.MustRegister(rabbitmq.Driver())
-	routerComp := &bussvc.RouterComponent{
-		Common:         connCommon,
-		TransMgr:       globals.TransMgr,
-		OnRecvSSPacket: onRecvSSPacket,
-		Drivers:        drivers,
-	}
-	tracing := &bussvc.TracingComponent{
-		ServiceName: "connsvr",
-		Cfg:         func() ssrpc.TracingConfig { return connCommon().Tracing },
-	}
-	logComp := &bussvc.LoggerComponent{
-		Cfg: func() bussvc.LoggerConfig {
-			c := connCommon()
-			return bussvc.LoggerConfig{Dir: c.LogDir, Level: c.LogLevel, Name: "connsvr"}
-		},
-	}
+	// TransMgr.ProcessSSPacket。DriverRegistry 只注册 rabbitmq（bus 服务不再隐式
+	// 链接全部 5 类 MQ SDK；websvr 不链接任何 driver）。
+	routerComp := bussvc.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry(), onRecvSSPacket)
 
 	// 网关监听器：在 router/bus 起来之后启动 TCP/WS/KCP。实现 Quiescer（停止接新连接）
 	// 与 runtime.Component（Stop 强制关闭全部连接），满足网关排空。
 	gateway := &gatewayComponent{}
-
-	app := runtime.MustNew("connsvr",
-		runtime.WithLoadConfig(func(_ context.Context) error {
-			if err := gconf.LoadConnConfig(*gconf.SvrConfFile); err != nil {
-				return err
-			}
-			logger.Infof("svr_conf loaded for connsvr")
-			return nil
-		}),
-	)
-
-	// admin 在 LoadConfig 后用 WithAdminConfig 的 source 读取端口/IP（延迟取配
-	// 置），直接复用 app.tracker（runtime.New 默认创建），无需外部传入。
-	adminComp := runtime.NewAdminComponent(app,
-		runtime.WithAdminConfig(func() runtime.AdminConfig {
-			c := connCommon()
-			return runtime.AdminConfig{
-				Enabled: c.AdminEnabled,
-				IP:      c.AdminIP,
-				Port:    c.AdminPort,
-				Pprof:   c.Pprof,
-			}
-		}),
-		runtime.WithAdminServiceName("connsvr"),
-		runtime.WithAdminReadyCheck(router.ReadyCheck),
-	)
 
 	// Start 顺序：datetime_tick → logger → admin → tracing → dependencies →
 	// ssrpc_registry → transaction_mgr → router → 网关。admin 紧跟 logger，使反向 Stop
@@ -109,30 +82,6 @@ func NewApp() *runtime.App {
 	return app
 }
 
-// connCommon 从 gconf 产出 connsvr 的 bus 服务共享配置段。
-func connCommon() bussvc.Common {
-	c := &gconf.ConnSvrCfg
-	return bussvc.Common{
-		LogDir:       c.Debug.LogDir,
-		LogLevel:     c.Debug.LogLevel,
-		SelfBusId:    c.Identity.SelfBusId,
-		BusMQAddr:    c.CommonRuntime.BusMQAddr,
-		RegisterAddr: c.CommonRuntime.RegisterAddr,
-		AdminEnabled: c.CommonRuntime.AdminServer.Enabled,
-		AdminIP:      c.CommonRuntime.AdminServer.IP,
-		AdminPort:    c.CommonRuntime.AdminServer.Port,
-		Pprof:        c.CommonDebug.Pprof,
-		Tracing: ssrpc.TracingConfig{
-			Enabled:      c.CommonRuntime.Tracing.Enabled,
-			Exporter:     c.CommonRuntime.Tracing.Exporter,
-			Endpoint:     c.CommonRuntime.Tracing.Endpoint,
-			Insecure:     c.CommonRuntime.Tracing.Insecure,
-			SamplerRatio: c.CommonRuntime.Tracing.SamplerRatio,
-			Headers:      c.CommonRuntime.Tracing.Headers,
-		},
-	}
-}
-
 // gatewayComponent 管理三传输（TCP/WS/KCP）网关监听器的启动、排空与停止。
 // Start 拉起监听；Quiesce 停止接新连接但保留既有；Stop 强制关闭全部连接。
 type gatewayComponent struct{}
@@ -145,7 +94,10 @@ func (gatewayComponent) Name() string { return "gateway_listeners" }
 func (gatewayComponent) Start(_ context.Context) error {
 	// 用已加载的 capacity 配置构造过载保护闸门，注入共享 SessionHub。
 	// 三传输 OnConn 与 pack_proc 首次登录通过 hub 间接调用闸门。off 模式直通。
-	cap := gconf.ConnSvrCfg.Capacity
+	var cap gconf.ConnCapacityConfig
+	if err := conf.Unmarshal("connsvr.capacity", &cap); err != nil {
+		return err
+	}
 	globals.SessionHub.SetAdmission(net_mgr.NewAdmissionController(globals.SessionHub, net_mgr.AdmissionLimits{
 		MaxConnections:                cap.MaxConnections,
 		MaxUnauthenticatedConnections: cap.MaxUnauthenticatedConnections,
@@ -154,6 +106,11 @@ func (gatewayComponent) Start(_ context.Context) error {
 		MaxInflight:                   cap.MaxInflight,
 		OverloadMode:                  cap.OverloadMode,
 	}))
+
+	// 网关监听端口/TCP 后端类型/KCP 端口从 conf 读取。
+	tcpImplType := conf.Get("connsvr.runtime.tcp_impl_type").String()
+	listenPort := conf.Get("connsvr.runtime.listen_port").Int()
+	kcpPort := conf.Get("connsvr.runtime.kcp_port").Int()
 
 	// started 记录已成功启动的传输及其 Stop 函数，用于部分启动失败时逆序回滚。
 	// Stop 签名为 Stop(context.Context) error：ctx 约束强制关闭、错误可观测。
@@ -173,8 +130,8 @@ func (gatewayComponent) Start(_ context.Context) error {
 	}
 
 	if err := globals.ConnTcpSvr.CreateTcpServer(
-		gconf.ConnSvrCfg.Runtime.TcpImplType,
-		gconf.ConnSvrCfg.Runtime.ListenPort+1, onTcpPacket); err != nil {
+		tcpImplType,
+		listenPort+1, onTcpPacket); err != nil {
 		return rollback(fmt.Errorf("tcp: %w", err))
 	}
 	started = append(started, struct {
@@ -183,7 +140,7 @@ func (gatewayComponent) Start(_ context.Context) error {
 	}{"tcp", globals.ConnTcpSvr.Stop})
 
 	if err := globals.ConnWsSvr.CreateWebSocketServer(
-		"gin", "debug", gconf.ConnSvrCfg.Runtime.ListenPort, onWebSocketPacket); err != nil {
+		"gin", "debug", listenPort, onWebSocketPacket); err != nil {
 		return rollback(fmt.Errorf("ws: %w", err))
 	}
 	started = append(started, struct {
@@ -191,7 +148,7 @@ func (gatewayComponent) Start(_ context.Context) error {
 		stop func(context.Context) error
 	}{"ws", globals.ConnWsSvr.Stop})
 
-	if kcpPort := gconf.ConnSvrCfg.Runtime.KcpPort; kcpPort > 0 {
+	if kcpPort > 0 {
 		if err := globals.ConnKcpSvr.CreateKcpServer(kcpPort, onKcpPacket); err != nil {
 			return rollback(fmt.Errorf("kcp: %w", err))
 		}

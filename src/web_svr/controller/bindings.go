@@ -4,7 +4,7 @@ import (
 	websvrv1 "github.com/Iori372552686/GoOne/api/gen/web/websvr/v1"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
-	"github.com/Iori372552686/GoOne/module/gconf"
+	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/src/web_svr/globals"
 	"github.com/Iori372552686/GoOne/src/web_svr/service"
 )
@@ -16,7 +16,7 @@ import (
 // 热路径无锁。
 func BuildWebDispatcher() (*ssrpc.Dispatcher, websvrv1.WebApiServiceSServer) {
 	srv := websvrv1.NewWebApiServiceSServer(&service.WebApiServiceImpl{}, ssrpc.DefaultMWOptions{
-		Sign: service.NewHTTPSignVerifier(gconf.WebSvrCfg.Runtime.HttpServer.AuthEnable, globals.SignMgr.GetSignIns()),
+		Sign: service.NewHTTPSignVerifier(conf.Get("websvr.runtime.http_server.auth_enable").Bool(), globals.SignMgr.GetSignIns()),
 	})
 	r := ssrpc.NewRegistry()
 	if err := websvrv1.RegisterWebApiServiceToRegistry(r, srv); err != nil {

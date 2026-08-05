@@ -132,7 +132,7 @@ func (m *RoleMgr) obtainRole(uid uint64, trans cmd_handler.IContext, createIfNot
 	// 因为在loadRole的过程中，可能已经有其他协程save了一个role，这里不能覆盖它。
 	if createHere {
 		role.SaveToDB(trans)
-		//role.SaveToMysql(trans) 双写
+		role.SaveToMysql(trans)
 	}
 
 	return role

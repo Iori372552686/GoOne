@@ -3,7 +3,7 @@ package role
 import (
 	"testing"
 
-	"github.com/Iori372552686/GoOne/module/gconf"
+	"github.com/Iori372552686/GoOne/module/conf"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
@@ -104,11 +104,11 @@ func TestInventoryDirtySetKeepsNetChange(t *testing.T) {
 }
 
 func TestShouldFlushPersistNowHonorsDebounce(t *testing.T) {
-	oldDebounce := gconf.MainSvrCfg.Capacity.RolePersistDebounceSec
-	gconf.MainSvrCfg.Capacity.RolePersistDebounceSec = 10
-	defer func() {
-		gconf.MainSvrCfg.Capacity.RolePersistDebounceSec = oldDebounce
-	}()
+	// 通过 conf 加载配置设置 debounce（被测代码从 conf 读取，不再依赖 gconf 全局）。
+	conf.ResetForTest()
+	if err := conf.LoadBytes([]byte("mainsvr:\n  capacity:\n    role_persist_debounce_sec: 10\n"), ".yaml"); err != nil {
+		t.Fatalf("conf.LoadBytes: %v", err)
+	}
 
 	r := newSyncTestRole(1005)
 	r.needPersist = true

@@ -17,6 +17,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
+	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/module/misc"
 )
 
@@ -41,6 +42,41 @@ type Common struct {
 	Pprof        bool
 
 	Tracing ssrpc.TracingConfig
+}
+
+// CommonFromConf 从 conf 按 key 读取并组装 Common，一处实现取代历史上散落在各
+// 服务 app.go 的 5 份近全同 xxxCommon()。svc 是服务段名（如 "connsvr"）。
+//
+// 读取的 key 路径与 yaml 结构一致：
+//   - <svc>.debug.log_dir / log_level
+//   - <svc>.identity.self_bus_id
+//   - base_cfg.runtime.bus_mq_addr / register_addr / admin_server.* / tracing.*
+//   - base_cfg.debug.pprof
+//
+// admin 端口为 0 时按服务类型回退（conf.ResolveAdminPort）。
+func CommonFromConf(svc string) Common {
+	admPrefix := "base_cfg.runtime.admin_server."
+	admPort := conf.ResolveAdminPort(conf.Get(admPrefix+"port").Int(), svc)
+	trPrefix := "base_cfg.runtime.tracing."
+	return Common{
+		LogDir:       conf.Get(svc + ".debug.log_dir").String(),
+		LogLevel:     conf.Get(svc + ".debug.log_level").String(),
+		SelfBusId:    conf.Get(svc + ".identity.self_bus_id").String(),
+		BusMQAddr:    conf.Get("base_cfg.runtime.bus_mq_addr").String(),
+		RegisterAddr: conf.Get("base_cfg.runtime.register_addr").String(),
+		AdminEnabled: conf.Get(admPrefix + "enabled").Bool(),
+		AdminIP:      conf.Get(admPrefix + "ip").String(),
+		AdminPort:    admPort,
+		Pprof:        conf.Get("base_cfg.debug.pprof").Bool(),
+		Tracing: ssrpc.TracingConfig{
+			Enabled:      conf.Get(trPrefix + "enabled").Bool(),
+			Exporter:     conf.Get(trPrefix + "exporter").String(),
+			Endpoint:     conf.Get(trPrefix + "endpoint").String(),
+			Insecure:     conf.Get(trPrefix + "insecure").Bool(),
+			SamplerRatio: conf.Get(trPrefix + "sampler_ratio").Float64(),
+			Headers:      conf.Get(trPrefix + "headers").StringsMap(),
+		},
+	}
 }
 
 // TracingComponent 把 ssrpc trace 的初始化与关闭包成 Component（早启动、晚停止）。
@@ -113,22 +149,46 @@ func (l *LoggerComponent) Stop(_ context.Context) error {
 
 // TransMgrComponent 把 TransactionMgr 的启动与排空关闭包成 Component。它实现
 // Drainer：Close 排空在途事务（受 ctx 超时约束）。
+//
+// 配置为值语义（无 func 包装）：NewApp 装配期 conf 尚未 Load，故分片数不在装配期
+// 读 conf；改用 ShardCountConfKey 声明 key（如 "mainsvr.capacity.trans_shard_count"），
+// Start 时（LoadConfig 之后）读取，缺省或 <=0 内部回退 DefaultShardCount()。
+// Cfg 与 ShardCountConfKey 全零时走遗留单分片路径（connsvr/infosvr/mysqlsvr 默认）。
 type TransMgrComponent struct {
-	Mgr     transaction.ITransactionMgr
-	Cfg     func() transaction.TransactionMgrConfig // 可选；为 nil 时用默认单分片。
-	started bool
+	Mgr transaction.ITransactionMgr
+	// Cfg 静态配置（MaxTrans / MaxPendingPerKey 直接给值）。MaxTrans<=0 内部回退
+	// misc.MaxTransNumber；ShardCount 一般不在这里给，用 ShardCountConfKey。
+	Cfg transaction.TransactionMgrConfig
+	// ShardCountConfKey 非空时，Start 从 conf 读取分片数覆盖 Cfg.ShardCount；
+	// <=0 或 key 不存在时内部回退 transaction.DefaultShardCount()。
+	ShardCountConfKey string
+	started           bool
 }
 
 // Name 实现 runtime.Component。
 func (c *TransMgrComponent) Name() string { return "transaction_mgr" }
 
-// Start 实现 runtime.Component：按配置启动 TransactionMgr。
+// Start 实现 runtime.Component：解析配置并启动 TransactionMgr。
+// 全零配置走遗留单分片路径（行为与历史 InitAndRun(misc.MaxTransNumber, false, 0)
+// 完全一致）；否则按值语义配置启动，ShardCount/MaxTrans 的 <=0 回退在内部完成。
 func (c *TransMgrComponent) Start(_ context.Context) error {
-	if c.Cfg != nil {
-		c.Mgr.InitAndRunWithConfig(c.Cfg())
-	} else {
+	if c.ShardCountConfKey == "" && c.Cfg == (transaction.TransactionMgrConfig{}) {
 		c.Mgr.InitAndRun(misc.MaxTransNumber, false, 0)
+		c.started = true
+		return nil
 	}
+	cfg := c.Cfg
+	if c.ShardCountConfKey != "" {
+		cfg.ShardCount = conf.Get(c.ShardCountConfKey).Int()
+	}
+	if cfg.MaxTrans <= 0 {
+		cfg.MaxTrans = misc.MaxTransNumber
+	}
+	if cfg.ShardCount <= 0 {
+		cfg.ShardCount = transaction.DefaultShardCount()
+	}
+	logger.Infof("transmgr shards=%d max_pending_per_key=%d serial_key=routerid_or_uid", cfg.ShardCount, cfg.MaxPendingPerKey)
+	c.Mgr.InitAndRunWithConfig(cfg)
 	c.started = true
 	return nil
 }

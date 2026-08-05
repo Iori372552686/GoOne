@@ -11,8 +11,8 @@ Prefer code over README or older docs when they disagree.
 - Deployment and local environment entrypoints are `main.sh`, `deploy/`, and `etc/env/`.
 
 ## Runtime Model
-- Service entrypoints follow `cmd/<service>/main.go`: parse flags, call `application.Init(<pkg>.NewApp())`, then `application.Run()`; wiring lives in `src/<service>/app.go` as package `connsvr` / `mainsvr` / `infosvr` / `mysqlsvr` / `roomcentersvr` / `websvr` (for `web_svr`).
-- `newApp()` normally returns `bootstrap.NewServiceApp(...)` and defines `LoadConfig`, `InitDeps`, `RegisterHandlers`, `StartRuntime`, `OnProc`, `OnTick`, and `OnExit`.
+- Service entrypoints follow `cmd/<service>/main.go`: parse flags, then `<pkg>.NewApp().Run(context.Background())`; wiring lives in `src/<service>/app.go` as package `connsvr` / `mainsvr` / `infosvr` / `mysqlsvr` / `roomcentersvr` / `websvr` (for `web_svr`).
+- `NewApp()` returns `*runtime.App` built with `runtime.MustNew("<svc>", bussvc.WithConfLoader(hooks...))` plus `app.MustRegister(...)` (registration order is Start order; reverse is Quiesce/Drain/Stop). The service name appears only in `MustNew`: standard components come from `lib/service/runtime/bussvc/stdcomp.go` constructors (`NewLoggerComponent(app)`, `NewAdminComponent(app, readyCheck)`, `NewTracingComponent(app)`, `NewRouterComponent(app, transMgr, drivers, ...)`) which read `app.Name()` and self-load config from `module/conf` at Start; bus drivers are wired with `rabbitmq.NewRegistry()`. Legacy `bootstrap.NewServiceApp` / `application.Init|Run` no longer exist.
 - Main packet flow is: client -> `connsvr` -> `lib/service/router` -> bus/routing rules -> target service `globals.TransMgr`.
 - `web_svr` is the main exception: it starts Gin HTTP routes and optional gRPC listeners rather than joining the normal bus transaction loop.
 
@@ -25,13 +25,14 @@ Prefer code over README or older docs when they disagree.
 - `web_svr` mounts HTTP routes from `src/web_svr/controller` and may expose gRPC as well.
 
 ## Config Rules
-- Shared config definitions are in `common/gconf/config.go`.
-- All services read the `-svr_conf` flag and load `base_cfg` plus their own service section.
-- Prefer the grouped config layout such as `base_cfg.runtime`, `base_cfg.dependencies`, `base_cfg.debug`, and `<service>.identity/debug/runtime/capacity`.
-- Legacy flat fields still exist for compatibility; do not remove them casually unless the loader and config files are updated together.
+- The single config entry point is `module/conf`: it loads the `-svr_conf` file (yaml/toml/json by extension), publishes an immutable snapshot, and exposes key-style access `conf.Get("connsvr.runtime.listen_port").Int()` and `conf.Unmarshal("base_cfg.dependencies.db_instances", &dbs)`. Do not introduce new package-level config globals.
+- Config struct types (field contracts with yaml tags) live in `module/gconf/config.go`; use them as `conf.Unmarshal` targets. They no longer hold global state.
+- Validation is registered per service in `module/conf/registry.go` and run via `conf.RunValidators("<service>")` during startup; admin port fallback uses named constants, not magic ints.
+- Prefer the grouped config layout: `base_cfg.runtime`, `base_cfg.dependencies`, `base_cfg.debug`, and `<service>.identity/debug/runtime/capacity`.
 - Bus services require `base_cfg.runtime.register_addr` and `base_cfg.runtime.bus_mq_addr`.
-- `websvr` requires `runtime.http_server.port`; `runtime.grpc_server.port` is required only when gRPC is enabled.
-- Local gamedata typically comes from `dependencies.game_data_dir`; remote/hot-reload setup goes through `dependencies.nacos_conf`.
+- `websvr` requires `websvr.runtime.http_server.port`; `websvr.runtime.grpc_server.port` is required only when gRPC is enabled.
+- Local gamedata typically comes from `base_cfg.dependencies.game_data_dir`; remote/hot-reload setup goes through `base_cfg.dependencies.nacos_conf`.
+- Config is start-up immutable; only gamedata hot-reloads. `conf.Watch` exists as a placeholder but returns `ErrWatchNotSupported`.
 
 ## Handler And Routing Rules
 - Default integration path is IDL-driven `ssrpc`.
@@ -69,7 +70,7 @@ Prefer code over README or older docs when they disagree.
 
 ## Where To Look First
 - For service startup and dependency wiring, inspect `src/<service>/app.go`.
-- For shared boot behavior, inspect `lib/service/bootstrap/` and `lib/service/application/app.go`.
+- For shared boot behavior, inspect `lib/service/runtime/app.go` (lifecycle) and `lib/service/runtime/bussvc/` (standard component assembly).
 - For config changes, inspect `common/gconf/config.go`.
 - For routing or service discovery issues, inspect `lib/service/router/`, `lib/service/svrinstmgr/`, `lib/service/bus/`, and `module/misc/`.
 - For web changes, inspect `src/web_svr/controller/` before touching bus-side handlers.

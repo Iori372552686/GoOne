@@ -439,3 +439,12 @@ func newBus(selfBusId uint32, onRecvMsg bus.MsgHandler, conf any) (bus.IBus, err
 func Driver() bus.Driver {
 	return bus.Driver{Name: DriverName, Ctor: newBus}
 }
+
+// NewRegistry 返回一个只注册本 driver 的 DriverRegistry，一行替代
+// NewDriverRegistry + MustRegister(Driver()) 的装配样板。链接语义不变：只有
+// import 本包的服务才链接 rabbitmq SDK（websvr 不 import，保持零 MQ 依赖）。
+func NewRegistry() *bus.DriverRegistry {
+	r := bus.NewDriverRegistry()
+	r.MustRegister(Driver())
+	return r
+}

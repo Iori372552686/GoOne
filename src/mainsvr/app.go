@@ -8,7 +8,8 @@ import (
 	mainsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/mainsvr/v1"
 	"github.com/Iori372552686/GoOne/common/gamedata"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/lib/service/bus"
+	"github.com/Iori372552686/GoOne/lib/api/net_conf"
+	"github.com/Iori372552686/GoOne/lib/db/redis"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
@@ -18,7 +19,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	"github.com/Iori372552686/GoOne/lib/util/idgen"
 	"github.com/Iori372552686/GoOne/lib/util/sensitive_words"
-	"github.com/Iori372552686/GoOne/module/gconf"
+	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals"
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals/rds"
@@ -27,29 +28,45 @@ import (
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 )
 
-// NewApp 用 runtime.App + Component 装配 mainsvr。
+// NewApp 用 runtime.App + Component 装配 mainsvr。服务名只在 MustNew 出现一次；
+// 标准组件（logger/admin/tracing/router）由 bussvc 构造器自读 conf 装配。
 func NewApp() *runtime.App {
+	// gamedata 本地目录加载作为 LoadConfig 的追加钩子，在校验通过后执行。
+	app := runtime.MustNew("mainsvr", bussvc.WithConfLoader(func(_ context.Context) error {
+		if gameDataDir := conf.Get("base_cfg.dependencies.game_data_dir").String(); gameDataDir != "" {
+			logger.Infof("Loading local file by gameconf_dir: %v ", gameDataDir)
+			if err := gamedata.InitLocal(gameDataDir); err != nil {
+				return err
+			}
+		}
+		return nil
+	}))
+
+	// 标准组件：服务名取 app.Name()，Start 时（LoadConfig 之后）自读 conf。
+	logComp := bussvc.NewLoggerComponent(app)
+	adminComp := bussvc.NewAdminComponent(app, router.ReadyCheck)
+	tracing := bussvc.NewTracingComponent(app)
+
+	// TransMgr：值语义配置，分片数由 Start 从 conf 读取（ShardCountConfKey），
+	// <=0 回退、启动日志均在组件内部完成。
 	transMgr := &bussvc.TransMgrComponent{
-		Mgr: globals.TransMgr,
-		Cfg: func() transaction.TransactionMgrConfig {
-			transShardCount := gconf.MainSvrCfg.Capacity.TransShardCount
-			if transShardCount <= 0 {
-				transShardCount = transaction.DefaultShardCount()
-			}
-			logger.Infof("mainsvr transmgr shards=%d serial_key=routerid_or_uid", transShardCount)
-			return transaction.TransactionMgrConfig{
-				MaxTrans:         misc.MaxTransNumber,
-				ShardCount:       transShardCount,
-				MaxPendingPerKey: 100,
-			}
+		Mgr:               globals.TransMgr,
+		ShardCountConfKey: "mainsvr.capacity.trans_shard_count",
+		Cfg: transaction.TransactionMgrConfig{
+			MaxTrans:         misc.MaxTransNumber,
+			MaxPendingPerKey: 100,
 		},
 	}
 
 	businessDeps := &bussvc.FuncComponent{
 		ComponentName: "business_deps",
 		OnStart: func(_ context.Context) error {
-			sensitive_words.Init(gconf.MainSvrCfg.Dependencies.SensitiveWordsFile)
-			if err := rds.RedisMgr.InitAndRun(gconf.MainSvrCfg.Dependencies.DbInstances); err != nil {
+			sensitive_words.Init(conf.Get("base_cfg.dependencies.sensitive_words_file").String())
+			var dbs []redis.Config
+			if err := conf.Unmarshal("base_cfg.dependencies.db_instances", &dbs); err != nil {
+				return err
+			}
+			if err := rds.RedisMgr.InitAndRun(dbs); err != nil {
 				return err
 			}
 			idGen, err := idgen.NewIDGen()
@@ -57,11 +74,13 @@ func NewApp() *runtime.App {
 				return err
 			}
 			globals.IDGen = idGen
-			if gconf.MainSvrCfg.Dependencies.NacosConf.IPAddr != "" {
-				logger.Infof("Loading remote gameconf by Nacos group: %v ", gconf.MainSvrCfg.Dependencies.NacosConf.GroupName)
+			var nacosConf net_conf.NacosConf
+			_ = conf.Unmarshal("base_cfg.dependencies.nacos_conf", &nacosConf)
+			if nacosConf.IPAddr != "" {
+				logger.Infof("Loading remote gameconf by Nacos group: %v ", nacosConf.GroupName)
 				// 经 lib/contrib/config/factory 构造配置中心 client，
 				// 由 gamedata.InitRemote 统一加载+热更；构造/拉取失败返回 error。
-				if err := gamedata.InitNacos(gconf.MainSvrCfg.Dependencies.NacosConf); err != nil {
+				if err := gamedata.InitNacos(nacosConf); err != nil {
 					return err
 				}
 			}
@@ -85,18 +104,8 @@ func NewApp() *runtime.App {
 		ssrpc.WithTransactionManager(globals.TransMgr),
 	)
 
-	// 显式 DriverRegistry，只注册 rabbitmq。
-	drivers := bus.NewDriverRegistry()
-	drivers.MustRegister(rabbitmq.Driver())
-	routerComp := &bussvc.RouterComponent{
-		Common:   mainCommon,
-		TransMgr: globals.TransMgr,
-		Drivers:  drivers,
-	}
-	tracing := &bussvc.TracingComponent{
-		ServiceName: "mainsvr",
-		Cfg:         func() ssrpc.TracingConfig { return mainCommon().Tracing },
-	}
+	// DriverRegistry 只注册 rabbitmq。
+	routerComp := bussvc.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry())
 
 	// SelfLogoutSender 注入：心跳过期淘汰改经事务串行执行，落盘与删除在 Logout
 	// handler 内按 uid 串行键执行，消除 Tick 与业务 handler 对同一 *Role 的并发读写。
@@ -122,44 +131,6 @@ func NewApp() *runtime.App {
 	// 全量落盘，避免 write-behind 防抖窗口内的变更在停机时丢失。作为 Drainer 在
 	// TransMgr Drain 之后执行（注册顺序：roleFlush 在 transMgr 之后）。
 	roleFlush := &roleFlushComponent{}
-	logComp := &bussvc.LoggerComponent{
-		Cfg: func() bussvc.LoggerConfig {
-			c := mainCommon()
-			return bussvc.LoggerConfig{Dir: c.LogDir, Level: c.LogLevel, Name: "mainsvr"}
-		},
-	}
-
-	app := runtime.MustNew("mainsvr",
-		runtime.WithLoadConfig(func(_ context.Context) error {
-			if err := gconf.LoadMainConfig(*gconf.SvrConfFile); err != nil {
-				return err
-			}
-			if gconf.MainSvrCfg.Dependencies.GameDataDir != "" {
-				logger.Infof("Loading local file by gameconf_dir: %v ", gconf.MainSvrCfg.Dependencies.GameDataDir)
-				if err := gamedata.InitLocal(gconf.MainSvrCfg.Dependencies.GameDataDir); err != nil {
-					return err
-				}
-			}
-			logger.Infof("gconf file load success for mainsvr")
-			return nil
-		}),
-	)
-
-	// admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
-	// app.tracker。
-	adminComp := runtime.NewAdminComponent(app,
-		runtime.WithAdminConfig(func() runtime.AdminConfig {
-			c := mainCommon()
-			return runtime.AdminConfig{
-				Enabled: c.AdminEnabled,
-				IP:      c.AdminIP,
-				Port:    c.AdminPort,
-				Pprof:   c.Pprof,
-			}
-		}),
-		runtime.WithAdminServiceName("mainsvr"),
-		runtime.WithAdminReadyCheck(router.ReadyCheck),
-	)
 
 	// Start 顺序：datetime → logger → admin → tracing → 业务依赖 → SSRPC 注册
 	// → TransMgr → router/bus → SelfLogoutSender → roleTick(Task) → roleFlush(Drainer)。
@@ -188,27 +159,3 @@ func (roleFlushComponent) Drain(_ context.Context) error {
 	return nil
 }
 func (roleFlushComponent) Stop(_ context.Context) error { return nil }
-
-// mainCommon 从 gconf 产出 mainsvr 的 bus 服务共享配置段。
-func mainCommon() bussvc.Common {
-	c := &gconf.MainSvrCfg
-	return bussvc.Common{
-		LogDir:       c.Debug.LogDir,
-		LogLevel:     c.Debug.LogLevel,
-		SelfBusId:    c.Identity.SelfBusId,
-		BusMQAddr:    c.CommonRuntime.BusMQAddr,
-		RegisterAddr: c.CommonRuntime.RegisterAddr,
-		AdminEnabled: c.CommonRuntime.AdminServer.Enabled,
-		AdminIP:      c.CommonRuntime.AdminServer.IP,
-		AdminPort:    c.CommonRuntime.AdminServer.Port,
-		Pprof:        c.CommonDebug.Pprof,
-		Tracing: ssrpc.TracingConfig{
-			Enabled:      c.CommonRuntime.Tracing.Enabled,
-			Exporter:     c.CommonRuntime.Tracing.Exporter,
-			Endpoint:     c.CommonRuntime.Tracing.Endpoint,
-			Insecure:     c.CommonRuntime.Tracing.Insecure,
-			SamplerRatio: c.CommonRuntime.Tracing.SamplerRatio,
-			Headers:      c.CommonRuntime.Tracing.Headers,
-		},
-	}
-}

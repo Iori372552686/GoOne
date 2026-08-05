@@ -7,7 +7,8 @@ import (
 	roomcenterv1 "github.com/Iori372552686/GoOne/api/gen/game/roomcenter/v1"
 	"github.com/Iori372552686/GoOne/common/gamedata"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/lib/service/bus"
+	"github.com/Iori372552686/GoOne/lib/api/net_conf"
+	"github.com/Iori372552686/GoOne/lib/db/redis"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
@@ -17,7 +18,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	"github.com/Iori372552686/GoOne/lib/util/idgen"
 	"github.com/Iori372552686/GoOne/lib/util/safego"
-	"github.com/Iori372552686/GoOne/module/gconf"
+	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/globals"
 	id "github.com/Iori372552686/GoOne/src/roomcentersvr/globals/idgen"
@@ -27,21 +28,33 @@ import (
 	pb "github.com/Iori372552686/game_protocol/protocol"
 )
 
-// NewApp 用 runtime.App + Component 装配 roomcentersvr。
+// NewApp 用 runtime.App + Component 装配 roomcentersvr。服务名只在 MustNew 出现一次；
+// 标准组件（logger/admin/tracing/router）由 bussvc 构造器自读 conf 装配。
 func NewApp() *runtime.App {
+	// gamedata 本地目录加载作为 LoadConfig 的追加钩子，在校验通过后执行。
+	app := runtime.MustNew("roomcentersvr", bussvc.WithConfLoader(func(_ context.Context) error {
+		if gameDataDir := conf.Get("base_cfg.dependencies.game_data_dir").String(); gameDataDir != "" {
+			logger.Infof("Loading local file by gameconf_dir: %v ", gameDataDir)
+			if err := gamedata.InitLocal(gameDataDir); err != nil {
+				return err
+			}
+		}
+		return nil
+	}))
+
+	// 标准组件：服务名取 app.Name()，Start 时（LoadConfig 之后）自读 conf。
+	logComp := bussvc.NewLoggerComponent(app)
+	adminComp := bussvc.NewAdminComponent(app, router.ReadyCheck)
+	tracing := bussvc.NewTracingComponent(app)
+
+	// TransMgr：值语义配置，分片数由 Start 从 conf 读取（ShardCountConfKey），
+	// <=0 回退、启动日志均在组件内部完成。
 	transMgr := &bussvc.TransMgrComponent{
-		Mgr: globals.TransMgr,
-		Cfg: func() transaction.TransactionMgrConfig {
-			transShardCount := gconf.RoomCenterSvrCfg.Capacity.TransShardCount
-			if transShardCount <= 0 {
-				transShardCount = transaction.DefaultShardCount()
-			}
-			logger.Infof("roomcentersvr transmgr shards=%d serial_key=routerid_or_uid", transShardCount)
-			return transaction.TransactionMgrConfig{
-				MaxTrans:         misc.MaxTransNumber,
-				ShardCount:       transShardCount,
-				MaxPendingPerKey: 200,
-			}
+		Mgr:               globals.TransMgr,
+		ShardCountConfKey: "roomcentersvr.capacity.trans_shard_count",
+		Cfg: transaction.TransactionMgrConfig{
+			MaxTrans:         misc.MaxTransNumber,
+			MaxPendingPerKey: 200,
 		},
 	}
 
@@ -54,17 +67,21 @@ func NewApp() *runtime.App {
 			}
 			id.IDGen = idGen
 			// 初始化 Redis（房间快照持久化用）。无配置时跳过，保持向后兼容。
-			if len(gconf.RoomCenterSvrCfg.Dependencies.DbInstances) > 0 {
-				if err := rds.RedisMgr.InitAndRun(gconf.RoomCenterSvrCfg.Dependencies.DbInstances); err != nil {
+			var dbs []redis.Config
+			_ = conf.Unmarshal("base_cfg.dependencies.db_instances", &dbs)
+			if len(dbs) > 0 {
+				if err := rds.RedisMgr.InitAndRun(dbs); err != nil {
 					return err
 				}
 				logger.Infof("roomcentersvr redis initialized for room snapshot persistence")
 			}
-			if gconf.RoomCenterSvrCfg.Dependencies.NacosConf.IPAddr != "" {
-				logger.Infof("Loading remote gameconf by Nacos group: %v ", gconf.RoomCenterSvrCfg.Dependencies.NacosConf.GroupName)
+			var nacosConf net_conf.NacosConf
+			_ = conf.Unmarshal("base_cfg.dependencies.nacos_conf", &nacosConf)
+			if nacosConf.IPAddr != "" {
+				logger.Infof("Loading remote gameconf by Nacos group: %v ", nacosConf.GroupName)
 				// 经 lib/contrib/config/factory 构造配置中心 client，
 				// 由 gamedata.InitRemote 统一加载+热更；构造/拉取失败返回 error。
-				if err := gamedata.InitNacos(gconf.RoomCenterSvrCfg.Dependencies.NacosConf); err != nil {
+				if err := gamedata.InitNacos(nacosConf); err != nil {
 					return err
 				}
 			}
@@ -97,18 +114,8 @@ func NewApp() *runtime.App {
 		},
 	}
 
-	// 显式 DriverRegistry，只注册 rabbitmq。
-	drivers := bus.NewDriverRegistry()
-	drivers.MustRegister(rabbitmq.Driver())
-	routerComp := &bussvc.RouterComponent{
-		Common:   roomCommon,
-		TransMgr: globals.TransMgr,
-		Drivers:  drivers,
-	}
-	tracing := &bussvc.TracingComponent{
-		ServiceName: "roomcentersvr",
-		Cfg:         func() ssrpc.TracingConfig { return roomCommon().Tracing },
-	}
+	// DriverRegistry 只注册 rabbitmq。
+	routerComp := bussvc.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry())
 
 	// 房间初始化：RoomListMgr.Init + 从 Redis 恢复房间快照 + AI 初始化房间。必须在
 	// router 起来之后。
@@ -141,43 +148,6 @@ func NewApp() *runtime.App {
 
 	// 房间落盘：原 OnExit。TransMgr 排空后全量落盘，避免数据丢失。作为 Drainer。
 	roomFlush := &roomFlushComponent{}
-	logComp := &bussvc.LoggerComponent{
-		Cfg: func() bussvc.LoggerConfig {
-			c := roomCommon()
-			return bussvc.LoggerConfig{Dir: c.LogDir, Level: c.LogLevel, Name: "roomcentersvr"}
-		},
-	}
-
-	app := runtime.MustNew("roomcentersvr",
-		runtime.WithLoadConfig(func(_ context.Context) error {
-			if err := gconf.LoadRoomCenterConfig(*gconf.SvrConfFile); err != nil {
-				return err
-			}
-			if gconf.RoomCenterSvrCfg.Dependencies.GameDataDir != "" {
-				logger.Infof("Loading local file by gameconf_dir: %v ", gconf.RoomCenterSvrCfg.Dependencies.GameDataDir)
-				if err := gamedata.InitLocal(gconf.RoomCenterSvrCfg.Dependencies.GameDataDir); err != nil {
-					return err
-				}
-			}
-			return nil
-		}),
-	)
-
-	// admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
-	// app.tracker。
-	adminComp := runtime.NewAdminComponent(app,
-		runtime.WithAdminConfig(func() runtime.AdminConfig {
-			c := roomCommon()
-			return runtime.AdminConfig{
-				Enabled: c.AdminEnabled,
-				IP:      c.AdminIP,
-				Port:    c.AdminPort,
-				Pprof:   c.Pprof,
-			}
-		}),
-		runtime.WithAdminServiceName("roomcentersvr"),
-		runtime.WithAdminReadyCheck(router.ReadyCheck),
-	)
 
 	// Start 顺序：datetime → logger → admin → tracing → 业务依赖 → SSRPC 注册
 	// → TransMgr → router/bus → 房间初始化 → roomTick → roomPersist → roomFlush(Drainer)。
@@ -205,27 +175,3 @@ func (roomFlushComponent) Drain(_ context.Context) error {
 	return nil
 }
 func (roomFlushComponent) Stop(_ context.Context) error { return nil }
-
-// roomCommon 从 gconf 产出 roomcentersvr 的 bus 服务共享配置段。
-func roomCommon() bussvc.Common {
-	c := &gconf.RoomCenterSvrCfg
-	return bussvc.Common{
-		LogDir:       c.Debug.LogDir,
-		LogLevel:     c.Debug.LogLevel,
-		SelfBusId:    c.Identity.SelfBusId,
-		BusMQAddr:    c.CommonRuntime.BusMQAddr,
-		RegisterAddr: c.CommonRuntime.RegisterAddr,
-		AdminEnabled: c.CommonRuntime.AdminServer.Enabled,
-		AdminIP:      c.CommonRuntime.AdminServer.IP,
-		AdminPort:    c.CommonRuntime.AdminServer.Port,
-		Pprof:        c.CommonDebug.Pprof,
-		Tracing: ssrpc.TracingConfig{
-			Enabled:      c.CommonRuntime.Tracing.Enabled,
-			Exporter:     c.CommonRuntime.Tracing.Exporter,
-			Endpoint:     c.CommonRuntime.Tracing.Endpoint,
-			Insecure:     c.CommonRuntime.Tracing.Insecure,
-			SamplerRatio: c.CommonRuntime.Tracing.SamplerRatio,
-			Headers:      c.CommonRuntime.Tracing.Headers,
-		},
-	}
-}

@@ -5,22 +5,30 @@ import (
 
 	mysqlsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/mysqlsvr/v1"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/lib/service/bus"
+	orm "github.com/Iori372552686/GoOne/lib/db/xorm"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
 	"github.com/Iori372552686/GoOne/lib/service/scheduler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
-	"github.com/Iori372552686/GoOne/module/gconf"
+	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/globals"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/manager"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/service"
 )
 
-// NewApp 用 runtime.App + Component 装配 mysqlsvr，取代旧的
-// application.Init/Run + bootstrap.ServiceApp Hook 生命周期。
+// NewApp 用 runtime.App + Component 装配 mysqlsvr。服务名只在 MustNew 出现一次；
+// 标准组件（logger/admin/tracing/router）由 bussvc 构造器自读 conf 装配。
 func NewApp() *runtime.App {
+	app := runtime.MustNew("mysqlsvr", bussvc.WithConfLoader())
+
+	// 标准组件：服务名取 app.Name()，Start 时（LoadConfig 之后）自读 conf。
+	// logger 最早启动、最晚停止（Stop 时 Flush 落盘）。
+	logComp := bussvc.NewLoggerComponent(app)
+	adminComp := bussvc.NewAdminComponent(app, router.ReadyCheck)
+	tracing := bussvc.NewTracingComponent(app)
+
 	// TransMgr：Start 启动分片 worker；Drain 排空在途事务（受 ctx 超时约束）。
 	transMgr := &bussvc.TransMgrComponent{Mgr: globals.TransMgr}
 
@@ -44,7 +52,11 @@ func NewApp() *runtime.App {
 		ComponentName: "orm_deps",
 		OnStart: func(_ context.Context) error {
 			manager.Start()
-			return globals.OrmMgr.InitAndRun(gconf.MySqlSvrCfg.Dependencies.OrmConf, manager.GetTables()...)
+			var ormConf []orm.Config
+			if err := conf.Unmarshal("base_cfg.dependencies.orm_instances", &ormConf); err != nil {
+				return err
+			}
+			return globals.OrmMgr.InitAndRun(ormConf, manager.GetTables()...)
 		},
 		OnStop: func(_ context.Context) error {
 			manager.Close()
@@ -55,51 +67,8 @@ func NewApp() *runtime.App {
 		},
 	}
 
-	// 显式 DriverRegistry，只注册 rabbitmq。
-	drivers := bus.NewDriverRegistry()
-	drivers.MustRegister(rabbitmq.Driver())
-	routerComp := &bussvc.RouterComponent{
-		Common:   mysqlCommon,
-		TransMgr: globals.TransMgr,
-		Drivers:  drivers,
-	}
-	tracing := &bussvc.TracingComponent{
-		ServiceName: "mysqlsvr",
-		Cfg:         func() ssrpc.TracingConfig { return mysqlCommon().Tracing },
-	}
-	// logger：最早启动、最晚停止（Stop 时 Flush 落盘）。
-	logComp := &bussvc.LoggerComponent{
-		Cfg: func() bussvc.LoggerConfig {
-			c := mysqlCommon()
-			return bussvc.LoggerConfig{Dir: c.LogDir, Level: c.LogLevel, Name: "mysqlsvr"}
-		},
-	}
-
-	app := runtime.MustNew("mysqlsvr",
-		runtime.WithLoadConfig(func(_ context.Context) error {
-			if err := gconf.LoadMySQLConfig(*gconf.SvrConfFile); err != nil {
-				return err
-			}
-			logger.Infof("svr_conf loaded for mysqlsvr")
-			return nil
-		}),
-	)
-
-	// admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
-	// app.tracker。
-	adminComp := runtime.NewAdminComponent(app,
-		runtime.WithAdminConfig(func() runtime.AdminConfig {
-			c := mysqlCommon()
-			return runtime.AdminConfig{
-				Enabled: c.AdminEnabled,
-				IP:      c.AdminIP,
-				Port:    c.AdminPort,
-				Pprof:   c.Pprof,
-			}
-		}),
-		runtime.WithAdminServiceName("mysqlsvr"),
-		runtime.WithAdminReadyCheck(router.ReadyCheck),
-	)
+	// DriverRegistry 只注册 rabbitmq。
+	routerComp := bussvc.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry())
 
 	// 注册顺序即 Start 顺序：datetime 周期刷新 → logger → admin → tracing →
 	// orm 依赖 → SSRPC 注册（必须在 TransMgr.InitAndRun 之前，因
@@ -110,28 +79,4 @@ func NewApp() *runtime.App {
 		ormDeps, registerHandlers, transMgr, routerComp,
 	)
 	return app
-}
-
-// mysqlCommon 从 gconf 产出 bus 服务共享配置段。
-func mysqlCommon() bussvc.Common {
-	c := &gconf.MySqlSvrCfg
-	return bussvc.Common{
-		LogDir:       c.Debug.LogDir,
-		LogLevel:     c.Debug.LogLevel,
-		SelfBusId:    c.Identity.SelfBusId,
-		BusMQAddr:    c.CommonRuntime.BusMQAddr,
-		RegisterAddr: c.CommonRuntime.RegisterAddr,
-		AdminEnabled: c.CommonRuntime.AdminServer.Enabled,
-		AdminIP:      c.CommonRuntime.AdminServer.IP,
-		AdminPort:    c.CommonRuntime.AdminServer.Port,
-		Pprof:        c.CommonDebug.Pprof,
-		Tracing: ssrpc.TracingConfig{
-			Enabled:      c.CommonRuntime.Tracing.Enabled,
-			Exporter:     c.CommonRuntime.Tracing.Exporter,
-			Endpoint:     c.CommonRuntime.Tracing.Endpoint,
-			Insecure:     c.CommonRuntime.Tracing.Insecure,
-			SamplerRatio: c.CommonRuntime.Tracing.SamplerRatio,
-			Headers:      c.CommonRuntime.Tracing.Headers,
-		},
-	}
 }

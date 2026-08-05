@@ -9,7 +9,7 @@ import (
 //
 // 命名空间统一为 goone，按领域分子系统：lifecycle（状态机）、component（组件启停）、
 // drain（排空）、task（调度器）、config（重载）。这些指标由 App / ComponentTracker /
-// scheduler / appconfig 在对应事件点上报，经 admin /metrics 暴露。
+// scheduler 在对应事件点上报，经 admin /metrics 暴露。
 //
 // 指标清单（与 docs/observability 对齐）：
 //   - goone_lifecycle_state：当前状态（gauge，按状态名 label）。

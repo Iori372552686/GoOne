@@ -11,12 +11,17 @@ import (
 
 	"github.com/Iori372552686/GoOne/common/gamedata"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/net_conf"
+	"github.com/Iori372552686/GoOne/lib/db/redis"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
 	"github.com/Iori372552686/GoOne/lib/service/scheduler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/util/sensitive_words"
+	"github.com/Iori372552686/GoOne/lib/web/http_sign"
+	"github.com/Iori372552686/GoOne/lib/web/rest_api"
 	"github.com/Iori372552686/GoOne/lib/web/web_gin"
+	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/module/gconf"
 	"github.com/Iori372552686/GoOne/src/web_svr/controller"
 	"github.com/Iori372552686/GoOne/src/web_svr/globals"
@@ -69,17 +74,33 @@ func (w *webRuntimeComponent) Start(_ context.Context) error {
 	if w.runtimeErrCh == nil {
 		w.runtimeErrCh = make(chan error, 1)
 	}
-	if err := globals.RedisMgr.InitAndRun(gconf.WebSvrCfg.Dependencies.DbInstances); err != nil {
+	var dbs []redis.Config
+	if err := conf.Unmarshal("base_cfg.dependencies.db_instances", &dbs); err != nil {
 		return err
 	}
-	globals.SignMgr.InitAndRun(gconf.WebSvrCfg.Dependencies.HTTPSigns)
-	globals.RestMgr.Init(gconf.WebSvrCfg.Dependencies.RestApiConf, globals.SignMgr)
-	sensitive_words.Init(gconf.WebSvrCfg.Dependencies.SensitiveWordsFile)
+	if err := globals.RedisMgr.InitAndRun(dbs); err != nil {
+		return err
+	}
+	var signs []http_sign.Config
+	if err := conf.Unmarshal("base_cfg.dependencies.http_sign", &signs); err != nil {
+		return err
+	}
+	globals.SignMgr.InitAndRun(signs)
+	var restConf []rest_api.Config
+	if err := conf.Unmarshal("base_cfg.dependencies.rest_api_config", &restConf); err != nil {
+		return err
+	}
+	globals.RestMgr.Init(restConf, globals.SignMgr)
+	sensitive_words.Init(conf.Get("base_cfg.dependencies.sensitive_words_file").String())
 
 	// 构建一次 Dispatcher，HTTP 与 gRPC 共享。
 	d, srv := controller.BuildWebDispatcher()
 
-	httpSrv, httpServeErr, err := web_gin.StartGin(gconf.WebSvrCfg.Runtime.HttpServer, func(router *gin.Engine) {
+	var httpCfg web_gin.Config
+	if err := conf.Unmarshal("websvr.runtime.http_server", &httpCfg); err != nil {
+		return err
+	}
+	httpSrv, httpServeErr, err := web_gin.StartGin(httpCfg, func(router *gin.Engine) {
 		controller.LoadWebRoutesWithDispatcher(router, d, srv)
 	})
 	if err != nil {
@@ -136,15 +157,18 @@ func (w *webRuntimeComponent) Stop(_ context.Context) error {
 }
 
 func (w *webRuntimeComponent) startGRPCServer(d *ssrpc.Dispatcher) error {
-	conf := gconf.WebSvrCfg.Runtime.GRPCServer
-	if !conf.Enabled {
+	var grpcCfg gconf.GRPCServerConfig
+	if err := conf.Unmarshal("websvr.runtime.grpc_server", &grpcCfg); err != nil {
+		return err
+	}
+	if !grpcCfg.Enabled {
 		return nil
 	}
-	if conf.Port <= 0 {
+	if grpcCfg.Port <= 0 {
 		return errors.New("grpc_server.port args err!")
 	}
 
-	addr := fmt.Sprintf("%s:%d", conf.IP, conf.Port)
+	addr := fmt.Sprintf("%s:%d", grpcCfg.IP, grpcCfg.Port)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -159,7 +183,7 @@ func (w *webRuntimeComponent) startGRPCServer(d *ssrpc.Dispatcher) error {
 	grpc_health_v1.RegisterHealthServer(srv, healthSrv)
 	w.setHealthSrv(healthSrv)
 	// reflection 仅在显式 debug 配置下启用，避免生产环境暴露服务元数据。
-	if conf.Reflection {
+	if grpcCfg.Reflection {
 		reflection.Register(srv)
 	}
 	w.setGRPCServer(srv)
@@ -254,69 +278,35 @@ func (w *webRuntimeComponent) getGRPCServer() *grpc.Server {
 }
 
 // NewApp 用 runtime.App + Component 装配 websvr（非 bus 服务：HTTP + 可选 gRPC）。
+// 服务名只在 MustNew 出现一次；标准组件（logger/admin/tracing）由 bussvc 构造器
+// 自读 conf 装配。websvr 无 bus/router，admin 不接运行期就绪探针。
 func NewApp() *runtime.App {
-	web := &webRuntimeComponent{}
-
-	tracing := &bussvc.TracingComponent{
-		ServiceName: "websvr",
-		Cfg: func() ssrpc.TracingConfig {
-			t := gconf.WebSvrCfg.CommonRuntime.Tracing
-			return ssrpc.TracingConfig{
-				Enabled:      t.Enabled,
-				Exporter:     t.Exporter,
-				Endpoint:     t.Endpoint,
-				Insecure:     t.Insecure,
-				SamplerRatio: t.SamplerRatio,
-				Headers:      t.Headers,
-			}
-		},
-	}
-	logComp := &bussvc.LoggerComponent{
-		Cfg: func() bussvc.LoggerConfig {
-			return bussvc.LoggerConfig{
-				Dir:   gconf.WebSvrCfg.Debug.LogDir,
-				Level: gconf.WebSvrCfg.Debug.LogLevel,
-				Name:  "websvr",
-			}
-		},
-	}
-
-	app := runtime.MustNew("websvr",
-		runtime.WithLoadConfig(func(_ context.Context) error {
-			if err := gconf.LoadWebConfig(*gconf.SvrConfFile); err != nil {
+	// gamedata 加载作为 LoadConfig 的追加钩子：配置中心（nacos）优先，
+	// 未配置时回退本地目录。
+	app := runtime.MustNew("websvr", bussvc.WithConfLoader(func(_ context.Context) error {
+		var nacosConf net_conf.NacosConf
+		_ = conf.Unmarshal("base_cfg.dependencies.nacos_conf", &nacosConf)
+		gameDataDir := conf.Get("base_cfg.dependencies.game_data_dir").String()
+		if nacosConf.IPAddr != "" {
+			logger.Infof("Loading remote gameconf by Nacos group: %v ", nacosConf.GroupName)
+			if err := gamedata.InitNacos(nacosConf); err != nil {
 				return err
 			}
-			logger.Infof("svr_conf loaded for websvr")
-			// 配置中心（nacos）优先；未配置时回退本地目录。
-			if gconf.WebSvrCfg.Dependencies.NacosConf.IPAddr != "" {
-				logger.Infof("Loading remote gameconf by Nacos group: %v ", gconf.WebSvrCfg.Dependencies.NacosConf.GroupName)
-				if err := gamedata.InitNacos(gconf.WebSvrCfg.Dependencies.NacosConf); err != nil {
-					return err
-				}
-			} else if gconf.WebSvrCfg.Dependencies.GameDataDir != "" {
-				logger.Infof("Loading local file by gameconf_dir: %v ", gconf.WebSvrCfg.Dependencies.GameDataDir)
-				if err := gamedata.InitLocal(gconf.WebSvrCfg.Dependencies.GameDataDir); err != nil {
-					return err
-				}
+		} else if gameDataDir != "" {
+			logger.Infof("Loading local file by gameconf_dir: %v ", gameDataDir)
+			if err := gamedata.InitLocal(gameDataDir); err != nil {
+				return err
 			}
-			return nil
-		}),
-	)
+		}
+		return nil
+	}))
 
-	// admin 在 LoadConfig 后用 WithAdminConfig 延迟读取端口/IP，复用
-	// app.tracker。
-	adminComp := runtime.NewAdminComponent(app,
-		runtime.WithAdminConfig(func() runtime.AdminConfig {
-			wc := gconf.WebSvrCfg.CommonRuntime
-			return runtime.AdminConfig{
-				Enabled: wc.AdminServer.Enabled,
-				IP:      wc.AdminServer.IP,
-				Port:    wc.AdminServer.Port,
-				Pprof:   gconf.WebSvrCfg.CommonDebug.Pprof,
-			}
-		}),
-		runtime.WithAdminServiceName("websvr"),
-	)
+	// 标准组件：服务名取 app.Name()，Start 时（LoadConfig 之后）自读 conf。
+	logComp := bussvc.NewLoggerComponent(app)
+	adminComp := bussvc.NewAdminComponent(app, nil)
+	tracing := bussvc.NewTracingComponent(app)
+
+	web := &webRuntimeComponent{}
 
 	// Start 顺序：datetime 周期刷新 → logger → admin → tracing → web 运行时
 	//（依赖 + HTTP/gRPC）。admin 紧跟 logger，反向 Stop 时在 web 资源之后、logger 之前

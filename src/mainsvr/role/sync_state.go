@@ -7,7 +7,7 @@ import (
 
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/lib/service/router"
-	"github.com/Iori372552686/GoOne/module/gconf"
+	"github.com/Iori372552686/GoOne/module/conf"
 	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
 	"google.golang.org/protobuf/proto"
 )
@@ -290,8 +290,8 @@ func (r *Role) markPersistSectionDirty(flag g1_protocol.ERoleSectionFlag, reason
 }
 
 func (r *Role) persistDebounceSec() int32 {
-	if gconf.MainSvrCfg.Capacity.RolePersistDebounceSec > 0 {
-		return int32(gconf.MainSvrCfg.Capacity.RolePersistDebounceSec)
+	if v := conf.Get("mainsvr.capacity.role_persist_debounce_sec").Int(); v > 0 {
+		return int32(v)
 	}
 	return defaultRolePersistDebounceSec
 }
@@ -342,10 +342,11 @@ func (r *Role) FlushPending(trans cmd_handler.IContext, forcePersist bool) error
 }
 
 func (r *Role) ShouldUseSyncPatch() bool {
-	if !gconf.MainSvrCfg.Capacity.RoleSyncPatchEnabled {
+	if !conf.Get("mainsvr.capacity.role_sync_patch_enabled").Bool() {
 		return false
 	}
-	allowUids := gconf.MainSvrCfg.Capacity.RoleSyncPatchAllowUids
+	var allowUids []uint64
+	_ = conf.Unmarshal("mainsvr.capacity.role_sync_patch_allow_uids", &allowUids)
 	if len(allowUids) == 0 {
 		return true
 	}

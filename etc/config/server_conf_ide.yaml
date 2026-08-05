@@ -1,4 +1,7 @@
-# 分组配置写法，仍兼容旧的平铺字段
+# GoOne 服务配置（分组写法：base_cfg + 各服务段）。
+# 加载与读取由 module/conf 统一负责：支持 yaml/toml/json，按 -svr_conf 指定的
+# 文件后缀自动选 decoder；业务代码用 conf.Get("connsvr.runtime.listen_port")
+# 或 conf.Unmarshal("base_cfg.dependencies.db_instances", &dbs) 读取。
 base_cfg:
   runtime:
     register_addr: 'etcd://43.139.3.228:12379?service=online&timeout=5s&namespace=/GoOneServices'
