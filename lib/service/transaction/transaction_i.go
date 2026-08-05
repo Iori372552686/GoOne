@@ -22,7 +22,8 @@ var (
 )
 
 type ITransactionMgr interface {
-	InitAndRun(maxTrans int32, useUidLock bool, maxUidPendingPacket int)
+	// InitAndRunWithConfig 按值语义配置启动分片 worker。历史单分片入口
+	// InitAndRun(maxTrans, useUidLock, maxUidPendingPacket) 已随多分片统一删除。
 	InitAndRunWithConfig(cfg TransactionMgrConfig)
 
 	// RegisterCmd 是兼容入口：内部委托 RegisterCmdE 并仅记录错误，不 Fatal、不覆盖

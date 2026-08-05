@@ -55,8 +55,10 @@ jobs:
           cache: true
 
       - name: Race (core packages)
-        # V4 P0-09：race 覆盖 runtime、net_mgr、router、svrinstmgr、bus、ssrpc、
-        # transaction、appconfig、scheduler、async 与 gamedata 等并发敏感包。
+        # race 覆盖 net、runtime、router、svrinstmgr、bus、ssrpc、
+        # transaction、scheduler、async 与 gamedata 等并发敏感包。
+        # 注：lib/service 下不存在 appconfig 子包；bus/... 含 nsq 手动联调用例，
+        # 这里只跑其并发核心，driver 的真实联调由 integration job 覆盖。
         run: >
           go test -race -count=1 -timeout 600s
           ./lib/net/...
@@ -66,7 +68,6 @@ jobs:
           ./lib/service/bus/...
           ./lib/service/ssrpc/...
           ./lib/service/transaction/...
-          ./lib/service/appconfig/...
           ./lib/service/scheduler/...
           ./lib/service/async/...
           ./common/gamedata/...
@@ -110,7 +111,8 @@ jobs:
     env:
       GOONE_INTEGRATION: "1"
       GOONE_AMQP_ADDR: amqp://goone:ci-pass-${{ github.run_id }}@127.0.0.1:5672/
-      GOONE_ETCD_ADDR: 127.0.0.1:2379
+      GOONE_MYSQL_DSN: root:ci-root-${{ github.run_id }}@tcp(127.0.0.1:3306)/testdb?charset=utf8
+      GOONE_REDIS_ADDR: 127.0.0.1:6379
     steps:
       - uses: actions/checkout@v4
 
@@ -119,12 +121,35 @@ jobs:
           go-version: '1.25.12'
           cache: true
 
+      - name: Init MySQL testdb
+        # xorm 集成测试 DSN 指向 testdb；CI mysql 镜像默认无该库，需先建。
+        run: |
+          for i in $(seq 1 30); do
+            if mysqladmin -h127.0.0.1 -uroot -p"ci-root-${{ github.run_id }}" ping >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          mysql -h127.0.0.1 -uroot -p"ci-root-${{ github.run_id }}" -e "CREATE DATABASE IF NOT EXISTS testdb;"
+
       - name: Integration tests
+        # 测试范围严格对齐已启动的中间件（mysql/redis/zookeeper/rabbitmq）：
+        #   - bus/driver/rabbitmq   → rabbitmq（精确到 driver 子包，避免递归进 nsq
+        #                              的手动联调用例，后者用 select{} 永久阻塞）
+        #   - router / svrinstmgr   → 纯内存单测，无中间件
+        #   - db/redis / db/xorm    → redis / mysql（经 env 覆盖默认 DSN）
+        #   - registry/zookeeper    → zookeeper（精确到子包，避免递归进
+        #                              etcd/consul/nacos——CI 未启动且 itest.Require
+        #                              在 GOONE_INTEGRATION=1 下为 t.Fatal）
         # 用 -v 输出实际执行用例；下方 step 校验用例数 > 0。
         run: >
           go test -count=1 -timeout 600s -v
-          ./lib/service/bus/... ./lib/service/router/... ./lib/service/svrinstmgr/...
-          ./lib/db/... ./lib/contrib/registry/...
+          ./lib/service/bus/driver/rabbitmq/...
+          ./lib/service/router/...
+          ./lib/service/svrinstmgr/...
+          ./lib/db/redis/...
+          ./lib/db/xorm/...
+          ./lib/contrib/registry/zookeeper/...
           2>&1 | tee integration.log
 
       - name: Verify non-zero executed tests

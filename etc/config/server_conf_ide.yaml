@@ -110,8 +110,6 @@ mainsvr:
   debug:
     log_dir: ../logs
     log_level: debug
-  capacity:
-    trans_shard_count: 0
 
 mysqlsvr:
   identity:
@@ -144,6 +142,4 @@ roomcentersvr:
   debug:
     log_dir: ../logs
     log_level: debug
-  capacity:
-    trans_shard_count: 0
 

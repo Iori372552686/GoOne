@@ -117,14 +117,9 @@ type ConnCapacityConfig struct {
 }
 
 type MainCapacityConfig struct {
-	TransShardCount        int      `json:"trans_shard_count" yaml:"trans_shard_count"`
 	RoleSyncPatchEnabled   bool     `json:"role_sync_patch_enabled" yaml:"role_sync_patch_enabled"`
 	RoleSyncPatchAllowUids []uint64 `json:"role_sync_patch_allow_uids" yaml:"role_sync_patch_allow_uids"`
 	RolePersistDebounceSec int      `json:"role_persist_debounce_sec" yaml:"role_persist_debounce_sec"`
-}
-
-type RoomCenterCapacityConfig struct {
-	TransShardCount int `json:"trans_shard_count" yaml:"trans_shard_count"`
 }
 
 type WebRuntimeConfig struct {
@@ -153,7 +148,6 @@ type MySqlSvr struct {
 
 type RoomCenterSvr struct {
 	ServiceCommonConfig `yaml:",inline"`
-	Capacity            RoomCenterCapacityConfig `json:"capacity" yaml:"capacity"`
 }
 
 type WebSvr struct {

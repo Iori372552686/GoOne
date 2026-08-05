@@ -210,21 +210,12 @@ func TestMustAppNamePanicsOnNil(t *testing.T) {
 	_ = NewLoggerComponent(nil)
 }
 
-// fakeTransMgr 只记录 Start 路径会触发的两个入口；其余方法经嵌入接口（nil）
+// fakeTransMgr 只记录 Start 路径会触发的入口；其余方法经嵌入接口（nil）
 // 兜底——组件若在 Start 调用它们会 panic，正是测试要抓的越界行为。
 type fakeTransMgr struct {
 	transaction.ITransactionMgr
-	legacyCalled              bool
-	legacyMaxTrans            int32
-	legacyUseUidLock          bool
-	legacyMaxUidPendingPacket int
-	withCfgCalled             bool
-	gotCfg                    transaction.TransactionMgrConfig
-}
-
-func (f *fakeTransMgr) InitAndRun(maxTrans int32, useUidLock bool, maxUidPendingPacket int) {
-	f.legacyCalled = true
-	f.legacyMaxTrans, f.legacyUseUidLock, f.legacyMaxUidPendingPacket = maxTrans, useUidLock, maxUidPendingPacket
+	withCfgCalled bool
+	gotCfg        transaction.TransactionMgrConfig
 }
 
 func (f *fakeTransMgr) InitAndRunWithConfig(cfg transaction.TransactionMgrConfig) {
@@ -232,74 +223,61 @@ func (f *fakeTransMgr) InitAndRunWithConfig(cfg transaction.TransactionMgrConfig
 	f.gotCfg = cfg
 }
 
-// TestTransMgrComponentLegacyPath 验证全零配置走遗留单分片路径，行为与历史
-// InitAndRun(misc.MaxTransNumber, false, 0) 完全一致（connsvr/infosvr/mysqlsvr 默认）。
-func TestTransMgrComponentLegacyPath(t *testing.T) {
+// TestTransMgrComponentZeroConfigDefaults 验证全零配置走默认多分片路径，三项默认值
+// 全部在组件内部回退：InitAndRunWithConfig{MaxTrans: misc.MaxTransNumber,
+// ShardCount: DefaultShardCount(), MaxPendingPerKey: DefaultMaxPendingPerKey}
+//（connsvr/infosvr/mysqlsvr/mainsvr 的默认装配形态）。
+func TestTransMgrComponentZeroConfigDefaults(t *testing.T) {
 	mgr := &fakeTransMgr{}
 	c := &TransMgrComponent{Mgr: mgr}
 	if err := c.Start(context.Background()); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	if !mgr.legacyCalled || mgr.withCfgCalled {
-		t.Fatalf("legacyCalled=%v withCfgCalled=%v", mgr.legacyCalled, mgr.withCfgCalled)
+	if !mgr.withCfgCalled {
+		t.Fatal("InitAndRunWithConfig 未被调用")
 	}
-	if mgr.legacyMaxTrans != misc.MaxTransNumber || mgr.legacyUseUidLock || mgr.legacyMaxUidPendingPacket != 0 {
-		t.Fatalf("legacy args = (%d,%v,%d)", mgr.legacyMaxTrans, mgr.legacyUseUidLock, mgr.legacyMaxUidPendingPacket)
+	want := transaction.TransactionMgrConfig{
+		MaxTrans:         misc.MaxTransNumber,
+		ShardCount:       transaction.DefaultShardCount(),
+		MaxPendingPerKey: transaction.DefaultMaxPendingPerKey,
 	}
-}
-
-// TestTransMgrComponentConfKey 验证 ShardCountConfKey 路径：Start 时从 conf 读分片数；
-// 显式值直接生效；缺省/<=0 内部回退 DefaultShardCount()；MaxTrans<=0 回退 misc.MaxTransNumber。
-func TestTransMgrComponentConfKey(t *testing.T) {
-	// 显式配置值生效。
-	loadTestConf(t, "mainsvr:\n  capacity:\n    trans_shard_count: 8\n")
-	mgr := &fakeTransMgr{}
-	c := &TransMgrComponent{
-		Mgr:               mgr,
-		ShardCountConfKey: "mainsvr.capacity.trans_shard_count",
-		Cfg:               transaction.TransactionMgrConfig{MaxTrans: misc.MaxTransNumber, MaxPendingPerKey: 100},
-	}
-	if err := c.Start(context.Background()); err != nil {
-		t.Fatalf("Start: %v", err)
-	}
-	if !mgr.withCfgCalled || mgr.legacyCalled {
-		t.Fatalf("withCfgCalled=%v legacyCalled=%v", mgr.withCfgCalled, mgr.legacyCalled)
-	}
-	want := transaction.TransactionMgrConfig{MaxTrans: misc.MaxTransNumber, ShardCount: 8, MaxPendingPerKey: 100}
 	if mgr.gotCfg != want {
 		t.Fatalf("cfg = %+v, want %+v", mgr.gotCfg, want)
 	}
-
-	// key 缺省：ShardCount 内部回退 DefaultShardCount()；MaxTrans 缺省回退 misc.MaxTransNumber。
-	loadTestConf(t, "mainsvr: {}\n")
-	mgr2 := &fakeTransMgr{}
-	c2 := &TransMgrComponent{
-		Mgr:               mgr2,
-		ShardCountConfKey: "mainsvr.capacity.trans_shard_count",
-		Cfg:               transaction.TransactionMgrConfig{MaxPendingPerKey: 100},
-	}
-	if err := c2.Start(context.Background()); err != nil {
-		t.Fatalf("Start: %v", err)
-	}
-	if mgr2.gotCfg.ShardCount != transaction.DefaultShardCount() {
-		t.Fatalf("ShardCount = %d, want default %d", mgr2.gotCfg.ShardCount, transaction.DefaultShardCount())
-	}
-	if mgr2.gotCfg.MaxTrans != misc.MaxTransNumber {
-		t.Fatalf("MaxTrans = %d, want %d", mgr2.gotCfg.MaxTrans, misc.MaxTransNumber)
-	}
 }
 
-// TestTransMgrComponentStaticCfg 验证纯静态 Cfg（无 conf key）原样透传。
+// TestTransMgrComponentStaticCfg 验证显式 Cfg 原样透传（组件不做任何回退覆盖）。
 func TestTransMgrComponentStaticCfg(t *testing.T) {
 	mgr := &fakeTransMgr{}
 	c := &TransMgrComponent{
 		Mgr: mgr,
-		Cfg: transaction.TransactionMgrConfig{MaxTrans: 5000, ShardCount: 4, MaxPendingPerKey: 50},
+		Cfg: transaction.TransactionMgrConfig{MaxTrans: 5000, ShardCount: 4, MaxPendingPerKey: 200},
 	}
 	if err := c.Start(context.Background()); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	want := transaction.TransactionMgrConfig{MaxTrans: 5000, ShardCount: 4, MaxPendingPerKey: 50}
+	want := transaction.TransactionMgrConfig{MaxTrans: 5000, ShardCount: 4, MaxPendingPerKey: 200}
+	if mgr.gotCfg != want {
+		t.Fatalf("cfg = %+v, want %+v", mgr.gotCfg, want)
+	}
+}
+
+// TestTransMgrComponentPartialCfg 验证只给 MaxPendingPerKey（roomcentersvr 形态）时
+// 其余字段仍按默认回退。
+func TestTransMgrComponentPartialCfg(t *testing.T) {
+	mgr := &fakeTransMgr{}
+	c := &TransMgrComponent{
+		Mgr: mgr,
+		Cfg: transaction.TransactionMgrConfig{MaxPendingPerKey: 200},
+	}
+	if err := c.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	want := transaction.TransactionMgrConfig{
+		MaxTrans:         misc.MaxTransNumber,
+		ShardCount:       transaction.DefaultShardCount(),
+		MaxPendingPerKey: 200,
+	}
 	if mgr.gotCfg != want {
 		t.Fatalf("cfg = %+v, want %+v", mgr.gotCfg, want)
 	}

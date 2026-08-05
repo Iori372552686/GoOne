@@ -48,15 +48,6 @@ type transactionShard struct {
 	pendingPackets map[uint64][]*sharedstruct.SSPacket
 }
 
-func (m *TransactionMgr) InitAndRun(maxTrans int32, useUidLock bool, maxUidPendingPacket int) {
-	m.InitAndRunWithConfig(TransactionMgrConfig{
-		MaxTrans:         maxTrans,
-		ShardCount:       1,
-		MaxPendingPerKey: maxUidPendingPacket,
-	})
-	m.useSerialKey = useUidLock
-}
-
 func (m *TransactionMgr) InitAndRunWithConfig(cfg TransactionMgrConfig) {
 	if m.started {
 		logger.Errorf("transmgr can only be InitAndRun once")

@@ -156,8 +156,6 @@ func validateService(service string) error {
 		return validateInfo()
 	case "mysqlsvr":
 		return validateMysql()
-	case "roomcentersvr":
-		return validateRoomCenter()
 	case "websvr":
 		return validateWeb()
 	}
@@ -212,9 +210,6 @@ func validateConn() error {
 }
 
 func validateMain() error {
-	if err := mustNonNegative("mainsvr", "mainsvr.capacity.trans_shard_count"); err != nil {
-		return err
-	}
 	if err := mustNonNegative("mainsvr", "mainsvr.capacity.role_persist_debounce_sec"); err != nil {
 		return err
 	}
@@ -230,10 +225,6 @@ func validateInfo() error {
 
 func validateMysql() error {
 	return mustNonEmptyList("mysqlsvr", "base_cfg.dependencies.orm_instances")
-}
-
-func validateRoomCenter() error {
-	return mustNonNegative("roomcentersvr", "roomcentersvr.capacity.trans_shard_count")
 }
 
 func validateWeb() error {

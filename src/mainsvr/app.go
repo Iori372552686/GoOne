@@ -16,11 +16,9 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
 	"github.com/Iori372552686/GoOne/lib/service/scheduler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
-	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	"github.com/Iori372552686/GoOne/lib/util/idgen"
 	"github.com/Iori372552686/GoOne/lib/util/sensitive_words"
 	"github.com/Iori372552686/GoOne/module/conf"
-	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals"
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals/rds"
 	"github.com/Iori372552686/GoOne/src/mainsvr/role"
@@ -47,16 +45,8 @@ func NewApp() *runtime.App {
 	adminComp := bussvc.NewAdminComponent(app, router.ReadyCheck)
 	tracing := bussvc.NewTracingComponent(app)
 
-	// TransMgr：值语义配置，分片数由 Start 从 conf 读取（ShardCountConfKey），
-	// <=0 回退、启动日志均在组件内部完成。
-	transMgr := &bussvc.TransMgrComponent{
-		Mgr:               globals.TransMgr,
-		ShardCountConfKey: "mainsvr.capacity.trans_shard_count",
-		Cfg: transaction.TransactionMgrConfig{
-			MaxTrans:         misc.MaxTransNumber,
-			MaxPendingPerKey: 100,
-		},
-	}
+	// TransMgr：零配置即默认形态（DefaultShardCount 多分片 + 每键排队背压默认值）。
+	transMgr := &bussvc.TransMgrComponent{Mgr: globals.TransMgr}
 
 	businessDeps := &bussvc.FuncComponent{
 		ComponentName: "business_deps",

@@ -150,42 +150,34 @@ func (l *LoggerComponent) Stop(_ context.Context) error {
 // TransMgrComponent 把 TransactionMgr 的启动与排空关闭包成 Component。它实现
 // Drainer：Close 排空在途事务（受 ctx 超时约束）。
 //
-// 配置为值语义（无 func 包装）：NewApp 装配期 conf 尚未 Load，故分片数不在装配期
-// 读 conf；改用 ShardCountConfKey 声明 key（如 "mainsvr.capacity.trans_shard_count"），
-// Start 时（LoadConfig 之后）读取，缺省或 <=0 内部回退 DefaultShardCount()。
-// Cfg 与 ShardCountConfKey 全零时走遗留单分片路径（connsvr/infosvr/mysqlsvr 默认）。
+// 配置为值语义（无 func 包装、无 conf key 声明）：全零配置即推荐默认形态——
+// ShardCount=DefaultShardCount() 多分片（按 routerid_or_uid 串行键分片）、
+// MaxTrans=misc.MaxTransNumber、MaxPendingPerKey=DefaultMaxPendingPerKey。
+// 分片数刻意不开放外部调优：它只划分派发队列与 transID 空间（handler 执行始终是
+// 每事务独立 goroutine），GOMAXPROCS 默认值恒正确；服务只需在确实不同时显式给
+// MaxPendingPerKey（如 roomcentersvr 的 200）。
 type TransMgrComponent struct {
 	Mgr transaction.ITransactionMgr
-	// Cfg 静态配置（MaxTrans / MaxPendingPerKey 直接给值）。MaxTrans<=0 内部回退
-	// misc.MaxTransNumber；ShardCount 一般不在这里给，用 ShardCountConfKey。
-	Cfg transaction.TransactionMgrConfig
-	// ShardCountConfKey 非空时，Start 从 conf 读取分片数覆盖 Cfg.ShardCount；
-	// <=0 或 key 不存在时内部回退 transaction.DefaultShardCount()。
-	ShardCountConfKey string
-	started           bool
+	// Cfg 静态配置，零值字段由 Start 内部回退（见上）。一般服务留零即可。
+	Cfg     transaction.TransactionMgrConfig
+	started bool
 }
 
 // Name 实现 runtime.Component。
 func (c *TransMgrComponent) Name() string { return "transaction_mgr" }
 
-// Start 实现 runtime.Component：解析配置并启动 TransactionMgr。
-// 全零配置走遗留单分片路径（行为与历史 InitAndRun(misc.MaxTransNumber, false, 0)
-// 完全一致）；否则按值语义配置启动，ShardCount/MaxTrans 的 <=0 回退在内部完成。
+// Start 实现 runtime.Component：归一化配置并启动 TransactionMgr（统一
+// InitAndRunWithConfig 多分片路径；<=0 回退全部在内部完成）。
 func (c *TransMgrComponent) Start(_ context.Context) error {
-	if c.ShardCountConfKey == "" && c.Cfg == (transaction.TransactionMgrConfig{}) {
-		c.Mgr.InitAndRun(misc.MaxTransNumber, false, 0)
-		c.started = true
-		return nil
-	}
 	cfg := c.Cfg
-	if c.ShardCountConfKey != "" {
-		cfg.ShardCount = conf.Get(c.ShardCountConfKey).Int()
-	}
 	if cfg.MaxTrans <= 0 {
 		cfg.MaxTrans = misc.MaxTransNumber
 	}
 	if cfg.ShardCount <= 0 {
 		cfg.ShardCount = transaction.DefaultShardCount()
+	}
+	if cfg.MaxPendingPerKey <= 0 {
+		cfg.MaxPendingPerKey = transaction.DefaultMaxPendingPerKey
 	}
 	logger.Infof("transmgr shards=%d max_pending_per_key=%d serial_key=routerid_or_uid", cfg.ShardCount, cfg.MaxPendingPerKey)
 	c.Mgr.InitAndRunWithConfig(cfg)

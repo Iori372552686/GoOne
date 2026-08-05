@@ -40,7 +40,7 @@ Prefer code over README or older docs when they disagree.
 - Treat legacy `globals.TransMgr.RegisterCmd(...)` or `cmd_handler/register.go` as compatibility paths for older code, not the default for new work.
 - When a handler needs domain state, reuse existing managers such as `globals.RoleMgr` or room managers instead of re-implementing load paths.
 - Routing behavior depends on `BusId`, `module/misc.ServerRouteRules`, and `lib/service/svrinstmgr`; avoid ad-hoc routing logic.
-- Preserve the serialized transaction model in `mainsvr` and `roomcentersvr`; they intentionally use sharded transaction processing that differs from lighter services like `connsvr`.
+- All bus services use sharded transaction processing via `bussvc.TransMgrComponent` (responses route by `DstTransID`, requests shard by RouterID/Uid serial key). Shard count is not externally tunable — it always defaults to `transaction.DefaultShardCount()` (it only partitions dispatch queues/transID space; handlers run one goroutine per transaction). Same-key queue backpressure defaults to `transaction.DefaultMaxPendingPerKey` (100); `roomcentersvr` explicitly overrides it to 200. Handlers must stay key-local; never rely on global single-thread ordering.
 
 ## Generated Code Boundaries
 - Do not hand-edit `api/gen/**`.

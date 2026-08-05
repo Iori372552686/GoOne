@@ -19,7 +19,6 @@ import (
 	"github.com/Iori372552686/GoOne/lib/util/idgen"
 	"github.com/Iori372552686/GoOne/lib/util/safego"
 	"github.com/Iori372552686/GoOne/module/conf"
-	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/globals"
 	id "github.com/Iori372552686/GoOne/src/roomcentersvr/globals/idgen"
 	rds "github.com/Iori372552686/GoOne/src/roomcentersvr/globals/rds"
@@ -47,15 +46,11 @@ func NewApp() *runtime.App {
 	adminComp := bussvc.NewAdminComponent(app, router.ReadyCheck)
 	tracing := bussvc.NewTracingComponent(app)
 
-	// TransMgr：值语义配置，分片数由 Start 从 conf 读取（ShardCountConfKey），
-	// <=0 回退、启动日志均在组件内部完成。
+	// TransMgr：房间高频同键包（tick/操作）需要更大的每键排队上限，显式给 200；
+	// 其余（分片数/MaxTrans）用组件内部默认。
 	transMgr := &bussvc.TransMgrComponent{
-		Mgr:               globals.TransMgr,
-		ShardCountConfKey: "roomcentersvr.capacity.trans_shard_count",
-		Cfg: transaction.TransactionMgrConfig{
-			MaxTrans:         misc.MaxTransNumber,
-			MaxPendingPerKey: 200,
-		},
+		Mgr: globals.TransMgr,
+		Cfg: transaction.TransactionMgrConfig{MaxPendingPerKey: 200},
 	}
 
 	businessDeps := &bussvc.FuncComponent{
