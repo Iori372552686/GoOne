@@ -277,7 +277,7 @@ func (w *webRuntimeComponent) getGRPCServer() *grpc.Server {
 func NewApp() *runtime.App {
 	// gamedata 加载作为 LoadConfig 的追加钩子：配置中心（nacos）优先，
 	// 未配置时回退本地目录。
-	app := runtime.MustNew("websvr", bussvc.WithConfLoader(func(_ context.Context) error {
+	app := bussvc.MustNew("websvr", nil, bussvc.WithConfLoader(func(_ context.Context) error {
 		var nacosConf net_conf.NacosConf
 		_ = conf.Unmarshal("base_cfg.dependencies.nacos_conf", &nacosConf)
 		gameDataDir := conf.Get("base_cfg.dependencies.game_data_dir").String()
@@ -295,12 +295,8 @@ func NewApp() *runtime.App {
 		return nil
 	}))
 
-	// 标准组件：服务名取 app.Name()，Start 时（LoadConfig 之后）自读 conf。
-	logComp := bussvc.NewLoggerComponent(app)
-	adminComp := bussvc.NewAdminComponent(app, nil)
-	tracing := bussvc.NewTracingComponent(app)
-
+	// 标准组件（datetime/logger/admin/tracing）由 bussvc.MustNew 集中注册。
 	web := &webRuntimeComponent{}
-	app.MustRegister(logComp, adminComp, tracing, web)
+	app.MustRegister(web)
 	return app
 }

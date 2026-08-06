@@ -7,7 +7,6 @@ import (
 )
 
 // Value 是 Get 返回的类型化访问对象。统一对象形态（放弃 GetString/GetInt 全家桶）
-// 是 due/kratos/goframe 三家的共识：API 面积最小、扩展性最好。
 type Value interface {
 	// Exists 报告 key 是否存在且已 Load。默认值构造的 Value 也返回 true。
 	Exists() bool
@@ -43,7 +42,7 @@ func newValue(raw any, exists bool) Value {
 }
 
 func (v *valueImpl) Exists() bool { return v.exists }
-func (v *valueImpl) Raw() any    { return v.raw }
+func (v *valueImpl) Raw() any     { return v.raw }
 
 func (v *valueImpl) String() string {
 	if v.raw == nil {

@@ -1,6 +1,6 @@
 package bussvc
 
-// 标准组件构造器（Due 风格装配）。
+// 标准组件构造器
 //
 // 设计目标：服务名只在 runtime.MustNew 出现一次，标准组件（logger/admin/tracing/
 // router）以 *runtime.App 为唯一上下文自行装配——服务名取 app.Name()，配置在组件
@@ -22,6 +22,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
+	"github.com/Iori372552686/GoOne/lib/service/scheduler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	"github.com/Iori372552686/GoOne/module/conf"
@@ -61,19 +62,38 @@ func LoadConf(svc string, hooks ...func(ctx context.Context) error) func(ctx con
 //	app := runtime.MustNew("connsvr", bussvc.WithConfLoader(gamedataHook))
 //
 // 不要与 runtime.WithLoadConfig 同时使用（后者会被覆盖）。
-//
-// 副作用：自动把 scheduler.DefaultDateTimeTick() 注册为 App 的首个组件（Option 在
-// runtime.New 内先于 MustRegister 执行，故它排在所有显式注册组件之前，满足
-// "datetime tick 最先启动" 的顺序约束——logger/xorm/tcp_server 启动期即读 datetime）。
-// 这样 6 个服务 app.go 不必再手写 app.MustRegister(scheduler.DefaultDateTimeTick(), ...)。
-// 调用方若已自行注册同名组件，Register 的重复名检测会 fail-fast 暴露冲突。
 func WithConfLoader(hooks ...func(ctx context.Context) error) runtime.Option {
 	return func(a *runtime.App) {
 		runtime.WithLoadConfig(LoadConf(a.Name(), hooks...))(a)
-		// 自动注册 datetime tick 为首个组件。Option 先于 MustRegister 执行，
-		// 保证它排在显式注册组件之前。
-		a.MustRegister(datetime.DefaultDateTimeTick())
 	}
+}
+
+// MustNew 是 bus 服务的统一装配入口：构建 runtime.App 后集中注册 4 个标准组件
+// （datetime_tick → logger → admin → tracing，顺序即 Start 顺序）。
+//
+// 它取代历史上散落在各 app.go 内的 "NewLoggerComponent/NewAdminComponent/
+// NewTracingComponent + datetime.DefaultDateTimeTick + MustRegister" 样板。
+// runtime.MustNew 仅构建 App，不装配组件——标准组件集中装配属于 bussvc（上层），
+// 不能下沉到 runtime（底层，否则 runtime→bussvc→runtime 循环 import）。
+//
+// readyCheck 是 admin 运行期就绪探针：bus 服务传 router.ReadyCheck（bus 断连时
+// /readyz 返 503 自动摘流），无 bus 的服务（websvr）传 nil。二者差异刻意保留，
+// 避免给无 bus 的服务挂上恒失败的探针。
+//
+// 用法：
+//
+//	app := bussvc.MustNew("connsvr", router.ReadyCheck, bussvc.WithConfLoader())
+//
+// opts 在 runtime.MustNew 内先于组件构造应用，故 WithConfLoader 等配置 Option 正常生效。
+func MustNew(name string, readyCheck func() error, opts ...runtime.Option) *runtime.App {
+	app := runtime.MustNew(name, opts...)
+	app.MustRegister(
+		NewDateTimeComponent(),
+		NewLoggerComponent(app),
+		NewAdminComponent(app, readyCheck),
+		NewTracingComponent(app),
+	)
+	return app
 }
 
 // NewLoggerComponent 构建标准 logger 组件：日志目录/级别在 Start 时读取
@@ -122,6 +142,23 @@ func NewTracingComponent(app *runtime.App) *TracingComponent {
 		ServiceName: svc,
 		Cfg:         func() ssrpc.TracingConfig { return CommonFromConf(svc).Tracing },
 	}
+}
+
+// NewDateTimeComponent 构建标准 datetime 刷新组件：返回驱动 datetime 缓存刷新的
+// scheduler.Task（Inline 模式，周期 datetime.TickInterval()，默认 100ms）。
+// 实际逻辑委托给 datetime.DefaultDateTimeTick（datetime 包内联 Task 工厂），本构造器
+// 仅做风格收敛，使调用方写 bussvc.NewDateTimeComponent(app) 而非裸调
+func NewDateTimeComponent() runtime.Component {
+	t := scheduler.New(
+		"datetime_tick",
+		datetime.TickInterval(),
+		func(_ context.Context) error {
+			datetime.Tick()
+			return nil
+		},
+	)
+	t.Inline = true
+	return t
 }
 
 // NewRouterComponent 构建标准 router/bus 组件：Common（self_bus_id、bus_mq_addr、

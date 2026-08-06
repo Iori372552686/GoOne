@@ -29,7 +29,7 @@ import (
 // 标准组件（logger/admin/tracing/router）由 bussvc 构造器自读 conf 装配。
 func NewApp() *runtime.App {
 	// gamedata 本地目录加载作为 LoadConfig 的追加钩子，在校验通过后执行。
-	app := runtime.MustNew("mainsvr", bussvc.WithConfLoader(func(_ context.Context) error {
+	app := bussvc.MustNew("mainsvr", router.ReadyCheck, bussvc.WithConfLoader(func(_ context.Context) error {
 		if gameDataDir := conf.Get("base_cfg.dependencies.game_data_dir").String(); gameDataDir != "" {
 			logger.Infof("Loading local file by gameconf_dir: %v ", gameDataDir)
 			if err := gamedata.InitLocal(gameDataDir); err != nil {
@@ -39,10 +39,7 @@ func NewApp() *runtime.App {
 		return nil
 	}))
 
-	// 标准组件：服务名取 app.Name()，Start 时（LoadConfig 之后）自读 conf。
-	logComp := bussvc.NewLoggerComponent(app)
-	adminComp := bussvc.NewAdminComponent(app, router.ReadyCheck)
-	tracing := bussvc.NewTracingComponent(app)
+	// 标准组件（datetime/logger/admin/tracing）由 bussvc.MustNew 集中注册。
 
 	// TransMgr：零配置即默认形态（DefaultShardCount 多分片 + 每键排队背压默认值）。
 	transMgr := &bussvc.TransMgrComponent{Mgr: globals.TransMgr}
@@ -121,7 +118,6 @@ func NewApp() *runtime.App {
 	// 启动期即读 datetime，由 WithConfLoader 自动注册保证。
 	// 用 MustRegister 一次注册全部组件。
 	app.MustRegister(
-		logComp, adminComp, tracing,
 		businessDeps, registerHandlers, transMgr, routerComp,
 		selfLogout, roleTick, roleFlush,
 	)

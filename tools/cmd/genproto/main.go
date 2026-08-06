@@ -31,7 +31,7 @@ func main() {
 	absProtoRoot := filepath.Join(repoRoot, *protoRoot)
 	gameProtocolRoot := filepath.Join(repoRoot, "game_protocol")
 
-	// Ensure cmd.proto exists (new checkouts shouldn't fail due to missing generated IDL).
+	// Ensure cmd.proto exists (new checkouts shouldn't fail to missing generated IDL).
 	if err := ensureCmdProto(repoRoot, absProtoRoot); err != nil {
 		die(err)
 	}

@@ -20,13 +20,9 @@ import (
 // NewApp 用 runtime.App + Component 装配 mysqlsvr。服务名只在 MustNew 出现一次；
 // 标准组件（logger/admin/tracing/router）由 bussvc 构造器自读 conf 装配。
 func NewApp() *runtime.App {
-	app := runtime.MustNew("mysqlsvr", bussvc.WithConfLoader())
+	app := bussvc.MustNew("mysqlsvr", router.ReadyCheck, bussvc.WithConfLoader())
 
-	// 标准组件：服务名取 app.Name()，Start 时（LoadConfig 之后）自读 conf。
-	// logger 最早启动、最晚停止（Stop 时 Flush 落盘）。
-	logComp := bussvc.NewLoggerComponent(app)
-	adminComp := bussvc.NewAdminComponent(app, router.ReadyCheck)
-	tracing := bussvc.NewTracingComponent(app)
+	// 标准组件（datetime/logger/admin/tracing）由 bussvc.MustNew 集中注册。
 
 	// TransMgr：Start 启动分片 worker；Drain 排空在途事务（受 ctx 超时约束）。
 	transMgr := &bussvc.TransMgrComponent{Mgr: globals.TransMgr}
@@ -74,7 +70,6 @@ func NewApp() *runtime.App {
 	// 之前，因 RegisterToTransactionMgr 调 RegisterCmd）→ TransMgr → router/bus。
 	// 用 MustRegister 一次注册全部组件。
 	app.MustRegister(
-		logComp, adminComp, tracing,
 		ormDeps, registerHandlers, transMgr, routerComp,
 	)
 	return app

@@ -6,8 +6,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/Iori372552686/GoOne/lib/api/datetime"
 )
 
 func TestTaskRunOnStart(t *testing.T) {
@@ -232,31 +230,5 @@ func TestTaskInlineNoGoroutineSurge(t *testing.T) {
 	// Inline 串行：同一时刻最多 1 个 Run 在执行。
 	if got := peak.Load(); got > 1 {
 		t.Fatalf("Inline should run serially, peak concurrency=%d", got)
-	}
-}
-
-// TestDefaultDateTimeTick 验证预设工厂能驱动 datetime 缓存刷新。
-func TestDefaultDateTimeTick(t *testing.T) {
-	task := datetime.DefaultDateTimeTick()
-	if task.Name() != "datetime_tick" {
-		t.Fatalf("expected name datetime_tick, got %q", task.Name())
-	}
-	if !task.Inline {
-		t.Fatal("DefaultDateTimeTick should set Inline=true")
-	}
-	// 用很短周期便于测试快速观测刷新。
-	task.Interval = 10 * time.Millisecond
-
-	before := datetime.NowT()
-	if err := task.Start(context.Background()); err != nil {
-		t.Fatalf("Start: %v", err)
-	}
-	time.Sleep(60 * time.Millisecond)
-	if err := task.Stop(context.Background()); err != nil {
-		t.Fatalf("Stop: %v", err)
-	}
-	after := datetime.NowT()
-	if !after.After(before) {
-		t.Fatalf("datetime snapshot should advance via DefaultDateTimeTick: before=%v after=%v", before, after)
 	}
 }

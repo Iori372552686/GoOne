@@ -14,12 +14,9 @@ import (
 // NewApp 用 runtime.App + Component 装配 infosvr。服务名只在 MustNew 出现一次；
 // 标准组件（logger/admin/tracing/router）由 bussvc 构造器自读 conf 装配。
 func NewApp() *runtime.App {
-	app := runtime.MustNew("infosvr", bussvc.WithConfLoader())
+	app := bussvc.MustNew("infosvr", router.ReadyCheck, bussvc.WithConfLoader())
 
-	// 标准组件：服务名取 app.Name()，Start 时（LoadConfig 之后）自读 conf。
-	logComp := bussvc.NewLoggerComponent(app)
-	adminComp := bussvc.NewAdminComponent(app, router.ReadyCheck)
-	tracing := bussvc.NewTracingComponent(app)
+	// 标准组件（datetime/logger/admin/tracing）由 bussvc.MustNew 集中注册。
 	transMgr := &bussvc.TransMgrComponent{Mgr: globals.TransMgr}
 
 	redisDeps := &bussvc.FuncComponent{
@@ -45,7 +42,6 @@ func NewApp() *runtime.App {
 	// admin → tracing → dependencies → ssrpc_registry → transaction_mgr → router。
 	// 用 MustRegister 一次注册全部组件。
 	app.MustRegister(
-		logComp, adminComp, tracing,
 		redisDeps, registerHandlers, transMgr, routerComp,
 	)
 	return app

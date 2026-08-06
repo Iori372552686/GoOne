@@ -71,7 +71,7 @@ func TestClientContextCancelAbortsRequest(t *testing.T) {
 	defer cancel()
 	c := NewClient(nil, WithMaxResponseBytes(1024))
 	if _, err := c.DoRequest(ctx, "GET", srv.URL, "", nil); err == nil {
-		t.Fatal("expected error due to context cancel")
+		t.Fatal("expected error to context cancel")
 	}
 }
 

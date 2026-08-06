@@ -2,7 +2,7 @@
 // time.Now() 的系统调用开销，并保证同一"逻辑帧"内所有调用方读到一致的时间值。
 //
 // 设计要点：
-//   - 缓存值由外部周期性调用 Tick() 刷新（推荐通过 scheduler.DefaultDateTimeTick()
+//   - 缓存值由外部周期性调用 Tick() 刷新
 //     注册为 runtime.Component，默认 100ms 周期）。
 //   - 内部用 atomic.Pointer[time.Time] / atomic.Int32 存储，消除高频读写下的
 //     数据竞争（旧实现裸字段 + 注释掉的锁在 -race 下必报警）。

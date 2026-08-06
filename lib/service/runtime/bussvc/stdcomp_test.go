@@ -127,36 +127,45 @@ mysvc:
 	}
 }
 
-// TestWithConfLoaderAutoRegistersDateTimeTick 验证 WithConfLoader 会把
-// scheduler.DefaultDateTimeTick() 自动注册为首个组件（排在所有显式注册组件之前），
-// 使各服务 app.go 不必再手写 app.MustRegister(scheduler.DefaultDateTimeTick(), ...)。
-// 通过注入 ComponentTracker 读取注册顺序来断言。
-func TestWithConfLoaderAutoRegistersDateTimeTick(t *testing.T) {
+// TestMustNewRegistersStdComponents 验证 bussvc.MustNew 集中注册 4 个标准组件
+// （datetime_tick → logger → admin → tracing），且 datetime_tick 排在首位。
+// 这是各服务 app.go 不再手写这 4 行装配的契约保证。通过注入 ComponentTracker
+// 读取注册顺序来断言。
+func TestMustNewRegistersStdComponents(t *testing.T) {
 	loadTestConf(t, `
 mysvc:
   debug:
     log_dir: "./log/mysvc"
 `)
 	tracker := runtime.NewComponentTracker(nil)
-	app := runtime.MustNew("mysvc",
+	app := MustNew("mysvc", nil,
 		runtime.WithComponentTracker(tracker),
 		WithConfLoader(),
 	)
-	// 再显式注册一个组件，确认 datetime tick 仍排在最前。
-	app.MustRegister(NewLoggerComponent(app))
 
+	want := []string{"datetime_tick", "logger", "admin", "tracing"}
 	reports := tracker.Report()
-	if len(reports) < 2 {
-		t.Fatalf("期望至少 2 个组件，实际 %d: %+v", len(reports), reports)
+	if len(reports) < len(want) {
+		t.Fatalf("期望至少 %d 个标准组件，实际 %d: %+v", len(want), len(reports), reports)
 	}
-	// datetime tick 的 TaskName 为 "datetime_tick"（见 scheduler.DefaultDateTimeTick）。
-	if reports[0].Name != "datetime_tick" {
-		t.Fatalf("首个组件 = %q, 期望 datetime_tick", reports[0].Name)
+	for i, name := range want {
+		if reports[i].Name != name {
+			t.Fatalf("第 %d 个组件 = %q, 期望 %q（完整顺序: %+v）", i, reports[i].Name, name, namesOf(reports))
+		}
 	}
-	// 显式注册的 logger 必须排在自动注册的 datetime tick 之后。
-	if reports[1].Name != "logger" {
-		t.Fatalf("第二个组件 = %q, 期望 logger", reports[1].Name)
+	// app 本身可用。
+	if app == nil || app.Name() != "mysvc" {
+		t.Fatalf("app = %+v, want name mysvc", app)
 	}
+}
+
+// namesOf 抽取组件报告的名字序列，便于失败信息展示。
+func namesOf(reports []runtime.ComponentReport) []string {
+	out := make([]string, len(reports))
+	for i, r := range reports {
+		out[i] = r.Name
+	}
+	return out
 }
 
 // TestNewLoggerComponent 验证 logger 组件从 conf 自读 dir/level，Name 为服务名。

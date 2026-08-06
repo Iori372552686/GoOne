@@ -176,6 +176,9 @@ func New(name string, opts ...Option) (*App, error) {
 
 // MustNew 是 New 的便捷封装，在出错时 panic。仅在装配错误即程序员错误的 src/<service>/
 // app.go 这类装配代码中使用；库代码应继续用 New 并返回 error。
+//
+// MustNew 只构建 App；标准组件（datetime/logger/admin/tracing）的集中装配由上层
+// bussvc.MustNew 负责——runtime 是底层框架，不能反向依赖 bussvc（会造成循环 import）。
 func MustNew(name string, opts ...Option) *App {
 	app, err := New(name, opts...)
 	if err != nil {

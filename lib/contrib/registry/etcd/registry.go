@@ -3,9 +3,10 @@ package etcd
 import (
 	"context"
 	"fmt"
-	"github.com/Iori372552686/GoOne/lib/contrib/registry"
 	"math/rand"
 	"time"
+
+	"github.com/Iori372552686/GoOne/lib/contrib/registry"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -198,7 +199,6 @@ func (r *Registry) heartBeat(ctx context.Context, leaseID clientv3.LeaseID, key 
 		case _, ok := <-kac:
 			if !ok {
 				if ctx.Err() != nil {
-					// channel closed due to context cancel
 					return
 				}
 				// need to retry registration

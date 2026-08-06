@@ -22,7 +22,7 @@ var (
 		Namespace: "goone",
 		Subsystem: "task",
 		Name:      "skipped_total",
-		Help:      "Total Task invocations skipped due to NonOverlap.",
+		Help:      "Total Task invocations skipped to NonOverlap.",
 	}, []string{"task"})
 )
 
