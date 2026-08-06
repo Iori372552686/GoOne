@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
@@ -60,9 +61,18 @@ func LoadConf(svc string, hooks ...func(ctx context.Context) error) func(ctx con
 //	app := runtime.MustNew("connsvr", bussvc.WithConfLoader(gamedataHook))
 //
 // 不要与 runtime.WithLoadConfig 同时使用（后者会被覆盖）。
+//
+// 副作用：自动把 scheduler.DefaultDateTimeTick() 注册为 App 的首个组件（Option 在
+// runtime.New 内先于 MustRegister 执行，故它排在所有显式注册组件之前，满足
+// "datetime tick 最先启动" 的顺序约束——logger/xorm/tcp_server 启动期即读 datetime）。
+// 这样 6 个服务 app.go 不必再手写 app.MustRegister(scheduler.DefaultDateTimeTick(), ...)。
+// 调用方若已自行注册同名组件，Register 的重复名检测会 fail-fast 暴露冲突。
 func WithConfLoader(hooks ...func(ctx context.Context) error) runtime.Option {
 	return func(a *runtime.App) {
 		runtime.WithLoadConfig(LoadConf(a.Name(), hooks...))(a)
+		// 自动注册 datetime tick 为首个组件。Option 先于 MustRegister 执行，
+		// 保证它排在显式注册组件之前。
+		a.MustRegister(datetime.DefaultDateTimeTick())
 	}
 }
 

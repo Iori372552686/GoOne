@@ -1,12 +1,14 @@
 package redis
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/module/conf"
 
 	"github.com/mediocregopher/radix/v3"
 )
@@ -30,6 +32,35 @@ type RedisMgr struct {
 func NewRedisMgr() *RedisMgr {
 	m := new(RedisMgr)
 	return m
+}
+
+// DefaultConfKey 是 RedisMgr 默认读取的 Redis 实例配置 key。
+const DefaultConfKey = "base_cfg.dependencies.db_instances"
+
+// OnStart 是组件启动钩子：从 module/conf 读取默认 key（DefaultConfKey）下的
+// Redis 实例配置并初始化。空配置时静默跳过（不视为错误），兼容把 redis 作为可选
+// 依赖的服务（如 roomcentersvr）；非空但任一实例初始化失败时返回该 error。
+//
+// 设计意图：把 "Unmarshal 默认 key → InitAndRun" 这段在多个服务 app.go 内重复的
+// 样板收敛到一处，调用方只需 globals.X.RedisMgr.OnStart(ctx)。
+func (self *RedisMgr) OnStart(_ context.Context) error {
+	var dbs []Config
+	if err := conf.Unmarshal(DefaultConfKey, &dbs); err != nil {
+		return err
+	}
+	if len(dbs) == 0 {
+		// 空配置：静默跳过，保留 "redis 可选" 的服务语义。
+		// 必填服务由 module/conf/registry 的 mustNonEmptyList 在启动期强制校验。
+		return nil
+	}
+	return self.InitAndRun(dbs)
+}
+
+// OnStop 是组件停止钩子：关闭所有 Redis 实例的连接池，与 OnStart 对称。
+// 直接代理幂等的 Close（重复调用不 panic、不重复释放，返回聚合 Close error），
+// 使服务 app.go 可直接 globals.X.RedisMgr.OnStop 作为 FuncComponent.OnStop 引用。
+func (self *RedisMgr) OnStop(_ context.Context) error {
+	return self.Close()
 }
 
 /**

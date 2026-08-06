@@ -1,17 +1,12 @@
 package infosvr
 
 import (
-	"context"
-
 	infosvrv1 "github.com/Iori372552686/GoOne/api/gen/game/infosvr/v1"
-	"github.com/Iori372552686/GoOne/lib/db/redis"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
-	"github.com/Iori372552686/GoOne/lib/service/scheduler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
-	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/src/infosvr/globals"
 	"github.com/Iori372552686/GoOne/src/infosvr/service"
 )
@@ -29,17 +24,8 @@ func NewApp() *runtime.App {
 
 	redisDeps := &bussvc.FuncComponent{
 		ComponentName: "redis_deps",
-		OnStart: func(_ context.Context) error {
-			var dbs []redis.Config
-			if err := conf.Unmarshal("base_cfg.dependencies.db_instances", &dbs); err != nil {
-				return err
-			}
-			return globals.InfoMgr.RedisMgr.InitAndRun(dbs)
-		},
-		// Stop 时关闭 Redis 连接池，消除连接泄漏。
-		OnStop: func(_ context.Context) error {
-			return globals.InfoMgr.RedisMgr.Close()
-		},
+		OnStart:       globals.InfoMgr.RedisMgr.OnStart,
+		OnStop:        globals.InfoMgr.RedisMgr.OnStop,
 	}
 
 	// 用 RegistryComponent 替代 "NewDispatcher→ToDispatcher→丢弃" 闭包。
@@ -55,11 +41,11 @@ func NewApp() *runtime.App {
 	// DriverRegistry 只注册 rabbitmq。
 	routerComp := bussvc.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry())
 
-	// Start 顺序：datetime_tick → logger → admin → tracing → dependencies →
-	// ssrpc_registry → transaction_mgr → router。datetime_tick 放最前。
+	// Start 顺序：datetime_tick（WithConfLoader 自动注册，隐含在最前）→ logger →
+	// admin → tracing → dependencies → ssrpc_registry → transaction_mgr → router。
 	// 用 MustRegister 一次注册全部组件。
 	app.MustRegister(
-		scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing,
+		logComp, adminComp, tracing,
 		redisDeps, registerHandlers, transMgr, routerComp,
 	)
 	return app

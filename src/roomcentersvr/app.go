@@ -8,7 +8,6 @@ import (
 	"github.com/Iori372552686/GoOne/common/gamedata"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
-	"github.com/Iori372552686/GoOne/lib/db/redis"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
@@ -61,14 +60,10 @@ func NewApp() *runtime.App {
 				return err
 			}
 			id.IDGen = idGen
-			// 初始化 Redis（房间快照持久化用）。无配置时跳过，保持向后兼容。
-			var dbs []redis.Config
-			_ = conf.Unmarshal("base_cfg.dependencies.db_instances", &dbs)
-			if len(dbs) > 0 {
-				if err := rds.RedisMgr.InitAndRun(dbs); err != nil {
-					return err
-				}
-				logger.Infof("roomcentersvr redis initialized for room snapshot persistence")
+			// 初始化 Redis（房间快照持久化用）。OnStart 内部对空配置静默跳过，
+			// 保留 "redis 可选" 的向后兼容语义。
+			if err := rds.RedisMgr.OnStart(nil); err != nil {
+				return err
 			}
 			var nacosConf net_conf.NacosConf
 			_ = conf.Unmarshal("base_cfg.dependencies.nacos_conf", &nacosConf)
@@ -144,12 +139,13 @@ func NewApp() *runtime.App {
 	// 房间落盘：原 OnExit。TransMgr 排空后全量落盘，避免数据丢失。作为 Drainer。
 	roomFlush := &roomFlushComponent{}
 
-	// Start 顺序：datetime → logger → admin → tracing → 业务依赖 → SSRPC 注册
-	// → TransMgr → router/bus → 房间初始化 → roomTick → roomPersist → roomFlush(Drainer)。
-	// datetime_tick 放最前：room tick/房间初始化都依赖 datetime.NowMs()。
+	// Start 顺序：datetime（WithConfLoader 自动注册，隐含在最前）→ logger → admin
+	// → tracing → 业务依赖 → SSRPC 注册 → TransMgr → router/bus → 房间初始化
+	// → roomTick → roomPersist → roomFlush(Drainer)。datetime_tick 必须最前：
+	// room tick/房间初始化都依赖 datetime.NowMs()，由 WithConfLoader 自动注册保证。
 	// 用 MustRegister 一次注册全部组件。
 	app.MustRegister(
-		scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing,
+		logComp, adminComp, tracing,
 		businessDeps, registerHandlers, cmdBacklist, transMgr, routerComp,
 		roomInit, roomTick, roomPersist, roomFlush,
 	)

@@ -79,7 +79,6 @@ func TickInterval() time.Duration {
 // Tick 刷新缓存快照一次。由外部周期驱动（推荐 scheduler.DefaultDateTimeTick）。
 // 幂等、线程安全；调用方无需加锁。
 func Tick() {
-	ensureInit()
 	t := time.Now()
 	now.Store(&t)
 }
@@ -94,7 +93,6 @@ func TimeOffset() int32 { return offset.Load() }
 
 // snapshot 返回当前缓存时间（内部统一出口，便于将来加监控）。
 func snapshot() time.Time {
-	ensureInit()
 	return *now.Load()
 }
 

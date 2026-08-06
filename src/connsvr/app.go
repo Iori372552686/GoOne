@@ -10,7 +10,6 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
-	"github.com/Iori372552686/GoOne/lib/service/scheduler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/web/http_sign"
 	"github.com/Iori372552686/GoOne/lib/web/rest_api"
@@ -69,14 +68,9 @@ func NewApp() *runtime.App {
 	// 与 runtime.Component（Stop 强制关闭全部连接），满足网关排空。
 	gateway := &gatewayComponent{}
 
-	// Start 顺序：datetime_tick → logger → admin → tracing → dependencies →
-	// ssrpc_registry → transaction_mgr → router → 网关。admin 紧跟 logger，使反向 Stop
-	// 时 admin 在业务资源之后、logger 之前关闭；admin 在 LoadConfig 后 Start 故端口
-	// 已生效。datetime_tick 放最前：tcp/ws/kcp 服务器启动期用 datetime.NowT() 设读写
-	// deadline。
 	// 用 MustRegister 一次注册全部组件（顺序即 Start 顺序）。
 	app.MustRegister(
-		scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing,
+		logComp, adminComp, tracing,
 		signRestDeps, registerHandlers, transMgr, routerComp, gateway,
 	)
 	return app
@@ -90,7 +84,7 @@ func (gatewayComponent) Name() string { return "gateway_listeners" }
 
 // Start 启动 TCP/WS/KCP 监听器。任一传输启动失败时，逆序 Stop 已成功启动的传输，
 // 合并原始启动错误与回滚错误，并在错误中标注传输名（tcp/ws/kcp），避免端口泄漏
-//。
+// 。
 func (gatewayComponent) Start(_ context.Context) error {
 	// 用已加载的 capacity 配置构造过载保护闸门，注入共享 SessionHub。
 	// 三传输 OnConn 与 pack_proc 首次登录通过 hub 间接调用闸门。off 模式直通。
@@ -161,7 +155,7 @@ func (gatewayComponent) Start(_ context.Context) error {
 }
 
 // Quiesce 实现 runtime.Quiescer：三传输停止接收新连接，SessionHub 拒绝新会话绑定
-//。保留既有连接处理在途工作。readyz 此刻已返回 503（由状态机保证）。
+// 。保留既有连接处理在途工作。readyz 此刻已返回 503（由状态机保证）。
 func (gatewayComponent) Quiesce(_ context.Context) error {
 	// 先让 hub 拒绝新 BindClient（draining），再停三传输 listener。
 	globals.SessionHub.Quiesce()
@@ -178,12 +172,12 @@ func (gatewayComponent) Drain(ctx context.Context) error {
 }
 
 // Stop 实现 runtime.Component：强制关闭三传输的全部残留连接，并关闭 SessionTracker
-//（唤醒任何仍在等待的 Drain）。幂等。ctx 透传给三传输 Stop（受 context
+// （唤醒任何仍在等待的 Drain）。幂等。ctx 透传给三传输 Stop（受 context
 // 约束、错误可观测）。
 func (gatewayComponent) Stop(ctx context.Context) error {
-	_ = globals.ConnTcpSvr.Stop(ctx)
-	_ = globals.ConnWsSvr.Stop(ctx)
-	_ = globals.ConnKcpSvr.Stop(ctx)
+	globals.ConnTcpSvr.Stop(ctx)
+	globals.ConnWsSvr.Stop(ctx)
+	globals.ConnKcpSvr.Stop(ctx)
 	globals.SessionTracker.Close()
 	return nil
 }

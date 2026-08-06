@@ -10,7 +10,6 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
-	"github.com/Iori372552686/GoOne/lib/service/scheduler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/globals"
@@ -70,12 +69,12 @@ func NewApp() *runtime.App {
 	// DriverRegistry 只注册 rabbitmq。
 	routerComp := bussvc.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry())
 
-	// 注册顺序即 Start 顺序：datetime 周期刷新 → logger → admin → tracing →
-	// orm 依赖 → SSRPC 注册（必须在 TransMgr.InitAndRun 之前，因
-	// RegisterToTransactionMgr 调 RegisterCmd）→ TransMgr → router/bus。
+	// 注册顺序即 Start 顺序：datetime 周期刷新（WithConfLoader 自动注册，隐含在最前）
+	// → logger → admin → tracing → orm 依赖 → SSRPC 注册（必须在 TransMgr.InitAndRun
+	// 之前，因 RegisterToTransactionMgr 调 RegisterCmd）→ TransMgr → router/bus。
 	// 用 MustRegister 一次注册全部组件。
 	app.MustRegister(
-		scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing,
+		logComp, adminComp, tracing,
 		ormDeps, registerHandlers, transMgr, routerComp,
 	)
 	return app

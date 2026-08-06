@@ -12,10 +12,8 @@ import (
 	"github.com/Iori372552686/GoOne/common/gamedata"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
-	"github.com/Iori372552686/GoOne/lib/db/redis"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
-	"github.com/Iori372552686/GoOne/lib/service/scheduler"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/util/sensitive_words"
 	"github.com/Iori372552686/GoOne/lib/web/http_sign"
@@ -74,11 +72,7 @@ func (w *webRuntimeComponent) Start(_ context.Context) error {
 	if w.runtimeErrCh == nil {
 		w.runtimeErrCh = make(chan error, 1)
 	}
-	var dbs []redis.Config
-	if err := conf.Unmarshal("base_cfg.dependencies.db_instances", &dbs); err != nil {
-		return err
-	}
-	if err := globals.RedisMgr.InitAndRun(dbs); err != nil {
+	if err := globals.RedisMgr.OnStart(nil); err != nil {
 		return err
 	}
 	var signs []http_sign.Config
@@ -307,11 +301,6 @@ func NewApp() *runtime.App {
 	tracing := bussvc.NewTracingComponent(app)
 
 	web := &webRuntimeComponent{}
-
-	// Start 顺序：datetime 周期刷新 → logger → admin → tracing → web 运行时
-	//（依赖 + HTTP/gRPC）。admin 紧跟 logger，反向 Stop 时在 web 资源之后、logger 之前
-	// 关闭。
-	// 用 MustRegister 一次注册全部组件。
-	app.MustRegister(scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing, web)
+	app.MustRegister(logComp, adminComp, tracing, web)
 	return app
 }

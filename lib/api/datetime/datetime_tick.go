@@ -4,12 +4,12 @@
 // scheduler（否则形成 datetime→scheduler→logger→datetime 的循环）。因此 datetime
 // 的周期刷新由 scheduler 侧主动驱动：本文件提供一个开箱即用的 Task 工厂，各 service
 // 在 app.Register 列表注册一行即可，无需手写 tick 逻辑。
-package scheduler
+package datetime
 
 import (
 	"context"
 
-	"github.com/Iori372552686/GoOne/lib/api/datetime"
+	"github.com/Iori372552686/GoOne/lib/service/scheduler"
 )
 
 // DefaultDateTimeTick 返回一个驱动 datetime 缓存刷新的 Task，作为
@@ -20,17 +20,14 @@ import (
 //   - Inline=true：在 loop 内同步调用 datetime.Tick()，零额外 goroutine。datetime.Tick
 //     是纳秒级单次 atomic 存储，绝无阻塞或重叠风险，正适合 Inline。
 //
-// 用法：
-//
-//	app.Register(scheduler.DefaultDateTimeTick())
-//
+
 // 应注册在所有依赖 datetime 的组件之前（如 logger/xorm/tcp_server 启动时即读时间）。
-func DefaultDateTimeTick() *Task {
-	t := New(
+func DefaultDateTimeTick() *scheduler.Task {
+	t := scheduler.New(
 		"datetime_tick",
-		datetime.TickInterval(),
+		TickInterval(),
 		func(_ context.Context) error {
-			datetime.Tick()
+			Tick()
 			return nil
 		},
 	)

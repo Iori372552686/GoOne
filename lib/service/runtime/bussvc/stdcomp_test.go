@@ -127,6 +127,38 @@ mysvc:
 	}
 }
 
+// TestWithConfLoaderAutoRegistersDateTimeTick 验证 WithConfLoader 会把
+// scheduler.DefaultDateTimeTick() 自动注册为首个组件（排在所有显式注册组件之前），
+// 使各服务 app.go 不必再手写 app.MustRegister(scheduler.DefaultDateTimeTick(), ...)。
+// 通过注入 ComponentTracker 读取注册顺序来断言。
+func TestWithConfLoaderAutoRegistersDateTimeTick(t *testing.T) {
+	loadTestConf(t, `
+mysvc:
+  debug:
+    log_dir: "./log/mysvc"
+`)
+	tracker := runtime.NewComponentTracker(nil)
+	app := runtime.MustNew("mysvc",
+		runtime.WithComponentTracker(tracker),
+		WithConfLoader(),
+	)
+	// 再显式注册一个组件，确认 datetime tick 仍排在最前。
+	app.MustRegister(NewLoggerComponent(app))
+
+	reports := tracker.Report()
+	if len(reports) < 2 {
+		t.Fatalf("期望至少 2 个组件，实际 %d: %+v", len(reports), reports)
+	}
+	// datetime tick 的 TaskName 为 "datetime_tick"（见 scheduler.DefaultDateTimeTick）。
+	if reports[0].Name != "datetime_tick" {
+		t.Fatalf("首个组件 = %q, 期望 datetime_tick", reports[0].Name)
+	}
+	// 显式注册的 logger 必须排在自动注册的 datetime tick 之后。
+	if reports[1].Name != "logger" {
+		t.Fatalf("第二个组件 = %q, 期望 logger", reports[1].Name)
+	}
+}
+
 // TestNewLoggerComponent 验证 logger 组件从 conf 自读 dir/level，Name 为服务名。
 func TestNewLoggerComponent(t *testing.T) {
 	loadTestConf(t, testConfYAML)

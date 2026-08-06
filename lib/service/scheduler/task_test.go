@@ -237,7 +237,7 @@ func TestTaskInlineNoGoroutineSurge(t *testing.T) {
 
 // TestDefaultDateTimeTick 验证预设工厂能驱动 datetime 缓存刷新。
 func TestDefaultDateTimeTick(t *testing.T) {
-	task := DefaultDateTimeTick()
+	task := datetime.DefaultDateTimeTick()
 	if task.Name() != "datetime_tick" {
 		t.Fatalf("expected name datetime_tick, got %q", task.Name())
 	}

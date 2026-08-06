@@ -9,7 +9,6 @@ import (
 	"github.com/Iori372552686/GoOne/common/gamedata"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
-	"github.com/Iori372552686/GoOne/lib/db/redis"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
@@ -52,11 +51,7 @@ func NewApp() *runtime.App {
 		ComponentName: "business_deps",
 		OnStart: func(_ context.Context) error {
 			sensitive_words.Init(conf.Get("base_cfg.dependencies.sensitive_words_file").String())
-			var dbs []redis.Config
-			if err := conf.Unmarshal("base_cfg.dependencies.db_instances", &dbs); err != nil {
-				return err
-			}
-			if err := rds.RedisMgr.InitAndRun(dbs); err != nil {
+			if err := rds.RedisMgr.OnStart(nil); err != nil {
 				return err
 			}
 			idGen, err := idgen.NewIDGen()
@@ -68,13 +63,11 @@ func NewApp() *runtime.App {
 			_ = conf.Unmarshal("base_cfg.dependencies.nacos_conf", &nacosConf)
 			if nacosConf.IPAddr != "" {
 				logger.Infof("Loading remote gameconf by Nacos group: %v ", nacosConf.GroupName)
-				// 经 lib/contrib/config/factory 构造配置中心 client，
-				// 由 gamedata.InitRemote 统一加载+热更；构造/拉取失败返回 error。
-				if err := gamedata.InitNacos(nacosConf); err != nil {
+				if err = gamedata.InitNacos(nacosConf); err != nil {
 					return err
 				}
 			}
-			return nil
+			return err
 		},
 		// Stop 时关闭 Redis 连接池，返回聚合 Close error，消除连接泄漏。
 		// 同时取消 Nacos gamedata 监听，回收监听 goroutine。
@@ -122,12 +115,13 @@ func NewApp() *runtime.App {
 	// TransMgr Drain 之后执行（注册顺序：roleFlush 在 transMgr 之后）。
 	roleFlush := &roleFlushComponent{}
 
-	// Start 顺序：datetime → logger → admin → tracing → 业务依赖 → SSRPC 注册
-	// → TransMgr → router/bus → SelfLogoutSender → roleTick(Task) → roleFlush(Drainer)。
-	// datetime_tick 放最前：logger/xorm 等启动期即读 datetime，需保证 ticker 已起。
+	// Start 顺序：datetime（WithConfLoader 自动注册，隐含在最前）→ logger → admin
+	// → tracing → 业务依赖 → SSRPC 注册 → TransMgr → router/bus → SelfLogoutSender
+	// → roleTick(Task) → roleFlush(Drainer)。datetime_tick 必须最前：logger/xorm 等
+	// 启动期即读 datetime，由 WithConfLoader 自动注册保证。
 	// 用 MustRegister 一次注册全部组件。
 	app.MustRegister(
-		scheduler.DefaultDateTimeTick(), logComp, adminComp, tracing,
+		logComp, adminComp, tracing,
 		businessDeps, registerHandlers, transMgr, routerComp,
 		selfLogout, roleTick, roleFlush,
 	)
