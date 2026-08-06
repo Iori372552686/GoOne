@@ -26,7 +26,6 @@ import (
 )
 
 // NewApp 用 runtime.App + Component 装配 mainsvr。服务名只在 MustNew 出现一次；
-// 标准组件（logger/admin/tracing/router）由 bussvc 构造器自读 conf 装配。
 func NewApp() *runtime.App {
 	// gamedata 本地目录加载作为 LoadConfig 的追加钩子，在校验通过后执行。
 	app := bussvc.MustNew("mainsvr", router.ReadyCheck, bussvc.WithConfLoader(func(_ context.Context) error {
@@ -38,8 +37,6 @@ func NewApp() *runtime.App {
 		}
 		return nil
 	}))
-
-	// 标准组件（datetime/logger/admin/tracing）由 bussvc.MustNew 集中注册。
 
 	// TransMgr：零配置即默认形态（DefaultShardCount 多分片 + 每键排队背压默认值）。
 	transMgr := &bussvc.TransMgrComponent{Mgr: globals.TransMgr}

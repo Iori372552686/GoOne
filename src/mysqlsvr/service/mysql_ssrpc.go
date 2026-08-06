@@ -15,9 +15,7 @@ import (
 )
 
 // MysqlServiceImpl is the IDL-driven ssrpc implementation for mysqlsvr internal RPCs.
-type MysqlServiceImpl struct{}
-
-var _ mysqlsvrv1.MysqlServiceSS = (*MysqlServiceImpl)(nil)
+type MysqlServiceImpl struct{ mysqlsvrv1.MysqlServiceSS }
 
 func (s *MysqlServiceImpl) UpdateRoleInfo(ctx *ssrpc.Context, req *g1_protocol.MysqlInnerUpdateRoleInfoReq) (*g1_protocol.MysqlInnerUpdateRoleInfoRsp, error) {
 	rsp := &g1_protocol.MysqlInnerUpdateRoleInfoRsp{Ret: &g1_protocol.Ret{Code: g1_protocol.ErrorCode_ERR_OK}}

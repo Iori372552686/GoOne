@@ -10,7 +10,9 @@ import (
 )
 
 // RoomCenterInnerServiceImpl is the IDL-driven ssrpc implementation for roomcentersvr internal commands.
-type RoomCenterInnerServiceImpl struct{}
+type RoomCenterInnerServiceImpl struct {
+	roomcenterv1.RoomCenterInnerServiceSS
+}
 
 func (s *RoomCenterInnerServiceImpl) Tick(ctx *ssrpc.Context, req *g1_protocol.InnerTickReq) (*emptypb.Empty, error) {
 	// Keep the exact same routing semantics as the legacy adapter:
@@ -62,8 +64,3 @@ func (s *RoomCenterInnerServiceImpl) DelRoomInfo(ctx *ssrpc.Context, req *g1_pro
 	}
 	return nil, nil
 }
-
-// Compile-time check (keeps us honest after proto regeneration).
-var _ roomcenterv1.RoomCenterInnerServiceSS = (*RoomCenterInnerServiceImpl)(nil)
-
-

@@ -1,7 +1,6 @@
 package service
 
 import (
-	connsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/connsvr/v1"
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/src/connsvr/globals"
@@ -10,8 +9,6 @@ import (
 
 // ConnServiceImpl is the IDL-driven ssrpc implementation for connsvr internal RPCs.
 type ConnServiceImpl struct{}
-
-var _ connsvrv1.ConnServiceSS = (*ConnServiceImpl)(nil)
 
 func (s *ConnServiceImpl) KickOut(ctx *ssrpc.Context, req *g1_protocol.ConnKickOutReq) (*g1_protocol.ConnKickOutRsp, error) {
 	if ctx == nil || req == nil {

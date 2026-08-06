@@ -295,7 +295,6 @@ func NewApp() *runtime.App {
 		return nil
 	}))
 
-	// 标准组件（datetime/logger/admin/tracing）由 bussvc.MustNew 集中注册。
 	web := &webRuntimeComponent{}
 	app.MustRegister(web)
 	return app
