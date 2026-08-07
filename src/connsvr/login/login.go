@@ -1,6 +1,8 @@
 package login
 
 import (
+	"context"
+
 	"github.com/Iori372552686/GoOne/lib/util/convert"
 	"github.com/Iori372552686/GoOne/src/connsvr/globals"
 )
@@ -42,7 +44,8 @@ func OnCheckAuthByAccSvr(accId string, token string, serverid uint32, loginType 
 		"login_type": loginType,
 	}
 
-	rsqBody, err := globals.RestMgr.GetRestIns().SignPostV2(header, nil, body)
+	bodyBytes := convert.StructToJson(body)
+	rsqBody, err := globals.RestMgr.GetRestIns().SignedPost(context.Background(), 0, nil, bodyBytes, header)
 	if err != nil {
 		return false, 0
 	}

@@ -53,9 +53,9 @@ func TestMapFields(t *testing.T) {
 	_ = file.SetSheetRow("Data", "A4", &[]interface{}{"all", "all", "all", "all"})
 	_ = file.SetSheetRow("Data", "A5", &[]interface{}{
 		"1",
-		"1:hp,2:mp,3:atk",       // int32 -> string
-		"hp:100,mp:50,speed:20", // string -> int64
-		"1:1:10|2:2:20",         // int32 -> Reward{ItemId:Count}，| 分隔元素，内部 ':' 需正确切分
+		"1:hp|2:mp|3:atk",       // int32 -> string: 元素'|', K:V ':'
+		"hp:100|mp:50|speed:20", // string -> int64
+		"1:1,10|2:2,20",         // int32 -> Reward{ItemId,Count}: K:V ':', 成员',', 元素'|'
 	})
 
 	if err := file.SaveAs(xlsxPath); err != nil {

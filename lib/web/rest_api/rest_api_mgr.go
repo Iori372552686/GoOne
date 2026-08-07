@@ -55,10 +55,18 @@ func (m *RestApiMgr) Count() int {
 
 // Init 为每个 Config 项构建并注册一个 RestApi 实例，
 // 并从 signs 解析其可选的 HttpSign 依赖。
+//
+// 构造失败的配置项（缺 ServiceName 或 Urls）会被跳过并以 Warning 上报，
+// 避免线上因静默丢弃而难以排查。
 func (m *RestApiMgr) Init(cfgs []Config, signs *http_sign.SignMgr) {
 	logger.Infof("RestApiMgr InsInit..")
 	for _, c := range cfgs {
-		m.SetRestIns(c.ServiceName, NewRestInstances(c, signs))
+		ins := NewRestApi(c, signs)
+		if ins == nil {
+			logger.Warningf("RestApiMgr skip invalid config | service=%q urls=%d", c.ServiceName, len(c.Urls))
+			continue
+		}
+		m.SetRestIns(c.ServiceName, ins)
 	}
-	logger.Infof("RestApiMgr InsInit... Done !")
+	logger.Infof("RestApiMgr InsInit... Done ! count=%d", m.Count())
 }

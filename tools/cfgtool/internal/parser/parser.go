@@ -132,6 +132,11 @@ func buildField(tab *base.Table, col int) (*base.Field, error) {
 		return nil, errs.New(tab.FileName, tab.Sheet, tab.Rows[1][col], 3, "类型错误", "数组最大仅支持到%d维: %s", domain.MaxArrayDepth, rawType)
 	}
 
+	// 外部 proto 类型（pb.XXX）分支：识别后走专用构造
+	if short, ok := manager.SplitExternalType(elemType); ok {
+		return buildExternalField(tab, col, short, arrayDepth)
+	}
+
 	typeOf := manager.GetTypeOf(elemType)
 	convFunc := manager.GetConvFunc(elemType)
 	if typeOf == domain.TypeOfBase && convFunc == nil {
@@ -158,6 +163,58 @@ func buildField(tab *base.Table, col int) (*base.Field, error) {
 	}, nil
 }
 
+// buildExternalField 构造引用外部 proto message/enum 的字段。
+// pb.XXX 语法解析后，XXX 在 externalMsgMgr/externalEnumMgr 中查表。
+// 能力与内置 struct/enum 对齐：支持单值、多维数组（map 由 buildMapField 单独处理 V）。
+// proto 生成时用裸短名（同包 g1.protocol），IsExternal 标记驱动 import 收集与反射赋值。
+func buildExternalField(tab *base.Table, col int, short string, arrayDepth int) (*base.Field, error) {
+	fieldName := tab.Rows[1][col]
+
+	isMsg := manager.IsExternalMsg(short)
+	isEnum := manager.IsExternalEnum(short)
+	if !isMsg && !isEnum {
+		return nil, errs.New(tab.FileName, tab.Sheet, fieldName, 3, "类型错误",
+			"外部proto类型未注册: pb.%s（请检查 -proto-src 目录是否包含定义该类型的 .proto）", short)
+	}
+
+	typeOf := domain.TypeOfStruct
+	if isEnum {
+		typeOf = domain.TypeOfEnum
+	}
+
+	container := domain.ContainerSingle
+	if arrayDepth > 0 {
+		container = domain.ContainerArray
+	}
+
+	return &base.Field{
+		Type: &base.Type{
+			Name:       short, // proto 字段类型用裸短名（同包 g1.protocol）
+			TypeOf:     typeOf,
+			ValueOf:    manager.GetValueOf(rawTypePlaceholder(arrayDepth)),
+			ArrayDepth: arrayDepth,
+			Container:  container,
+		},
+		Name:       fieldName,
+		Desc:       strings.ReplaceAll(tab.Rows[0][col], "\n", ""),
+		Position:   col,
+		IsExternal: true,
+	}, nil
+}
+
+// rawTypePlaceholder 生成一个仅用于 GetValueOf 判定 List/Base 的占位类型字符串。
+// 外部类型的 ValueOf 由数组维度决定，不依赖具体类型名。
+func rawTypePlaceholder(arrayDepth int) string {
+	if arrayDepth == 0 {
+		return "int32"
+	}
+	prefix := ""
+	for i := 0; i < arrayDepth; i++ {
+		prefix += "[]"
+	}
+	return prefix + "int32"
+}
+
 // buildMapField 构造 map[K]V 字段。
 // 本期能力边界：
 //   - K：标量（int*/uint*/string/bool），不接受 enum/float/double/struct/array（受 protobuf3 规范约束）
@@ -180,9 +237,21 @@ func buildMapField(tab *base.Table, col int, rawType, keyName, valName string) (
 	}
 
 	// ---- 校验 V ----
-	valConvFunc := manager.GetConvFunc(valName)
-	valTypeOf := manager.GetTypeOf(valName)
-	if valTypeOf == domain.TypeOfBase && valConvFunc == nil {
+	// V 可能是 pb.XXX 外部类型，剥前缀取短名
+	valShort, isExternalV := manager.SplitExternalType(valName)
+	valLookupName := valName
+	valNameForProto := manager.GetConvType(valName)
+	if isExternalV {
+		if !manager.IsExternalMsg(valShort) && !manager.IsExternalEnum(valShort) {
+			return nil, errs.New(tab.FileName, tab.Sheet, fieldName, 3, "类型错误",
+				"外部proto类型未注册: pb.%s", valShort)
+		}
+		valLookupName = valShort
+		valNameForProto = valShort // proto 用裸短名
+	}
+	valConvFunc := manager.GetConvFunc(valLookupName)
+	valTypeOf := manager.GetTypeOf(valLookupName)
+	if valTypeOf == domain.TypeOfBase && valConvFunc == nil && !isExternalV {
 		return nil, errs.New(tab.FileName, tab.Sheet, fieldName, 3, "类型错误", "未识别的类型: %s", valName)
 	}
 	// V 不允许数组/嵌套 map
@@ -197,7 +266,7 @@ func buildMapField(tab *base.Table, col int, rawType, keyName, valName string) (
 
 	return &base.Field{
 		Type: &base.Type{
-			Name:      manager.GetConvType(valName),
+			Name:      valNameForProto,
 			TypeOf:    valTypeOf,
 			Container: domain.ContainerMap,
 			KeyType: &base.Type{
@@ -205,10 +274,11 @@ func buildMapField(tab *base.Table, col int, rawType, keyName, valName string) (
 				TypeOf: domain.TypeOfBase,
 			},
 		},
-		Name:     fieldName,
-		Desc:     strings.ReplaceAll(tab.Rows[0][col], "\n", ""),
-		Position: col,
-		ConvFunc: valConvFunc, // V 的标量转换函数；结构体 V 由 data_gen 另走 parseStructMessage
+		Name:       fieldName,
+		Desc:       strings.ReplaceAll(tab.Rows[0][col], "\n", ""),
+		Position:   col,
+		ConvFunc:   valConvFunc, // V 的标量转换函数；结构体 V 由 data_gen 另走 parseStructMessage
+		IsExternal: isExternalV, // map value 引用外部类型时标记
 	}, nil
 }
 

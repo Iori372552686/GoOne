@@ -22,8 +22,9 @@ image
 更详细的运行时与协议说明见：
 
 - `[docs/ssrpc_idl.md](docs/ssrpc_idl.md)`（ssrpc / IDL 方案）
-- `[docs/architecture_review_2026-07-v2.md](docs/architecture_review_2026-07-v2.md)`（架构复审 v2：生命周期、模块化与性能治理）
-- `[docs/optimization_roadmap.md](docs/optimization_roadmap.md)`（核心现代化 P0/P1/P2 执行计划）
+- `[docs/modernization_execution_plan_2026-07-v4.md](docs/modernization_execution_plan_2026-07-v4.md)`（V4 生产闭环现代化实施计划：当前主计划）
+- `[docs/architecture_review_2026-07-v2.md](docs/architecture_review_2026-07-v2.md)`（架构复审 v2：生命周期、模块化与性能治理 · 历史归档，已被 v4 取代）
+- `[docs/optimization_roadmap.md](docs/optimization_roadmap.md)`（核心现代化 P0/P1/P2 执行计划 · 历史归档，已被 v4 取代）
 - `[docs/STYLE.md](docs/STYLE.md)`（代码风格规范）
 - `[docs/observability/README.md](docs/observability/README.md)`（可观测性：指标 / Trace / 日志）
 - `[docs/benchmarks/baseline.md](docs/benchmarks/baseline.md)`（性能基线与优化对比）
@@ -35,14 +36,14 @@ image
 - **工程化**：提供统一的控制台入口 `main.sh`，把常用操作标准化（doctor/go/docker/build/deploy）
 - **可扩展**：注册中心 / 配置中心 / 消息总线均采用接口 + 工厂抽象，便于替换实现
 - **易落地**：提供 `deploy/`（Ansible）与 `etc/env/`（Docker 依赖环境）开箱即用
-- **高性能导向**：网络层支持 tcp/kcp/ws，多服务按 busId 路由通信
+- **高性能导向**：网络层支持 tcp/kcp/ws（及 gnet 实现），多服务按 busId 路由通信
 
 ---
 
 ## 3. 功能模块
 
 - **ssrpc 运行时**：`lib/service/ssrpc/*` -- IDL 驱动的统一 RPC runtime / codegen（当前 SSPacket/HTTP/WS 已接入，gRPC 支持 unary + server-streaming）
-- **网络层**：`lib/net/*`（tcp/kcp/ws）
+- **网络层**：`lib/net/*`（tcp/kcp/ws，及基于 gnet 的实现，含接入管理层 `net_mgr`）
 - **服务注册发现**：`lib/contrib/registry/*`（默认 ZooKeeper，支持 etcd/consul/nacos/k8s 等）
 - **配置中心**：`lib/contrib/config/*`（支持 apollo/etcd/consul/nacos/k8s 等，并提供本地 Manager 聚合/热更新）
 - **消息总线（Bus）**：`lib/service/bus/*`（RabbitMQ / NSQ / NATS / Kafka / RocketMQ，统一 `IBus` 接口）
@@ -122,8 +123,8 @@ Windows / PowerShell：
 - `ws` 当前仍要求有 cmd 绑定
 - gRPC server-streaming method 当前必须是 grpc-only
 - generator 当前支持 gRPC unary 与 server-streaming 自动注册；client-streaming / bidi-streaming 尚未支持
-- 主线已在 `game_protocol/websvr.proto` 启用 `grpc: true`（`Ping` / `WatchPing`）作为真实生成示例
-- `web_svr` 已接入可选的 `grpc_server` listener 配置；其他服务若要对外监听 gRPC，仍需各自在 app 层挂载
+- gRPC 通路（option 字段 `grpc` / `grpc_service` 定义于 `api/proto/goone/options/v1/options.proto`，runtime `WrapGRPCUnary` / `WrapGRPCServerStreamTyped` / `MountGRPC` 与 codegen 均就绪）当前**尚无业务 method 显式声明 `grpc: true`**；`game_protocol/proto/service/websvr.proto` 的 `Ping` / `MsgSecCheck` 目前均走 HTTP（`http_path`），未来按需 opt-in 即可
+- `web_svr` 已接入可选的 `grpc_server` listener 配置（`enabled` / `port` / `reflection`），其他服务若要对外监听 gRPC，仍需各自在 app 层挂载
 - `web_svr` 的 gRPC listener 已附带标准 health / reflection，便于本地调试
 
 ---
@@ -288,7 +289,7 @@ lib/        框架核心库
   lib/service/ssrpc/    ssrpc 运行时（Context/Dispatcher/Middleware/Wrap*/Client）
   lib/service/bus/      消息总线（RabbitMQ/NATS/Kafka/...）
   lib/service/router/   路由与服务编排
-  lib/net/              网络层（tcp/kcp/ws）
+  lib/net/              网络层（tcp/kcp/ws，含 gnet 实现与 net_mgr 接入层）
   lib/contrib/          注册中心 / 配置中心
 src/        业务服务（connsvr/mainsvr/infosvr/web_svr/roomcentersvr/mysqlsvr）
 tools/      工具链

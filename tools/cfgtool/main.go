@@ -25,6 +25,7 @@ func main() {
 	flag.StringVar(&domain.XlsxPath, "xlsx", "./xls", "cfg文件目录")
 	flag.StringVar(&domain.TextPath, "text", "", "pb text数据文件目录")
 	flag.StringVar(&domain.ProtoPath, "proto", "", "proto文件目录")
+	flag.StringVar(&domain.ProtoSrcPath, "proto-src", "", "外部proto源文件目录（用于pb.XXX类型引用检索，如 game_protocol/proto）")
 	flag.StringVar(&domain.JsonPath, "json", "", "json数据文件目录")
 	flag.StringVar(&domain.BytesPath, "bytes", "", "pb bytes数据文件目录")
 	flag.StringVar(&domain.LuaPath, "lua", "", "lua数据文件目录")
@@ -76,6 +77,13 @@ func run() error {
 	files, err := base.Glob(domain.XlsxPath, ".*\\.xlsx", true)
 	if err != nil {
 		return errs.Wrap(err, "", "", "", 0, "加载错误", "扫描xlsx目录失败")
+	}
+	// 预加载外部 proto（必须在 ParseFiles 之前，使 buildField 能识别 pb.XXX 类型、
+	// parseReference 能收集外部 import）。留空则跳过。
+	if len(domain.ProtoSrcPath) > 0 {
+		if err := manager.LoadExternalProtos(domain.ProtoSrcPath); err != nil {
+			return errs.Wrap(err, "", "", "", 0, "加载错误", "加载外部proto失败")
+		}
 	}
 	// 解析所有文件
 	if err := parser.ParseFiles(files...); err != nil {

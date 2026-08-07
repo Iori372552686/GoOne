@@ -25,13 +25,14 @@ const (
 )
 
 var (
-	Version      = "1.0.7"       // 当前版本号
+	Version      = "1.0.8"       // 当前版本号
 	Module       = ""            // 项目目录
 	ConfMode     = ""            // 配置gen模式（all：全部  client：客户端  server：服务器）；xlsx第四行支持 key/KEY 标记主键索引
 	ProtoPkgName = "g1.protocol" // proto包名
 	PkgName      = ""            // 包名
 	XlsxPath     = ""            // 解析文件路径
-	ProtoPath    = ""            // proto文件路径
+	ProtoPath    = ""            // proto文件路径（输出）
+	ProtoSrcPath = ""            // 外部 proto 源文件目录（输入，用于 pb.XXX 类型引用检索）
 	PbPath       = ""            // proto生成路径
 	CodePath     = ""            // 代码生成路径
 	CppPath      = ""            // C++代码生成路径

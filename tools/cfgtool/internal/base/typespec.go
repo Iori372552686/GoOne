@@ -26,6 +26,9 @@ type Field struct {
 	Desc     string
 	Position int
 	ConvFunc func(string) interface{} // 装换函数
+	// IsExternal 表示该字段类型引用自外部 proto（pb.XXX 语法）。
+	// 用于 parseReference 收集外部 import、data_gen 走反射驱动赋值。
+	IsExternal bool
 }
 
 type Struct struct {

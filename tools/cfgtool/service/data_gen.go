@@ -8,14 +8,27 @@ import (
 	"github.com/Iori372552686/GoOne/tools/cfgtool/internal/errs"
 	"github.com/Iori372552686/GoOne/tools/cfgtool/internal/logx"
 	"github.com/Iori372552686/GoOne/tools/cfgtool/internal/manager"
+	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"strings"
 )
 
-var (
-	scalarArrayDelimiters = []string{",", "|", ";"}
-	structArrayDelimiters = []string{"|", ";", "^"}
-)
+// arrayDelimiters 是数组/Map 元素的层级分隔符表（类型无关）。
+// 设计原则（鲁班式「纯层级化」）：
+//   - 分隔符仅表达「第几维」，与元素是标量还是结构体无关 —— 标量与结构体同一维度用同一符号
+//   - 层级递进：第1维 |（最细）→ 第2维 ; → 第3维 ^（最粗）
+//   - 与结构体成员分隔符 ',' 和 map K-V 分隔符 ':' 完全正交，无歧义
+//
+// 示例：
+//
+//	[]int32        → 1|2|3
+//	[][]int64      → 1|2;3|4
+//	[]Reward       → 1,10|2,20        (结构体成员用 ',')
+//	map[int32]Reward → 1:1,10|2:2,20  (K:V 用 ':', 元素间用 '|')
+var arrayDelimiters = []string{"|", ";", "^"}
+
+// mapFieldDelim 是 map 元素之间的分隔符（恒为数组第 1 维，与 value 类型无关）。
+const mapFieldDelim = "|"
 
 func GenData() error {
 	for _, cfg := range manager.GetConfigMap() {
@@ -234,6 +247,10 @@ func parseFieldValue(file, sheet string, field *base.Field, rowIndex int, raw st
 	case domain.TypeOfBase, domain.TypeOfEnum:
 		return field.ConvFunc(raw), nil
 	case domain.TypeOfStruct:
+		// 外部 proto message：走反射驱动的赋值路径
+		if field.IsExternal {
+			return parseExternalMessage(file, sheet, field.Name, field.Type.Name, rowIndex, raw)
+		}
 		st := manager.GetStruct(field.Type.Name)
 		if st == nil {
 			return nil, errs.New(file, sheet, field.Name, rowIndex, "结构体类型不存在", "找不到结构体类型: %s", field.Type.Name)
@@ -249,7 +266,8 @@ func parseStructMessage(f *base.Struct, rowIndex int, raw string) (*dynamic.Mess
 		return nil, uerror.New(1, -1, "new %s is nil", f.Name)
 	}
 
-	strs := strings.Split(raw, ":")
+	// 结构体成员按 ',' 分隔（叶子层；与数组 '|' 和 map K:V ':' 正交，无歧义）
+	strs := strings.Split(raw, ",")
 	if len(strs) > len(f.FieldList) {
 		return nil, errs.New(f.FileName, f.Sheet, "", rowIndex, "结构体字段数不匹配",
 			"结构体=%s 传入元素数=%d 超过定义字段数=%d, 原始值=%q", f.Name, len(strs), len(f.FieldList), raw)
@@ -271,10 +289,129 @@ func parseStructMessage(f *base.Struct, rowIndex int, raw string) (*dynamic.Mess
 	return item, nil
 }
 
-// parseMapValue 解析 map[K]V 字段的单元格字符串，返回可塞入 dynamic.Message 的 map。
-// 元素分隔符：value 为结构体用 '|'（避开结构体内部 ':'），标量/枚举用 ','。
-// 每个元素用 SplitN(":",2) 切分——只在第一个冒号处分开 K 与 V，
-// 使结构体 V（其内部字段也以 ':' 分隔）不受影响。
+// parseExternalMessage 解析引用外部 proto message 的字段值。
+// 与 parseStructMessage 不同，外部 message 的字段布局不在 structMgr 中，
+// 而是从 proto descriptor 反射获取（GetFields），按定义顺序从 raw 的 ',' 分隔项取值。
+// 每个字段按 proto 类型（标量/enum/message/repeated）转换：
+//   - 标量/enum：走 convertMgr 转换（enum 视为 int32）
+//   - message：递归 parseExternalMessage（嵌套结构用 ',' 不便表达，本期按需）
+//   - repeated：按 '|' 分隔后逐元素转换
+//
+// fieldName 是 xlsx 字段名（用于错误定位），msgShortName 是外部 message 短名（如 Reward）。
+func parseExternalMessage(file, sheet, fieldName, msgShortName string, rowIndex int, raw string) (*dynamic.Message, error) {
+	item := manager.NewProto("", msgShortName)
+	if item == nil {
+		return nil, errs.New(file, sheet, fieldName, rowIndex, "外部类型构造失败",
+			"无法构造外部 message: %s（请确认 -proto-src 已加载且 proto 已解析）", msgShortName)
+	}
+
+	fields := item.GetMessageDescriptor().GetFields()
+	strs := strings.Split(raw, ",")
+	if len(strs) > len(fields) {
+		return nil, errs.New(file, sheet, fieldName, rowIndex, "外部结构体字段数不匹配",
+			"message=%s 定义字段数=%d 传入元素数=%d, 原始值=%q", msgShortName, len(fields), len(strs), raw)
+	}
+
+	for i, fd := range fields {
+		if i >= len(strs) {
+			break
+		}
+		cell := strs[i]
+		if strings.TrimSpace(cell) == "" {
+			continue
+		}
+		if err := assignExternalField(item, fd, cell, file, sheet, fieldName, rowIndex); err != nil {
+			return nil, err
+		}
+	}
+	return item, nil
+}
+
+// assignExternalField 按单个 proto 字段描述符，把单元格字符串值赋给 dynamic.Message。
+func assignExternalField(msg *dynamic.Message, fd *desc.FieldDescriptor, cell, file, sheet, fieldName string, rowIndex int) error {
+	// repeated 字段（非 map）：按 '|' 分隔后逐元素追加
+	if fd.IsRepeated() && !fd.IsMap() {
+		parts := strings.Split(cell, arrayDelimiters[0])
+		values := make([]interface{}, 0, len(parts))
+		for _, p := range parts {
+			if strings.TrimSpace(p) == "" {
+				continue
+			}
+			v, err := convertExternalScalar(msg, fd, p, file, sheet, fieldName, rowIndex)
+			if err != nil {
+				return err
+			}
+			values = append(values, v)
+		}
+		if len(values) == 0 {
+			return nil
+		}
+		return safeSetRepeatedFieldByName(msg, fd.GetName(), values, file, sheet, fd.GetName(), fd.GetName(), rowIndex)
+	}
+
+	v, err := convertExternalScalar(msg, fd, cell, file, sheet, fieldName, rowIndex)
+	if err != nil {
+		return err
+	}
+	if v == nil {
+		return nil
+	}
+	return safeSetField(msg, fd.GetName(), v, file, sheet, fd.GetName(), fd.GetName(), rowIndex)
+}
+
+// convertExternalScalar 把单元格字符串按 proto 字段类型转换为 Go 值。
+// 标量/enum 走 convertMgr（enum 视为 int32），message 字段递归 parseExternalMessage。
+func convertExternalScalar(msg *dynamic.Message, fd *desc.FieldDescriptor, cell, file, sheet, fieldName string, rowIndex int) (interface{}, error) {
+	// message 字段：递归解析
+	if mt := fd.GetMessageType(); mt != nil {
+		return parseExternalMessage(file, sheet, fd.GetName(), mt.GetName(), rowIndex, cell)
+	}
+	// enum 字段：按短名查枚举转换，否则按 int32
+	if ed := fd.GetEnumType(); ed != nil {
+		if convFunc := manager.GetConvFunc(ed.GetName()); convFunc != nil {
+			return convFunc(cell), nil
+		}
+		return manager.GetConvFunc("int32")(cell), nil
+	}
+	// 标量：用 proto 类型名查 convertMgr
+	convName := protoTypeToConvName(fd.GetType().String())
+	convFunc := manager.GetConvFunc(convName)
+	if convFunc == nil {
+		return nil, errs.New(file, sheet, fieldName, rowIndex, "外部标量类型不支持",
+			"字段=%s proto类型=%s", fd.GetName(), fd.GetType().String())
+	}
+	return convFunc(cell), nil
+}
+
+// protoTypeToConvName 把 proto 类型字符串（fd.GetType().String()，如 "TYPE_INT32"）
+// 映射到 convertMgr 的标量名。
+func protoTypeToConvName(typeStr string) string {
+	switch typeStr {
+	case "TYPE_INT32", "TYPE_SINT32", "TYPE_SFIXED32":
+		return "int32"
+	case "TYPE_INT64", "TYPE_SINT64", "TYPE_SFIXED64":
+		return "int64"
+	case "TYPE_UINT32", "TYPE_FIXED32":
+		return "uint32"
+	case "TYPE_UINT64", "TYPE_FIXED64":
+		return "uint64"
+	case "TYPE_FLOAT":
+		return "float"
+	case "TYPE_DOUBLE":
+		return "double"
+	case "TYPE_BOOL":
+		return "bool"
+	case "TYPE_STRING":
+		return "string"
+	default:
+		return "string"
+	}
+}
+
+// 分隔符约定（类型无关）：
+//   - 元素之间统一用 mapFieldDelim('|')，无论 value 是标量还是结构体
+//   - 每个 K:V 用 ':' 分隔，按首个 ':' 切分（SplitN 2）
+//     因结构体成员已改用 ','、数组用 '|'，value 内部不含 ':'，故 K/V 切分天然无歧义
 func parseMapValue(file, sheet string, field *base.Field, rowIndex int, raw string) (interface{}, error) {
 	keyType := field.Type.KeyType
 	if keyType == nil {
@@ -285,19 +422,13 @@ func parseMapValue(file, sheet string, field *base.Field, rowIndex int, raw stri
 		return nil, errs.New(file, sheet, field.Name, rowIndex, "类型错误", "map key 转换函数缺失: %s", keyType.Name)
 	}
 
-	// value 是结构体时走结构体分隔符集（'|'），否则用标量分隔符（','）
-	delim := scalarArrayDelimiters[0]
-	if field.Type.TypeOf == domain.TypeOfStruct {
-		delim = structArrayDelimiters[0]
-	}
-
-	parts := strings.Split(raw, delim)
+	parts := strings.Split(raw, mapFieldDelim)
 	result := make(map[interface{}]interface{}, len(parts))
 	for _, part := range parts {
 		if strings.TrimSpace(part) == "" {
 			continue
 		}
-		// 只在第一个 ':' 切 K/V，保护结构体 V 内部的 ':'
+		// 只在第一个 ':' 切 K/V；value 内部（结构体 ',' / 数组 '|'）不含 ':'，无歧义
 		kv := strings.SplitN(part, ":", 2)
 		if len(kv) != 2 {
 			return nil, errs.New(file, sheet, field.Name, rowIndex, "map 元素格式错误",
@@ -318,6 +449,14 @@ func parseMapValue(file, sheet string, field *base.Field, rowIndex int, raw stri
 		case domain.TypeOfBase, domain.TypeOfEnum:
 			val = field.ConvFunc(valStr)
 		case domain.TypeOfStruct:
+			// 外部 proto message 作为 map value：走反射驱动赋值
+			if field.IsExternal {
+				val, err = parseExternalMessage(file, sheet, field.Name, field.Type.Name, rowIndex, valStr)
+				if err != nil {
+					return nil, err
+				}
+				break
+			}
 			st := manager.GetStruct(field.Type.Name)
 			if st == nil {
 				return nil, errs.New(file, sheet, field.Name, rowIndex, "结构体类型不存在",
@@ -337,7 +476,7 @@ func parseMapValue(file, sheet string, field *base.Field, rowIndex int, raw stri
 }
 
 func parseArrayValue(file, sheet string, field *base.Field, rowIndex int, raw string, depth int) ([]interface{}, error) {
-	delimiter, err := arrayDelimiter(field.Type.TypeOf, depth)
+	delimiter, err := arrayDelimiter(depth)
 	if err != nil {
 		return nil, errs.New(file, sheet, field.Name, rowIndex, "类型错误", "%s", err.Error())
 	}
@@ -377,6 +516,10 @@ func parseArrayElement(file, sheet string, field *base.Field, rowIndex int, raw 
 	case domain.TypeOfBase, domain.TypeOfEnum:
 		return field.ConvFunc(raw), nil
 	case domain.TypeOfStruct:
+		// 外部 proto message 数组元素：走反射驱动赋值
+		if field.IsExternal {
+			return parseExternalMessage(file, sheet, field.Name, field.Type.Name, rowIndex, raw)
+		}
 		st := manager.GetStruct(field.Type.Name)
 		if st == nil {
 			return nil, errs.New(file, sheet, field.Name, rowIndex, "结构体类型不存在", "找不到结构体类型: %s", field.Type.Name)
@@ -386,16 +529,13 @@ func parseArrayElement(file, sheet string, field *base.Field, rowIndex int, raw 
 	return nil, nil
 }
 
-func arrayDelimiter(typeOf, depth int) (string, error) {
+// arrayDelimiter 返回第 depth 维数组的元素分隔符（类型无关）。
+// 标量与结构体数组共用同一张层级表，不再按 typeOf 区分。
+func arrayDelimiter(depth int) (string, error) {
 	if depth <= 0 || depth > domain.MaxArrayDepth {
 		return "", fmt.Errorf("数组最大仅支持到%d维", domain.MaxArrayDepth)
 	}
-
-	delimiters := scalarArrayDelimiters
-	if typeOf == domain.TypeOfStruct || typeOf == domain.TypeOfConfig {
-		delimiters = structArrayDelimiters
-	}
-	return delimiters[depth-1], nil
+	return arrayDelimiters[depth-1], nil
 }
 
 // 安全包装，捕获 dynamic.Message SetFieldByName 的 panic，转为可读错误

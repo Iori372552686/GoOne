@@ -1,236 +1,193 @@
 package rest_api
 
 import (
+	"context"
 	"errors"
+	"sync/atomic"
+	"time"
 
+	apiclient "github.com/Iori372552686/GoOne/lib/api/http_client"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/util/convert"
-	"github.com/Iori372552686/GoOne/lib/web/http_client"
-	http_sign2 "github.com/Iori372552686/GoOne/lib/web/http_sign"
-
-	"math/rand"
+	"github.com/Iori372552686/GoOne/lib/web/http_sign"
 )
 
-/**
- * RestApi
- * @Description:
-**/
-type RestApi struct {
-	serviceName string               //服务名
-	urlAddr     *UrlConfig           //url addrs
-	signName    string               //sign indexName
-	signImpl    *http_sign2.HttpSign //sign impl
+// errNoSign 表示需要签名但该实例未装配 HttpSign。
+var errNoSign = errors.New("rest_api: sign instance not configured")
 
-	//private
-	user     string
-	password string
+// RestApi 是带可选签名与多后端分片的轻量出站 HTTP 客户端。
+//
+// 设计要点：
+//   - 底层统一委托 lib/api/http_client.Client.DoRequest，天然获得 context 感知、
+//     TLS 严格校验、响应体上限、非 2xx 错误处理；不再走 lib/web/http_client 垫层；
+//   - 多 URL 采用 uin 取模分片，uin==0 时 atomic 自增轮询，并发安全且确定；
+//   - 签名链路复用 http_sign：对调用方 query map 做防御性 clone，避免就地改写；
+//   - 超时分层：ctx 自带 deadline 优先 → 实例 Timeout > 0 → 底层默认 8s。
+type RestApi struct {
+	serviceName string                   // 服务名，仅用于日志与错误归属
+	urls        *urlPool                 // 后端地址池
+	sign        *http_sign.HttpSign      // 可选签名实例
+	client      *apiclient.Client        // 底层统一 HTTP 客户端
+	timeout     time.Duration            // 兜底超时；0 表示复用底层默认
 }
 
-/**
-* @Description: new  restapi impl
-* @param: conf
-* @return: *RestApi
-* @Author: Iori
-* @Date: 2022-07-06 15:14:20
-**/
-func NewRestInstances(conf Config, signs *http_sign2.SignMgr) *RestApi {
-	//check args
+// Option 配置 RestApi，遵循 GoOne functional options 惯例（见 http_client.NewClient）。
+type Option func(*RestApi)
+
+// WithHTTPClient 注入自定义底层客户端，主要用于测试或共享特殊传输层。
+// 传 nil 视作未设置，保留 NewClient(nil) 默认。
+func WithHTTPClient(c *apiclient.Client) Option {
+	return func(r *RestApi) {
+		if c != nil {
+			r.client = c
+		}
+	}
+}
+
+// WithTimeout 设置兜底超时；仅当调用方 ctx 无 deadline 时生效。
+// d<=0 视作未设置，复用底层 Client 的默认超时。
+func WithTimeout(d time.Duration) Option {
+	return func(r *RestApi) {
+		if d > 0 {
+			r.timeout = d
+		}
+	}
+}
+
+// NewRestApi 依据 Config 构造 RestApi 实例。
+//
+// 必填：ServiceName 非空且 Urls 至少一项，否则返回 nil（由调用方决定是否报警）。
+// signs 非 nil 且 conf.SignName 非空时，按名解析 HttpSign；解析不到则该实例不签名。
+func NewRestApi(conf Config, signs *http_sign.SignMgr, opts ...Option) *RestApi {
 	if conf.ServiceName == "" || len(conf.Urls) == 0 {
 		return nil
 	}
 
-	//new obj
-	impl := &RestApi{}
-	impl.serviceName = conf.ServiceName
-	impl.urlAddr = NewUrlConf(conf.Urls)
-	impl.user = conf.User
-	impl.password = conf.Pass
-	impl.signName = conf.SignName
+	r := &RestApi{
+		serviceName: conf.ServiceName,
+		urls:        newUrlPool(conf.Urls),
+		client:      apiclient.NewClient(nil),
+	}
 	if signs != nil && conf.SignName != "" {
-		impl.signImpl = signs.GetSignIns(conf.SignName)
+		r.sign = signs.GetSignIns(conf.SignName)
+	}
+	if conf.Timeout > 0 {
+		r.timeout = time.Duration(conf.Timeout) * time.Second
+	}
+	for _, o := range opts {
+		o(r)
 	}
 
-	logger.Infof("[%v] RestIns Init. ", conf.ServiceName)
-	return impl
+	logger.Infof("[%s] RestApi init | urls=%d sign=%t timeout=%s",
+		conf.ServiceName, len(conf.Urls), r.sign != nil, r.timeout)
+	return r
 }
 
-/**
-* @Description:  创建url实例
-* @param: urls
-* @return: config
-* @Author: Iori
-* @Date: 2022-07-06 15:12:21
-**/
-func NewUrlConf(urls []string) (config *UrlConfig) {
-	count := len(urls)
-	if count <= 0 {
+// newUrlPool 构造后端地址池；urls 为空时返回 nil（构造时已拦截，此处兜底）。
+func newUrlPool(urls []string) *urlPool {
+	if len(urls) == 0 {
 		return nil
 	}
-
-	config = &UrlConfig{Urls: urls, UrlCount: int64(count)}
-	return
+	return &urlPool{urls: urls}
 }
 
-/**
-* @Description: 根据uin hash获取
-* @param: uin
-* @return: string
-* @Author: Iori
-* @Date: 2022-07-06 15:12:24
-**/
-func (self *UrlConfig) GetHashUrl(uin ...int64) string {
-	if self.UrlCount == 1 {
-		return self.Urls[0]
-	}
-
-	if uin == nil || uin[0] == 0 {
-		uin = make([]int64, 1)
-		uin[0] = int64(rand.Intn(int(self.UrlCount)))
-	}
-
-	return self.Urls[uin[0]%self.UrlCount]
+// urlPool 维护后端地址列表，并发安全地按 uin 取模分片或轮询。
+type urlPool struct {
+	urls []string
+	seq  atomic.Uint64 // uin==0 时的轮询计数器
 }
 
-//--------------------------------------- func -------------------
+// pick 返回目标后端地址。uin!=0 时取模分片，uin==0 时 atomic 自增轮询。
+func (p *urlPool) pick(uin int64) string {
+	if len(p.urls) == 1 {
+		return p.urls[0]
+	}
+	var idx uint64
+	if uin != 0 {
+		idx = uint64(uin) % uint64(len(p.urls))
+	} else {
+		idx = p.seq.Add(1) % uint64(len(p.urls))
+	}
+	return p.urls[idx]
+}
 
-/**
-* @Description: 带签名的get请求
-* @param: uin
-* @param: uriMap
-* @return: map[string]interface{}
-* @return: error
-* @Author: Iori
-* @Date: 2022-07-06 17:11:14
-**/
-func (self *RestApi) SignGet(uin int64, uriMap map[string]string) ([]byte, error) {
-	if self == nil || self.signImpl == nil {
-		return nil, errors.New("signImpl  is nil ,not signReq !")
+// Get 发起普通 GET 请求，query 序列化进 URL；不做签名。
+func (r *RestApi) Get(ctx context.Context, uin int64, query map[string]string) ([]byte, error) {
+	return r.do(ctx, "GET", uin, query, nil, nil, false)
+}
+
+// SignedGet 发起带签名的 GET 请求：签名写入 query string（与历史报文格式一致）。
+func (r *RestApi) SignedGet(ctx context.Context, uin int64, query map[string]string) ([]byte, error) {
+	return r.do(ctx, "GET", uin, query, nil, nil, true)
+}
+
+// Post 发起普通 POST 请求；body 为原始字节（已是 JSON 序列化结果），headers 可为 nil。
+func (r *RestApi) Post(ctx context.Context, uin int64, body []byte, headers map[string]string) ([]byte, error) {
+	return r.do(ctx, "POST", uin, nil, body, headers, false)
+}
+
+// SignedPost 发起带签名的 POST 请求：
+//   - query 走 query string 并参与签名；
+//   - body 既作为签名内容也作为请求体；
+//   - headers 透传（如 Authorization、Content-Type），不参与签名。
+//
+// query 会做防御性 clone，调用方原始 map 不被就地改写。
+func (r *RestApi) SignedPost(ctx context.Context, uin int64, query map[string]string, body []byte, headers map[string]string) ([]byte, error) {
+	return r.do(ctx, "POST", uin, query, body, headers, true)
+}
+
+// do 是所有请求方法的统一骨架。
+//
+// 出错统一返回 (nil, err)，绝不把 URL/部分 body 当作响应体返回（修复历史 Get 的缺陷）。
+// 日志带上 serviceName 以便跨服务排障。
+func (r *RestApi) do(ctx context.Context, method string, uin int64, query map[string]string, body []byte, headers map[string]string, sign bool) ([]byte, error) {
+	if r == nil {
+		return nil, errors.New("rest_api: nil receiver")
 	}
 
-	url := self.urlAddr.GetHashUrl(uin) + http_sign2.Map2uri(self.signImpl.PushSign(uriMap, nil), "", true, false)
-	rspBody, err := http_client.HttpGetRequest(url, "")
+	// 兜底超时：仅当调用方 ctx 无 deadline 且实例配置了 timeout 时包裹一层。
+	if sign {
+		if r.sign == nil {
+			return nil, errNoSign
+		}
+		query = signedQuery(r.sign, query, body)
+	}
+
+	url := r.urls.pick(uin) + http_sign.Map2uri(query, "", true, false)
+
+	ctx, cancel := applyTimeout(ctx, r.timeout)
+	if cancel != nil {
+		defer cancel()
+	}
+
+	resp, err := r.client.DoRequest(ctx, method, url, convert.Bytes2str(body), headers)
 	if err != nil {
-		logger.Errorf("SignGet Request err | %v", err.Error())
+		logger.Errorf("[%s] %s request err | url=%s err=%v", r.serviceName, method, url, err)
 		return nil, err
 	}
-
-	return rspBody, nil
+	return resp, nil
 }
 
-/**
-* @Description: get请求
-* @param: uin
-* @param: uriMap
-* @return: map[string]interface{}
-* @return: error
-* @Author: Iori
-* @Date: 2022-07-06 17:11:14
-**/
-func (self *RestApi) Get(uin int64, uriMap map[string]string) ([]byte, error) {
-	if self == nil {
-		return nil, errors.New("impl is nil ,not Get !")
+// signedQuery 对 (clone(query) + body) 做签名，返回带 timestamp/sign 等字段的 query map。
+//
+// 防御性 clone：http_sign.PushSign 会就地写入时间戳与签名字段，
+// 此处复制一份，保证调用方原始 map 不被改写（修复历史就地变异隐患）。
+func signedQuery(sign *http_sign.HttpSign, query map[string]string, body []byte) map[string]string {
+	q := make(map[string]string, len(query)+4)
+	for k, v := range query {
+		q[k] = v
 	}
-
-	//req get
-	url := self.urlAddr.GetHashUrl(uin) + http_sign2.Map2uri(uriMap, "", true, false)
-	rspBody, err := http_client.HttpGetRequest(url, "")
-	if err != nil {
-		logger.Errorf("Get Request err | %v", err.Error())
-		return convert.Str2bytes(url), err
-	}
-
-	return rspBody, nil
+	return sign.PushSign(q, body)
 }
 
-/**
-* @Description: 带签名的post,新规范请求
-* @param: uin
-* @param: uriMap
-* @return: map[string]interface{}
-* @return: error
-* @Author: Iori
-* @Date: 2022-07-06 17:11:32
-**/
-func (self *RestApi) SignPost(common_param, actions map[string]interface{}) ([]byte, error) {
-	if self == nil || self.signImpl == nil || actions == nil {
-		return nil, errors.New("SignImpl or actions  is nil ,not signReq !")
+// applyTimeout 在 ctx 无 deadline 且 d>0 时叠加 WithTimeout，返回新 ctx 与 cancel。
+// cancel 为 nil 表示未包裹，调用方不应 defer。
+func applyTimeout(ctx context.Context, d time.Duration) (context.Context, context.CancelFunc) {
+	if d <= 0 {
+		return ctx, nil
 	}
-
-	uin := int64(0)
-	uriMap := make(map[string]string)
-	if common_param != nil && common_param["uin"] != nil {
-		uin = common_param["uin"].(int64)
+	if _, ok := ctx.Deadline(); ok {
+		return ctx, nil
 	}
-
-	//gen body
-	bodystr := convert.StructToJson(&map[string]interface{}{"common_param": common_param, "actions": actions})
-	rspBody, err := http_client.HttpPostRequest(self.urlAddr.GetHashUrl(uin)+
-		http_sign2.Map2uri(self.signImpl.PushSign(uriMap, bodystr), "", true, false), convert.Bytes2str(bodystr))
-	if err != nil {
-		logger.Errorf("SignPost Request err | %v", err.Error())
-		return nil, err
-	}
-
-	return rspBody, nil
-}
-
-/**
-* @Description: post新规范请求
-* @param: uin
-* @param: uriMap
-* @return: map[string]interface{}
-* @return: error
-* @Author: Iori
-* @Date: 2022-07-06 17:11:32
-**/
-func (self *RestApi) Post(common_param, actions map[string]interface{}) ([]byte, error) {
-	if self == nil || actions == nil {
-		return nil, errors.New("body is nil,not Post Req !")
-	}
-
-	uin := int64(0)
-	if common_param != nil && common_param["uin"] != nil {
-		uin = int64(common_param["uin"].(float64))
-	}
-
-	//gen body
-	bodystr := convert.StructToJsonStr(&map[string]interface{}{"common_param": common_param, "actions": actions})
-	rspBody, err := http_client.HttpPostRequest(self.urlAddr.GetHashUrl(uin), bodystr)
-	if err != nil {
-		logger.Errorf("Post Request err | %v", err.Error())
-		return nil, err
-	}
-
-	return rspBody, nil
-}
-
-/**
-* @Description: 带签名的post,不带规范
-* @param: uin
-* @param: uriMap
-* @return: map[string]interface{}
-* @return: error
-* @Author: Iori
-* @Date: 2025-03-15 17:11:32
-**/
-func (self *RestApi) SignPostV2(headMap, uriMap map[string]string, actions map[string]interface{}) ([]byte, error) {
-	if self == nil || self.signImpl == nil || actions == nil {
-		return nil, errors.New("SignImpl or actions  is nil ,not signReq !")
-	}
-
-	uid := int64(0)
-	if uriMap != nil && uriMap["uid"] != "" {
-		uid = int64(convert.StrToInt(uriMap["uid"]))
-	}
-
-	//gen body
-	bodystr := convert.StructToJson(actions)
-	rspBody, err := http_client.HeaderHttpPostRequest(self.urlAddr.GetHashUrl(uid)+http_sign2.Map2uri(self.signImpl.PushSign(uriMap, bodystr), "", true, false),
-		convert.Bytes2str(bodystr), &headMap)
-	if err != nil {
-		logger.Errorf("SignPost Request err | %v", err.Error())
-		return nil, err
-	}
-
-	return rspBody, nil
+	return context.WithTimeout(ctx, d)
 }

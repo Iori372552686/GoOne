@@ -7,7 +7,7 @@ Prefer code over README or older docs when they disagree.
 ## Repository Snapshot
 - `GoOne` is a Go microservice game backend.
 - Active services under `src/` are `connsvr`, `infosvr`, `mainsvr`, `mysqlsvr`, `roomcentersvr`, and `web_svr`.
-- Core shared layers live under `lib/`, shared config under `common/gconf`, protocol sources under `api/proto/` and `game_protocol/proto/`, generated code under `api/gen/`.
+- Core shared layers live under `lib/`, shared config struct types under `module/gconf`, protocol sources under `api/proto/` and `game_protocol/proto/`, generated code under `api/gen/`.
 - Deployment and local environment entrypoints are `main.sh`, `deploy/`, and `etc/env/`.
 
 ## Runtime Model
@@ -71,7 +71,7 @@ Prefer code over README or older docs when they disagree.
 ## Where To Look First
 - For service startup and dependency wiring, inspect `src/<service>/app.go`.
 - For shared boot behavior, inspect `lib/service/runtime/app.go` (lifecycle) and `lib/service/runtime/bussvc/` (standard component assembly).
-- For config changes, inspect `common/gconf/config.go`.
+- For config changes, inspect `module/gconf/config.go`.
 - For routing or service discovery issues, inspect `lib/service/router/`, `lib/service/svrinstmgr/`, `lib/service/bus/`, and `module/misc/`.
 - For web changes, inspect `src/web_svr/controller/` before touching bus-side handlers.
 - For tester changes, inspect `tools/tester/internal/session/` (network/session layer) and `tools/tester/app/component/` (business components).

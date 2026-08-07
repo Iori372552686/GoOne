@@ -18,7 +18,7 @@ GoOne 的 ssrpc 方案把：
 - HTTP Gin 挂载（`web_svr`）
 - WS/CSPacket 挂载（`connsvr` 登录前置）
 
-gRPC unary 与 server-streaming runtime / 代码生成已经具备；当前主线已在 `game_protocol/websvr.proto` 中示范性启用 `grpc: true`，并且 `web_svr` 已预留可配置的 gRPC listener 挂载位。
+gRPC unary 与 server-streaming runtime / 代码生成已经具备（option 字段 `grpc` / `grpc_service` 在 `api/proto/goone/options/v1/options.proto` 中定义）。**当前主线尚无 method 显式声明 `grpc: true`**——`game_protocol/proto/service/websvr.proto` 的方法仍走 HTTP；`web_svr` 已预留可配置的 gRPC listener 挂载位，业务 method 按需 opt-in 即可。
 
 ### 2. 当前代码布局
 
@@ -32,7 +32,7 @@ gRPC unary 与 server-streaming runtime / 代码生成已经具备；当前主�
   - `src/connsvr/ws_login.go`
   - `src/web_svr/controller/router.go`
 
-业务 service proto 目前主要以 `game_protocol/*.proto` 为 source-of-truth；例如 `game_protocol/mainsvrc2s.proto`、`game_protocol/websvr.proto`。
+业务 service proto 目前主要以 `game_protocol/proto/service/*.proto` 为 source-of-truth；例如 `game_protocol/proto/service/mainsvrc2s.proto`、`game_protocol/proto/service/websvr.proto`。
 
 ### 3. method option（当前实现）
 
@@ -191,12 +191,17 @@ d.MountGin(router)
 - 普通 unary method：`RegisterGRPCUnary(...)`
 - `server_streaming = true` method：`RegisterGRPCStream(...)`
 
-当前仓库里已经有真实示例：
+当前仓库里**尚无 method 声明 `grpc: true`**（`websvr.proto` 的 `Ping` / `MsgSecCheck` 均走 HTTP）。若要在某个 method 上启用 gRPC，在 proto option 中加 `grpc: true` 即可，例如：
 
-- `game_protocol/websvr.proto` 的 `Ping`：HTTP + gRPC unary（无 cmd）
-- `game_protocol/websvr.proto` 的 `WatchPing`：gRPC server-streaming（grpc-only）
+```proto
+rpc MyMethod(MyReq) returns (MyRsp) {
+  option (goone.options.v1.ssrpc) = {
+    grpc: true
+  };
+}
+```
 
-unary 示例：
+unary 接入示例：
 
 ```go
 srv := mysvrv1.NewMyServiceSServer(&service.MyServiceImpl{}, ssrpc.DefaultMWOptions{})
@@ -241,7 +246,7 @@ option (goone.options.v1.ssrpc) = {
 
 以下内容在当前实现里要明确区分：
 
-- 主线现在已有 `websvr.Ping` / `websvr.WatchPing` 作为 `grpc: true` 示例；其他业务 service 仍按需 opt-in
+- 当前主线**尚无 method 声明 `grpc: true`**；`web_svr` 的 gRPC listener（`websvr.grpc_server`）已就绪但当前注册 0 个 gRPC service，业务 method 按需 opt-in
 - 生成 gRPC 绑定不等于所有服务都会自动对外监听；当前 `web_svr` 已通过 `websvr.grpc_server` 配置接好示例，其它服务仍需各自挂载
 - generator 现在支持 gRPC unary 与 server-streaming 自动注册
 - client-streaming / bidi-streaming 仍未支持
