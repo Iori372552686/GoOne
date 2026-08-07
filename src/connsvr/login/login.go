@@ -31,12 +31,12 @@ type MiddleRole struct {
 
 // check auth by accsvr
 func OnCheckAuthByAccSvr(accId string, token string, serverid uint32, loginType string) (bool, uint64) {
-	header := &map[string]string{
+	header := map[string]string{
 		"Authorization": token,
 		"Content-type":  "application/json",
 	}
 
-	body := &map[string]interface{}{
+	body := map[string]interface{}{
 		"channel_id": serverid,
 		"account_id": accId,
 		"login_type": loginType,

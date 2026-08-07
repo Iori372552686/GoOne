@@ -121,6 +121,12 @@ func parseEnum(tab *base.Table) {
 
 func buildField(tab *base.Table, col int) (*base.Field, error) {
 	rawType := tab.Rows[2][col]
+
+	// map[K]V 分支：优先识别，单独走结构化构造
+	if keyName, valName, ok := manager.SplitMapType(rawType); ok {
+		return buildMapField(tab, col, rawType, keyName, valName)
+	}
+
 	elemType, arrayDepth := manager.SplitArrayType(rawType)
 	if arrayDepth > domain.MaxArrayDepth {
 		return nil, errs.New(tab.FileName, tab.Sheet, tab.Rows[1][col], 3, "类型错误", "数组最大仅支持到%d维: %s", domain.MaxArrayDepth, rawType)
@@ -132,18 +138,87 @@ func buildField(tab *base.Table, col int) (*base.Field, error) {
 		return nil, errs.New(tab.FileName, tab.Sheet, tab.Rows[1][col], 3, "类型错误", "未识别的类型: %s", elemType)
 	}
 
+	container := domain.ContainerSingle
+	if arrayDepth > 0 {
+		container = domain.ContainerArray
+	}
+
 	return &base.Field{
 		Type: &base.Type{
 			Name:       manager.GetConvType(elemType),
 			TypeOf:     typeOf,
 			ValueOf:    manager.GetValueOf(rawType),
 			ArrayDepth: arrayDepth,
+			Container:  container,
 		},
 		Name:     tab.Rows[1][col],                               //base.ToCamelCase(tab.Rows[1][col]),去掉了小驼峰规则需求
 		Desc:     strings.ReplaceAll(tab.Rows[0][col], "\n", ""), // 字段描述,自动去掉换行，避免生成proto时出错
 		Position: col,
 		ConvFunc: convFunc,
 	}, nil
+}
+
+// buildMapField 构造 map[K]V 字段。
+// 本期能力边界：
+//   - K：标量（int*/uint*/string/bool），不接受 enum/float/double/struct/array（受 protobuf3 规范约束）
+//   - V：标量/枚举/结构体，不接受数组、嵌套 map
+func buildMapField(tab *base.Table, col int, rawType, keyName, valName string) (*base.Field, error) {
+	fieldName := tab.Rows[1][col]
+
+	// ---- 校验 K ----
+	keyConvName := manager.GetConvType(keyName)
+	keyConvFunc := manager.GetConvFunc(keyName)
+	keyTypeOf := manager.GetTypeOf(keyName)
+	if keyTypeOf != domain.TypeOfBase || keyConvFunc == nil {
+		return nil, errs.New(tab.FileName, tab.Sheet, fieldName, 3, "类型错误",
+			"map 的 key 仅支持标量(int/uint/string/bool): %s", keyName)
+	}
+	_ = keyConvFunc // 转换函数在 data_gen 阶段按 KeyType.Name 现查，避免 Type 持有函数
+	if !isValidMapKey(keyConvName) {
+		return nil, errs.New(tab.FileName, tab.Sheet, fieldName, 3, "类型错误",
+			"map 的 key 不允许使用浮点/枚举/结构体/数组(protobuf3规范): %s", keyName)
+	}
+
+	// ---- 校验 V ----
+	valConvFunc := manager.GetConvFunc(valName)
+	valTypeOf := manager.GetTypeOf(valName)
+	if valTypeOf == domain.TypeOfBase && valConvFunc == nil {
+		return nil, errs.New(tab.FileName, tab.Sheet, fieldName, 3, "类型错误", "未识别的类型: %s", valName)
+	}
+	// V 不允许数组/嵌套 map
+	if _, _, isMap := manager.SplitMapType(valName); isMap {
+		return nil, errs.New(tab.FileName, tab.Sheet, fieldName, 3, "类型错误",
+			"map 的 value 不支持嵌套 map: %s", valName)
+	}
+	if _, depth := manager.SplitArrayType(valName); depth > 0 {
+		return nil, errs.New(tab.FileName, tab.Sheet, fieldName, 3, "类型错误",
+			"map 的 value 不支持数组(本期): %s", valName)
+	}
+
+	return &base.Field{
+		Type: &base.Type{
+			Name:      manager.GetConvType(valName),
+			TypeOf:    valTypeOf,
+			Container: domain.ContainerMap,
+			KeyType: &base.Type{
+				Name:   keyConvName,
+				TypeOf: domain.TypeOfBase,
+			},
+		},
+		Name:     fieldName,
+		Desc:     strings.ReplaceAll(tab.Rows[0][col], "\n", ""),
+		Position: col,
+		ConvFunc: valConvFunc, // V 的标量转换函数；结构体 V 由 data_gen 另走 parseStructMessage
+	}, nil
+}
+
+// isValidMapKey 判定归一化后的标量类型名是否允许作为 map key（protobuf3 规范）。
+func isValidMapKey(protoTypeName string) bool {
+	switch protoTypeName {
+	case "int32", "int64", "uint32", "uint64", "string", "bool":
+		return true
+	}
+	return false
 }
 
 func parseStruct(tab *base.Table) {

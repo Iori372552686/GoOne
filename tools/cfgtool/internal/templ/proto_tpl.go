@@ -8,6 +8,10 @@ import (
 )
 
 func protoFieldModifier(t *base.Type) string {
+	// map 字段不加 repeated（proto3 map 本身是字段的类型修饰）
+	if t.Container == domain.ContainerMap {
+		return ""
+	}
 	if t.ArrayDepth > 0 || t.ValueOf == domain.ValueOfList {
 		return "repeated "
 	}
@@ -15,6 +19,10 @@ func protoFieldModifier(t *base.Type) string {
 }
 
 func protoFieldType(fileName string, t *base.Type) string {
+	// map<K,V>：proto3 原生 map 语法，K/V 直接用规范类型名
+	if t.Container == domain.ContainerMap && t.KeyType != nil {
+		return "map<" + t.KeyType.Name + ", " + t.Name + ">"
+	}
 	depth := t.ArrayDepth
 	if depth == 0 && t.ValueOf == domain.ValueOfList {
 		depth = 1

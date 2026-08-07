@@ -6,88 +6,74 @@ import (
 	"strings"
 )
 
-/**
- * @Description: 把URL字符串参数转为参数列表map
- * @Author Iori
- * @Date 2022-01-22 18:33:33
- * @param params
- * @return map[string]string
- **/
-func UriParam2Map(params string) *map[string]string {
-	requestParamMap := make(map[string]string)
-	if params == "" {
-		return &requestParamMap
+// UriParam2Map 将 URL 原始查询串（"a=1&b=2"）解析为 map。
+//
+// 值中包含 '=' 会被完整保留（使用 SplitN 限制切分次数 2），因此形如
+// "url=http://x?a=1" 的查询会把 "url" 映射为 "http://x?a=1"。
+// 重复 key 取最后出现的值，符合常见的查询串语义。
+func UriParam2Map(rawQuery string) map[string]string {
+	m := make(map[string]string)
+	if rawQuery == "" {
+		return m
 	}
-
-	arr := strings.Split(params, "&")
-
-	for _, s := range arr {
-		kvArr := strings.Split(s, "=")
-		if len(kvArr) > 1 {
-			requestParamMap[kvArr[0]] = kvArr[1]
+	for _, pair := range strings.Split(rawQuery, "&") {
+		k, v, ok := strings.Cut(pair, "=")
+		if !ok {
+			continue
 		}
+		m[k] = v
 	}
-	return &requestParamMap
+	return m
 }
 
-/**
-* @Description: 把参数列表map转为URL字符串参数，,外部使用
-* @param: params
-* @param: url_encode
-* @return: string
-* @Author: Iori
-* @Date: 2022-02-17 10:01:06
-**/
-func MapParam2Uri(params *map[string]string, url_encode bool) string {
-	if params == nil {
-		return ""
-	}
-	return Map2uri(params, "", false, url_encode)
+// MapParam2Uri 将 params 序列化为 "k=v&k=v" 查询串，不排序，
+// 可选地对值做 URL 编码。它是不带字段过滤的 Map2uri 外部封装。
+func MapParam2Uri(params map[string]string, encode bool) string {
+	return Map2uri(params, "", false, encode)
 }
 
-/**
-* @Description: map转为URL字符串参数 ,内部使用
-* @param: params
-* @param: filter_field
-* @param: need_sort
-* @param: url_encode
-* @return: string
-* @Author: Iori
-* @Date: 2022-02-17 10:12:58
-**/
-func Map2uri(params *map[string]string, filter_field string, need_sort, url_encode bool) string {
-	if params == nil {
+// Map2uri 将 params 序列化为 "k=v&k=v" 查询串。
+//
+// 参数：
+//   - filter   ：需排除的字段名（例如签名字段本身）。
+//   - sortKeys ：为 true 时按 key 字典序升序输出，保证结果稳定、可用于签名。
+//   - encode   ：为 true 时对值做 url.QueryEscape。
+//
+// 注意：为向后兼容，空值会被跳过——这意味着 "foo=" 不会影响签名；
+// 改动该行为会使所有已签发的签名失效，因此明确不做修改。
+func Map2uri(params map[string]string, filter string, sortKeys, encode bool) string {
+	if len(params) == 0 {
 		return ""
 	}
-	var strParams string
-	var keys []string
 
-	for k := range *params {
-		if k != filter_field {
+	keys := make([]string, 0, len(params))
+	for k := range params {
+		if k != filter {
 			keys = append(keys, k)
 		}
 	}
-
-	//排序
-	if need_sort {
+	if sortKeys {
 		sort.Strings(keys)
 	}
 
-	//拼接
-	for _, key := range keys {
-		val := (*params)[key]
-		//url 编码
-		if url_encode {
-			val = url.QueryEscape(val)
+	var b strings.Builder
+	b.Grow(len(params) * 16) // 预估容量，避免大多数扩容
+	first := true
+	for _, k := range keys {
+		v := params[k]
+		if v == "" {
+			continue
 		}
-
-		if val != "" {
-			if len(strParams) > 0 {
-				strParams = strParams + "&"
-			}
-			strParams = strParams + key + "=" + val
+		if encode {
+			v = url.QueryEscape(v)
 		}
+		if !first {
+			b.WriteByte('&')
+		}
+		first = false
+		b.WriteString(k)
+		b.WriteByte('=')
+		b.WriteString(v)
 	}
-
-	return strParams
+	return b.String()
 }

@@ -70,3 +70,32 @@ func GetValueOf(name string) int {
 	}
 	return domain.ValueOfBase
 }
+
+// SplitMapType 解析 map[K]V 形式的字段类型。
+// 命中返回 (K 原始名, V 原始名, true)；否则返回 ok=false。
+// 仅识别最外层的 map（不递归，嵌套 map 本期不支持）。
+// 注意：V 是首个 ']' 之后的全部内容（V 不被 ']' 包裹），故不能用 HasSuffix("]")。
+func SplitMapType(name string) (key, val string, ok bool) {
+	const prefix = "map["
+	if !strings.HasPrefix(name, prefix) {
+		return "", "", false
+	}
+	rest := name[len(prefix):]
+	idx := strings.IndexByte(rest, ']')
+	if idx < 0 {
+		return "", "", false
+	}
+	return rest[:idx], rest[idx+1:], true
+}
+
+// GetContainerOf 根据类型名前缀判定字段值容器类别。
+// map[K]V -> ContainerMap；[]... 前缀 -> ContainerArray；其余 -> ContainerSingle。
+func GetContainerOf(name string) int {
+	if _, _, isMap := SplitMapType(name); isMap {
+		return domain.ContainerMap
+	}
+	if _, depth := SplitArrayType(name); depth > 0 {
+		return domain.ContainerArray
+	}
+	return domain.ContainerSingle
+}

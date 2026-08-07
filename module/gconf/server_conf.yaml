@@ -16,6 +16,7 @@ base_cfg:
     game_data_dir: '{{ root_path }}/gamedata'
     sensitive_words_file: '{{ root_path }}/commconf/sensitive.txt'
     http_sign:
+      # sign_type 可选: md5(默认, 旧客户端兼容) | sha1 | hmac_sha256(新部署推荐)
       - index_name: default
         private_key: '{{ http_sign_private_key }}'
         sign_name: sign

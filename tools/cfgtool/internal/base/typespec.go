@@ -5,7 +5,14 @@ type Type struct {
 	TypeOf  int
 	ValueOf int
 	// ArrayDepth 表示数组维度：0=标量，1=一维，2=二维，3=三维。
+	// 仅 ContainerArray 有效。
 	ArrayDepth int
+	// Container 描述字段值容器类别（domain.ContainerSingle/Array/Map）。
+	// 与 TypeOf 正交：TypeOf 描述元素种类，Container 描述承载形态。
+	Container int
+	// KeyType 仅在 Container==ContainerMap 时填充，描述 map 的 K。
+	// map 的 V 复用本 Type 的 Name/TypeOf 表达。
+	KeyType *Type
 }
 
 type Convert struct {

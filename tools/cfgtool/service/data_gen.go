@@ -199,13 +199,19 @@ func assignFieldValue(msg *dynamic.Message, file, sheet, msgName string, field *
 		}
 		return safeSetRepeatedFieldByName(msg, field.Name, values, file, sheet, msgName, field.Name, rowIndex)
 	}
+	// map[K]V：作为 singular 字段整体 SetField（proto3 map 在 dynamic 里以 map 形式赋值）
+	if field.Type.Container == domain.ContainerMap {
+		return safeSetMapField(msg, field.Name, value, file, sheet, msgName, field.Name, rowIndex)
+	}
 	return safeSetField(msg, field.Name, value, file, sheet, msgName, field.Name, rowIndex)
 }
 
 func parseFieldValue(file, sheet string, field *base.Field, rowIndex int, raw string) (interface{}, error) {
 	if strings.TrimSpace(raw) == "" {
 		switch {
-		case field.Type.ArrayDepth > 0:
+		case field.Type.Container == domain.ContainerMap:
+			return nil, nil
+		case field.Type.ArrayDepth > 0, field.Type.Container == domain.ContainerArray:
 			return nil, nil
 		case field.Type.TypeOf == domain.TypeOfStruct:
 			logx.Warnf("[%s/%s] 字段=%s 行=%d 值为空(结构体) 跳过\n", file, sheet, field.Name, rowIndex)
@@ -213,6 +219,11 @@ func parseFieldValue(file, sheet string, field *base.Field, rowIndex int, raw st
 		default:
 			return field.ConvFunc(raw), nil
 		}
+	}
+
+	// map[K]V 分支
+	if field.Type.Container == domain.ContainerMap {
+		return parseMapValue(file, sheet, field, rowIndex, raw)
 	}
 
 	if field.Type.ArrayDepth > 0 {
@@ -258,6 +269,71 @@ func parseStructMessage(f *base.Struct, rowIndex int, raw string) (*dynamic.Mess
 		}
 	}
 	return item, nil
+}
+
+// parseMapValue 解析 map[K]V 字段的单元格字符串，返回可塞入 dynamic.Message 的 map。
+// 元素分隔符：value 为结构体用 '|'（避开结构体内部 ':'），标量/枚举用 ','。
+// 每个元素用 SplitN(":",2) 切分——只在第一个冒号处分开 K 与 V，
+// 使结构体 V（其内部字段也以 ':' 分隔）不受影响。
+func parseMapValue(file, sheet string, field *base.Field, rowIndex int, raw string) (interface{}, error) {
+	keyType := field.Type.KeyType
+	if keyType == nil {
+		return nil, errs.New(file, sheet, field.Name, rowIndex, "类型错误", "map 字段缺少 KeyType 定义")
+	}
+	keyConv := manager.GetConvFunc(keyType.Name)
+	if keyConv == nil {
+		return nil, errs.New(file, sheet, field.Name, rowIndex, "类型错误", "map key 转换函数缺失: %s", keyType.Name)
+	}
+
+	// value 是结构体时走结构体分隔符集（'|'），否则用标量分隔符（','）
+	delim := scalarArrayDelimiters[0]
+	if field.Type.TypeOf == domain.TypeOfStruct {
+		delim = structArrayDelimiters[0]
+	}
+
+	parts := strings.Split(raw, delim)
+	result := make(map[interface{}]interface{}, len(parts))
+	for _, part := range parts {
+		if strings.TrimSpace(part) == "" {
+			continue
+		}
+		// 只在第一个 ':' 切 K/V，保护结构体 V 内部的 ':'
+		kv := strings.SplitN(part, ":", 2)
+		if len(kv) != 2 {
+			return nil, errs.New(file, sheet, field.Name, rowIndex, "map 元素格式错误",
+				"缺少 K:V 分隔符 ':', 原始片段=%q", part)
+		}
+		keyStr := strings.TrimSpace(kv[0])
+		valStr := kv[1]
+		if keyStr == "" {
+			return nil, errs.New(file, sheet, field.Name, rowIndex, "map 元素格式错误",
+				"map key 为空, 原始片段=%q", part)
+		}
+		key := keyConv(keyStr)
+
+		// 解析 value
+		var val interface{}
+		var err error
+		switch field.Type.TypeOf {
+		case domain.TypeOfBase, domain.TypeOfEnum:
+			val = field.ConvFunc(valStr)
+		case domain.TypeOfStruct:
+			st := manager.GetStruct(field.Type.Name)
+			if st == nil {
+				return nil, errs.New(file, sheet, field.Name, rowIndex, "结构体类型不存在",
+					"找不到结构体类型: %s", field.Type.Name)
+			}
+			val, err = parseStructMessage(st, rowIndex, valStr)
+			if err != nil {
+				return nil, err
+			}
+		default:
+			return nil, errs.New(file, sheet, field.Name, rowIndex, "类型错误",
+				"map value 类型不支持: TypeOf=%d", field.Type.TypeOf)
+		}
+		result[key] = val
+	}
+	return result, nil
 }
 
 func parseArrayValue(file, sheet string, field *base.Field, rowIndex int, raw string, depth int) ([]interface{}, error) {
@@ -333,6 +409,42 @@ func safeSetField(msg *dynamic.Message, fieldName string, value interface{}, fil
 	return nil
 }
 
+// safeSetMapField 将解析得到的 map[interface{}]interface{} 赋给 proto3 map 字段。
+// jhump/protoreflect 的 dynamic.Message 对 map 字段：
+//   - 用 field descriptor 的 TryMapKey/TryPut 按条目写入最稳，避开 SetField 对 map 具体类型的要求
+func safeSetMapField(msg *dynamic.Message, fieldName string, value interface{}, file, sheet, msgName, cfgField string, row int) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errs.New(file, sheet, cfgField, row, "赋值错误", "Message=%s Field=%s MapType=%T panic=%v", msgName, fieldName, value, r)
+		}
+	}()
+
+	desc := msg.GetMessageDescriptor().FindFieldByName(fieldName)
+	if desc == nil {
+		return errs.New(file, sheet, cfgField, row, "赋值错误", "Message=%s 找不到 map 字段=%s", msgName, fieldName)
+	}
+	if !desc.IsMap() {
+		return errs.New(file, sheet, cfgField, row, "赋值错误", "Message=%s Field=%s 不是 map 类型字段", msgName, fieldName)
+	}
+
+	entries, ok := value.(map[interface{}]interface{})
+	if !ok {
+		return errs.New(file, sheet, cfgField, row, "赋值错误", "map 字段解析结果不是 map[interface{}]interface{}: %T", value)
+	}
+
+	for k, v := range entries {
+		// value 是 nil（如结构体值为空跳过）时跳过该条目
+		if v == nil {
+			continue
+		}
+		if err := msg.TryPutMapField(desc, k, v); err != nil {
+			return errs.New(file, sheet, cfgField, row, "赋值错误",
+				"Message=%s Field=%s key=%v valueType=%T err=%v", msgName, fieldName, k, v, err)
+		}
+	}
+	return nil
+}
+
 func safeSetRepeatedFieldByName(msg *dynamic.Message, fieldName string, values []interface{}, file, sheet, msgName, cfgField string, row int) error {
 	for _, value := range values {
 		if err := safeAddRepeatedFieldByName(msg, fieldName, value, file, sheet, msgName, cfgField, row); err != nil {
@@ -378,6 +490,11 @@ func dynamicValueToInterface(val interface{}) interface{} {
 		}
 		result := make(map[string]interface{})
 		for _, field := range v.GetKnownFields() {
+			// proto3 map 字段在 dynamic 里 GetField 返回 map[interface{}]interface{}
+			if field.IsMap() {
+				result[field.GetName()] = mapFieldToInterface(v.GetField(field))
+				continue
+			}
 			result[field.GetName()] = dynamicValueToInterface(v.GetField(field))
 		}
 		return result
@@ -390,6 +507,20 @@ func dynamicValueToInterface(val interface{}) interface{} {
 	default:
 		return val
 	}
+}
+
+// mapFieldToInterface 把 proto3 map 字段（GetField 返回 map[interface{}]interface{}）
+// 转为 JSON 友好的 map[string]interface{}，key 统一 fmt 成字符串。
+func mapFieldToInterface(val interface{}) interface{} {
+	m, ok := val.(map[interface{}]interface{})
+	if !ok {
+		return val
+	}
+	out := make(map[string]interface{}, len(m))
+	for k, v := range m {
+		out[fmt.Sprintf("%v", k)] = dynamicValueToInterface(v)
+	}
+	return out
 }
 
 func isArrayWrapperMessage(msg *dynamic.Message) bool {

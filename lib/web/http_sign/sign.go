@@ -1,11 +1,22 @@
+// Package http_sign 计算并校验 HTTP 请求签名。
+//
+// 支持两类算法，可通过 Config.SignType 为每个 HttpSign 实例单独选择：
+//
+//   - "md5" / "sha1"    ：旧式明文哈希，签名内容为 "<params>&<body><secret>"。
+//     为向后兼容保留，签名输出与原实现逐字节一致，已部署客户端无感。
+//   - "hmac_sha256"     ：以 secret 为密钥对 "<params>&<body>" 做 HMAC-SHA256。
+//     新部署推荐使用。
+//
+// 无论使用哪种算法，签名比较一律采用 hmac.Equal（恒定时间比较）。
 package http_sign
 
 import (
-	"bytes"
+	"crypto/hmac"
 	"crypto/md5"
 	"crypto/sha1"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -14,306 +25,262 @@ import (
 	"github.com/gofrs/uuid"
 )
 
-// ----------------------   const  --------------------
+// 默认字段名与默认签名有效期。
 const (
-	Const_SignVer_Name   string = "sign_ver"   //签名规范版本名称
-	Const_SignType_Name  string = "sign_type"  //签名加密方式名称
-	Const_TimeStamp_Name string = "timestamp"  //默认时间戳字段名
-	Const_RequestId_Name string = "request_id" //默认时间戳字段名
-	Const_SignName       string = "sign"       //默认签名字段名
-	Const_ExpiredTime    int64  = 60           //默认签名有效时长
+	Const_SignVer_Name   = "sign_ver"   // 签名规范版本字段名
+	Const_SignType_Name  = "sign_type"  // 签名算法字段名
+	Const_TimeStamp_Name = "timestamp"  // 默认时间戳字段名
+	Const_RequestId_Name = "request_id" // 默认请求唯一标识字段名
+	Const_SignName       = "sign"       // 默认签名字段名
+	Const_ExpiredTime    = 60           // 默认签名有效期（秒）
 )
 
-// ---------------------   enum ----------------------
-// 版本类型
+// EVersionType 标识签名规范版本。
+//
+// Deprecated：版本分派仅为兼容保留在公开接口上，当前并无实际行为差异。
 type EVersionType string
 
 const (
-	Version_NewV1 EVersionType = "1" //新签名规范版本1
-	Version_NewV2 EVersionType = "2" //新签名规范版本2
+	Version_NewV1 EVersionType = "1"
+	Version_NewV2 EVersionType = "2"
 )
 
-var version_type = map[string]EVersionType{
+var versionType = map[string]EVersionType{
 	string(Version_NewV1): Version_NewV1,
 	string(Version_NewV2): Version_NewV2,
 }
 
-// 签名类型
+// ESignType 标识签名算法。
 type ESignType string
 
 const (
-	Sign_Md5  ESignType = "md5"  //md5 加密方式
-	Sign_Sha1 ESignType = "sha1" //sha1 加密方式
+	Sign_Md5        ESignType = "md5"         // 旧式 MD5
+	Sign_Sha1       ESignType = "sha1"        // 旧式 SHA-1
+	Sign_HMacSha256 ESignType = "hmac_sha256" // HMAC-SHA256（推荐）
 )
 
-var sign_type = map[string]ESignType{
-	string(Sign_Md5):  Sign_Md5,
-	string(Sign_Sha1): Sign_Sha1,
+var signType = map[string]ESignType{
+	string(Sign_Md5):        Sign_Md5,
+	string(Sign_Sha1):       Sign_Sha1,
+	string(Sign_HMacSha256): Sign_HMacSha256,
 }
 
-// -- err code
+// ErrorCode 表示一次签名校验的结果码。
 type ErrorCode int32
 
 const (
-	SIGH_OK           ErrorCode = 0  //签名成功
-	TIMESTAMP_INVALID ErrorCode = -1 //时间戳无效
-	PARSE_FAIL        ErrorCode = -2 //解析失败
-	TIME_OUT          ErrorCode = -3 //时间超时
-	SIGN_NOT_FOUND    ErrorCode = -4 //签名未找到
-	ARGUMENTS_INVALID ErrorCode = -5 //参数无效
-	VERIFY_FAILURE    ErrorCode = -6 //签名验证失败
-	SIGNTYPE_INVALID  ErrorCode = -7 //签名加密类型无效
+	SignOK           ErrorCode = 0  // 签名校验通过
+	ErrTimestamp     ErrorCode = -1 // 时间戳字段缺失
+	ErrParse         ErrorCode = -2 // 时间戳解析失败
+	ErrTimeout       ErrorCode = -3 // 时间戳超出有效期
+	ErrSignNotFound  ErrorCode = -4 // 签名字段缺失
+	ErrArguments     ErrorCode = -5 // 入参非法
+	ErrVerifyFailure ErrorCode = -6 // 签名比对不一致
 )
 
-var error_code_msg = map[int32]string{
-	int32(SIGH_OK):           "SIGH_OK",
-	int32(TIMESTAMP_INVALID): "TIMESTAMP_INVALID",
-	int32(PARSE_FAIL):        "PARSE_FAIL",
-	int32(TIME_OUT):          "TIMESTAMP_TIME_OUT",
-	int32(SIGN_NOT_FOUND):    "SIGN_NOT_FOUND",
-	int32(ARGUMENTS_INVALID): "ARGUMENTS_INVALID",
-	int32(VERIFY_FAILURE):    "VERIFY_FAILURE",
-	int32(SIGNTYPE_INVALID):  "SIGNTYPE_INVALID",
+var errorCodeMsg = map[ErrorCode]string{
+	SignOK:           "SIGH_OK",
+	ErrTimestamp:     "TIMESTAMP_INVALID",
+	ErrParse:         "PARSE_FAIL",
+	ErrTimeout:       "TIMESTAMP_TIME_OUT",
+	ErrSignNotFound:  "SIGN_NOT_FOUND",
+	ErrArguments:     "ARGUMENTS_INVALID",
+	ErrVerifyFailure: "VERIFY_FAILURE",
 }
 
-func (x ErrorCode) String() string {
-	return error_code_msg[int32(x)]
-}
+func (c ErrorCode) String() string { return errorCodeMsg[c] }
 
-// ----------------------  end
-
-/*
-*  HttpSign
-*  @Description: 签名信息结构
-*  @Author: Iori
- */
+// HttpSign 负责针对单个 secret 计算与校验请求签名。
 type HttpSign struct {
-	//检验参数类型名，不会参与校验，如：sign|token|md5
-	signName string
-	//密钥
-	secret string
-	//有效期时长
-	expiredTime int64
-	//时间戳名
-	timestampName string
-	//请求唯一标识，如：uuid
-	requestIdName string
-	//版本类型
-	versionType EVersionType
+	signName      string // 签名字段名（不参与签名内容）
+	secret        string // 共享密钥 / HMAC 密钥
+	expiredTime   int64  // 有效期（秒）；0 表示不校验
+	timestampName string // 时间戳字段名
+	requestIdName string // 请求唯一标识字段名（如 uuid）；空串表示不启用
+	versionType   EVersionType
+	defaultSign   ESignType // 未在报文中显式指定算法时使用的默认算法
 }
 
-/**
-* @Description: 创建httpSign对象
-* @param: signName
-* @param: secret
-* @param: expiredTime
-* @param: timestampName
-* @param: requestIdName  请求唯一标识
-* @return: *HttpSign
-* @Author: Iori
-* @Date: 2022-01-27 16:46:05
-**/
+// BuildHttpSign 构造一个 HttpSign 实例，对空串或非法字段套用默认值。
+// expiredTime 为 0 表示关闭时间戳窗口校验；负数回退到 Const_ExpiredTime。
 func BuildHttpSign(signName, secret string, expiredTime int64, timestampName, requestIdName, version string) *HttpSign {
-	//check args
-	if "" == signName {
-		signName = Const_SignName
+	s := &HttpSign{
+		signName:      signName,
+		secret:        secret,
+		expiredTime:   expiredTime,
+		timestampName: timestampName,
+		requestIdName: requestIdName,
+		versionType:   toVersionType(version),
+		defaultSign:   Sign_Md5,
 	}
-	if "" == timestampName {
-		timestampName = Const_TimeStamp_Name
+	if signName == "" {
+		s.signName = Const_SignName
 	}
-
+	if timestampName == "" {
+		s.timestampName = Const_TimeStamp_Name
+	}
 	if expiredTime < 0 {
-		expiredTime = Const_ExpiredTime
+		s.expiredTime = int64(Const_ExpiredTime)
 	}
-	//new obj
-	sign_ins := &HttpSign{}
-	sign_ins.signName = signName
-	sign_ins.secret = secret
-	sign_ins.expiredTime = expiredTime
-	sign_ins.requestIdName = requestIdName
-	sign_ins.timestampName = timestampName
-	sign_ins.versionType = sign_ins.toVersionType(version)
-
-	return sign_ins
+	return s
 }
 
-/**
-* @Description: 时间戳检测
-* @Author Iori
-* @Date 2022-01-25 10:33:01
-* @param signName, secret string, expiredTime int64, timestampName, signType
-* @return  *HttpSign
-**/
-func (this *HttpSign) checkTimestamp(params *map[string]string) (bool, error, int) {
-	//获取时间戳参数
-	timestamp := (*params)[this.timestampName]
-	//是否存在
+// WithSignType 设置 PushSign 在调用方未显式指定算法时使用的默认算法。
+// 通过该接口可实现“改配置不改调用代码”的算法切换。返回接收者以便链式调用。
+func (s *HttpSign) WithSignType(t ESignType) *HttpSign {
+	s.defaultSign = t
+	return s
+}
+
+// SignType 返回本实例默认使用的签名算法。
+func (s *HttpSign) SignType() ESignType { return s.defaultSign }
+
+// CheckSign 校验请求签名。params 为查询参数，body 为请求体，sign 为可选的
+// 显式签名串（为空时从 params[signName] 读取）。比较采用恒定时间。
+//
+// 校验通过返回 (SignOK, nil)，否则返回对应的 ErrorCode 与描述错误。
+func (s *HttpSign) CheckSign(params map[string]string, body []byte, sign string) (ErrorCode, error) {
+	if params == nil && body == nil {
+		return ErrArguments, errors.New(ErrArguments.String())
+	}
+
+	// 时间戳新鲜度校验（双边，拒绝远未来时间戳）
+	if code, err := s.checkTimestamp(params); code != SignOK {
+		return code, err
+	}
+
+	// 解析待校验签名
+	if sign == "" {
+		if sign = params[s.signName]; sign == "" {
+			return ErrSignNotFound, errors.New(ErrSignNotFound.String())
+		}
+	}
+
+	// 重建签名并恒定时间比较
+	local, debugURI := s.buildSign(params, body, toSignType(params[Const_SignType_Name]), s.versionType)
+	if !hmac.Equal([]byte(sign), []byte(local)) {
+		logger.Errorf("CheckSign -- 签名不一致, 期望签名内容 uriStr: %s", debugURI)
+		return ErrVerifyFailure, errors.New(ErrVerifyFailure.String())
+	}
+	return SignOK, nil
+}
+
+// PushSign 向 params 注入时间戳、请求唯一标识与签名（就地修改并返回），
+// 用于对外发起的已签名请求。params 为 nil 时会新建 map。
+//
+// 签名算法由实例默认算法（见 WithSignType / SignType）决定；若 params
+// 中已带 sign_type 字段则以该字段为准。md5 会从报文中剔除 sign_type 字段，
+// 以保持与旧客户端的逐字节兼容。
+//
+// 算法不作为参数暴露，避免调用方与实例配置出现两套真实来源。
+func (s *HttpSign) PushSign(params map[string]string, body []byte) map[string]string {
+	if params == nil {
+		params = make(map[string]string)
+	}
+
+	// 时间戳：已有则保留，否则盖上当前时间
+	if params[s.timestampName] == "" {
+		params[s.timestampName] = strconv.FormatInt(time.Now().Unix(), 10)
+	}
+
+	// 算法解析：报文显式值优先，否则用实例默认值。
+	signType := s.defaultSign
+	if wire := params[Const_SignType_Name]; wire != "" {
+		signType = toSignType(wire)
+	}
+
+	// 可选的请求唯一标识（如 uuid，去掉中划线）
+	if s.requestIdName != "" {
+		if u, err := uuid.NewV4(); err == nil {
+			params[s.requestIdName] = strings.ReplaceAll(u.String(), "-", "")
+		}
+	}
+
+	// 规整 sign_type 字段：md5 剔除该字段（保持旧报文格式），
+	// 其余算法写入算法名。
+	if signType == Sign_Md5 {
+		delete(params, Const_SignType_Name)
+	} else {
+		params[Const_SignType_Name] = string(signType)
+	}
+
+	params[s.signName], _ = s.buildSign(params, body, signType, s.versionType)
+	return params
+}
+
+// checkTimestamp 按配置的有效期做对称（双边）校验。
+// expiredTime 为 0 表示关闭校验。时间戳缺失或无法解析会单独上报错误码。
+func (s *HttpSign) checkTimestamp(params map[string]string) (ErrorCode, error) {
+	timestamp := params[s.timestampName]
 	if timestamp == "" {
-		return false, errors.New(TIMESTAMP_INVALID.String()), int(TIMESTAMP_INVALID)
+		return ErrTimestamp, errors.New(ErrTimestamp.String())
 	}
 
 	reqTime, err := strconv.ParseInt(timestamp, 10, 64)
 	if err != nil {
-		return false, err, int(PARSE_FAIL)
+		return ErrParse, err
 	}
 
-	//时间范围检测,设置有效时间为0则跳过
-	if this.expiredTime != 0 {
-		cur_time := time.Now().Unix()
-		if (cur_time - reqTime) > this.expiredTime {
-			return false, errors.New(TIME_OUT.String()), int(TIME_OUT)
+	if s.expiredTime == 0 {
+		return SignOK, nil
+	}
+
+	// 对称偏差校验：既拒绝过期时间戳，也拒绝远未来时间戳
+	if skew := time.Now().Unix() - reqTime; skew > s.expiredTime || skew < -s.expiredTime {
+		return ErrTimeout, errors.New(ErrTimeout.String())
+	}
+	return SignOK, nil
+}
+
+// buildSign 计算给定 params+body 的签名，并返回一份不含 secret 的签名内容
+// 供校验失败时打印调试日志（有意不输出 secret，避免经日志泄露密钥）。
+//
+// md5/sha1 的签名内容为 "params+body+secret"（与原实现逐字节一致）；
+// hmac_sha256 以 secret 为密钥对 "params+body" 做 HMAC。
+func (s *HttpSign) buildSign(params map[string]string, body []byte, signType ESignType, _ EVersionType) (sign, debugURI string) {
+	// 统一构建不含 secret 的签名内容（同时也是 debugURI），供各算法复用。
+	paramsStr := Map2uri(params, s.signName, true, false)
+	debugURI = paramsStr + string(body)
+
+	switch signType {
+	case Sign_HMacSha256:
+		// HMAC：secret 作为密钥，params+body 作为消息
+		mac := hmac.New(sha256.New, []byte(s.secret))
+		mac.Write([]byte(paramsStr))
+		mac.Write(body)
+		return hex.EncodeToString(mac.Sum(nil)), debugURI
+
+	default:
+		// md5 / sha1（及任何未知类型）：旧式布局 params+body+secret，
+		// 输出与原实现逐字节一致。复用 pool buffer 拼接以减少分配。
+		buf := getBuffer()
+		defer putBuffer(buf)
+		buf.WriteString(paramsStr)
+		buf.Write(body)
+		buf.WriteString(s.secret)
+
+		payload := buf.Bytes()
+		if signType == Sign_Sha1 {
+			sum := sha1.Sum(payload)
+			return hex.EncodeToString(sum[:]), debugURI
 		}
+		sum := md5.Sum(payload)
+		return hex.EncodeToString(sum[:]), debugURI
 	}
-
-	return true, nil, int(SIGH_OK)
 }
 
-/**
- * @Description: 签名认证
- * @receiver this
- * @Date 2022-01-22 18:41:24
- * @param sign 待认证的签名
- * @return bool 认证成功返回tue 否则返回false
- * @return error 认证成功返回nil 否则返回异常值
- **/
-func (this *HttpSign) CheckSign(params *map[string]string, body []byte, sign string) (bool, error, int) {
-	if params == nil && body == nil {
-		return false, errors.New(ARGUMENTS_INVALID.String()), int(ARGUMENTS_INVALID)
+// toSignType 解析算法名，未知名回退为 md5。
+func toSignType(name string) ESignType {
+	if t, ok := signType[strings.ToLower(name)]; ok {
+		return t
 	}
-
-	//时间戳检测
-	_time, _err, _code := this.checkTimestamp(params)
-	if !_time {
-		return false, _err, _code
-	}
-
-	//获取签名字段值
-	if "" == sign {
-		sign = (*params)[this.signName]
-		if "" == sign {
-			return false, errors.New(SIGN_NOT_FOUND.String()), int(SIGN_NOT_FOUND)
-		}
-	}
-
-	//签名检测
-	local_sign, uri_str := this.buildSign(params, body,
-		this.toSignType((*params)[Const_SignType_Name]),
-		this.toVersionType((*params)[Const_SignVer_Name]))
-	if sign != local_sign {
-		logger.Errorf("CheckSign -- error sign uriStr:| %v", uri_str)
-		return false, errors.New(VERIFY_FAILURE.String()), int(VERIFY_FAILURE)
-	}
-
-	return true, nil, int(SIGH_OK)
-}
-
-/**
- * @Description: 添加签名
- * @receiver this
- * @Date 2022-01-22 18:41:24
- * @param sign 待认证的签名
- * @return bool 认证成功返回tue 否则返回false
- * @return error 认证成功返回nil 否则返回异常值
- **/
-func (this *HttpSign) PushSign(params *map[string]string, body []byte, signType ESignType) *map[string]string {
-	if params == nil {
-		params = &map[string]string{}
-	}
-
-	//添加时间戳
-	timestamp := (*params)[this.timestampName]
-	if timestamp == "" {
-		(*params)[this.timestampName] = strconv.Itoa(int(time.Now().Unix()))
-	}
-
-	//获取签名方式
-	type_str := (*params)[Const_SignType_Name]
-	_signType := this.toSignType(type_str)
-	if _signType != signType && type_str != "" {
-		signType = _signType
-	}
-
-	//requestid
-	if "" != this.requestIdName {
-		uuid, _ := uuid.NewV4()
-		(*params)[this.requestIdName] = strings.ReplaceAll(uuid.String(), "-", "")
-	}
-
-	//签名type字段修正
-	if signType == Sign_Md5 {
-		delete(*params, Const_SignType_Name)
-	} else {
-		(*params)[Const_SignType_Name] = string(signType)
-	}
-
-	//添加签名与签名方式
-	sign_, _ := this.buildSign(params, body, signType, this.versionType)
-	(*params)[this.signName] = sign_
-	return params
-}
-
-/**
- * @Description: 根据传入的signstr 取对应的ESignType类型
- * @Author Iori
- * @Date 2022-01-26 17:55:55
- * @param signType
- * @return ESignType
- **/
-func (this *HttpSign) toSignType(signType string) ESignType {
-	if _type, ok := sign_type[strings.ToLower(signType)]; ok {
-		return _type
-	}
-
-	//default
 	return Sign_Md5
 }
 
-/**
- * @Description: 根据传入的str 取对应的EVersionType类型
- * @Author Iori
- * @Date 2022-03-08 17:55:55
- * @param verStr
- * @return EVersionType
- **/
-func (this *HttpSign) toVersionType(verStr string) EVersionType {
-	if verType, ok := version_type[strings.ToLower(verStr)]; ok {
-		return verType
+// toVersionType 解析版本名，未知名回退为 V1。
+func toVersionType(name string) EVersionType {
+	if v, ok := versionType[strings.ToLower(name)]; ok {
+		return v
 	}
-
-	//default
 	return Version_NewV1
-}
-
-/**
- * @Description: 通过uri的参数列表构建sign
- * @Author Iori
- * @Date 2022-01-22 17:55:55
- * @param params 参数列表map，其中k为参数名，v为参数值
- * @param body http请求中以post等协议携带的包体中的内容(可为nil)
- * @param secret 盐值
- * @return string 签名值
- **/
-func (this *HttpSign) buildSign(params *map[string]string, body []byte, signType ESignType, verType EVersionType) (string, string) {
-	var uriStr bytes.Buffer
-
-	if params == nil {
-		params = &map[string]string{}
-	}
-
-	uriStr.WriteString(Map2uri(params, this.signName, true, false))
-	uriStr.Write(body)
-	uriStr.WriteString(this.secret)
-
-	//crypto
-	sign := ""
-	switch signType {
-	case Sign_Sha1:
-		sign = fmt.Sprintf("%x", sha1.Sum(uriStr.Bytes()))
-	case Sign_Md5:
-		sign = fmt.Sprintf("%x", md5.Sum(uriStr.Bytes()))
-	default: //md5
-		sign = fmt.Sprintf("%x", md5.Sum(uriStr.Bytes()))
-	}
-
-	return sign, uriStr.String()
 }

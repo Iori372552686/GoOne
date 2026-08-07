@@ -18,11 +18,11 @@ func TestHTTPSignVerifierVerify(t *testing.T) {
 	params := map[string]string{
 		"timestamp": strconv.FormatInt(time.Now().Unix(), 10),
 	}
-	signIns.PushSign(&params, body, http_sign2.Sign_Md5)
+	signIns.PushSign(params, body)
 
 	ctx := &ssrpc.Context{}
 	ctx.SetHTTPRequest(&http.Request{
-		URL: &url.URL{RawQuery: http_sign2.MapParam2Uri(&params, false)},
+		URL: &url.URL{RawQuery: http_sign2.MapParam2Uri(params, false)},
 	}, body)
 
 	verifier := NewHTTPSignVerifier(true, signIns)
@@ -32,7 +32,7 @@ func TestHTTPSignVerifierVerify(t *testing.T) {
 
 	badCtx := &ssrpc.Context{}
 	badCtx.SetHTTPRequest(&http.Request{
-		URL: &url.URL{RawQuery: http_sign2.MapParam2Uri(&params, false)},
+		URL: &url.URL{RawQuery: http_sign2.MapParam2Uri(params, false)},
 	}, []byte(`{"account_id":"acc","msg_content":"tampered","time":"123"}`))
 
 	err := verifier.Verify(badCtx, nil)

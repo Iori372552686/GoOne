@@ -1,111 +1,63 @@
-// by  Iori  2022/2/14
 package http_sign
 
 import (
 	"sync"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/module/gfunc"
 )
 
-/*
-*  SignMgr
-*  @Description:
- */
+// defaultSignKey 为未指定 key 时返回的 HttpSign 实例名。
+const defaultSignKey = "default"
+
+// SignMgr 是按名注册的 HttpSign 实例表，并发安全，供各服务共享。
 type SignMgr struct {
 	mu        sync.RWMutex
-	Instances map[string]*HttpSign
-
-	//private
-	lastTick int64
+	instances map[string]*HttpSign
 }
 
-/**
-* @Description: 创建签名管理器
-* @return: *SignMgr
-* @Author: Iori
-* @Date: 2022-02-14 11:28:59
-**/
+// NewSignMgr 返回一个空的 SignMgr。
 func NewSignMgr() *SignMgr {
-	r := &SignMgr{}
-	r.Instances = make(map[string]*HttpSign)
-
-	return r
+	return &SignMgr{instances: make(map[string]*HttpSign)}
 }
 
-/**
-* @Description: 设置签名类型实例
-* @param: key
-* @param: impl
-* @Author: Iori
-* @Date: 2022-02-14 16:13:53
-**/
-func (self *SignMgr) SetSignIns(key string, impl *HttpSign) {
-	self.mu.Lock()
-	defer self.mu.Unlock()
-	self.Instances[key] = impl
+// SetSignIns 在 key 下注册（或替换）一个 HttpSign 实例。
+func (m *SignMgr) SetSignIns(key string, impl *HttpSign) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.instances[key] = impl
 }
 
-/**
-* @Description: 获取签名类型
-* @receiver: self
-* @param: key
-* @param: o
-* @Author: Iori
-* @Date: 2022-02-14 11:29:20
-**/
-func (self *SignMgr) GetSignIns(keys ...string) *HttpSign {
-	self.mu.RLock()
-	defer self.mu.RUnlock()
+// GetSignIns 返回指定 key 的实例；未传 key 时返回 "default" 实例。
+// 不存在时返回 nil。
+func (m *SignMgr) GetSignIns(keys ...string) *HttpSign {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if len(keys) == 0 {
-		return self.Instances["default"]
-	} else {
-		return self.Instances[keys[0]]
+		return m.instances[defaultSignKey]
 	}
+	return m.instances[keys[0]]
 }
 
-func (self *SignMgr) Count() int {
-	if self == nil {
+// Count 返回已注册的实例数量。
+func (m *SignMgr) Count() int {
+	if m == nil {
 		return 0
 	}
-	self.mu.RLock()
-	defer self.mu.RUnlock()
-	return len(self.Instances)
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.instances)
 }
 
-/**
-* @Description: 初始化签名管理器
-* @receiver: self
-* @param: cfgs
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-14 11:29:45
-**/
-func (self *SignMgr) InitAndRun(cfgs []Config) {
-	logger.Infof("SignMgr   InsInit.. ")
-
-	for _, conf := range cfgs {
-		sign := BuildHttpSign(conf.SignName,
-			conf.PrivateKey,
-			int64(conf.ExpiredTime),
-			conf.TimestampName,
-			conf.RequestIDName,
-			conf.VersionType,
-		)
-		self.SetSignIns(conf.IndexName, sign)
+// InitAndRun 为每个 Config 项构建并注册一个 HttpSign 实例，
+// 是服务启动时调用的主入口。
+func (m *SignMgr) InitAndRun(cfgs []Config) {
+	logger.Infof("SignMgr InsInit..")
+	for _, c := range cfgs {
+		ins := BuildHttpSign(
+			c.SignName, c.PrivateKey, int64(c.ExpiredTime),
+			c.TimestampName, c.RequestIDName, c.VersionType,
+		).WithSignType(toSignType(c.SignType))
+		m.SetSignIns(c.IndexName, ins)
 	}
-
-	logger.Infof("SignMgr   InsInit... Done !")
-}
-
-/**
-* @Description: tick
-* @receiver: self
-* @param: nowMs
-* @Author: Iori
-* @Date: 2022-02-14 11:39:54
-**/
-func (self *SignMgr) Tick(nowMs int64) {
-	defer gfunc.CheckRecover()
-	return
+	logger.Infof("SignMgr InsInit... Done !")
 }

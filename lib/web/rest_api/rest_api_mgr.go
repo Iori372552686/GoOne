@@ -5,111 +5,60 @@ import (
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/web/http_sign"
-	"github.com/Iori372552686/GoOne/module/gfunc"
 )
 
-/**
- * RestApiMgr
- * @Description:
-**/
+// defaultRestKey 为未指定 key 时返回的 RestApi 实例名。
+const defaultRestKey = "default"
+
+// RestApiMgr 是按服务名注册的 RestApi 实例表，并发安全。
 type RestApiMgr struct {
 	mu        sync.RWMutex
-	Instances map[string]*RestApi
-
-	//private
-	lastTick int64
+	instances map[string]*RestApi
 }
 
-/**
-* @Description: 创建restApi管理器
-* @return: *RestApiMgr
-* @Author: Iori
-* @Date: 2022-02-14 11:28:59
-**/
+// NewRestApiMgr 返回一个空的 RestApiMgr。
 func NewRestApiMgr() *RestApiMgr {
-	r := &RestApiMgr{}
-	r.Instances = make(map[string]*RestApi)
-
-	return r
+	return &RestApiMgr{instances: make(map[string]*RestApi)}
 }
 
-/**
-* @Description: 设置restApi实例
-* @param: key
-* @param: impl
-* @Author: Iori
-* @Date: 2022-02-14 16:13:53
-**/
-func (self *RestApiMgr) SetRestIns(key string, impl *RestApi) {
+// SetRestIns 在 key 下注册（或替换）一个 RestApi 实例。
+// key 为空或 impl 为 nil 时为空操作。
+func (m *RestApiMgr) SetRestIns(key string, impl *RestApi) {
 	if key == "" || impl == nil {
 		return
 	}
-
-	self.mu.Lock()
-	defer self.mu.Unlock()
-	self.Instances[key] = impl
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.instances[key] = impl
 }
 
-/**
-* @Description: 获取restApi实例
-* @receiver: self
-* @param: key
-* @param: o
-* @Author: Iori
-* @Date: 2022-02-14 11:29:20
-**/
-func (self *RestApiMgr) GetRestIns(keys ...string) *RestApi {
-	self.mu.RLock()
-	defer self.mu.RUnlock()
+// GetRestIns 返回指定 key 的实例；未传 key 时返回 "default" 实例。
+// 不存在时返回 nil。
+func (m *RestApiMgr) GetRestIns(keys ...string) *RestApi {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if len(keys) == 0 {
-		return self.Instances["default"]
-	} else {
-		return self.Instances[keys[0]]
+		return m.instances[defaultRestKey]
 	}
+	return m.instances[keys[0]]
 }
 
-/**
-* @Description: 计数
-* @receiver: self
-* @return: int
-* @Author: Iori
-* @Date: 2022-02-14 11:29:45
-**/
-func (self *RestApiMgr) Count() int {
-	if self == nil {
+// Count 返回已注册的实例数量。
+func (m *RestApiMgr) Count() int {
+	if m == nil {
 		return 0
 	}
-	self.mu.RLock()
-	defer self.mu.RUnlock()
-	return len(self.Instances)
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.instances)
 }
 
-/**
-* @Description: 初始化RestApi管理器
-* @receiver: self
-* @param: cfgs
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-14 11:29:45
-**/
-func (self *RestApiMgr) Init(cfgs []Config, signs *http_sign.SignMgr) {
-	logger.Infof("RestApiMgr   InsInit.. ")
-
-	for _, conf := range cfgs {
-		self.SetRestIns(conf.ServiceName, NewRestInstances(conf, signs))
+// Init 为每个 Config 项构建并注册一个 RestApi 实例，
+// 并从 signs 解析其可选的 HttpSign 依赖。
+func (m *RestApiMgr) Init(cfgs []Config, signs *http_sign.SignMgr) {
+	logger.Infof("RestApiMgr InsInit..")
+	for _, c := range cfgs {
+		m.SetRestIns(c.ServiceName, NewRestInstances(c, signs))
 	}
-
-	logger.Infof("RestApiMgr   InsInit... Done !")
-}
-
-/**
-* @Description: tick
-* @receiver: self
-* @param: nowMs
-* @Author: Iori
-* @Date: 2022-02-14 11:39:54
-**/
-func (self *RestApiMgr) Tick(nowMs int64) {
-	defer gfunc.CheckRecover()
-	return
+	logger.Infof("RestApiMgr InsInit... Done !")
 }

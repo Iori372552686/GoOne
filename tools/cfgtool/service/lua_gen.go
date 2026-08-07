@@ -54,6 +54,13 @@ func toLuaTable(v interface{}) string {
 			parts = append(parts, fmt.Sprintf("[%q]=%s", k, toLuaTable(v2)))
 		}
 		return "{" + strings.Join(parts, ",") + "}\n"
+	case map[interface{}]interface{}:
+		// 兜底：非字符串 key 的 map（key 统一 fmt 成字符串以兼容 Lua）
+		parts := make([]string, 0, len(val))
+		for k, v2 := range val {
+			parts = append(parts, fmt.Sprintf("[%q]=%s", fmt.Sprintf("%v", k), toLuaTable(v2)))
+		}
+		return "{" + strings.Join(parts, ",") + "}\n"
 	case []interface{}:
 		parts := make([]string, len(val))
 		for i, v2 := range val {
