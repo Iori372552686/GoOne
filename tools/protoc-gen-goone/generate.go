@@ -196,6 +196,10 @@ func renderSSRPC(fd *descriptorpb.FileDescriptorProto, goPkgName string, curImpo
 
 		cmdLit string // literal for MethodDesc.Cmd, can be "0" for non-cmd transports
 
+		// cmdResp is the raw ssrpc cmd_resp value; 0 means "let runtime default to Cmd+1".
+		// Only emitted for transports whose runtime consumes CmdResp (cmd/WS).
+		cmdResp uint32
+
 		grpcServerStream bool
 
 		oneWay    bool
@@ -469,6 +473,7 @@ func renderSSRPC(fd *descriptorpb.FileDescriptorProto, goPkgName string, curImpo
 					inGo:      inGo,
 					outGo:     "",
 					cmdLit:    cmdExpr,
+					cmdResp:   ext.cmdResp,
 					oneWay:    oneWay,
 					uidLock:   ext.uidLock,
 					auth:      ext.auth,
@@ -633,6 +638,9 @@ func renderSSRPC(fd *descriptorpb.FileDescriptorProto, goPkgName string, curImpo
 				b.WriteString(fmt.Sprintf("\td.RegisterWS(uint32(%s), ssrpc.WrapWS(\n", wb.cmdLit))
 				b.WriteString("\t\tssrpc.MethodDesc{\n")
 				b.WriteString(fmt.Sprintf("\t\t\tCmd: %s,\n", wb.cmdLit))
+				if wb.cmdResp != 0 {
+					b.WriteString(fmt.Sprintf("\t\t\tCmdResp: g1_protocol.CMD(0x%X),\n", wb.cmdResp))
+				}
 				if wb.oneWay {
 					b.WriteString("\t\t\tOneWay: true,\n")
 				}
@@ -858,6 +866,9 @@ func renderSSRPC(fd *descriptorpb.FileDescriptorProto, goPkgName string, curImpo
 				b.WriteString(fmt.Sprintf("\td.RegisterWS(uint32(%s), ssrpc.WrapWS(\n", wb.cmdLit))
 				b.WriteString("\t\tssrpc.MethodDesc{\n")
 				b.WriteString(fmt.Sprintf("\t\t\tCmd: %s,\n", wb.cmdLit))
+				if wb.cmdResp != 0 {
+					b.WriteString(fmt.Sprintf("\t\t\tCmdResp: g1_protocol.CMD(0x%X),\n", wb.cmdResp))
+				}
 				if wb.oneWay {
 					b.WriteString("\t\t\tOneWay: true,\n")
 				}
@@ -989,7 +1000,7 @@ func renderSSRPC(fd *descriptorpb.FileDescriptorProto, goPkgName string, curImpo
 			// http-bound methods -> BindingHTTP
 			for _, hb := range httpBinds {
 				b.WriteString(fmt.Sprintf("\t\t{Kind: ssrpc.BindingHTTP, HTTPMethod: %q, HTTPPath: %q, HTTPHandler: ssrpc.WrapHTTPGin(\n", hb.httpMethod, hb.path))
-				writeMethodDescForBindingRaw(&b, hb.cmdLit, hb.oneWay, hb.uidLock, hb.auth, hb.sign, hb.timeoutMs, hb.tags, hb.name)
+				writeMethodDescForBindingRaw(&b, hb.cmdLit, "", hb.oneWay, hb.uidLock, hb.auth, hb.sign, hb.timeoutMs, hb.tags, hb.name)
 				b.WriteString("\t\t\tsrv.MW,\n")
 				b.WriteString(fmt.Sprintf("\t\t\tfunc() any { return new(%s) },\n", hb.inGo))
 				b.WriteString("\t\t\tfunc(ctx *ssrpc.Context, in any) (any, error) {\n")
@@ -1000,7 +1011,11 @@ func renderSSRPC(fd *descriptorpb.FileDescriptorProto, goPkgName string, curImpo
 			// ws-bound methods -> BindingWS
 			for _, wb := range wsBinds {
 				b.WriteString("\t\t{Kind: ssrpc.BindingWS, CMD: " + wb.cmdLit + ", CmdHandler: ssrpc.WrapWS(\n")
-				writeMethodDescForBindingRaw(&b, wb.cmdLit, wb.oneWay, wb.uidLock, wb.auth, wb.sign, wb.timeoutMs, wb.tags, wb.name)
+				wsCmdRespExpr := ""
+				if wb.cmdResp != 0 {
+					wsCmdRespExpr = fmt.Sprintf("g1_protocol.CMD(0x%X)", wb.cmdResp)
+				}
+				writeMethodDescForBindingRaw(&b, wb.cmdLit, wsCmdRespExpr, wb.oneWay, wb.uidLock, wb.auth, wb.sign, wb.timeoutMs, wb.tags, wb.name)
 				b.WriteString("\t\t\tsrv.MW,\n")
 				b.WriteString(fmt.Sprintf("\t\t\tfunc() any { return new(%s) },\n", wb.inGo))
 				b.WriteString("\t\t\tfunc(ctx *ssrpc.Context, in any) (any, error) {\n")
@@ -1015,7 +1030,7 @@ func renderSSRPC(fd *descriptorpb.FileDescriptorProto, goPkgName string, curImpo
 				} else {
 					b.WriteString(fmt.Sprintf("\t\t{Kind: ssrpc.BindingGRPCUnary, GRPCService: %q, GRPCMethod: %q, ReqFactory: func() any { return new(%s) }, UnaryHandler: ssrpc.WrapGRPCUnary(\n", gb.grpcService, gb.method, gb.inGo))
 				}
-				writeMethodDescForBindingRaw(&b, gb.cmdLit, gb.oneWay, gb.uidLock, gb.auth, gb.sign, gb.timeoutMs, gb.tags, gb.name)
+				writeMethodDescForBindingRaw(&b, gb.cmdLit, "", gb.oneWay, gb.uidLock, gb.auth, gb.sign, gb.timeoutMs, gb.tags, gb.name)
 				b.WriteString("\t\t\tsrv.MW,\n")
 				if gb.grpcServerStream {
 					b.WriteString(fmt.Sprintf("\t\t\tfunc() any { return new(%s) },\n", gb.inGo))
@@ -1448,9 +1463,15 @@ func writeMethodDescForBinding(b *strings.Builder, ext ssrpcOpt, timeoutMs uint3
 
 // writeMethodDescForBindingRaw 与 writeMethodDescForBinding 相同，但从已解构的原始字段
 // 构造（用于 http/ws/grpc bind，它们不持有 ssrpcOpt）。
-func writeMethodDescForBindingRaw(b *strings.Builder, cmdLit string, oneWay, uidLock, auth, sign bool, timeoutMs uint32, tags []string, name string) {
+//
+// cmdRespExpr 是已生成的 CmdResp 行内表达式（如 "g1_protocol.CMD(0x200)"），空串表示不输出
+// （留 0 由 runtime 默认 Cmd+1）。HTTP/gRPC runtime 不消费 CmdResp，调用方传 ""。
+func writeMethodDescForBindingRaw(b *strings.Builder, cmdLit, cmdRespExpr string, oneWay, uidLock, auth, sign bool, timeoutMs uint32, tags []string, name string) {
 	b.WriteString("\t\t\tssrpc.MethodDesc{\n")
 	b.WriteString(fmt.Sprintf("\t\t\t\tCmd: %s,\n", cmdLit))
+	if cmdRespExpr != "" {
+		b.WriteString(fmt.Sprintf("\t\t\t\tCmdResp: %s,\n", cmdRespExpr))
+	}
 	if oneWay {
 		b.WriteString("\t\t\t\tOneWay: true,\n")
 	}

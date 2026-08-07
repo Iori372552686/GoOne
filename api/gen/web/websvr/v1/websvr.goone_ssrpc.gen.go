@@ -64,6 +64,7 @@ func RegisterWebApiServiceToGin(r gin.IRoutes, srv WebApiServiceSServer) {
 	r.Handle("POST", "/v1/web/msg-sec-check", ssrpc.WrapHTTPGin(
 		ssrpc.MethodDesc{
 			Cmd:     0,
+			Auth:    true,
 			Sign:    true,
 			Timeout: 8000 * time.Millisecond,
 			Name:    "msg security check",
@@ -99,6 +100,7 @@ func RegisterWebApiServiceToDispatcher(d *ssrpc.Dispatcher, srv WebApiServiceSSe
 	d.RegisterHTTP("POST", "/v1/web/msg-sec-check", ssrpc.WrapHTTPGin(
 		ssrpc.MethodDesc{
 			Cmd:     0,
+			Auth:    true,
 			Sign:    true,
 			Timeout: 8000 * time.Millisecond,
 			Name:    "msg security check",
@@ -134,6 +136,7 @@ func WebApiServiceBindings(srv WebApiServiceSServer) []ssrpc.Binding {
 		{Kind: ssrpc.BindingHTTP, HTTPMethod: "POST", HTTPPath: "/v1/web/msg-sec-check", HTTPHandler: ssrpc.WrapHTTPGin(
 			ssrpc.MethodDesc{
 				Cmd:     0,
+				Auth:    true,
 				Sign:    true,
 				Timeout: 8000 * time.Millisecond,
 				Name:    "msg security check",

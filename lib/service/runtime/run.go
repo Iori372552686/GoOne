@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Iori372552686/GoOne/lib/api/logo"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 )
 
@@ -373,6 +374,7 @@ func (a *App) stopComponents(started []Component, timeout time.Duration) error {
 
 func (a *App) markStarting() {
 	// state store 已在 NewStateStore 构造时起始为 Starting 且上报了 gauge。
+	logo.Print(a.name)
 	logger.Infof("%s starting", a.name)
 }
 

@@ -17,6 +17,7 @@ import (
 func BuildWebDispatcher() (*ssrpc.Dispatcher, websvrv1.WebApiServiceSServer) {
 	srv := websvrv1.NewWebApiServiceSServer(&service.WebApiServiceImpl{}, ssrpc.DefaultMWOptions{
 		Sign: service.NewHTTPSignVerifier(conf.Get("websvr.runtime.http_server.auth_enable").Bool(), globals.SignMgr.GetSignIns()),
+		Auth: service.NewHTTPAuthVerifier(conf.Get("websvr.runtime.http_server.auth_enable").Bool(), globals.SignMgr.GetSignIns()),
 	})
 	r := ssrpc.NewRegistry()
 	if err := websvrv1.RegisterWebApiServiceToRegistry(r, srv); err != nil {

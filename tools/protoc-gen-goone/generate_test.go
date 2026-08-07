@@ -1710,6 +1710,192 @@ func TestGenerate_GRPCClientStreaming_Unsupported(t *testing.T) {
 	}
 }
 
+// TestGenerate_WSBinding_EmitsCmdResp verifies that WS-bound methods honor an
+// explicit cmd_resp across all three WS emission sites (RegisterToWS,
+// RegisterToDispatcher, and the Bindings slice). Previously the WS path
+// silently dropped cmd_resp, falling back to cmd+1 even though the WS runtime
+// consumes desc.CmdResp.
+func TestGenerate_WSBinding_EmitsCmdResp(t *testing.T) {
+	descFD := protodesc.ToFileDescriptorProto(descriptorpb.File_google_protobuf_descriptor_proto)
+
+	optionsFD := &descriptorpb.FileDescriptorProto{
+		Name:    protoString(ssrpcOptFilePath),
+		Package: protoString("goone.options.v1"),
+		Dependency: []string{
+			"google/protobuf/descriptor.proto",
+		},
+		Options: &descriptorpb.FileOptions{GoPackage: protoString("github.com/Iori372552686/GoOne/api/gen/goone/options/v1;optionsv1")},
+		MessageType: []*descriptorpb.DescriptorProto{
+			{
+				Name: protoString("SsRpc"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{Name: protoString("cmd"), Number: protoInt32(1), Label: labelPtr(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL), Type: typePtr(descriptorpb.FieldDescriptorProto_TYPE_UINT32)},
+					{Name: protoString("cmd_resp"), Number: protoInt32(2), Label: labelPtr(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL), Type: typePtr(descriptorpb.FieldDescriptorProto_TYPE_UINT32)},
+					{Name: protoString("ws"), Number: protoInt32(30), Label: labelPtr(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL), Type: typePtr(descriptorpb.FieldDescriptorProto_TYPE_BOOL)},
+				},
+			},
+		},
+		Extension: []*descriptorpb.FieldDescriptorProto{
+			{
+				Name:     protoString("ssrpc"),
+				Number:   protoInt32(61001),
+				Label:    labelPtr(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+				Type:     typePtr(descriptorpb.FieldDescriptorProto_TYPE_MESSAGE),
+				TypeName: protoString(".goone.options.v1.SsRpc"),
+				Extendee: protoString(".google.protobuf.MethodOptions"),
+			},
+		},
+	}
+
+	svcFD := &descriptorpb.FileDescriptorProto{
+		Name:       protoString("test/wscmdresp/v1/svc.proto"),
+		Package:    protoString("test.wscmdresp.v1"),
+		Dependency: []string{ssrpcOptFilePath},
+		Options:    &descriptorpb.FileOptions{GoPackage: protoString("github.com/Iori372552686/GoOne/api/gen/test/wscmdresp/v1;wscmdrespv1")},
+		MessageType: []*descriptorpb.DescriptorProto{
+			{Name: protoString("Req")},
+			{Name: protoString("Rsp")},
+		},
+		Service: []*descriptorpb.ServiceDescriptorProto{
+			{
+				Name: protoString("Svc"),
+				Method: []*descriptorpb.MethodDescriptorProto{
+					{
+						Name:       protoString("Do"),
+						InputType:  protoString(".test.wscmdresp.v1.Req"),
+						OutputType: protoString(".test.wscmdresp.v1.Rsp"),
+						Options:    &descriptorpb.MethodOptions{},
+					},
+				},
+			},
+		},
+	}
+
+	extType, extMsgDesc, _, err := buildSsRpcExtension([]*descriptorpb.FileDescriptorProto{descFD, optionsFD, svcFD})
+	if err != nil {
+		t.Fatalf("buildSsRpcExtension err: %v", err)
+	}
+	optMsg := dynamicpb.NewMessage(extMsgDesc)
+	optMsg.Set(extMsgDesc.Fields().ByName("cmd"), protoreflect.ValueOfUint32(0x100))
+	optMsg.Set(extMsgDesc.Fields().ByName("cmd_resp"), protoreflect.ValueOfUint32(0x200))
+	optMsg.Set(extMsgDesc.Fields().ByName("ws"), protoreflect.ValueOfBool(true))
+	svcFD.Service[0].Method[0].Options = mustMethodOptionsUnknown(t, extType, optMsg)
+
+	req := &pluginpb.CodeGeneratorRequest{
+		FileToGenerate: []string{svcFD.GetName()},
+		ProtoFile:      []*descriptorpb.FileDescriptorProto{descFD, optionsFD, svcFD},
+		Parameter:      protoString("paths=import,module=github.com/Iori372552686/GoOne"),
+	}
+	resp, err := Generate(req)
+	if err != nil {
+		t.Fatalf("Generate err: %v", err)
+	}
+	out := resp.File[0].GetContent()
+
+	// CmdResp must appear in the WS MethodDesc literals. A WS+cmd method triggers
+	// both the cmd path (TransactionMgr/Dispatcher/Bindings) and the WS path
+	// (ToWS/ToDispatcher/Bindings), so CmdResp appears multiple times. The WS gap
+	// this test guards is that RegisterSvcToWS carries the explicit CmdResp.
+	if !contains(out, "func RegisterSvcToWS(d *ssrpc.Dispatcher, srv SvcSServer)") {
+		t.Fatalf("expected RegisterSvcToWS function, got:\n%s", out)
+	}
+	wantCmdResp := "CmdResp: g1_protocol.CMD(0x200)"
+	count := 0
+	for i := 0; i+len(wantCmdResp) <= len(out); i++ {
+		if out[i:i+len(wantCmdResp)] == wantCmdResp {
+			count++
+		}
+	}
+	// At minimum the three WS emission sites (ToWS, ToDispatcher, Bindings) must
+	// carry CmdResp. The cmd path adds three more, so the total is >= 3.
+	if count < 3 {
+		t.Fatalf("expected CmdResp at least 3 times (WS sites), got %d in:\n%s", count, out)
+	}
+}
+
+// TestGenerate_CmdResp_NonZeroEmitted covers the cmd (TransactionMgr) path with
+// an explicit cmd_resp, which was previously a coverage blind spot: no test set
+// cmd_resp to a non-zero value, so the CmdResp emission branch went unexercised.
+func TestGenerate_CmdResp_NonZeroEmitted(t *testing.T) {
+	descFD := protodesc.ToFileDescriptorProto(descriptorpb.File_google_protobuf_descriptor_proto)
+
+	optionsFD := &descriptorpb.FileDescriptorProto{
+		Name:    protoString(ssrpcOptFilePath),
+		Package: protoString("goone.options.v1"),
+		Dependency: []string{
+			"google/protobuf/descriptor.proto",
+		},
+		Options: &descriptorpb.FileOptions{GoPackage: protoString("github.com/Iori372552686/GoOne/api/gen/goone/options/v1;optionsv1")},
+		MessageType: []*descriptorpb.DescriptorProto{
+			{
+				Name: protoString("SsRpc"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{Name: protoString("cmd"), Number: protoInt32(1), Label: labelPtr(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL), Type: typePtr(descriptorpb.FieldDescriptorProto_TYPE_UINT32)},
+					{Name: protoString("cmd_resp"), Number: protoInt32(2), Label: labelPtr(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL), Type: typePtr(descriptorpb.FieldDescriptorProto_TYPE_UINT32)},
+				},
+			},
+		},
+		Extension: []*descriptorpb.FieldDescriptorProto{
+			{
+				Name:     protoString("ssrpc"),
+				Number:   protoInt32(61001),
+				Label:    labelPtr(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+				Type:     typePtr(descriptorpb.FieldDescriptorProto_TYPE_MESSAGE),
+				TypeName: protoString(".goone.options.v1.SsRpc"),
+				Extendee: protoString(".google.protobuf.MethodOptions"),
+			},
+		},
+	}
+
+	svcFD := &descriptorpb.FileDescriptorProto{
+		Name:       protoString("test/cmdresp/v1/svc.proto"),
+		Package:    protoString("test.cmdresp.v1"),
+		Dependency: []string{ssrpcOptFilePath},
+		Options:    &descriptorpb.FileOptions{GoPackage: protoString("github.com/Iori372552686/GoOne/api/gen/test/cmdresp/v1;cmdrespv1")},
+		MessageType: []*descriptorpb.DescriptorProto{
+			{Name: protoString("Req")},
+			{Name: protoString("Rsp")},
+		},
+		Service: []*descriptorpb.ServiceDescriptorProto{
+			{
+				Name: protoString("Svc"),
+				Method: []*descriptorpb.MethodDescriptorProto{
+					{
+						Name:       protoString("Do"),
+						InputType:  protoString(".test.cmdresp.v1.Req"),
+						OutputType: protoString(".test.cmdresp.v1.Rsp"),
+						Options:    &descriptorpb.MethodOptions{},
+					},
+				},
+			},
+		},
+	}
+
+	extType, extMsgDesc, _, err := buildSsRpcExtension([]*descriptorpb.FileDescriptorProto{descFD, optionsFD, svcFD})
+	if err != nil {
+		t.Fatalf("buildSsRpcExtension err: %v", err)
+	}
+	optMsg := dynamicpb.NewMessage(extMsgDesc)
+	optMsg.Set(extMsgDesc.Fields().ByName("cmd"), protoreflect.ValueOfUint32(0x01020002))
+	optMsg.Set(extMsgDesc.Fields().ByName("cmd_resp"), protoreflect.ValueOfUint32(0x01020099))
+	svcFD.Service[0].Method[0].Options = mustMethodOptionsUnknown(t, extType, optMsg)
+
+	req := &pluginpb.CodeGeneratorRequest{
+		FileToGenerate: []string{svcFD.GetName()},
+		ProtoFile:      []*descriptorpb.FileDescriptorProto{descFD, optionsFD, svcFD},
+		Parameter:      protoString("paths=import,module=github.com/Iori372552686/GoOne"),
+	}
+	resp, err := Generate(req)
+	if err != nil {
+		t.Fatalf("Generate err: %v", err)
+	}
+	out := resp.File[0].GetContent()
+	// cmd path (TransactionMgr + Dispatcher + Bindings) all emit explicit CmdResp.
+	if !contains(out, "CmdResp: g1_protocol.CMD(0x1020099)") {
+		t.Fatalf("expected explicit CmdResp in cmd path, got:\n%s", out)
+	}
+}
+
 func contains(s, sub string) bool {
 	return len(s) >= len(sub) && (s == sub || (len(sub) > 0 && (stringIndex(s, sub) >= 0)))
 }

@@ -542,43 +542,132 @@ item.Range(c => { console.log(c.Name); return true; }); // 遍历
 - 每个**文件**作为一个配置项发布，`dataID` = 文件名（如 `ItemConfig.json`）。大小写不敏感，重复 token 自动去重，未知 token 记 warn 跳过。
 - 上传发生在 `GenData()` 之后；GenData 末尾会清空内存表，故上传阶段直接扫描各产物目录（而非读内存）。
 
+### Key 命名规范与永久性（etcd）
+
+为保证多环境隔离、可读、可治理，etcd 的 key 统一采用 **`<根前缀>/<配置分区>/<环境名>/<dataID>`** 的四段式布局：
+
+```
+/goone/config/<env>/<SheetName>.<ext>
+└─┬─────┘ └─┬────┘ └┬──┘ └────┬─────────────┘
+  根前缀   配置分区  环境名     dataID（= 文件名）
+```
+
+| 段 | 取值示例 | 说明 |
+|----|---------|------|
+| 根前缀 | `/goone` | 项目命名空间，与服务发现区(`/goone/register`)、其它业务隔离 |
+| 配置分区 | `config` | 固定，专放策划配置数据 |
+| **环境名** | `dev` / `test` / `prod` | **环境隔离的关键 key**；通过 URL 的 `path` 参数表达，一次上传一个环境 |
+| dataID | `ItemConfig.json` | = 本地产物文件名，见上表 |
+
+**示例**：开发环境传 `path=/goone/config/dev`，生成的 key 形如：
+
+```
+/goone/config/dev/DropItemConfig.json
+/goone/config/dev/GlobalConst.json
+/goone/config/dev/MachineConfig.json
+/goone/config/dev/TaskConfig.json
+/goone/config/dev/TexasConfig.json
+/goone/config/dev/TexasTestConfig.json
+```
+
+> 切换环境只需改 `path` 末段：`/goone/config/prod`、`/goone/config/test`。多环境并存、互不覆盖，便于灰度与回滚。
+
+**永久存储（永不过期）**：etcd `Publisher` 用裸 `Put` 写入、**不附带 Lease**，因此每个 key 都是永久 key（直到被显式 `Delete` 或集群 compact）。这是策划配置数据的预期语义——配置不随会话/进程消亡。
+
 ### 支持的后端
 
 通过 `lib/contrib/config/factory` 的 URL scheme 选择后端：
 
 | 后端 | URL 形态 | 说明 |
 |------|---------|------|
-| **etcd** | `etcd://host:2379?path=/goone/config&username=...&password=...` | 二进制安全，`key = path.Join(path, dataID)`。**需用 `-tags config_etcd` 编译**。鉴权可选（`username`/`password` query）。 |
+| **etcd** | `etcd://host:2379?path=/goone/config/dev&username=...&password=...` | 二进制安全，`key = path.Join(path, dataID)`，**永久存储**。**需用 `-tags config_etcd` 编译**。鉴权可选（`username`/`password` query）。 |
 | **nacos** | `nacos://host:8848?dataid=...&group=...&namespace_id=...&username=...&password=...` | `dataid` query 在发布时仅用于校验，实际以文件名为准；`group` 透传。Nacos 以**文本字符串**存储，`.bytes` 二进制经 `string()` 转换可能损坏非 UTF-8 字节，**建议仅在 etcd 上传 bytes**。 |
 
 > consul / apollo / k8s 目前只实现了读路径（`Source`），发布（`Publisher`）暂未实现，指定这些 scheme 会返回错误。
 
-### 使用示例
+### 完整使用示例
 
-**etcd（推荐，二进制安全）：**
+**1) 编译（etcd 后端需 `config_etcd` tag）**
 
 ```bash
-xlsx_trans.exe \
-  -xlsx=./xls \
+# 本仓库根目录
+go build -tags config_etcd -o xlsx_trans.exe ./tools/cfgtool/
+```
+
+**2) 生成 + 上传到 etcd（开发环境 dev）**
+
+```bash
+./xlsx_trans.exe \
+  -xlsx=./tools/cfgtool/xls \
   -json=./gen/json \
-  -text=./gen/text \
-  -bytes=./gen/bytes \
+  -proto=./gen/proto \
   -mode=all \
-  -upload="etcd://47.107.101.29:2379?path=/goone/config&username=root&password=secret" \
+  -upload="etcd://47.107.101.29:2379?path=/goone/config/dev" \
+  -uptype=json
+```
+
+输出（实测）：
+
+```
+✅ 配置数据生成完成
+ℹ️ 已连接配置中心后端=etcd，开始上传
+ℹ️ 已上传 DropItemConfig.json  (json, 1335 bytes)
+ℹ️ 已上传 GlobalConst.json     (json, 1389 bytes)
+ℹ️ 已上传 MachineConfig.json   (json,  822 bytes)
+ℹ️ 已上传 TaskConfig.json      (json,  453 bytes)
+ℹ️ 已上传 TexasConfig.json     (json, 2270 bytes)
+ℹ️ 已上传 TexasTestConfig.json (json, 2570 bytes)
+✅ 配置数据上传完成，共 6 项
+```
+
+**3) 上传多种格式（json + pb text + bytes）到 etcd 生产环境 prod**
+
+```bash
+./xlsx_trans.exe \
+  -xlsx=./tools/cfgtool/xls \
+  -json=./gen/json -text=./gen/text -bytes=./gen/bytes \
+  -proto=./gen/proto -mode=all \
+  -upload="etcd://47.107.101.29:2379?path=/goone/config/prod" \
   -uptype=json,conf,bytes
 ```
 
-**nacos（文本产物）：**
+**4) 上传到 nacos（文本产物）**
 
 ```bash
-xlsx_trans.exe \
-  -xlsx=./xls \
-  -json=./gen/json \
-  -text=./gen/text \
-  -mode=all \
+./xlsx_trans.exe \
+  -xlsx=./tools/cfgtool/xls \
+  -json=./gen/json -text=./gen/text -proto=./gen/proto -mode=all \
   -upload="nacos://127.0.0.1:8848?group=GOONE_CONFIG&namespace_id=public&username=nacos&password=nacos" \
   -uptype=json,conf
 ```
+
+### 回读校验（运维/CI 可用）
+
+上传后可用任意 etcd client 直接 `Get` 前缀验证。下面是用 Go 校验「永久 + JSON 合法 + 与本地一致」的最小程序：
+
+```go
+resp, _ := cli.Get(ctx, "/goone/config/dev/", clientv3.WithPrefix())
+for _, kv := range resp.Kvs {
+    // kv.Lease == 0            → 永久 key（不过期）
+    // json.Unmarshal(kv.Value) → 合法 JSON
+    // 与本地 ./gen/json/<basename> 字节一致
+}
+```
+
+> 实测（`47.107.101.29:2379`，`/goone/config/dev/`）：6 个 key 全部 `lease=0`、JSON 合法、与本地字节一致。
+
+### ⚠️ 读取端契约（架构师须知）
+
+上传只是"写"，要让业务服务真正读回这些数据，必须对齐 `common/gamedata` 读取端的契约，否则会 `InitRemote` 失败：
+
+1. **格式必须是 pb text（`.conf`）**：`gamedata` 每个 sheet 的 parser 硬编码调 `proto.UnmarshalText`，**完全忽略 `kv.Format`**。上传 JSON/bytes 给 `gamedata` 读会反序列化失败。→ **服务器侧读取请用 `-uptype=conf` 上传 `.conf`**；JSON/bytes 仅供客户端/工具链消费。
+2. **dataID 必须是 `<SheetName>.conf`**：`SheetFiles()` 返回的是 `["ItemConfig.conf", "TexasConfig.conf", ...]`，`applyKVs` 用 `kv.Key` **精确匹配**，未知名直接判缺失。
+3. **etcd 读取端需剥路径前缀**：Nacos `Load()` 返回 `kv.Key = dataID`（裸名，如 `ItemConfig.conf`），与读取端匹配；但 etcd `Load()` 返回 `kv.Key = 完整 key`（如 `/goone/config/dev/ItemConfig.conf`），而当前 `applyKVs` **不做 `filepath.Base` 剥离**。
+   → **若要用 etcd 作为 `gamedata` 后端**，需二选一改一处（尚未实现）：
+   - 在 `common/gamedata/gamedata.go` 的 `applyKVs` 里改用 `byKey[filepath.Base(kv.Key)]`；或
+   - 新增 `gamedata.InitEtcd` 分支（参考 `remote.go` 的 `InitNacos`），并在 `src/*/app.go` 里按配置选择后端。
+
+> 当前仓库**生产读取端只接了 Nacos**（`gamedata.InitNacos`），etcd 读取路径尚未在业务侧落地。本工具的 etcd 上传能力已就绪并可独立用于客户端/工具链/校验场景；要打通服务器热更读取，按上述第 3 点补一处适配即可。
 
 ### 关于 `-tags config_etcd`
 
@@ -601,3 +690,5 @@ go build -tags config_etcd ./tools/cfgtool/
 - Node.js代码依赖JSON输出，建议同时开启 `-json` 和 `-nodejs`
 - C++代码依赖proto生成的 `.pb.h`，请确保protoc的C++输出路径正确
 - 上传二进制 `.bytes` 优先选 etcd；Nacos 以文本存储，二进制可能损坏
+- 上传到 etcd 的 key 为**永久存储**（无 lease，不过期）；多环境靠 `path` 末段（`dev`/`test`/`prod`）隔离，切换环境只改 URL 的 `path` 参数即可
+- 服务器侧 `gamedata` 热更读取当前只接 Nacos；若要用 etcd 作为读取后端，需补一处路径前缀剥离适配（详见[上传到配置中心 › 读取端契约](#⚠️-读取端契约架构师须知)）
