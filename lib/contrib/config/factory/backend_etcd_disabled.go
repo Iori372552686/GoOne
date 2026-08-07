@@ -14,4 +14,7 @@ func newEtcdClient(cfg Config) (contribconfig.Client, error) {
 	return nil, fmt.Errorf("etcd config backend not enabled (build with: -tags config_etcd)")
 }
 
-
+func newEtcdPublisher(cfg Config) (contribconfig.Publisher, error) {
+	_ = cfg
+	return nil, fmt.Errorf("etcd config backend not enabled (build with: -tags config_etcd)")
+}

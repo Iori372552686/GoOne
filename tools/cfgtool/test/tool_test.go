@@ -43,6 +43,8 @@ func resetGlobals(t *testing.T) {
 		domain.TextPath = ""
 		domain.LuaPath = ""
 		domain.TsPath = ""
+		domain.UploadURL = ""
+		domain.UploadType = ""
 	})
 }
 

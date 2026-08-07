@@ -25,7 +25,7 @@ func main() {
 	flag.StringVar(&domain.XlsxPath, "xlsx", "./xls", "cfg文件目录")
 	flag.StringVar(&domain.TextPath, "text", "", "pb text数据文件目录")
 	flag.StringVar(&domain.ProtoPath, "proto", "", "proto文件目录")
-	flag.StringVar(&domain.ProtoSrcPath, "proto-src", "", "外部proto源文件目录（用于pb.XXX类型引用检索，如 game_protocol/proto）")
+	flag.StringVar(&domain.ProtoSrcPath, "proto-src", "", "外部proto源文件目录（用于pb.XXX类型引用检索，通常指向game_protocol仓库根，使import路径与proto声明对齐）")
 	flag.StringVar(&domain.JsonPath, "json", "", "json数据文件目录")
 	flag.StringVar(&domain.BytesPath, "bytes", "", "pb bytes数据文件目录")
 	flag.StringVar(&domain.LuaPath, "lua", "", "lua数据文件目录")
@@ -36,6 +36,8 @@ func main() {
 	flag.StringVar(&domain.ConfMode, "mode", "all", "配置gen模式（all：全部  client：客户端  server： 服务器）")
 	flag.StringVar(&domain.Module, "module", "github.com/Iori372552686/GoOne", "项目目录")
 	flag.StringVar(&domain.PbPath, "pb", "github.com/Iori372552686/game_protocol/protocol", "proto生成路径")
+	flag.StringVar(&domain.UploadURL, "upload", "", "配置中心URL（留空不上传；如 etcd://host:2379?path=/goone/config 或 nacos://host:8848?dataid=...&group=...）")
+	flag.StringVar(&domain.UploadType, "uptype", "", "上传数据格式，逗号分隔（json/conf/bytes/lua），需配合对应 -json/-text/-bytes/-lua 目录")
 	flag.Parse()
 
 	if *verFlag {
@@ -105,6 +107,10 @@ func run() error {
 		return errs.Wrap(err, "", "", "", 0, "生成错误", "生成配置数据失败")
 	} else {
 		logx.Successf("配置数据生成完成")
+	}
+	// 上传生成产物到配置中心（可选；-upload 为空则跳过）
+	if err := service.UploadData(); err != nil {
+		return errs.Wrap(err, "", "", "", 0, "上传错误", "上传配置数据失败")
 	}
 	// 生成code代码（可选）
 	if err := service.GenCode(); err != nil {

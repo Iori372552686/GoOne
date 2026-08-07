@@ -6,6 +6,7 @@ package factory
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	contribconfig "github.com/Iori372552686/GoOne/lib/contrib/config"
 	conf_etcd "github.com/Iori372552686/GoOne/lib/contrib/config/etcd"
@@ -25,14 +26,24 @@ func (e *etcdClient) Close() error {
 	return nil
 }
 
-func newEtcdClient(cfg Config) (contribconfig.Client, error) {
+// newEtcdClientImpl 构造 etcd client，读/写共用。Username/Password 为空则不带鉴权。
+func newEtcdClientImpl(cfg Config) (*clientv3.Client, error) {
 	if len(cfg.Addrs) == 0 {
 		return nil, fmt.Errorf("etcd: missing address")
 	}
-	cli, err := clientv3.New(clientv3.Config{
+	cc := clientv3.Config{
 		Endpoints:   cfg.Addrs,
 		DialTimeout: cfg.Timeout,
-	})
+	}
+	if cfg.EtcdUserName != "" || cfg.EtcdPassword != "" {
+		cc.Username = cfg.EtcdUserName
+		cc.Password = cfg.EtcdPassword
+	}
+	return clientv3.New(cc)
+}
+
+func newEtcdClient(cfg Config) (contribconfig.Client, error) {
+	cli, err := newEtcdClientImpl(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -48,4 +59,13 @@ func newEtcdClient(cfg Config) (contribconfig.Client, error) {
 	return &etcdClient{Client: contribconfig.Wrap(src, nil), cli: cli}, nil
 }
 
-
+func newEtcdPublisher(cfg Config) (contribconfig.Publisher, error) {
+	if strings.TrimSpace(cfg.Path) == "" {
+		return nil, fmt.Errorf("etcd: missing path")
+	}
+	cli, err := newEtcdClientImpl(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return conf_etcd.NewPublisher(cli, conf_etcd.WithPubPath(cfg.Path))
+}

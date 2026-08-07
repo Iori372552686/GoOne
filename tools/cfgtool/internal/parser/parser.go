@@ -178,8 +178,15 @@ func buildExternalField(tab *base.Table, col int, short string, arrayDepth int) 
 	}
 
 	typeOf := domain.TypeOfStruct
+	var convFunc func(string) interface{}
 	if isEnum {
 		typeOf = domain.TypeOfEnum
+		// 外部 enum：优先按短名查内置 enumMgr 的中文枚举转换（若同名注册过），
+		// 否则按 int32 转换（proto enum 在 dynamic 里就是 int32）
+		convFunc = manager.GetConvFunc(short)
+		if convFunc == nil {
+			convFunc = manager.GetConvFunc("int32")
+		}
 	}
 
 	container := domain.ContainerSingle
@@ -198,6 +205,7 @@ func buildExternalField(tab *base.Table, col int, short string, arrayDepth int) 
 		Name:       fieldName,
 		Desc:       strings.ReplaceAll(tab.Rows[0][col], "\n", ""),
 		Position:   col,
+		ConvFunc:   convFunc,
 		IsExternal: true,
 	}, nil
 }

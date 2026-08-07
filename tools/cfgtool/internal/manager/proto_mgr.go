@@ -144,27 +144,55 @@ func LoadExternalProtos(dir string) error {
 		relPaths = append(relPaths, protoKey)
 	}
 
-	// 第二遍：预解析，提取 message/enum 短名注册
-	// 用一个独立 parser（只解析外部 proto 子集），避免影响主 ParseProto 流程
+	// 第二遍：预解析，提取 message/enum 短名注册。
+	// 容错策略：先尝试一次性解析全部（性能最优，且能 cross-link 同目录内的相互 import）；
+	// 若整体失败（常见于部分 proto import 了仓库外文件如 google/protobuf/*.proto），
+	// 回退为逐文件解析——成功的注册，失败的从 protoMgr 移除（避免污染后续主流程 ParseProto）。
 	subMap := make(map[string]string, len(relPaths))
 	for _, k := range relPaths {
 		subMap[k] = protoMgr[k]
 	}
 	subParser := protoparse.Parser{Accessor: protoparse.FileContentsFromMap(subMap)}
-	descs, err := subParser.ParseFiles(relPaths...)
-	if err != nil {
-		return uerror.New(1, -1, "解析外部proto失败: %s", err.Error())
-	}
-	for i, k := range relPaths {
-		fd := descs[i]
-		if fd == nil {
-			continue
+
+	// 先尝试整体解析（支持同目录内跨文件 cross-link，如 struct.proto import role.proto）
+	if descs, err := subParser.ParseFiles(relPaths...); err == nil {
+		for i, k := range relPaths {
+			if fd := descs[i]; fd != nil {
+				registerExternalTypes(fd, k)
+			}
 		}
-		registerExternalTypes(fd, k)
+	} else {
+		// 整体失败：回退为逐文件解析，容错跳过有外部依赖的 proto
+		logx.Warnf("外部proto整体解析失败，回退为逐文件解析（部分含仓库外import的proto将被跳过）: %v", err)
+		for _, k := range relPaths {
+			d, perr := subParser.ParseFiles(k)
+			if perr != nil {
+				// 该文件依赖了 map 中没有的文件（如 google/protobuf/*.proto），
+				// 从 protoMgr/protoList 移除，避免后续主流程 ParseProto 解析它时整体失败
+				logx.Warnf("跳过外部proto %s: %v", k, perr)
+				removeProto(k)
+				continue
+			}
+			if d[0] != nil {
+				registerExternalTypes(d[0], k)
+			}
+		}
 	}
 	logx.Infof("加载外部proto完成: %d 个文件, %d message, %d enum",
-		len(relPaths), len(externalMsgMgr), len(externalEnumMgr))
+		len(protoList), len(externalMsgMgr), len(externalEnumMgr))
 	return nil
+}
+
+// removeProto 从 protoMgr 与 protoList 中移除指定 proto 文件（用于容错清理）。
+func removeProto(key string) {
+	delete(protoMgr, key)
+	out := protoList[:0]
+	for _, k := range protoList {
+		if k != key {
+			out = append(out, k)
+		}
+	}
+	protoList = out
 }
 
 // registerExternalTypes 把一个 FileDescriptor 里的顶层 message/enum 注册到外部注册表。

@@ -42,4 +42,12 @@ var (
 	TextPath     = ""            // 数据文件路径
 	LuaPath      = ""            // lua数据文件路径
 	TsPath       = ""            // ts数据文件路径
+
+	// —— 配置中心上传 ——
+	// UploadURL 为空则不上传；非空时通过 lib/contrib/config/factory 解析为 Publisher，
+	// 例如 etcd://host:2379?path=/goone/config 或 nacos://host:8848?dataid=...&group=...
+	UploadURL = ""
+	// UploadType 控制上传哪些已生成产物，逗号分隔，取值：json / conf / bytes / lua。
+	// 留空时与各 -json/-text/-bytes/-lua 目录是否非空无关，直接跳过上传。
+	UploadType = ""
 )

@@ -16,6 +16,7 @@ import (
 
 	"github.com/hashicorp/consul/api"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients"
+	"github.com/nacos-group/nacos-sdk-go/v2/clients/config_client"
 	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 )
@@ -40,7 +41,9 @@ type Config struct {
 	Path string
 
 	// etcd options.
-	EtcdPrefix bool
+	EtcdPrefix   bool
+	EtcdUserName string
+	EtcdPassword string
 
 	// Kubernetes options.
 	KubeNamespace    string
@@ -178,6 +181,13 @@ func ParseConfig(addr string) (Config, error) {
 			return Config{}, fmt.Errorf("invalid prefix: %q: %w", v, err)
 		}
 		cfg.EtcdPrefix = b
+	}
+	// etcd 鉴权（可选）；公开 etcd 常带账号密码，与 username/password query 对齐。
+	if v := strings.TrimSpace(q.Get("username")); v != "" {
+		cfg.EtcdUserName = v
+	}
+	if v := strings.TrimSpace(q.Get("password")); v != "" {
+		cfg.EtcdPassword = v
 	}
 
 	// k8s params
@@ -317,30 +327,7 @@ func NewClient(cfg Config) (contribconfig.Client, error) {
 		return contribconfig.Wrap(src, nil), nil
 
 	case BackendNacos:
-		// server conf
-		sc := make([]constant.ServerConfig, 0, len(cfg.Addrs))
-		for _, a := range cfg.Addrs {
-			host, port, err := splitHostPortDefault(a, 8848)
-			if err != nil {
-				return nil, fmt.Errorf("nacos: invalid addr %q: %w", a, err)
-			}
-			sc = append(sc, *constant.NewServerConfig(host, uint64(port)))
-		}
-		// client conf
-		cc := constant.ClientConfig{
-			TimeoutMs:           uint64(maxInt64(1000, cfg.Timeout.Milliseconds())),
-			NotLoadCacheAtStart: true,
-			NamespaceId:         cfg.NacosNamespaceID,
-			LogDir:              cfg.NacosLogDir,
-			CacheDir:            cfg.NacosCacheDir,
-			LogLevel:            cfg.NacosLogLevel,
-			Username:            cfg.NacosUserName,
-			Password:            cfg.NacosPassword,
-		}
-		nc, err := clients.NewConfigClient(vo.NacosClientParam{
-			ClientConfig:  &cc,
-			ServerConfigs: sc,
-		})
+		nc, err := newNacosConfigClient(cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -364,6 +351,35 @@ func NewClient(cfg Config) (contribconfig.Client, error) {
 	default:
 		return nil, fmt.Errorf("unsupported config backend: %q", cfg.Backend)
 	}
+}
+
+// newNacosConfigClient 构造一个 nacos config client（读/写共用）。
+// 从 NewClient 的 nacos 分支提取，行为零变化；NewPublisher 也复用此构造。
+func newNacosConfigClient(cfg Config) (config_client.IConfigClient, error) {
+	// server conf
+	sc := make([]constant.ServerConfig, 0, len(cfg.Addrs))
+	for _, a := range cfg.Addrs {
+		host, port, err := splitHostPortDefault(a, 8848)
+		if err != nil {
+			return nil, fmt.Errorf("nacos: invalid addr %q: %w", a, err)
+		}
+		sc = append(sc, *constant.NewServerConfig(host, uint64(port)))
+	}
+	// client conf
+	cc := constant.ClientConfig{
+		TimeoutMs:           uint64(maxInt64(1000, cfg.Timeout.Milliseconds())),
+		NotLoadCacheAtStart: true,
+		NamespaceId:         cfg.NacosNamespaceID,
+		LogDir:              cfg.NacosLogDir,
+		CacheDir:            cfg.NacosCacheDir,
+		LogLevel:            cfg.NacosLogLevel,
+		Username:            cfg.NacosUserName,
+		Password:            cfg.NacosPassword,
+	}
+	return clients.NewConfigClient(vo.NacosClientParam{
+		ClientConfig:  &cc,
+		ServerConfigs: sc,
+	})
 }
 
 func splitHostPortDefault(s string, defaultPort int) (string, int, error) {
@@ -410,6 +426,46 @@ func NewFromAddr(addr string) (contribconfig.Client, Config, error) {
 		return nil, Config{}, err
 	}
 	return c, cfg, nil
+}
+
+// NewPublisher 按 Config 构造一个配置中心写 Publisher，风格与 NewClient 对称：
+// 按 cfg.Backend 切换到对应后端实现。读（Source）与写（Publisher）共用同一套
+// 地址/鉴权解析（ParseConfig），调用方只需提供同一个 URL。
+func NewPublisher(cfg Config) (contribconfig.Publisher, error) {
+	if err := cfg.Normalize(); err != nil {
+		return nil, err
+	}
+	switch cfg.Backend {
+	case BackendNacos:
+		nc, err := newNacosConfigClient(cfg)
+		if err != nil {
+			return nil, err
+		}
+		group := cfg.NacosGroup
+		if strings.TrimSpace(group) == "" {
+			group = "DEFAULT_GROUP"
+		}
+		return conf_nacos.NewPublisher(nc, conf_nacos.WithPubGroup(group))
+
+	case BackendEtcd:
+		return newEtcdPublisher(cfg)
+
+	default:
+		return nil, fmt.Errorf("publisher not implemented for backend: %q (only nacos/etcd)", cfg.Backend)
+	}
+}
+
+// NewPublisherFromURL 是便捷入口：解析 URL 后构造 Publisher（与 NewFromAddr 对称）。
+func NewPublisherFromURL(addr string) (contribconfig.Publisher, Config, error) {
+	cfg, err := ParseConfig(addr)
+	if err != nil {
+		return nil, Config{}, err
+	}
+	p, err := NewPublisher(cfg)
+	if err != nil {
+		return nil, Config{}, err
+	}
+	return p, cfg, nil
 }
 
 func splitAddrs(s string) []string {

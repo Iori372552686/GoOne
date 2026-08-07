@@ -87,6 +87,8 @@ pause
 | `-mode` | 配置生成模式（`all` / `client` / `server`） | `all` |
 | `-module` | 生成代码导出项目目录 | `github.com/Iori372552686/GoOne` |
 | `-pb` | Protocol Buffers生成路径 | `github.com/Iori372552686/game_protocol/protocol` |
+| `-upload` | 配置中心URL（留空不上传；详见下方[上传到配置中心](#上传到配置中心)） | 空（不上传） |
+| `-uptype` | 上传数据格式，逗号分隔（`json` / `conf` / `bytes` / `lua`），需配合对应 `-json` / `-text` / `-bytes` / `-lua` 目录 | 空（不上传） |
 | `-version` | 打印当前程序版本号 | - |
 
 ---
@@ -153,7 +155,7 @@ pause
 | `map[int32]Reward` | 整数→结构体 映射 | `1:1,10\|2:2,20` |
 | `pb.MessageName` | 引用外部proto的message | `100,200,1` |
 | `[]pb.MessageName` | 外部proto结构体数组 | `100,200,1\|200,300,2` |
-| `map[int32]pb.MessageName` | 整数→外部结构体 映射 | `1:100,200,1\|2:200,300,2` |
+| `map[int32]pb.MessageName` | 整数→外部结构体 映射 | `1:100,200,1;2:200,300,2` |
 | 枚举名 | 枚举类型，可中文 | `金币` |
 | 结构名 | 引用结构体 | `1,100,name` |
 
@@ -166,16 +168,18 @@ pause
 | 层级 | 分隔符 | 用途 | 示例类型 | 示例值 |
 |------|--------|------|---------|--------|
 | 结构体成员 | `,` | 结构体内部字段间（叶子层） | `Reward` | `1,10` |
-| 数组第1维 / map元素 | `\|` | 一维数组元素间，或 map 元素间 | `[]int64` / `map[int32]string` | `1\|2\|3` / `1:hp\|2:mp` |
+| 数组第1维 | `\|` | 一维数组元素间 | `[]int64` | `1\|2\|3` |
 | 数组第2维 | `;` | 二维数组的外层分隔 | `[][]int64` | `1\|2;3\|4` |
 | 数组第3维 | `^` | 三维数组的最外层分隔 | `[][][]int64` | `1\|2;3\|4^5\|6;7\|8` |
+| map 元素间 | `;` | map 元素之间的分隔（高于 value 内部的 `,` 与 `\|`） | `map[int32]string` | `1:hp;2:mp` |
 | map K:V | `:` | map 元素的键值分隔（独占，正交） | `map[K]V` | `1:hp` |
 
 **设计要点：**
 
-1. **类型无关** —— 同一维度的分隔符固定，无论元素是标量还是结构体。如 `[]int64` 和 `[]Reward` 的元素间都用 `|`。
-2. **层级递进** —— 从叶子到根：成员 `,`（最细）→ 1维 `|` → 2维 `;` → 3维 `^`（最粗），不会冲突。
-3. **map K:V 独占 `:`** —— 与所有层级符号正交。因结构体成员用 `,`、数组用 `|`，value 内部不含 `:`，故 map 的 K/V 切分天然无歧义（按首个 `:` 切分）。
+1. **类型无关** —— 同一维度的数组分隔符固定，无论元素是标量还是结构体。如 `[]int64` 和 `[]Reward` 的元素间都用 `|`。
+2. **层级递进** —— 数组从内到外：成员 `,`（最细）→ 1维 `|` → 2维 `;` → 3维 `^`（最粗）。
+3. **map 元素用 `;`** —— 高于 value 内部的 `,`（结构体成员）与 `|`（repeated 字段内部），保证 value 是含 repeated 字段的结构体（如 `pb.TexasGameEndInfo` 的 hands/bests）时不冲突。
+4. **map K:V 独占 `:`** —— 与所有层级符号正交。因结构体成员用 `,`、数组用 `|`/`;`，value 内部不含 `:`，故 map 的 K/V 切分天然无歧义（按首个 `:` 切分）。
 
 #### 示例对照
 
@@ -187,8 +191,8 @@ pause
 | `Reward` (结构体) | `1,10` | `{ItemId:1, Count:10}` |
 | `[]Reward` | `1,10\|2,20` | `[{1,10},{2,20}]` |
 | `[][]Reward` | `1,10\|2,20;3,30\|4,40` | `[[{1,10},{2,20}],[{3,30},{4,40}]]` |
-| `map[int32]string` | `1:hp\|2:mp` | `{1:"hp", 2:"mp"}` |
-| `map[int32]Reward` | `1:1,10\|2:2,20` | `{1:{1,10}, 2:{2,20}}` |
+| `map[int32]string` | `1:hp;2:mp` | `{1:"hp", 2:"mp"}` |
+| `map[int32]Reward` | `1:1,10;2:2,20` | `{1:{1,10}, 2:{2,20}}` |
 
 ### 多维数组说明
 
@@ -222,14 +226,15 @@ pause
 
 #### map 元素分隔符
 
-每个 map 元素用 `K:V` 表示，元素之间**统一用 `|`**（与 value 类型无关，遵循上文层级分隔符表）：
+每个 map 元素用 `K:V` 表示，元素之间**统一用 `;`**（高于 value 内部的 `,` 与 `|`，保证 value 是含 repeated 字段的结构体时不冲突）：
 
 | value 类型 | 元素分隔符 | 示例 |
 |-----------|-----------|------|
-| 标量 / 枚举 | `\|` | `1:hp\|2:mp\|3:atk` |
-| 结构体 | `\|` | `1:1,10\|2:2,20` |
+| 标量 / 枚举 | `;` | `1:hp;2:mp;3:atk` |
+| 结构体 | `;` | `1:1,10;2:2,20` |
+| 含 repeated 的结构体 | `;` | `1:100,1\|2;2:200,3\|4`（value 内部 repeated 仍用 `\|`） |
 
-> 解析时按第一个 `:` 切分 K 与 V。因结构体成员改用 `,`、数组用 `|`，value 内部不含 `:`，K/V 切分天然无歧义。
+> 解析时按第一个 `:` 切分 K 与 V。因结构体成员用 `,`、repeated 内部用 `|`，value 内部不含 `:` 与 `;`，K/V 切分与元素切分均无歧义。
 
 #### map 字段示例
 
@@ -240,7 +245,7 @@ pause
 | Id | Attrs | Tags | Rewards |
 | `int32` | `map[int32]string` | `map[string]int64` | `map[int32]Reward` |
 | key | all | all | all |
-| 1 | `1:hp\|2:mp\|3:atk` | `hp:100\|mp:50\|speed:20` | `1:1,10\|2:2,20` |
+| 1 | `1:hp;2:mp;3:atk` | `hp:100;mp:50;speed:20` | `1:1,10;2:2,20` |
 
 对应的 proto 输出：
 ```proto
@@ -273,13 +278,15 @@ message MapConfig {
 
 #### 使用步骤
 
-1. **准备外部 proto 目录**：所有 `.proto` 文件放在一个根目录下（通常就是 `game_protocol/proto`），工具会递归扫描。
+1. **准备外部 proto 目录**：所有 `.proto` 文件放在一个根目录下。通常指向 `game_protocol`（仓库根，使相对路径 `proto/core/x.proto` 与 proto 内的 import 声明对齐），工具会递归扫描全部 `.proto`。
 
 2. **启动时指定 `-proto-src`**：
    ```bash
-   xlsx_trans.exe -xlsx=./xls -proto-src=../game_protocol/proto -json=./gen/json ...
+   xlsx_trans.exe -xlsx=./xls -proto-src=../game_protocol -json=./gen/json ...
    ```
    留空则不启用外部引用（不影响现有功能）。
+
+   > **容错说明**：若目录下部分 proto import 了仓库外文件（如 `google/protobuf/*.proto`、`goone/options/*.proto`），工具会自动跳过这些文件，不影响其余 proto 的加载。
 
 3. **xlsx 类型列写 `pb.MessageName`**：
    ```
@@ -302,6 +309,7 @@ message MapConfig {
 - ✅ **K（map 的 key）**：仍限于标量（protobuf3 规范），不接受 `pb.X` 作 key。
 - ✅ **V / 元素**：外部 message 可作单值、数组元素、map value，与内置 struct 完全对齐。
 - ✅ **message 内部字段**：按 proto 定义顺序用 `,` 分隔填值；标量/enum/repeated 字段均支持。
+  - 其中 **repeated 字段内部**（如 `hands`/`bests`）用 `/` 分隔（外部 message 专用 repeated 分隔符，避开所有外层容器的 `,`/`|`/`;`/`^`/`:`）。
 - ⚠️ **嵌套 message 字段**：外部 message 内部若含 message 类型字段，会递归解析，但 xlsx 单元格表达嵌套层级有限，复杂嵌套建议拆表。
 - ⚠️ **要求同包**：外部 proto 的 `package` 必须与配置 proto 一致（`g1.protocol`），跨 package 暂不支持。
 
@@ -324,7 +332,7 @@ xlsx 配置表：
 | Id | Reward | Rewards | RewardMap |
 | `int32` | `pb.TheReward` | `[]pb.TheReward` | `map[int32]pb.TheReward` |
 | all | all | all | all |
-| 1 | `100,200,1` | `100,200,1\|200,300,2` | `1:100,200,1\|2:200,300,2` |
+| 1 | `100,200,1` | `100,200,1\|200,300,2` | `1:100,200,1;2:200,300,2` |
 
 生成的 proto（自动 import）：
 ```proto
@@ -515,6 +523,75 @@ item.Range(c => { console.log(c.Name); return true; }); // 遍历
 
 ---
 
+## 上传到配置中心
+
+生成完成后，工具可把**已生成的数据产物**直接发布到配置中心，复用 `lib/contrib/config` 的统一地址/鉴权解析（与 `common/gamedata` 读取路径同源），无需额外的上传脚本。
+
+### 工作机制
+
+- `-upload` 指定配置中心 URL（与读取路径完全一致的 `factory.ParseConfig` 格式），留空则跳过上传。
+- `-uptype` 指定上传哪些产物，逗号分隔，对应已开启的产物目录：
+
+  | `uptype` 取值 | 源目录 | 文件后缀 | 发布格式提示 |
+  |-------------|--------|---------|------------|
+  | `json` | `-json` 目录 | `.json` | `json` |
+  | `conf` | `-text` 目录 | `.conf`（pb text） | `text` |
+  | `bytes` | `-bytes` 目录 | `.bytes`（pb 二进制） | `bytes` |
+  | `lua` | `-lua` 目录 | `.lua` | `text` |
+
+- 每个**文件**作为一个配置项发布，`dataID` = 文件名（如 `ItemConfig.json`）。大小写不敏感，重复 token 自动去重，未知 token 记 warn 跳过。
+- 上传发生在 `GenData()` 之后；GenData 末尾会清空内存表，故上传阶段直接扫描各产物目录（而非读内存）。
+
+### 支持的后端
+
+通过 `lib/contrib/config/factory` 的 URL scheme 选择后端：
+
+| 后端 | URL 形态 | 说明 |
+|------|---------|------|
+| **etcd** | `etcd://host:2379?path=/goone/config&username=...&password=...` | 二进制安全，`key = path.Join(path, dataID)`。**需用 `-tags config_etcd` 编译**。鉴权可选（`username`/`password` query）。 |
+| **nacos** | `nacos://host:8848?dataid=...&group=...&namespace_id=...&username=...&password=...` | `dataid` query 在发布时仅用于校验，实际以文件名为准；`group` 透传。Nacos 以**文本字符串**存储，`.bytes` 二进制经 `string()` 转换可能损坏非 UTF-8 字节，**建议仅在 etcd 上传 bytes**。 |
+
+> consul / apollo / k8s 目前只实现了读路径（`Source`），发布（`Publisher`）暂未实现，指定这些 scheme 会返回错误。
+
+### 使用示例
+
+**etcd（推荐，二进制安全）：**
+
+```bash
+xlsx_trans.exe \
+  -xlsx=./xls \
+  -json=./gen/json \
+  -text=./gen/text \
+  -bytes=./gen/bytes \
+  -mode=all \
+  -upload="etcd://47.107.101.29:2379?path=/goone/config&username=root&password=secret" \
+  -uptype=json,conf,bytes
+```
+
+**nacos（文本产物）：**
+
+```bash
+xlsx_trans.exe \
+  -xlsx=./xls \
+  -json=./gen/json \
+  -text=./gen/text \
+  -mode=all \
+  -upload="nacos://127.0.0.1:8848?group=GOONE_CONFIG&namespace_id=public&username=nacos&password=nacos" \
+  -uptype=json,conf
+```
+
+### 关于 `-tags config_etcd`
+
+etcd 后端依赖 `go.etcd.io/etcd/client/v3`（可能触发 protobuf extension 相关的 panic），默认不编入，需显式开启：
+
+```bash
+go build -tags config_etcd ./tools/cfgtool/
+```
+
+> 启用后 etcd 的读路径（`factory.NewClient`）与写路径（`factory.NewPublisher` / `NewPublisherFromURL`）同时可用。未启用时两者均返回 `"etcd config backend not enabled"` 错误。
+
+---
+
 ## 注意事项
 
 - 路径处理：支持Windows路径（反斜杠）和Linux路径（正斜杠），相对路径基于执行目录
@@ -523,3 +600,4 @@ item.Range(c => { console.log(c.Name); return true; }); // 遍历
 - 错误日志统一输出包含：文件名、表名、字段名、行号、错误类型，便于快速定位
 - Node.js代码依赖JSON输出，建议同时开启 `-json` 和 `-nodejs`
 - C++代码依赖proto生成的 `.pb.h`，请确保protoc的C++输出路径正确
+- 上传二进制 `.bytes` 优先选 etcd；Nacos 以文本存储，二进制可能损坏

@@ -27,8 +27,10 @@ import (
 //	map[int32]Reward → 1:1,10|2:2,20  (K:V 用 ':', 元素间用 '|')
 var arrayDelimiters = []string{"|", ";", "^"}
 
-// mapFieldDelim 是 map 元素之间的分隔符（恒为数组第 1 维，与 value 类型无关）。
-const mapFieldDelim = "|"
+// mapFieldDelim 是 map 元素之间的分隔符。
+// 取 ';'（高于结构体成员 ',' 与 repeated 内部 '|'），保证 value 是含 repeated 字段的
+// 结构体时（如 pb.TexasGameEndInfo 的 hands/bests 用 '|'）不与元素分隔冲突。
+const mapFieldDelim = ";"
 
 func GenData() error {
 	for _, cfg := range manager.GetConfigMap() {
@@ -327,11 +329,17 @@ func parseExternalMessage(file, sheet, fieldName, msgShortName string, rowIndex 
 	return item, nil
 }
 
+// externalRepeatedDelim 是外部 proto message 内部 repeated 字段的元素分隔符。
+// 用 '/' 而非 '|'：因为外部 message 可作为单值/[]数组/map value 出现，
+// 其宿主容器的分隔符已占用 ','(成员) '|'(1维) ';'(2维/map元素) '^'(3维) ':'(K:V)，
+// '/' 是唯一不与任何外层冲突的安全符号。
+const externalRepeatedDelim = "/"
+
 // assignExternalField 按单个 proto 字段描述符，把单元格字符串值赋给 dynamic.Message。
 func assignExternalField(msg *dynamic.Message, fd *desc.FieldDescriptor, cell, file, sheet, fieldName string, rowIndex int) error {
-	// repeated 字段（非 map）：按 '|' 分隔后逐元素追加
+	// repeated 字段（非 map）：按 externalRepeatedDelim 分隔后逐元素追加
 	if fd.IsRepeated() && !fd.IsMap() {
-		parts := strings.Split(cell, arrayDelimiters[0])
+		parts := strings.Split(cell, externalRepeatedDelim)
 		values := make([]interface{}, 0, len(parts))
 		for _, p := range parts {
 			if strings.TrimSpace(p) == "" {
@@ -409,7 +417,7 @@ func protoTypeToConvName(typeStr string) string {
 }
 
 // 分隔符约定（类型无关）：
-//   - 元素之间统一用 mapFieldDelim('|')，无论 value 是标量还是结构体
+//   - 元素之间统一用 mapFieldDelim(';')，无论 value 是标量还是结构体
 //   - 每个 K:V 用 ':' 分隔，按首个 ':' 切分（SplitN 2）
 //     因结构体成员已改用 ','、数组用 '|'，value 内部不含 ':'，故 K/V 切分天然无歧义
 func parseMapValue(file, sheet string, field *base.Field, rowIndex int, raw string) (interface{}, error) {
@@ -620,6 +628,10 @@ func buildMapKey(meta map[string]interface{}, keyFields []string) string {
 func dynamicValueToInterface(val interface{}) interface{} {
 	switch v := val.(type) {
 	case *dynamic.Message:
+		// proto3 message 字段未设置时 GetField 可能返回类型化的 nil（*dynamic.Message(nil)）
+		if v == nil {
+			return nil
+		}
 		if isArrayWrapperMessage(v) {
 			for _, field := range v.GetKnownFields() {
 				if field.GetName() == "Values" {
