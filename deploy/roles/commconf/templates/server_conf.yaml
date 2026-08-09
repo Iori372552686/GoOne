@@ -13,7 +13,7 @@ base_cfg:
       insecure: false
       sampler_ratio: 1
   dependencies:
-    game_data_dir: '{{ root_path }}/gamedata'
+    game_data_dir: '{{ root_path }}/common/game_data'
     sensitive_words_file: '{{ root_path }}/commconf/sensitive.txt'
     http_sign:
       - index_name: default

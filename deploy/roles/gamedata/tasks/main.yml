@@ -6,22 +6,22 @@
     mode: '0755'
   with_items:
     - /data/GoOne/
-    - /data/GoOne/gamedata/
+    - /data/GoOne/common/game_data/
   tags: 'gamedata_init'
 
 - name: '[gamedata] Gen tar ball'
-  shell: cd ../common/gamedata/data; tar cvf gamedata.tar --transform s=data/== ./*
+  shell: cd ../common/game_data; tar cvf gamedata.tar --transform s=game_data/== ./*
   connection: local
   tags: "gamedata_push"
 
 - name: '[gamedata] Copy gamedata tar ball'
   copy:
-    src: ../common/gamedata/data/gamedata.tar
-    dest: /data/GoOne/gamedata.tar
+    src: ../common/game_data/gamedata.tar
+    dest: /data/GoOne/common/game_data.tar
   tags: "gamedata_push"
 
 - name: '[gamedata] unzip gamedata tar ball'
-  shell: cd /data/GoOne/; tar xvf gamedata.tar -C ./gamedata; rm gamedata.tar
+  shell: cd /data/GoOne/common/; tar xvf game_data.tar -C ./game_data; rm game_data.tar
   ignore_errors: yes
   tags: 'gamedata_push'
 

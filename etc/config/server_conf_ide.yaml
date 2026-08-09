@@ -18,7 +18,7 @@ base_cfg:
       sampler_ratio: 1
 
   dependencies:
-    game_data_dir: ./common/gamedata/data
+    game_data_dir: ./common/game_data
     sensitive_words_file: ./common/sensitive/sensitive.txt
 
     http_sign:
