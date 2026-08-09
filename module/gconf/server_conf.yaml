@@ -13,7 +13,7 @@ base_cfg:
       insecure: false
       sampler_ratio: 1
   dependencies:
-    game_data_dir: '{{ root_path }}/gamedata'
+    game_data_dir: '{{ root_path }}/common/game_data'
     sensitive_words_file: '{{ root_path }}/commconf/sensitive.txt'
     http_sign:
       # sign_type 可选: md5(默认, 旧客户端兼容) | sha1 | hmac_sha256(新部署推荐)
