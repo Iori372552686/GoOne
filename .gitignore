@@ -22,3 +22,4 @@ deploy/hosts/host_dev.txt
 /plan
 /report
 /.zcode/plans
+/.GoOne
