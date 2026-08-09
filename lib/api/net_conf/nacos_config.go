@@ -28,7 +28,7 @@ type NacosConf struct {
 // NewNacosConfigClient 构造 Nacos 配置中心 client。
 //
 // Deprecated: gamedata 远端配置统一经 lib/contrib/config/factory 构造
-// 后端无关的 config.Client（见 common/gamedata.InitNacos/InitRemote），监听回收由
+// 后端无关的 config.Client（见 module/gamedata.InitNacos/InitRemote），监听回收由
 // contrib watcher.Stop 负责。本函数保留仅供仍需裸 nacos IConfigClient 的旧代码使用。
 // 构造失败返回 error，不返回 nil client。
 func NewNacosConfigClient(conf NacosConf) (config_client.IConfigClient, error) {

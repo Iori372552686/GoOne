@@ -79,7 +79,7 @@ GoOne 的 ssrpc 模块借鉴 CloudWeGo 的 IDL 驱动思路与 Kratos 的 middle
 
 **当前协议归属：**
 
-- `game_protocol/`：共享消息、枚举、`CMD`，以及主线业务 service proto
+- `common/`（submodule `g1_common`）：共享消息、枚举、`CMD`、主线业务 service proto（源在 `common/game_proto/`，生成在 `common/protocol/`），以及 cfgtool 工具链（`common/game_conf/`）与运行时配置数据（`common/game_data/`）
 - `api/proto/goone/`**、`api/proto/game/**`、存在时的 `api/proto/web/**`：repo-owned proto 输入
 - `api/gen/**`：统一生成产物
 
@@ -123,7 +123,7 @@ Windows / PowerShell：
 - `ws` 当前仍要求有 cmd 绑定
 - gRPC server-streaming method 当前必须是 grpc-only
 - generator 当前支持 gRPC unary 与 server-streaming 自动注册；client-streaming / bidi-streaming 尚未支持
-- gRPC 通路（option 字段 `grpc` / `grpc_service` 定义于 `api/proto/goone/options/v1/options.proto`，runtime `WrapGRPCUnary` / `WrapGRPCServerStreamTyped` / `MountGRPC` 与 codegen 均就绪）当前**尚无业务 method 显式声明 `grpc: true`**；`game_protocol/proto/service/websvr.proto` 的 `Ping` / `MsgSecCheck` 目前均走 HTTP（`http_path`），未来按需 opt-in 即可
+- gRPC 通路（option 字段 `grpc` / `grpc_service` 定义于 `api/proto/goone/options/v1/options.proto`，runtime `WrapGRPCUnary` / `WrapGRPCServerStreamTyped` / `MountGRPC` 与 codegen 均就绪）当前**尚无业务 method 显式声明 `grpc: true`**；`common/game_proto/service/websvr.proto` 的 `Ping` / `MsgSecCheck` 目前均走 HTTP（`http_path`），未来按需 opt-in 即可
 - `web_svr` 已接入可选的 `grpc_server` listener 配置（`enabled` / `port` / `reflection`），其他服务若要对外监听 gRPC，仍需各自在 app 层挂载
 - `web_svr` 的 gRPC listener 已附带标准 health / reflection，便于本地调试
 
@@ -284,7 +284,7 @@ common/     公共模块（配置/常量/工具/游戏数据等）
 deploy/     Ansible 自动化部署脚本与 roles
 docs/       文档（架构/环境搭建/IDL 设计等）
 etc/        环境与本地调试配置（`etc/env/` docker compose；`etc/config/` 示例 `server_conf_ide.yaml`）
-game_protocol/ 协议子仓（共享消息 / CMD / protocol-owned service proto）
+common/     协议子仓 g1_common（共享消息 / CMD / protocol-owned service proto / cfgtool / game_data）
 lib/        框架核心库
   lib/service/ssrpc/    ssrpc 运行时（Context/Dispatcher/Middleware/Wrap*/Client）
   lib/service/bus/      消息总线（RabbitMQ/NATS/Kafka/...）

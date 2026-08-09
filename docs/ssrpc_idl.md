@@ -18,12 +18,12 @@ GoOne 的 ssrpc 方案把：
 - HTTP Gin 挂载（`web_svr`）
 - WS/CSPacket 挂载（`connsvr` 登录前置）
 
-gRPC unary 与 server-streaming runtime / 代码生成已经具备（option 字段 `grpc` / `grpc_service` 在 `api/proto/goone/options/v1/options.proto` 中定义）。**当前主线尚无 method 显式声明 `grpc: true`**——`game_protocol/proto/service/websvr.proto` 的方法仍走 HTTP；`web_svr` 已预留可配置的 gRPC listener 挂载位，业务 method 按需 opt-in 即可。
+gRPC unary 与 server-streaming runtime / 代码生成已经具备（option 字段 `grpc` / `grpc_service` 在 `api/proto/goone/options/v1/options.proto` 中定义）。**当前主线尚无 method 显式声明 `grpc: true`**——`common/game_proto/service/websvr.proto` 的方法仍走 HTTP；`web_svr` 已预留可配置的 gRPC listener 挂载位，业务 method 按需 opt-in 即可。
 
 ### 2. 当前代码布局
 
 - repo-owned proto 输入：`api/proto/goone/**`、`api/proto/game/**`，以及存在时的 `api/proto/web/**`
-- protocol-owned service proto：`game_protocol/*.proto` 中声明了 `service` 的文件
+- protocol-owned service proto：`common/game_proto/**/*.proto` 中声明了 `service` 的文件
 - 生成产物：`api/gen/**`
 - runtime：`lib/service/ssrpc/**`
 - 生成器：`tools/protoc-gen-goone/**`
@@ -32,7 +32,7 @@ gRPC unary 与 server-streaming runtime / 代码生成已经具备（option 字�
   - `src/connsvr/ws_login.go`
   - `src/web_svr/controller/router.go`
 
-业务 service proto 目前主要以 `game_protocol/proto/service/*.proto` 为 source-of-truth；例如 `game_protocol/proto/service/mainsvrc2s.proto`、`game_protocol/proto/service/websvr.proto`。
+业务 service proto 目前主要以 `common/game_proto/service/*.proto` 为 source-of-truth；例如 `common/game_proto/service/mainsvrc2s.proto`、`common/game_proto/service/websvr.proto`。
 
 ### 3. method option（当前实现）
 
@@ -82,7 +82,7 @@ go run ./tools/cmd/genproto
 - 必要时先确保 `cmd.proto` 存在
 - 构建 `protoc-gen-go` 与 `protoc-gen-goone`
 - 扫描 repo-owned proto 输入目录
-- 扫描 `game_protocol` 下真正声明了 `service` 的 proto
+- 扫描 `common/game_proto` 下真正声明了 `service` 的 proto
 - 分两次调用 `protoc`，避免 repo proto 与 protocol proto 的消息符号冲突
 
 一键包装：
@@ -90,14 +90,14 @@ go run ./tools/cmd/genproto
 - `./scripts/proto_goone.sh`
 - `./scripts/proto_goone.ps1`
 
-它们会先生成 `game_protocol/protocol/**`，再生成主仓 `api/gen/**`。
+它们会先生成 `common/protocol/**`，再生成主仓 `api/gen/**`。
 
 校验生成物：
 
 - 默认：`./main.sh check-genproto` 或 `.\scripts\check_genproto.ps1`
 - 全量：`./main.sh check-genproto --full` 或 `.\scripts\check_genproto.ps1 -Full`
 
-如果你改的是 `game_protocol` 里的共享消息，而不只是 service proto，合并前应执行 full 检查。
+如果你改的是 `common/game_proto` 里的共享消息，而不只是 service proto，合并前应执行 full 检查。
 
 ### 5. 生成代码长什么样
 

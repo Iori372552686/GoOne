@@ -70,7 +70,7 @@ jobs:
           ./lib/service/transaction/...
           ./lib/service/scheduler/...
           ./lib/service/async/...
-          ./common/gamedata/...
+          ./module/gamedata/...
 
   integration:
     # V4 P0-09：真实中间件集成。GOONE_INTEGRATION=1 时依赖不可达必须失败
@@ -164,7 +164,7 @@ jobs:
           fi
 
   generated:
-    # V4 P0-09：生成代码两次生成无 diff（含 game_protocol，用 --full）。
+    # V4 P0-09：生成代码两次生成无 diff（含 common/protocol，用 --full）。
     name: Generated Code (no drift)
     runs-on: ubuntu-latest
     steps:

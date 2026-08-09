@@ -38,7 +38,7 @@ benchstat before.txt after.txt
 | 1 | Admission CAS 竞争与 method counter | `lib/net/net_mgr/admission.go` | 高并发登录时 CAS 重试与 per-method 计数器竞争 | 待 profile |
 | 2 | TransactionMgr 排队/channel/closure 分配 | `lib/service/transaction/transaction_mgr_impl.go`、`transaction_impl.go` | 每事务 channel + closure 闭包分配 | 待 profile |
 | 3 | RabbitMQ frame 构建/publish 等待/backlog | `lib/service/bus/driver/rabbitmq/rabbitmq.go` | BuildFrame 拷贝、同步 publish 阻塞 | 待 profile |
-| 4 | Gamedata 快照构建 | `common/gamedata/` | 热更全表重建的瞬时分配 | 待 profile |
+| 4 | Gamedata 快照构建 | `module/gamedata/` | 热更全表重建的瞬时分配 | 待 profile |
 | 5 | HTTP Client 连接复用 | `lib/api/http_client/client.go` | Transport 复用与 LimitReader 开销 | 待 profile |
 | 6 | Sonic 在 Go 1.26 下回退 encoding/json 兼容 | 依赖 go.mod | 编解码路径 | 待 profile |
 

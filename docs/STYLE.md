@@ -91,7 +91,7 @@
 
 ## 8. 生成代码边界
 
-- 禁止手改 `api/gen/**`、`game_protocol/protocol/*.pb.go`、`common/gamedata/repository/**/*.gen.go`；
+- 禁止手改 `api/gen/**`、`common/protocol/*.pb.go`、`module/gamedata/repository/**/*.gen.go`；
   改 proto/生成器后执行 `go run ./tools/cmd/genproto` 并过 `./main.sh check-genproto`。
 
 ## 9. 测试

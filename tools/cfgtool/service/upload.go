@@ -63,7 +63,7 @@ func ParseUploadType(raw string) []UploadItem {
 // 设计要点：
 //   - -upload 为空 → 直接返回（不上传）。
 //   - 通过 lib/contrib/config/factory.NewPublisherFromURL 解析 URL 并构造 Publisher，
-//     与 common/gamedata 读路径使用同一套地址/鉴权解析。
+//     与 module/gamedata 读路径使用同一套地址/鉴权解析。
 //   - GenData() 末尾已 manager.Clear()，故这里直接扫各产物目录而非读内存。
 //   - 每种产物（json/conf/bytes/lua）各自 glob 对应后缀，逐文件 Publish；
 //     dataID = filepath.Base(file)（如 "ItemConfig.json"）。

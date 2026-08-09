@@ -1407,7 +1407,7 @@ contrib/bus/rocketmq
 # 5. 全程注意事项
 
 - 不手工修改 api/gen、protobuf 和 gamedata 生成文件。
-- 保留工作区现有 game_protocol 修改和 .zcode，不覆盖、不清理。
+- 保留工作区现有 common（原 game_protocol）修改和 .zcode，不覆盖、不清理。
 - 先写失败测试，再修改实现。
 - 不用 sleep 模拟生命周期同步。
 - 不持锁执行 callback、网络写、Drain 或 Stop。

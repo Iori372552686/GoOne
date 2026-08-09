@@ -77,7 +77,7 @@ golangci-lint v2.12.2、benchstat、pprof。
 - 不同时支持多种生产 MQ 语义。
 - 不为低频登录分配引入对象池。
 - 不在没有 profile、benchmark 或容量数据时声称性能提升。
-- 不手工修改 `api/gen/**`、`game_protocol/protocol/*.pb.go` 或 gamedata 生成文件。
+- 不手工修改 `api/gen/**`、`common/protocol/*.pb.go` 或 gamedata 生成文件。
 
 ---
 
@@ -557,7 +557,7 @@ go test -count=20 ./src/infosvr/... ./src/mainsvr/... ./src/mysqlsvr/... ./src/r
 
 #### 当前风险
 
-- `common/gamedata.InitNet` 不保存 ListenConfig 句柄，无法 Cancel。
+- `module/gamedata.InitNet` 不保存 ListenConfig 句柄，无法 Cancel。
 - 多表逐个解析、逐个 Store，跨表热更可能读取到混合版本。
 - 监听或后续表加载失败时，之前注册的监听没有回滚。
 
@@ -590,14 +590,14 @@ type Component struct {
 
 #### 文件
 
-- 修改：`common/gamedata/gamedata.go`
+- 修改：`module/gamedata/gamedata.go`
 - 修改：`tools/cfgtool/internal/templ/code_tpl.go`
 - 修改：`tools/cfgtool/service/code_gen.go`
 - 修改：`tools/cfgtool/test/tool_test.go`
-- 不修改：`common/gamedata/repository/**/*.gen.go`
-- 创建：`common/gamedata/snapshot.go`
-- 创建：`common/gamedata/component.go`
-- 创建：`common/gamedata/component_test.go`
+- 不修改：`module/gamedata/repository/**/*.gen.go`
+- 创建：`module/gamedata/snapshot.go`
+- 创建：`module/gamedata/component.go`
+- 创建：`module/gamedata/component_test.go`
 - 修改：`lib/contrib/config/nacos/nacos.go`
 - 修改：`lib/contrib/config/nacos/watcher.go`
 - 修改：`src/mainsvr/app.go`
@@ -619,8 +619,8 @@ type Component struct {
 #### 验收
 
 ```bash
-go test -count=50 ./common/gamedata/... ./lib/contrib/config/nacos/...
-go test -race -count=30 ./common/gamedata/... ./lib/contrib/config/nacos/...
+go test -count=50 ./module/gamedata/... ./lib/contrib/config/nacos/...
+go test -race -count=30 ./module/gamedata/... ./lib/contrib/config/nacos/...
 ./main.sh check-genproto --full
 ```
 
@@ -787,7 +787,7 @@ go test -count=1 -timeout 600s ./...
 go test -race -count=1 -timeout 600s \
   ./lib/net/... ./lib/service/runtime/... ./lib/service/router/... \
   ./lib/service/svrinstmgr/... ./lib/service/bus/... ./lib/service/ssrpc/... \
-  ./lib/service/transaction/... ./lib/service/async/... ./common/gamedata/...
+  ./lib/service/transaction/... ./lib/service/async/... ./module/gamedata/...
 go run ./tools/cmd/checkdocs ./docs
 ./main.sh check-genproto --full
 ```
@@ -993,7 +993,7 @@ go test -race -count=20 ./module/gconf/... ./lib/service/appconfig/... ./src/...
 - 候选修改：`lib/service/transaction/transaction_mgr_impl.go`
 - 候选修改：`lib/service/transaction/transaction_impl.go`
 - 候选修改：`lib/service/bus/driver/rabbitmq/rabbitmq.go`
-- 候选修改：`common/gamedata/snapshot.go`
+- 候选修改：`module/gamedata/snapshot.go`
 - 候选修改：`lib/api/httpclient/client.go`
 - 更新：`docs/benchmarks/v4/micro-baseline.md`
 - 创建：`docs/benchmarks/v4/profile-findings.md`
@@ -1090,8 +1090,8 @@ rg -n 'P0-|P1-|P2-|方案 B|V3-|roadmap' \
   cmd src lib common module tools \
   --glob '*.go' \
   --glob '!api/gen/**' \
-  --glob '!game_protocol/protocol/**' \
-  --glob '!common/gamedata/repository/**'
+  --glob '!common/protocol/**' \
+  --glob '!module/gamedata/repository/**'
 go run ./tools/cmd/checkdocs ./docs
 ```
 

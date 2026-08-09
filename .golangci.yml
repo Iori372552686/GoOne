@@ -44,8 +44,8 @@ exclusions:
   generated: lax
   paths:
     - api/gen
-    - game_protocol/protocol
-    - common/gamedata/repository
+    - common/protocol
+    - module/gamedata/repository
     # 辅助函数返回 *Rsp（非 ssrpc handler），保留 rsp.Ret.Code 写法
     - src/mainsvr/room/create\.go
     - src/mainsvr/room/join\.go

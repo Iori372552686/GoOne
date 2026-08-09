@@ -7,7 +7,7 @@ Prefer code over README or older docs when they disagree.
 ## Repository Snapshot
 - `GoOne` is a Go microservice game backend.
 - Active services under `src/` are `connsvr`, `infosvr`, `mainsvr`, `mysqlsvr`, `roomcentersvr`, and `web_svr`.
-- Core shared layers live under `lib/`, shared config struct types under `module/gconf`, protocol sources under `api/proto/` and `game_protocol/proto/`, generated code under `api/gen/`.
+- Core shared layers live under `lib/`, shared config struct types under `module/gconf`, protocol sources under `api/proto/` and `common/game_proto/`, generated code under `api/gen/` and `common/protocol/`.
 - Deployment and local environment entrypoints are `main.sh`, `deploy/`, and `etc/env/`.
 
 ## Runtime Model
@@ -44,10 +44,10 @@ Prefer code over README or older docs when they disagree.
 
 ## Generated Code Boundaries
 - Do not hand-edit `api/gen/**`.
-- Do not hand-edit `game_protocol/protocol/*.pb.go`.
-- Do not hand-edit `common/gamedata/repository/**/*.gen.go`.
+- Do not hand-edit `common/protocol/*.pb.go`.
+- Do not hand-edit `module/gamedata/repository/**/*.gen.go`.
 - When protocol changes are needed, edit the source proto files and regenerate.
-- `go.mod` replaces `github.com/Iori372552686/game_protocol` with local `./game_protocol`, so protocol work belongs in the local module.
+- `go.mod` replaces `github.com/Iori372552686/g1_common` with local `./common`, so shared protocol work (game_proto sources + generated `common/protocol`) belongs in the `common/` submodule.
 
 ## Build And Verification
 - Preferred top-level entrypoint is `main.sh`.
@@ -56,7 +56,7 @@ Prefer code over README or older docs when they disagree.
 - `build.sh` is the repository build helper for the active `src/` services plus the tester tools: `connsvr`, `mainsvr`, `infosvr`, `mysqlsvr`, `roomcentersvr`, `web_svr` (output binary `websvr`), `tester`, and `stress`.
 - On Windows, use `./build.ps1` for local builds; use PowerShell proto helpers such as `.\scripts\check_genproto.ps1 -Full`, and prefer WSL or Git-Bash for `main.sh`.
 - Validate generated code with `./main.sh check-genproto`.
-- Use `./main.sh check-genproto --full` when `game_protocol` output also needs verification.
+- Use `./main.sh check-genproto --full` when `common/protocol` output also needs verification.
 - Local middleware dependencies are defined under `etc/env/env_docker.yaml`.
 - Tester builds: `./build.sh tester stress` (or `.uild.ps1 tester stress` on Windows).
 

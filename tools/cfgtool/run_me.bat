@@ -1,2 +1,2 @@
-xlsx_trans.exe
+cfgtool.exe
 pause

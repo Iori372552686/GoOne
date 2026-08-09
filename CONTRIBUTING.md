@@ -30,9 +30,9 @@ golangci-lint run --new-from-rev=origin/dev
 
 | 生成物                                      | 源头                                     | 生成命令                          |
 | ---------------------------------------- | -------------------------------------- | ----------------------------- |
-| `api/gen/**`                             | `api/proto/**`、`game_protocol/*.proto` | `go run ./tools/cmd/genproto` |
-| `game_protocol/protocol/*.pb.go`         | `game_protocol/proto/**`               | `./scripts/proto_goone.sh`    |
-| `common/gamedata/repository/**/*.gen.go` | 策划 xlsx（cfgtool）                       | `tools/cfgtool`               |
+| `api/gen/**`                             | `api/proto/**`、`common/game_proto/*.proto` | `go run ./tools/cmd/genproto` |
+| `common/protocol/*.pb.go`                | `common/game_proto/**`               | `./main.sh proto game`         |
+| `module/gamedata/repository/**/*.gen.go` | 策划 xlsx（cfgtool）                       | `./main.sh xls`               |
 
 
 ## 提交信息

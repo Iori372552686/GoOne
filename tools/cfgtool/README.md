@@ -50,7 +50,7 @@
 项目包含一个批处理脚本 `run_me.bat`，用于简化执行流程。编辑该脚本设置您的参数，然后直接运行：
 
 ```bash
-xlsx_trans.exe ^
+cfgtool ^
   -xlsx=./xls ^
   -text=./gen/text ^
   -proto=./gen/proto ^
@@ -76,7 +76,7 @@ pause
 | `-xlsx` | Excel文件目录 | `./xls` |
 | `-text` | 生成pb text格式文件目录 | 空（不生成） |
 | `-proto` | 生成proto定义文件目录 | 空（不生成） |
-| `-proto-src` | 外部proto源文件目录（用于`pb.XXX`类型引用检索，如`game_protocol/proto`） | 空（不启用） |
+| `-proto-src` | 外部proto源文件目录（用于`pb.XXX`类型引用检索，如`common/game_proto/core`） | 空（不启用） |
 | `-json` | 生成JSON格式文件目录 | 空（不生成） |
 | `-bytes` | 生成pb bytes格式文件目录 | 空（不生成） |
 | `-lua` | 生成Lua配置表文件目录 | 空（不生成） |
@@ -278,11 +278,11 @@ message MapConfig {
 
 #### 使用步骤
 
-1. **准备外部 proto 目录**：所有 `.proto` 文件放在一个根目录下。通常指向 `game_protocol`（仓库根，使相对路径 `proto/core/x.proto` 与 proto 内的 import 声明对齐），工具会递归扫描全部 `.proto`。
+1. **准备外部 proto 目录**：所有 `.proto` 文件放在一个根目录下。GoOne 中通常指向 `common/game_proto/core`（只扫 core，不要扫 config/，否则与生成的配置 proto 符号重定义），工具会递归扫描该目录下全部 `.proto`。
 
 2. **启动时指定 `-proto-src`**：
    ```bash
-   xlsx_trans.exe -xlsx=./xls -proto-src=../game_protocol -json=./gen/json ...
+   cfgtool -xlsx=./xls -proto-src=../game_proto/core -json=./gen/json ...
    ```
    留空则不启用外部引用（不影响现有功能）。
 
@@ -525,7 +525,7 @@ item.Range(c => { console.log(c.Name); return true; }); // 遍历
 
 ## 上传到配置中心
 
-生成完成后，工具可把**已生成的数据产物**直接发布到配置中心，复用 `lib/contrib/config` 的统一地址/鉴权解析（与 `common/gamedata` 读取路径同源），无需额外的上传脚本。
+生成完成后，工具可把**已生成的数据产物**直接发布到配置中心，复用 `lib/contrib/config` 的统一地址/鉴权解析（与 `module/gamedata` 读取路径同源），无需额外的上传脚本。
 
 ### 工作机制
 
@@ -591,13 +591,13 @@ item.Range(c => { console.log(c.Name); return true; }); // 遍历
 
 ```bash
 # 本仓库根目录
-go build -tags config_etcd -o xlsx_trans.exe ./tools/cfgtool/
+go build -tags config_etcd -o cfgtool ./tools/cfgtool/
 ```
 
 **2) 生成 + 上传到 etcd（开发环境 dev）**
 
 ```bash
-./xlsx_trans.exe \
+./cfgtool \
   -xlsx=./tools/cfgtool/xls \
   -json=./gen/json \
   -proto=./gen/proto \
@@ -623,7 +623,7 @@ go build -tags config_etcd -o xlsx_trans.exe ./tools/cfgtool/
 **3) 上传多种格式（json + pb text + bytes）到 etcd 生产环境 prod**
 
 ```bash
-./xlsx_trans.exe \
+./cfgtool \
   -xlsx=./tools/cfgtool/xls \
   -json=./gen/json -text=./gen/text -bytes=./gen/bytes \
   -proto=./gen/proto -mode=all \
@@ -634,7 +634,7 @@ go build -tags config_etcd -o xlsx_trans.exe ./tools/cfgtool/
 **4) 上传到 nacos（文本产物）**
 
 ```bash
-./xlsx_trans.exe \
+./cfgtool \
   -xlsx=./tools/cfgtool/xls \
   -json=./gen/json -text=./gen/text -proto=./gen/proto -mode=all \
   -upload="nacos://127.0.0.1:8848?group=GOONE_CONFIG&namespace_id=public&username=nacos&password=nacos" \
@@ -658,13 +658,13 @@ for _, kv := range resp.Kvs {
 
 ### ⚠️ 读取端契约（架构师须知）
 
-上传只是"写"，要让业务服务真正读回这些数据，必须对齐 `common/gamedata` 读取端的契约，否则会 `InitRemote` 失败：
+上传只是"写"，要让业务服务真正读回这些数据，必须对齐 `module/gamedata` 读取端的契约，否则会 `InitRemote` 失败：
 
 1. **格式必须是 pb text（`.conf`）**：`gamedata` 每个 sheet 的 parser 硬编码调 `proto.UnmarshalText`，**完全忽略 `kv.Format`**。上传 JSON/bytes 给 `gamedata` 读会反序列化失败。→ **服务器侧读取请用 `-uptype=conf` 上传 `.conf`**；JSON/bytes 仅供客户端/工具链消费。
 2. **dataID 必须是 `<SheetName>.conf`**：`SheetFiles()` 返回的是 `["ItemConfig.conf", "TexasConfig.conf", ...]`，`applyKVs` 用 `kv.Key` **精确匹配**，未知名直接判缺失。
 3. **etcd 读取端需剥路径前缀**：Nacos `Load()` 返回 `kv.Key = dataID`（裸名，如 `ItemConfig.conf`），与读取端匹配；但 etcd `Load()` 返回 `kv.Key = 完整 key`（如 `/goone/config/dev/ItemConfig.conf`），而当前 `applyKVs` **不做 `filepath.Base` 剥离**。
    → **若要用 etcd 作为 `gamedata` 后端**，需二选一改一处（尚未实现）：
-   - 在 `common/gamedata/gamedata.go` 的 `applyKVs` 里改用 `byKey[filepath.Base(kv.Key)]`；或
+   - 在 `module/gamedata/gamedata.go` 的 `applyKVs` 里改用 `byKey[filepath.Base(kv.Key)]`；或
    - 新增 `gamedata.InitEtcd` 分支（参考 `remote.go` 的 `InitNacos`），并在 `src/*/app.go` 里按配置选择后端。
 
 > 当前仓库**生产读取端只接了 Nacos**（`gamedata.InitNacos`），etcd 读取路径尚未在业务侧落地。本工具的 etcd 上传能力已就绪并可独立用于客户端/工具链/校验场景；要打通服务器热更读取，按上述第 3 点补一处适配即可。
