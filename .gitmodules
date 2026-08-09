@@ -1,4 +1,4 @@
-[submodule "game_protocol"]
-	path = game_protocol
-	url = https://github.com/Iori372552686/game_protocol.git
+[submodule "common"]
+	path = common
+	url = https://github.com/Iori372552686/g1_common.git
 	branch = main

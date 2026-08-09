@@ -8,7 +8,7 @@ toolchain go1.25.12
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	github.com/Iori372552686/game_protocol v0.0.0-20250427031738-c3072b032cc4
+	github.com/Iori372552686/g1_common v0.0.0-00010101000000-000000000000
 	github.com/apache/rocketmq-client-go/v2 v2.1.2
 	github.com/apolloconfig/agollo/v4 v4.4.0
 	github.com/bugsnag/bugsnag-go/v2 v2.6.2
@@ -223,4 +223,4 @@ require (
 	xorm.io/core v0.7.2-0.20190928055935-90aeac8d08eb // indirect
 )
 
-replace github.com/Iori372552686/game_protocol => ./game_protocol
+replace github.com/Iori372552686/g1_common => ./common

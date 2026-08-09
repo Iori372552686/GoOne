@@ -13,7 +13,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/util/convert"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 type Role struct {

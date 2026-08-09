@@ -1,8 +1,8 @@
 package role
 
 import (
-	"github.com/Iori372552686/GoOne/common/gamedata/repository/mall_config"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/mall_config"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 func (r *Role) MallGetItem(confId int32) *g1_protocol.PbMallItem {

@@ -3,7 +3,7 @@ package ssrpc
 import (
 	"testing"
 
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 	"github.com/golang/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"

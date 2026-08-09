@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/Iori372552686/GoOne/lib/api/gerr"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 // 注册/分发层的哨兵错误。调用方可用 errors.Is 区分；它们不会被不透明包装。

@@ -4,7 +4,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/src/connsvr/globals"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 // ConnServiceImpl is the IDL-driven ssrpc implementation for connsvr internal RPCs.

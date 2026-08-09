@@ -9,7 +9,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/globals"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/manager"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 	"github.com/golang/protobuf/proto"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )

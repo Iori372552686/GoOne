@@ -6,7 +6,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/net/kcp_server"
 	"github.com/Iori372552686/GoOne/lib/net/tcp_server"
 	"github.com/Iori372552686/GoOne/lib/net/ws_server"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 type Client struct {

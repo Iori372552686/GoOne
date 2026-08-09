@@ -5,7 +5,7 @@ import (
 	"time"
 
 	roomcenterv1 "github.com/Iori372552686/GoOne/api/gen/game/roomcenter/v1"
-	"github.com/Iori372552686/GoOne/common/gamedata"
+	"github.com/Iori372552686/GoOne/module/gamedata"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
@@ -23,7 +23,7 @@ import (
 	rds "github.com/Iori372552686/GoOne/src/roomcentersvr/globals/rds"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/room_ai"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/service"
-	pb "github.com/Iori372552686/game_protocol/protocol"
+	pb "github.com/Iori372552686/g1_common/protocol"
 )
 
 // NewApp 用 runtime.App + Component 装配 roomcentersvr。服务名只在 MustNew 出现一次；

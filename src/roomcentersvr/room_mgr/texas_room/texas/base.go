@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
-	pb "github.com/Iori372552686/game_protocol/protocol"
+	pb "github.com/Iori372552686/g1_common/protocol"
 )
 
 type TexasRoom struct {

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 	kcp "github.com/xtaci/kcp-go/v5"
 )
 

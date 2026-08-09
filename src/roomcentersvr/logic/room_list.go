@@ -2,7 +2,7 @@ package logic
 
 import (
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/room_mgr/texas_room"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 func OnCenterRoomList(req *g1_protocol.RoomListReq, roomMgr *texas_room.TexasRoomCenterMgr) *g1_protocol.RoomListRsp {

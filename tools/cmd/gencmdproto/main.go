@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 type cmdItem struct {
@@ -84,8 +84,8 @@ func main() {
 func loadCmdComments() map[string]string {
 	out := map[string]string{}
 
-	// Find the module dir of github.com/Iori372552686/game_protocol/protocol.
-	cmd := exec.Command("go", "list", "-f", "{{.Dir}}", "github.com/Iori372552686/game_protocol/protocol")
+	// Find the module dir of github.com/Iori372552686/g1_common/protocol.
+	cmd := exec.Command("go", "list", "-f", "{{.Dir}}", "github.com/Iori372552686/g1_common/protocol")
 	b, err := cmd.Output()
 	if err != nil {
 		return out

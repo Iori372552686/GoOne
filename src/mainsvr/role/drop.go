@@ -5,9 +5,9 @@ package role
 import (
 	"math/rand"
 
-	"github.com/Iori372552686/GoOne/common/gamedata/repository/drop_item_config"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/drop_item_config"
 	"github.com/Iori372552686/GoOne/module/drop"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 const (

@@ -8,7 +8,7 @@ package infosvrv1
 
 import (
 	_ "github.com/Iori372552686/GoOne/api/gen/goone/options/v1"
-	protocol "github.com/Iori372552686/game_protocol/protocol"
+	protocol "github.com/Iori372552686/g1_common/protocol"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"

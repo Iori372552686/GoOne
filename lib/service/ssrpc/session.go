@@ -1,6 +1,6 @@
 package ssrpc
 
-import g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+import g1_protocol "github.com/Iori372552686/g1_common/protocol"
 
 // Session captures transport-neutral request metadata that middleware and
 // observability code can rely on without depending on a concrete transport.

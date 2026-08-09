@@ -3,7 +3,7 @@ package ssrpc
 import (
 	"testing"
 
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

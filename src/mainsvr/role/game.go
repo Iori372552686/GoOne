@@ -2,7 +2,7 @@ package role
 
 import (
 	util "github.com/Iori372552686/GoOne/lib/util/slices"
-	pb "github.com/Iori372552686/game_protocol/protocol"
+	pb "github.com/Iori372552686/g1_common/protocol"
 )
 
 func (r *Role) AddPlayRoomID(roomId uint64) pb.ErrorCode {

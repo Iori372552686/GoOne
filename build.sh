@@ -23,6 +23,10 @@ Targets:
   web         -> cmd/web_svr          -> build/websvr
   tester      -> tools/tester/cmd/tester -> build/tester
   stress      -> tools/tester/cmd/stress -> build/stress
+  cfgtool     -> tools/cfgtool        -> common/game_conf/cfgtool
+
+Environment:
+  GO_BUILD_TAGS=tag1,tag2   pass extra build tags (e.g. config_etcd for cfgtool etcd upload)
 
 Aliases:
   connsvr, mainsvr, infosvr, mysqlsvr, room, roomcentersvr, websvr, web_svr
@@ -33,7 +37,7 @@ build_one() {
   local source_dir="$1"
   local output_name="$2"
   echo "building ${output_name} !"
-  (cd "${project_root_dir}/${source_dir}" && go build -o "${project_root_dir}/build/${output_name}")
+  (cd "${project_root_dir}/${source_dir}" && go build ${GO_BUILD_TAGS:+-tags "${GO_BUILD_TAGS}"} -o "${project_root_dir}/build/${output_name}")
 }
 
 connsvr() { build_one "cmd/connsvr" "connsvr"; }
@@ -44,6 +48,18 @@ roomcentersvr() { build_one "cmd/roomcentersvr" "roomcentersvr"; }
 websvr() { build_one "cmd/web_svr" "websvr"; }
 tester() { build_one "tools/tester/cmd/tester" "tester"; }
 stress() { build_one "tools/tester/cmd/stress" "stress"; }
+
+# cfgtool 输出到 common/game_conf/（跨平台带后缀），支持 GO_BUILD_TAGS=config_etcd
+cfgtool() {
+  local out_dir="${project_root_dir}/common/game_conf"
+  local exe_name="cfgtool"
+  if [[ "$(go env GOOS)" == "windows" ]]; then
+    exe_name="cfgtool.exe"
+  fi
+  mkdir -p "${out_dir}"
+  echo "building cfgtool -> ${out_dir}/${exe_name} ${GO_BUILD_TAGS:+(tags: ${GO_BUILD_TAGS})}!"
+  (cd "${project_root_dir}" && go build ${GO_BUILD_TAGS:+-tags "${GO_BUILD_TAGS}"} -o "${out_dir}/${exe_name}" ./tools/cfgtool)
+}
 
 run_all() {
   connsvr
@@ -61,7 +77,7 @@ case "${target}" in
     usage
     ;;
   list)
-    printf '%s\n' conn main info mysql roomcenter web tester stress
+    printf '%s\n' conn main info mysql roomcenter web tester stress cfgtool
     ;;
   all|"")
     run_all
@@ -89,6 +105,9 @@ case "${target}" in
     ;;
   stress)
     stress
+    ;;
+  cfgtool)
+    cfgtool
     ;;
   *)
     echo "Unsupported build target: ${target}" >&2

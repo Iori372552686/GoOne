@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Iori372552686/GoOne/common/gamedata"
+	"github.com/Iori372552686/GoOne/module/gamedata"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"

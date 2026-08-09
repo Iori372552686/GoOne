@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 // Login 执行 GoOne 单步游客/账号登录；成功后同步 uid。

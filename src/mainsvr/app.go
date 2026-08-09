@@ -6,7 +6,7 @@ import (
 	"time"
 
 	mainsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/mainsvr/v1"
-	"github.com/Iori372552686/GoOne/common/gamedata"
+	"github.com/Iori372552686/GoOne/module/gamedata"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
@@ -22,7 +22,7 @@ import (
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals/rds"
 	"github.com/Iori372552686/GoOne/src/mainsvr/role"
 	"github.com/Iori372552686/GoOne/src/mainsvr/service"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 // NewApp 用 runtime.App + Component 装配 mainsvr。服务名只在 MustNew 出现一次；

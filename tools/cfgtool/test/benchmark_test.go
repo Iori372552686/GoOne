@@ -168,7 +168,7 @@ func BenchmarkParseMultiArray(b *testing.B) {
 
 // BenchmarkParseExternalMessage 外部 message 反射赋值热点（含 N 个 repeated 元素 × N 行）。
 func BenchmarkParseExternalMessage(b *testing.B) {
-	protoSrcDir := filepath.Join(repoRootB(b), "game_protocol")
+	protoSrcDir := filepath.Join(repoRootB(b), "common/game_proto")
 	for _, n := range []int{10, 100, 1000} {
 		b.Run(fmt.Sprintf("rows=%d_repeated=%d", n, n), func(b *testing.B) {
 			tmpDir := b.TempDir()

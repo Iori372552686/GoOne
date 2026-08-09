@@ -6,7 +6,7 @@ import (
 
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 // BenchmarkTransactionMgrThroughput measures the end-to-end dispatch cost of

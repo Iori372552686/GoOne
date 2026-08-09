@@ -86,7 +86,7 @@ pause
 | `-nodejs` | 生成Node.js/TypeScript代码文件目录 | 空（不生成） |
 | `-mode` | 配置生成模式（`all` / `client` / `server`） | `all` |
 | `-module` | 生成代码导出项目目录 | `github.com/Iori372552686/GoOne` |
-| `-pb` | Protocol Buffers生成路径 | `github.com/Iori372552686/game_protocol/protocol` |
+| `-pb` | Protocol Buffers生成路径 | `github.com/Iori372552686/g1_common/protocol` |
 | `-upload` | 配置中心URL（留空不上传；详见下方[上传到配置中心](#上传到配置中心)） | 空（不上传） |
 | `-uptype` | 上传数据格式，逗号分隔（`json` / `conf` / `bytes` / `lua`），需配合对应 `-json` / `-text` / `-bytes` / `-lua` 目录 | 空（不上传） |
 | `-version` | 打印当前程序版本号 | - |

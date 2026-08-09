@@ -23,7 +23,7 @@ const (
 	ssrpcOptFilePath               = "goone/options/v1/options.proto"
 	ssrpcExtFullName               = "goone.options.v1.ssrpc"
 	ssrpcServiceExtFullName        = "goone.options.v1.ssrpc_service"
-	gameProtocolPath               = "github.com/Iori372552686/game_protocol/protocol"
+	gameProtocolPath               = "github.com/Iori372552686/g1_common/protocol"
 	defaultSSRPCTimeoutMs   uint32 = 5000
 )
 

@@ -3,8 +3,8 @@
 import (
 	"strconv"
 
-	"github.com/Iori372552686/GoOne/common/gamedata/repository/mall_config"
-	"github.com/Iori372552686/GoOne/common/gamedata/repository/texas_config"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/mall_config"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/texas_config"
 	"github.com/Iori372552686/GoOne/lib/api/gerr"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
@@ -14,7 +14,7 @@ import (
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals"
 	"github.com/Iori372552686/GoOne/src/mainsvr/role"
 	"github.com/Iori372552686/GoOne/src/mainsvr/room"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )

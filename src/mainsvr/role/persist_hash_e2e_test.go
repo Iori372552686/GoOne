@@ -7,7 +7,7 @@ import (
 
 	"github.com/Iori372552686/GoOne/lib/db/redis"
 	rds "github.com/Iori372552686/GoOne/src/mainsvr/globals/rds"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 // 端到端联调：连真实 Redis 验证角色 hash 持久化。

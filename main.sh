@@ -46,6 +46,7 @@ ${COLOR_BOLD}Usage${COLOR_RESET}
   ./main.sh ${COLOR_CYAN}doctor${COLOR_RESET}
   ./main.sh ${COLOR_CYAN}check-genproto${COLOR_RESET} [--full]
   ./main.sh ${COLOR_CYAN}proto${COLOR_RESET} [game|full|help]
+  ./main.sh ${COLOR_CYAN}xls${COLOR_RESET} [all|client|server]
   ./main.sh ${COLOR_CYAN}install${COLOR_RESET} ansible [--venv <dir>]
   ./main.sh ${COLOR_CYAN}go${COLOR_RESET} <install|list|current|use|uninstall|check|help> [args...]
   ./main.sh ${COLOR_CYAN}docker${COLOR_RESET} <install|up|restart|down|status|logs> --env <dev> [options...]
@@ -67,10 +68,15 @@ ${COLOR_BOLD}Examples${COLOR_RESET}
   ./main.sh proto game
   ./main.sh proto full
 
+  # xls (game config from xlsx)
+  ./main.sh xls
+  ./main.sh xls server
+
   # build
   ./main.sh build
   ./main.sh build web
   ./main.sh build roomcenter
+  ./main.sh build cfgtool
 
   # deploy
   ./main.sh deploy --env dev1 --action restart --role websvr
@@ -117,12 +123,12 @@ check_genproto() {
     log_info "Running full proto generation: ./scripts/proto_goone.sh"
     (cd "$ROOT_DIR" && ./scripts/proto_goone.sh)
 
-    log_info "Checking working tree: api/gen and game_protocol/protocol must match generator output"
-    if ! (cd "$ROOT_DIR" && git diff --quiet -- api/gen game_protocol/protocol); then
-      die "api/gen or game_protocol/protocol is out of date. Run: ./scripts/proto_goone.sh, then commit."
+    log_info "Checking working tree: api/gen and common/protocol must match generator output"
+    if ! (cd "$ROOT_DIR" && git diff --quiet -- api/gen common/protocol); then
+      die "api/gen or common/protocol is out of date. Run: ./scripts/proto_goone.sh, then commit."
     fi
 
-    log_ok "api/gen and game_protocol/protocol match full proto generation."
+    log_ok "api/gen and common/protocol match full proto generation."
     return
   fi
 
@@ -131,12 +137,12 @@ check_genproto() {
 
   log_info "Checking working tree: api/gen must match generator output"
   if ! (cd "$ROOT_DIR" && git diff --quiet -- api/gen); then
-    die "api/gen is out of date. Run: go run ./tools/cmd/genproto  (or ./main.sh check-genproto --full / ./scripts/proto_goone.sh for game_protocol + api/gen), then commit."
+    die "api/gen is out of date. Run: go run ./tools/cmd/genproto  (or ./main.sh check-genproto --full / ./scripts/proto_goone.sh for common/protocol + api/gen), then commit."
   fi
 
   log_ok "api/gen matches genproto."
   hr
-  log_info "Note: shared message pb.go under game_protocol/protocol is not validated in default mode; use ./main.sh check-genproto --full when protocol messages change."
+  log_info "Note: shared message pb.go under common/protocol is not validated in default mode; use ./main.sh check-genproto --full when protocol messages change."
 }
 
 doctor() {
@@ -195,6 +201,13 @@ run_build() {
   local target="${1:-}"
   require_file "${ROOT_DIR}/build.sh"
   print_header
+  # list/help 只打印目标列表，不输出 "Build done"
+  case "${target}" in
+    list|help|-h|--help)
+      (cd "$ROOT_DIR" && ./build.sh "${target}")
+      return
+      ;;
+  esac
   log_info "Building... (target='${target:-all}')"
   (cd "$ROOT_DIR" && ./build.sh ${target:+$target})
   log_ok "Build done."
@@ -207,15 +220,15 @@ run_proto() {
   case "$sub" in
     game|"")
       require_cmd go
-      require_file "${ROOT_DIR}/game_protocol/gen_code.sh"
-      log_info "Generating game_protocol/protocol..."
-      (cd "${ROOT_DIR}/game_protocol" && bash ./gen_code.sh)
-      log_ok "game_protocol/protocol generated."
+      require_file "${ROOT_DIR}/common/gen_proto.sh"
+      log_info "Generating common/protocol (g1_common)..."
+      (cd "${ROOT_DIR}/common" && bash ./gen_proto.sh)
+      log_ok "common/protocol generated."
       ;;
 
     full)
       require_file "${ROOT_DIR}/scripts/proto_goone.sh"
-      log_info "Running full proto generation (game_protocol + api/gen)..."
+      log_info "Running full proto generation (common/protocol + api/gen)..."
       (cd "$ROOT_DIR" && ./scripts/proto_goone.sh)
       log_ok "Full proto generation done."
       ;;
@@ -228,8 +241,8 @@ ${COLOR_BOLD}Usage${COLOR_RESET}
   ./main.sh ${COLOR_CYAN}proto${COLOR_RESET} [game|full]
 
 ${COLOR_BOLD}Subcommands${COLOR_RESET}
-  game  Generate pb.go under ${COLOR_CYAN}game_protocol/protocol${COLOR_RESET} from proto files in ${COLOR_CYAN}game_protocol/proto${COLOR_RESET} (default).
-  full  Run the full pipeline: ${COLOR_CYAN}game_protocol/protocol${COLOR_RESET} plus ${COLOR_CYAN}api/gen${COLOR_RESET} via ${COLOR_CYAN}scripts/proto_goone.sh${COLOR_RESET}.
+  game  Generate pb.go under ${COLOR_CYAN}common/protocol${COLOR_RESET} from proto files in ${COLOR_CYAN}common/game_proto${COLOR_RESET} (default).
+  full  Run the full pipeline: ${COLOR_CYAN}common/protocol${COLOR_RESET} plus ${COLOR_CYAN}api/gen${COLOR_RESET} via ${COLOR_CYAN}scripts/proto_goone.sh${COLOR_RESET}.
 
 ${COLOR_BOLD}Examples${COLOR_RESET}
   ./main.sh proto
@@ -242,6 +255,15 @@ EOF
       die "Unknown proto subcommand: $sub (supported: game, full, help)"
       ;;
   esac
+}
+
+run_xls() {
+  local mode="${1:-all}"
+  print_header
+  require_file "${ROOT_DIR}/common/gen_xls.sh"
+  log_info "Generating xlsx game config (mode=${mode})..."
+  (cd "${ROOT_DIR}/common" && bash ./gen_xls.sh "${mode}")
+  log_ok "xlsx config generated."
 }
 
 cmd="${1:-help}"
@@ -292,6 +314,10 @@ case "$cmd" in
 
   proto)
     run_proto "${1:-game}"
+    ;;
+
+  xls)
+    run_xls "${1:-all}"
     ;;
 
   env)

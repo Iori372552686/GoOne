@@ -1,5 +1,5 @@
 # Regenerate api/gen and fail if the working tree still differs (same contract as ./main.sh check-genproto).
-# Use -Full to regenerate game_protocol/protocol too.
+# Use -Full to regenerate common/protocol too.
 # Requires: go, git, protoc (via tools/cmd/genproto discovery).
 
 Param(
@@ -20,10 +20,10 @@ if ($Full) {
   & powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\proto_goone.ps1
   if ($LASTEXITCODE -ne 0) { throw "proto_goone.ps1 failed with exit code $LASTEXITCODE" }
 
-  Write-Host "[check_genproto] git diff --quiet api/gen game_protocol/protocol"
-  git -C $repoRoot diff --quiet -- api/gen game_protocol/protocol
+  Write-Host "[check_genproto] git diff --quiet api/gen common/protocol"
+  git -C $repoRoot diff --quiet -- api/gen common/protocol
   if ($LASTEXITCODE -ne 0) {
-    throw "api/gen or game_protocol/protocol is out of date. Run scripts/proto_goone.ps1, then commit."
+    throw "api/gen or common/protocol is out of date. Run scripts/proto_goone.ps1, then commit."
   }
 } else {
   Write-Host "[check_genproto] go run tools/cmd/genproto module=$module"

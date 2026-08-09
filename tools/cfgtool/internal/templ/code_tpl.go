@@ -17,8 +17,8 @@ package {{.Pkg}}
 import (
 	"sync/atomic"
 
-	"github.com/Iori372552686/GoOne/common/gamedata"
-	{{.PbPkg}} "github.com/Iori372552686/game_protocol/protocol"
+	"github.com/Iori372552686/GoOne/module/gamedata"
+	{{.PbPkg}} "github.com/Iori372552686/g1_common/protocol"
 	"github.com/golang/protobuf/proto"
 )
 

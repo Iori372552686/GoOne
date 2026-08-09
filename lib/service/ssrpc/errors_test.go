@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/Iori372552686/GoOne/lib/api/gerr"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 // TestApplyErrCodeNestedRet 验证把错误码写入嵌套 Ret 字段（最常见形态）。

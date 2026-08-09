@@ -29,7 +29,7 @@ func main() {
 
 	absOut := filepath.Join(repoRoot, *outDir)
 	absProtoRoot := filepath.Join(repoRoot, *protoRoot)
-	gameProtocolRoot := filepath.Join(repoRoot, "game_protocol")
+	gameProtocolRoot := filepath.Join(repoRoot, "common/game_proto")
 
 	// Ensure cmd.proto exists (new checkouts shouldn't fail to missing generated IDL).
 	if err := ensureCmdProto(repoRoot, absProtoRoot); err != nil {
@@ -59,18 +59,18 @@ func main() {
 
 	// proto inputs are split into two protoc invocations:
 	// 1) repo-owned api/proto/** inputs (legacy + current main-repo service protos)
-	// 2) protocol-owned service protos from game_protocol/** that declare services
+	// 2) protocol-owned service protos from common/game_proto/** that declare services
 	//
 	// We must keep them separate because repo-owned service protos still import the
 	// temporary third_party stubs, while protocol-owned service protos import the
-	// real game_protocol messages. Mixing both worlds in one protoc invocation
+	// real g1_common messages. Mixing both worlds in one protoc invocation
 	// causes duplicate symbol errors for g1.protocol message types.
 	repoInputs, protocolInputs, err := collectProtoInputs(absProtoRoot, gameProtocolRoot)
 	if err != nil {
 		die(err)
 	}
 	if len(repoInputs) == 0 && len(protocolInputs) == 0 {
-		die(errors.New("no proto files found under api/proto/{goone,game,web} or game_protocol service protos"))
+		die(errors.New("no proto files found under api/proto/{goone,game,web} or common/game_proto service protos"))
 	}
 
 	// Inputs are already collected relative to their proto roots and must stay that

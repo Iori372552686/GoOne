@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 // Error is the canonical GoOne error value.

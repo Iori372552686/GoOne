@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/go-xorm/xorm"
 

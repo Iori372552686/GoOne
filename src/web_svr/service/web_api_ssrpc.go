@@ -8,7 +8,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	define "github.com/Iori372552686/GoOne/src/web_svr/common"
 	"github.com/Iori372552686/GoOne/src/web_svr/web_service"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 // WebApiServiceImpl is the Phase-2 HTTP adapter target implementation for web_svr.

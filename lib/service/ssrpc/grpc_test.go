@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	optionsv1 "github.com/Iori372552686/GoOne/api/gen/goone/options/v1"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

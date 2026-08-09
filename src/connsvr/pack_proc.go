@@ -9,7 +9,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/connsvr/globals"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 // handleClientPacket 是三种传输（TCP/WS/KCP）共用的客户端包处理逻辑：

@@ -158,8 +158,8 @@ func TestIntegration_AllFeatures(t *testing.T) {
 		t.Fatalf("save xlsx: %v", err)
 	}
 
-	// 外部 proto 源：指向 game_protocol（仓库根）
-	protoSrcDir := filepath.Join(repoRoot(t), "game_protocol")
+	// 外部 proto 源：指向 common/game_proto（仓库内）
+	protoSrcDir := filepath.Join(repoRoot(t), "common/game_proto")
 	protoText, jsonText, pbText := runIntegrationPipeline(t, xlsxPath, tmpDir, protoSrcDir)
 
 	// ---- 1. proto 文本断言 ----
@@ -286,7 +286,7 @@ func TestIntegration_EmptyValues(t *testing.T) {
 		t.Fatalf("save: %v", err)
 	}
 
-	protoSrcDir := filepath.Join(repoRoot(t), "game_protocol")
+	protoSrcDir := filepath.Join(repoRoot(t), "common/game_proto")
 	_, jsonText, _ := runIntegrationPipeline(t, xlsxPath, tmpDir, protoSrcDir)
 
 	var out []map[string]interface{}

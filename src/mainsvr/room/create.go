@@ -7,7 +7,7 @@ import (
 	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals"
 	"github.com/Iori372552686/GoOne/src/mainsvr/role"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 func OnMainCreateRoom(c cmd_handler.IContext, req *g1_protocol.CreateRoomReq, myRole *role.Role) *g1_protocol.CreateRoomRsp {

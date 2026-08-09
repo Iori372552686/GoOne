@@ -5,7 +5,7 @@ import (
 
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/room_ai"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/room_mgr/texas_room/texas"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 )

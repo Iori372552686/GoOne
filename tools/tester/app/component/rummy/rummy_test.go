@@ -3,8 +3,8 @@ package rummy
 import (
 	"fmt"
 	"github.com/Iori372552686/GoOne/lib/util/random"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
-	pb "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
+	pb "github.com/Iori372552686/g1_common/protocol"
 	"math"
 	"sort"
 	"strings"

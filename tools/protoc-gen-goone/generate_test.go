@@ -664,7 +664,7 @@ func TestGenerate_HTTPOnly_NoCmd_SkipsTransactionMgr(t *testing.T) {
 	if contains(out, "RegisterSvc2ToTransactionMgr") {
 		t.Fatalf("expected no transaction mgr register for http-only method, got:\n%s", out)
 	}
-	if contains(out, "lib/service/transaction") || contains(out, "game_protocol/protocol") {
+	if contains(out, "lib/service/transaction") || contains(out, "g1_common/protocol") {
 		t.Fatalf("expected no transaction/g1_protocol imports for http-only method, got:\n%s", out)
 	}
 	if !contains(out, "func RegisterSvc2ToGin(r gin.IRoutes") {
@@ -1544,7 +1544,7 @@ func TestGenerate_GRPCOnly_NoCmd_SkipsTransactionMgr(t *testing.T) {
 	if !contains(out, "Cmd:     0,") {
 		t.Fatalf("expected grpc-only method to use Cmd: 0, got:\n%s", out)
 	}
-	if contains(out, "lib/service/transaction") || contains(out, "game_protocol/protocol") {
+	if contains(out, "lib/service/transaction") || contains(out, "g1_common/protocol") {
 		t.Fatalf("expected no transaction/g1_protocol imports for grpc-only method, got:\n%s", out)
 	}
 }

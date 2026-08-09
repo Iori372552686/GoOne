@@ -5,7 +5,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/globals"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/logic"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 

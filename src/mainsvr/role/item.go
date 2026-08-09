@@ -3,8 +3,8 @@
 package role
 
 import (
-	"github.com/Iori372552686/GoOne/common/gamedata/repository/item_config"
-	pb "github.com/Iori372552686/game_protocol/protocol"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/item_config"
+	pb "github.com/Iori372552686/g1_common/protocol"
 )
 
 /// 玩家道具相关操作放在这里

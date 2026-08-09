@@ -51,7 +51,7 @@ func TestUploadEtcdRoundTrip(t *testing.T) {
 	domain.BytesPath = filepath.Join(tmp, "bytes")
 	domain.ProtoPath = filepath.Join(tmp, "proto")
 	domain.Module = "github.com/Iori372552686/GoOne"
-	domain.PbPath = "github.com/Iori372552686/game_protocol/protocol"
+	domain.PbPath = "github.com/Iori372552686/g1_common/protocol"
 	domain.PkgName = filepath.Base(domain.PbPath)
 	domain.ConfMode = "all"
 

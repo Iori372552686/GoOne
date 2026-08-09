@@ -57,13 +57,13 @@ if (-not $goExe) {
   throw "go.exe not found"
 }
 
-if (Test-Path (Join-Path $repoRoot "game_protocol\gen_code.bat")) {
-  Write-Host "[proto_goone] step 1/2: generate game_protocol/protocol"
-  Push-Location (Join-Path $repoRoot "game_protocol")
+if (Test-Path (Join-Path $repoRoot "common/game_proto/gen_code.bat")) {
+  Write-Host "[proto_goone] step 1/2: generate common/protocol"
+  Push-Location (Join-Path $repoRoot "commongame_proto")
   try {
     cmd /c gen_code.bat
     if ($LASTEXITCODE -ne 0) {
-      throw "game_protocol\gen_code.bat failed with exit code $LASTEXITCODE"
+      throw "common/game_proto/gen_code.bat failed with exit code $LASTEXITCODE"
     }
   }
   finally {

@@ -7,8 +7,8 @@ package texas_test_config
 import (
 	"sync/atomic"
 
-	"github.com/Iori372552686/GoOne/common/gamedata"
-	protocol "github.com/Iori372552686/game_protocol/protocol"
+	"github.com/Iori372552686/GoOne/module/gamedata"
+	protocol "github.com/Iori372552686/g1_common/protocol"
 	"github.com/golang/protobuf/proto"
 )
 

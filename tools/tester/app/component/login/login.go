@@ -9,7 +9,7 @@ import (
 	"github.com/Iori372552686/GoOne/tools/tester/app/component"
 	"github.com/Iori372552686/GoOne/tools/tester/internal/session"
 	"github.com/Iori372552686/GoOne/tools/tester/internal/testcfg"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 func init() {

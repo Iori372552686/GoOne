@@ -9,7 +9,7 @@ import (
 
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	http_sign2 "github.com/Iori372552686/GoOne/lib/web/http_sign"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 func TestHTTPAuthVerifier_AuthenticateDisabled(t *testing.T) {

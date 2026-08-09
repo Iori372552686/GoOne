@@ -8,7 +8,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/room_mgr/texas_room"
-	pb "github.com/Iori372552686/game_protocol/protocol"
+	pb "github.com/Iori372552686/g1_common/protocol"
 )
 
 type RoomMgr struct {

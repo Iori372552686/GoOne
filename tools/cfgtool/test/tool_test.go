@@ -58,7 +58,7 @@ func TestConfig(t *testing.T) {
 	domain.CodePath = filepath.Join(root, "tools", "cfgtool", "gen", "code")
 	domain.LuaPath = filepath.Join(root, "tools", "cfgtool", "gen", "lua")
 	domain.Module = "github.com/Iori372552686/GoOne"
-	domain.PbPath = "github.com/Iori372552686/game_protocol/protocol"
+	domain.PbPath = "github.com/Iori372552686/g1_common/protocol"
 	domain.PkgName = filepath.Base(domain.PbPath)
 
 	// 加载所有配置

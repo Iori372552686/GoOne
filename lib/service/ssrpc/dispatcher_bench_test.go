@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
-	g1_protocol "github.com/Iori372552686/game_protocol/protocol"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 // BenchmarkDispatchWS_Sealed 度量已 Seal dispatcher 上 WS 查找的热路径（无锁只读
