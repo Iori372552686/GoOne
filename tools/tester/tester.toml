@@ -60,3 +60,8 @@ token = ""
 #   order   - "stress" 模式下 flow = "sequential" 时使用，数值小的先执行
 [modules.login]
 enabled = true
+
+# 背包/道具/掉落/恭喜获得 4 系统回归（移植自 seed-server）
+[modules.inventory]
+enabled = true
+order = 20

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v6.33.2
-// source: proto/service/infoservice.proto
+// source: service/infoservice.proto
 
 package infosvrv1
 
@@ -22,17 +22,17 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-var File_proto_service_infoservice_proto protoreflect.FileDescriptor
+var File_service_infoservice_proto protoreflect.FileDescriptor
 
-const file_proto_service_infoservice_proto_rawDesc = "" +
+const file_service_infoservice_proto_rawDesc = "" +
 	"\n" +
-	"\x1fproto/service/infoservice.proto\x12\x0fgame.infosvr.v1\x1a\x1egoone/options/v1/options.proto\x1a\x17proto/core/client.proto\x1a\x1bproto/service/infosvr.proto2\xc0\x03\n" +
+	"\x19service/infoservice.proto\x12\x0fgame.infosvr.v1\x1a\x1egoone/options/v1/options.proto\x1a\x11core/client.proto\x1a\x15service/infosvr.proto2\xc0\x03\n" +
 	"\vInfoService\x12\x8a\x01\n" +
 	"\fGetBriefInfo\x12 .g1.protocol.InfoGetBriefInfoReq\x1a .g1.protocol.InfoGetBriefInfoRsp\"6\xca\xe4\x1d2*\x1bCMD_INFO_GET_BRIEF_INFO_REQz\x13info get brief info\x12\x85\x01\n" +
 	"\vGetIconDesc\x12\x1f.g1.protocol.InfoGetIconDescReq\x1a\x1f.g1.protocol.InfoGetIconDescRsp\"4\xca\xe4\x1d0*\x1aCMD_INFO_GET_ICON_DESC_REQz\x12info get icon desc\x12\x92\x01\n" +
 	"\fSetBriefInfo\x12 .g1.protocol.InfoSetBriefInfoReq\x1a .g1.protocol.InfoSetBriefInfoRsp\">\xca\xe4\x1d:\x18\x01*!CMD_INFO_INNER_SET_BRIEF_INFO_REQz\x13info set brief info\x1a\a\xd2\xe4\x1d\x03\b\x88'BBZ@github.com/Iori372552686/GoOne/api/gen/game/infosvr/v1;infosvrv1b\x06proto3"
 
-var file_proto_service_infoservice_proto_goTypes = []any{
+var file_service_infoservice_proto_goTypes = []any{
 	(*protocol.InfoGetBriefInfoReq)(nil), // 0: g1.protocol.InfoGetBriefInfoReq
 	(*protocol.InfoGetIconDescReq)(nil),  // 1: g1.protocol.InfoGetIconDescReq
 	(*protocol.InfoSetBriefInfoReq)(nil), // 2: g1.protocol.InfoSetBriefInfoReq
@@ -40,7 +40,7 @@ var file_proto_service_infoservice_proto_goTypes = []any{
 	(*protocol.InfoGetIconDescRsp)(nil),  // 4: g1.protocol.InfoGetIconDescRsp
 	(*protocol.InfoSetBriefInfoRsp)(nil), // 5: g1.protocol.InfoSetBriefInfoRsp
 }
-var file_proto_service_infoservice_proto_depIdxs = []int32{
+var file_service_infoservice_proto_depIdxs = []int32{
 	0, // 0: game.infosvr.v1.InfoService.GetBriefInfo:input_type -> g1.protocol.InfoGetBriefInfoReq
 	1, // 1: game.infosvr.v1.InfoService.GetIconDesc:input_type -> g1.protocol.InfoGetIconDescReq
 	2, // 2: game.infosvr.v1.InfoService.SetBriefInfo:input_type -> g1.protocol.InfoSetBriefInfoReq
@@ -54,25 +54,25 @@ var file_proto_service_infoservice_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_proto_service_infoservice_proto_init() }
-func file_proto_service_infoservice_proto_init() {
-	if File_proto_service_infoservice_proto != nil {
+func init() { file_service_infoservice_proto_init() }
+func file_service_infoservice_proto_init() {
+	if File_service_infoservice_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_service_infoservice_proto_rawDesc), len(file_proto_service_infoservice_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_infoservice_proto_rawDesc), len(file_service_infoservice_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   0,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_service_infoservice_proto_goTypes,
-		DependencyIndexes: file_proto_service_infoservice_proto_depIdxs,
+		GoTypes:           file_service_infoservice_proto_goTypes,
+		DependencyIndexes: file_service_infoservice_proto_depIdxs,
 	}.Build()
-	File_proto_service_infoservice_proto = out.File
-	file_proto_service_infoservice_proto_goTypes = nil
-	file_proto_service_infoservice_proto_depIdxs = nil
+	File_service_infoservice_proto = out.File
+	file_service_infoservice_proto_goTypes = nil
+	file_service_infoservice_proto_depIdxs = nil
 }

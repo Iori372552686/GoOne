@@ -3,7 +3,11 @@
 package role
 
 import (
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/decompose_config"
 	"github.com/Iori372552686/GoOne/module/gamedata/repository/item_config"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/item_rule_config"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/item_rule_ref_config"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/item_use_config"
 	pb "github.com/Iori372552686/g1_common/protocol"
 )
 
@@ -45,7 +49,40 @@ func (r *Role) ItemGetCountRef(itemId int32) *int64 {
 }
 
 func (r *Role) ItemCheckAdd(itemId int32, itemCount int64) int {
+	if itemCount <= 0 {
+		return int(pb.ErrorCode_ERR_ARGV)
+	}
+	itemConf := item_config.GetByItemId(itemId)
+	if itemConf == nil {
+		return int(pb.ErrorCode_ERR_CONF)
+	}
+	// 普通道具检查 MaxOwnCount 上限（货币走 BasicInfo，不受此限）
+	if !isBasicInfoItem(itemId) {
+		rule := r.getItemRule(itemConf)
+		if rule != nil && rule.MaxOwnCount > 0 {
+			cur := r.GetItemCount(itemId)
+			if cur+itemCount > int64(rule.MaxOwnCount) {
+				r.Errorf("ITEM|over limit {id:%d, cur:%d, add:%d, max:%d}",
+					itemId, cur, itemCount, rule.MaxOwnCount)
+				return int(pb.ErrorCode_ERR_ITEM_OVER_LIMIT)
+			}
+		}
+	}
 	return 0
+}
+
+// getItemRule 取道具规则配置。
+// ItemConfig 当前未携带 RuleID 字段，通过独立的 ItemRuleRefConfig(ItemId→RuleId) 间接查得，
+// 再到 ItemRuleConfig 取规则细节。任一环节缺失返回 nil。
+func (r *Role) getItemRule(itemConf *pb.ItemConfig) *pb.ItemRuleConfig {
+	if itemConf == nil {
+		return nil
+	}
+	ref := item_rule_ref_config.GetByItemId(itemConf.ItemId)
+	if ref == nil || ref.RuleId == 0 {
+		return nil
+	}
+	return item_rule_config.GetById(ref.RuleId)
 }
 
 func (r *Role) ItemsCheckAdd(items *[]*pb.PbItem) pb.ErrorCode {
@@ -250,6 +287,15 @@ func (r *Role) itemDoAdd(itemId int32, itemCount int64, reason *Reason) int {
 		return ret
 	}
 
+	// 获得即使用：道具规则 Getuse>0 时，AddItem 不入背包，直接转使用流程。
+	// 典型场景：宝箱/礼包（拿到即开）、碎片（拿到即合成）。
+	if rule := r.getItemRule(itemConf); rule != nil && rule.Getuse > 0 {
+		useConf := item_use_config.GetById(itemId)
+		if useConf != nil && useConf.IsEnable != 0 {
+			return int(r.useItemInner(useConf, int32(itemCount), reason))
+		}
+	}
+
 	ref := r.ItemGetCountRef(itemId)
 	switch pb.EItemID(itemId) {
 	case pb.EItemID_GOLD,
@@ -403,4 +449,190 @@ func (r *Role) itemAggregate(items *[]*pb.PbItem) *[]*pb.PbItem {
 		*items = append(*items, v)
 	}
 	return items
+}
+
+// ============================================================
+// 道具使用 / 出售 / 分解 / 背包查询（移植自 seed-server，本土化为 *Role 方法）
+// ============================================================
+
+// ItemUseType 道具使用类型（与 ItemUseConfig.UseType 对应）
+const (
+	itemUseTypeGainItem  int32 = 2 // 获得道具：UseId 作道具ID，UseValue 作数量
+	itemUseTypeDropGroup int32 = 3 // 掉落组：UseId 作掉落组ID，UseValue 作次数
+)
+
+// ItemUse 主动使用道具：扣道具 → 按 UseType 发效果。
+func (r *Role) ItemUse(itemId int32, count int32, reason *Reason) pb.ErrorCode {
+	if count <= 0 {
+		return pb.ErrorCode_ERR_ARGV
+	}
+	useConf := item_use_config.GetById(itemId)
+	if useConf == nil || useConf.IsEnable == 0 {
+		return pb.ErrorCode_ERR_ITEM_CAN_NOT_USE
+	}
+	// 主动使用：先扣道具
+	if _, ret := r.ItemReduce(itemId, int64(count), reason); ret != pb.ErrorCode_ERR_OK {
+		return ret
+	}
+	return r.applyItemUse(useConf, count, reason)
+}
+
+// useItemInner 供 getuse 自动使用调用：道具未入背包，不扣，直接发效果。
+func (r *Role) useItemInner(useConf *pb.ItemUseConfig, count int32, reason *Reason) pb.ErrorCode {
+	return r.applyItemUse(useConf, count, reason)
+}
+
+// applyItemUse 按使用类型分发效果（只发不扣）。
+func (r *Role) applyItemUse(useConf *pb.ItemUseConfig, count int32, reason *Reason) pb.ErrorCode {
+	switch useConf.UseType {
+	case itemUseTypeGainItem:
+		// 获得道具：给 UseId × UseValue × count
+		prodCnt := int64(useConf.UseValue) * int64(count)
+		if prodCnt <= 0 {
+			prodCnt = int64(count)
+		}
+		return r.ItemAdd(useConf.UseId, prodCnt, reason)
+	case itemUseTypeDropGroup:
+		// 掉落组：UseId 是掉落组ID，count 是次数；产出走 ItemAdd
+		var produced []*pb.PbItem
+		for i := int32(0); i < count; i++ {
+			got := r.DropGetItemByDropID(useConf.UseId)
+			if got != nil {
+				produced = append(produced, *got...)
+			}
+		}
+		for _, it := range produced {
+			r.ItemAdd(it.Id, it.Count, reason)
+		}
+		return pb.ErrorCode_ERR_OK
+	default:
+		r.Errorf("ITEM|use unknown type {item:%d, type:%d}", useConf.Id, useConf.UseType)
+		return pb.ErrorCode_ERR_ITEM_CAN_NOT_USE
+	}
+}
+
+// ItemSell 出售道具：扣道具 + 加金币（金币 = ItemConfig.Sale × count）。
+func (r *Role) ItemSell(itemId int32, count int32, reason *Reason) pb.ErrorCode {
+	if count <= 0 {
+		return pb.ErrorCode_ERR_ARGV
+	}
+	if isBasicInfoItem(itemId) {
+		return pb.ErrorCode_ERR_ITEM_CAN_NOT_SELL
+	}
+	itemConf := item_config.GetByItemId(itemId)
+	if itemConf == nil || itemConf.Sale <= 0 {
+		return pb.ErrorCode_ERR_ITEM_CAN_NOT_SELL
+	}
+	if _, ret := r.ItemReduce(itemId, int64(count), reason); ret != pb.ErrorCode_ERR_OK {
+		return ret
+	}
+	gold := int64(itemConf.Sale) * int64(count)
+	return r.GoldAdd(gold, reason)
+}
+
+// ItemDecompose 分解道具：扣道具 → 按 DecomposeConfig 发放产出。
+// 返回 (产出列表, 错误码)。
+func (r *Role) ItemDecompose(itemId int32, count int32, reason *Reason) (*[]*pb.PbItem, pb.ErrorCode) {
+	if count <= 0 {
+		return nil, pb.ErrorCode_ERR_ARGV
+	}
+	if isBasicInfoItem(itemId) {
+		return nil, pb.ErrorCode_ERR_ITEM_CAN_NOT_DECOMPOSE
+	}
+	outputs := decompose_config.GetByItemId(itemId)
+	if len(outputs) == 0 {
+		return nil, pb.ErrorCode_ERR_ITEM_CAN_NOT_DECOMPOSE
+	}
+	if _, ret := r.ItemReduce(itemId, int64(count), reason); ret != pb.ErrorCode_ERR_OK {
+		return nil, ret
+	}
+	rewards := make([]*pb.PbItem, 0, len(outputs))
+	for _, out := range outputs {
+		if out.IsEnable == 0 {
+			continue
+		}
+		prodCnt := int64(out.OutputCount) * int64(count)
+		if prodCnt <= 0 {
+			continue
+		}
+		if ret := r.ItemAdd(out.OutputItemId, prodCnt, reason); ret != pb.ErrorCode_ERR_OK {
+			continue
+		}
+		rewards = append(rewards, &pb.PbItem{Id: out.OutputItemId, Count: prodCnt})
+	}
+	return &rewards, pb.ErrorCode_ERR_OK
+}
+
+// QueryBackpack 分页查询背包：按 bagType 过滤 + Quality/Id 排序 + 分页。
+// bagType=0 表示全部分类；pageIdx 从 1 起；pageSize 0 用默认 30，上限 100。
+func (r *Role) QueryBackpack(bagType int32, pageIdx int32, pageSize int32) (int32, []*pb.PbItem) {
+	const defaultPageSize int32 = 30
+	const maxPageSize int32 = 100
+	if pageIdx <= 0 {
+		pageIdx = 1
+	}
+	if pageSize <= 0 {
+		pageSize = defaultPageSize
+	}
+	if pageSize > maxPageSize {
+		pageSize = maxPageSize
+	}
+
+	views := r.buildBackpackViews(bagType)
+	total := int32(len(views))
+	start := (pageIdx - 1) * pageSize
+	var items []*pb.PbItem
+	if start < total {
+		end := start + pageSize
+		if end > total {
+			end = total
+		}
+		items = views[start:end]
+	}
+	return total, items
+}
+
+// buildBackpackViews 构建（过滤+排序后的）背包条目列表。
+func (r *Role) buildBackpackViews(bagType int32) []*pb.PbItem {
+	inv := r.PbRole.InventoryInfo
+	if inv == nil || inv.ItemMap == nil {
+		return nil
+	}
+	views := make([]*pb.PbItem, 0, len(inv.ItemMap))
+	for id, it := range inv.ItemMap {
+		if it == nil || it.Count <= 0 {
+			continue
+		}
+		conf := item_config.GetByItemId(id)
+		if conf != nil && bagType != 0 && conf.BagType != bagType {
+			continue
+		}
+		views = append(views, it)
+	}
+	// 排序：品质降序 → ItemId 升序（conf 缺失按品质 0）
+	sortBackpackViews(views)
+	return views
+}
+
+// sortBackpackViews 就地排序背包条目：品质降序优先，再按 ItemId 升序。
+func sortBackpackViews(views []*pb.PbItem) {
+	for i := 1; i < len(views); i++ {
+		for j := i; j > 0; j-- {
+			qj := itemQuality(views[j].Id)
+			qj1 := itemQuality(views[j-1].Id)
+			if qj > qj1 || (qj == qj1 && views[j].Id < views[j-1].Id) {
+				views[j], views[j-1] = views[j-1], views[j]
+			} else {
+				break
+			}
+		}
+	}
+}
+
+// itemQuality 取道具品质；配置缺失返回 0。
+func itemQuality(itemId int32) int32 {
+	if c := item_config.GetByItemId(itemId); c != nil {
+		return c.Quality
+	}
+	return 0
 }

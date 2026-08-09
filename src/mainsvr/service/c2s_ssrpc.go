@@ -216,6 +216,77 @@ func (s *MainC2SServiceImpl) GmAddItem(ctx *ssrpc.Context, req *g1_protocol.GMAd
 	return &g1_protocol.GMAddItemRsp{Ret: &g1_protocol.Ret{Code: ret}}, nil
 }
 
+// ===== 背包/道具系统 handler（移植自 seed-server）=====
+
+func (s *MainC2SServiceImpl) UseItem(ctx *ssrpc.Context, req *g1_protocol.UseItemReq) (*g1_protocol.UseItemRsp, error) {
+	myRole := globals.RoleMgr.GetOrLoadRole(ctx.Uid(), ctx)
+	if myRole == nil {
+		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
+	}
+	ret := myRole.ItemUse(req.GetItemId(), req.GetCount(), &role.Reason{Reason: g1_protocol.Reason_REASON_CONSUME, Scene: 0})
+	_ = myRole.FlushPending(ctx, false)
+	return &g1_protocol.UseItemRsp{Ret: &g1_protocol.Ret{Code: ret}}, nil
+}
+
+func (s *MainC2SServiceImpl) SellItem(ctx *ssrpc.Context, req *g1_protocol.SellItemReq) (*g1_protocol.SellItemRsp, error) {
+	myRole := globals.RoleMgr.GetOrLoadRole(ctx.Uid(), ctx)
+	if myRole == nil {
+		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
+	}
+	ret := myRole.ItemSell(req.GetItemId(), req.GetCount(), &role.Reason{Reason: g1_protocol.Reason_REASON_CONSUME, Scene: 0})
+	_ = myRole.FlushPending(ctx, false)
+	return &g1_protocol.SellItemRsp{Ret: &g1_protocol.Ret{Code: ret}}, nil
+}
+
+func (s *MainC2SServiceImpl) DecomposeItem(ctx *ssrpc.Context, req *g1_protocol.DecomposeItemReq) (*g1_protocol.DecomposeItemRsp, error) {
+	myRole := globals.RoleMgr.GetOrLoadRole(ctx.Uid(), ctx)
+	if myRole == nil {
+		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
+	}
+	rewards, ret := myRole.ItemDecompose(req.GetItemId(), req.GetCount(), &role.Reason{Reason: g1_protocol.Reason_REASON_CONSUME, Scene: 0})
+	_ = myRole.FlushPending(ctx, false)
+	// 分解产出触发展示
+	if rewards != nil && len(*rewards) > 0 {
+		_ = myRole.ObtainNotifyItems("decompose", *rewards)
+	}
+	rsp := &g1_protocol.DecomposeItemRsp{Ret: &g1_protocol.Ret{Code: ret}}
+	if rewards != nil {
+		rsp.Rewards = *rewards
+	}
+	return rsp, nil
+}
+
+func (s *MainC2SServiceImpl) QueryBackpack(ctx *ssrpc.Context, req *g1_protocol.QueryBackpackReq) (*g1_protocol.QueryBackpackRsp, error) {
+	myRole := globals.RoleMgr.GetOrLoadRole(ctx.Uid(), ctx)
+	if myRole == nil {
+		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
+	}
+	total, items := myRole.QueryBackpack(req.GetBagType(), req.GetPageIdx(), req.GetPageSize())
+	return &g1_protocol.QueryBackpackRsp{
+		Ret:      &g1_protocol.Ret{Code: g1_protocol.ErrorCode_ERR_OK},
+		Total:    total,
+		PageIdx:  req.GetPageIdx(),
+		PageSize: req.GetPageSize(),
+		BagType:  req.GetBagType(),
+		Items:    items,
+	}, nil
+}
+
+func (s *MainC2SServiceImpl) BatchAddItem(ctx *ssrpc.Context, req *g1_protocol.BatchAddItemReq) (*g1_protocol.BatchAddItemRsp, error) {
+	myRole := globals.RoleMgr.GetOrLoadRole(ctx.Uid(), ctx)
+	if myRole == nil {
+		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
+	}
+	code := g1_protocol.ErrorCode_ERR_OK
+	for _, it := range req.GetItems() {
+		if ret := myRole.ItemAdd(it.GetId(), it.GetCount(), &role.Reason{Reason: g1_protocol.Reason_REASON_GM, Scene: 0}); ret != g1_protocol.ErrorCode_ERR_OK {
+			code = ret
+		}
+	}
+	_ = myRole.FlushPending(ctx, false)
+	return &g1_protocol.BatchAddItemRsp{Ret: &g1_protocol.Ret{Code: code}}, nil
+}
+
 func (s *MainC2SServiceImpl) MallBuyPackage(ctx *ssrpc.Context, req *g1_protocol.MallBuyPackageReq) (*g1_protocol.MallBuyPackageRsp, error) {
 	myRole := globals.RoleMgr.GetOrLoadRole(ctx.Uid(), ctx)
 	if myRole == nil {

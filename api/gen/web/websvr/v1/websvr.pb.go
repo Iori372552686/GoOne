@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v6.33.2
-// source: proto/service/websvr.proto
+// source: service/websvr.proto
 
 package websvrv1
 
@@ -31,7 +31,7 @@ type PingReq struct {
 
 func (x *PingReq) Reset() {
 	*x = PingReq{}
-	mi := &file_proto_service_websvr_proto_msgTypes[0]
+	mi := &file_service_websvr_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *PingReq) String() string {
 func (*PingReq) ProtoMessage() {}
 
 func (x *PingReq) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_service_websvr_proto_msgTypes[0]
+	mi := &file_service_websvr_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +56,7 @@ func (x *PingReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingReq.ProtoReflect.Descriptor instead.
 func (*PingReq) Descriptor() ([]byte, []int) {
-	return file_proto_service_websvr_proto_rawDescGZIP(), []int{0}
+	return file_service_websvr_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *PingReq) GetMsg() string {
@@ -76,7 +76,7 @@ type PingRsp struct {
 
 func (x *PingRsp) Reset() {
 	*x = PingRsp{}
-	mi := &file_proto_service_websvr_proto_msgTypes[1]
+	mi := &file_service_websvr_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -88,7 +88,7 @@ func (x *PingRsp) String() string {
 func (*PingRsp) ProtoMessage() {}
 
 func (x *PingRsp) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_service_websvr_proto_msgTypes[1]
+	mi := &file_service_websvr_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -101,7 +101,7 @@ func (x *PingRsp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingRsp.ProtoReflect.Descriptor instead.
 func (*PingRsp) Descriptor() ([]byte, []int) {
-	return file_proto_service_websvr_proto_rawDescGZIP(), []int{1}
+	return file_service_websvr_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *PingRsp) GetMsg() string {
@@ -129,7 +129,7 @@ type MsgSecCheckReq struct {
 
 func (x *MsgSecCheckReq) Reset() {
 	*x = MsgSecCheckReq{}
-	mi := &file_proto_service_websvr_proto_msgTypes[2]
+	mi := &file_service_websvr_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -141,7 +141,7 @@ func (x *MsgSecCheckReq) String() string {
 func (*MsgSecCheckReq) ProtoMessage() {}
 
 func (x *MsgSecCheckReq) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_service_websvr_proto_msgTypes[2]
+	mi := &file_service_websvr_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -154,7 +154,7 @@ func (x *MsgSecCheckReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MsgSecCheckReq.ProtoReflect.Descriptor instead.
 func (*MsgSecCheckReq) Descriptor() ([]byte, []int) {
-	return file_proto_service_websvr_proto_rawDescGZIP(), []int{2}
+	return file_service_websvr_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *MsgSecCheckReq) GetAccountId() string {
@@ -189,7 +189,7 @@ type MsgSecCheckRsp struct {
 
 func (x *MsgSecCheckRsp) Reset() {
 	*x = MsgSecCheckRsp{}
-	mi := &file_proto_service_websvr_proto_msgTypes[3]
+	mi := &file_service_websvr_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -201,7 +201,7 @@ func (x *MsgSecCheckRsp) String() string {
 func (*MsgSecCheckRsp) ProtoMessage() {}
 
 func (x *MsgSecCheckRsp) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_service_websvr_proto_msgTypes[3]
+	mi := &file_service_websvr_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -214,7 +214,7 @@ func (x *MsgSecCheckRsp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MsgSecCheckRsp.ProtoReflect.Descriptor instead.
 func (*MsgSecCheckRsp) Descriptor() ([]byte, []int) {
-	return file_proto_service_websvr_proto_rawDescGZIP(), []int{3}
+	return file_service_websvr_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *MsgSecCheckRsp) GetMsg() string {
@@ -224,11 +224,11 @@ func (x *MsgSecCheckRsp) GetMsg() string {
 	return ""
 }
 
-var File_proto_service_websvr_proto protoreflect.FileDescriptor
+var File_service_websvr_proto protoreflect.FileDescriptor
 
-const file_proto_service_websvr_proto_rawDesc = "" +
+const file_service_websvr_proto_rawDesc = "" +
 	"\n" +
-	"\x1aproto/service/websvr.proto\x12\rweb.websvr.v1\x1a\x1egoone/options/v1/options.proto\"\x1b\n" +
+	"\x14service/websvr.proto\x12\rweb.websvr.v1\x1a\x1egoone/options/v1/options.proto\"\x1b\n" +
 	"\aPingReq\x12\x10\n" +
 	"\x03msg\x18\x01 \x01(\tR\x03msg\"A\n" +
 	"\aPingRsp\x12\x10\n" +
@@ -247,25 +247,25 @@ const file_proto_service_websvr_proto_rawDesc = "" +
 	"\vMsgSecCheck\x12\x1d.web.websvr.v1.MsgSecCheckReq\x1a\x1d.web.websvr.v1.MsgSecCheckRsp\";\xca\xe4\x1d78\x01@\x01z\x12msg security check\xa2\x01\x15/v1/web/msg-sec-check\xaa\x01\x04POST\x1a\a\xd2\xe4\x1d\x03\b\xc0>B?Z=github.com/Iori372552686/GoOne/api/gen/web/websvr/v1;websvrv1b\x06proto3"
 
 var (
-	file_proto_service_websvr_proto_rawDescOnce sync.Once
-	file_proto_service_websvr_proto_rawDescData []byte
+	file_service_websvr_proto_rawDescOnce sync.Once
+	file_service_websvr_proto_rawDescData []byte
 )
 
-func file_proto_service_websvr_proto_rawDescGZIP() []byte {
-	file_proto_service_websvr_proto_rawDescOnce.Do(func() {
-		file_proto_service_websvr_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_service_websvr_proto_rawDesc), len(file_proto_service_websvr_proto_rawDesc)))
+func file_service_websvr_proto_rawDescGZIP() []byte {
+	file_service_websvr_proto_rawDescOnce.Do(func() {
+		file_service_websvr_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_service_websvr_proto_rawDesc), len(file_service_websvr_proto_rawDesc)))
 	})
-	return file_proto_service_websvr_proto_rawDescData
+	return file_service_websvr_proto_rawDescData
 }
 
-var file_proto_service_websvr_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-var file_proto_service_websvr_proto_goTypes = []any{
+var file_service_websvr_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_service_websvr_proto_goTypes = []any{
 	(*PingReq)(nil),        // 0: web.websvr.v1.PingReq
 	(*PingRsp)(nil),        // 1: web.websvr.v1.PingRsp
 	(*MsgSecCheckReq)(nil), // 2: web.websvr.v1.MsgSecCheckReq
 	(*MsgSecCheckRsp)(nil), // 3: web.websvr.v1.MsgSecCheckRsp
 }
-var file_proto_service_websvr_proto_depIdxs = []int32{
+var file_service_websvr_proto_depIdxs = []int32{
 	0, // 0: web.websvr.v1.WebApiService.Ping:input_type -> web.websvr.v1.PingReq
 	2, // 1: web.websvr.v1.WebApiService.MsgSecCheck:input_type -> web.websvr.v1.MsgSecCheckReq
 	1, // 2: web.websvr.v1.WebApiService.Ping:output_type -> web.websvr.v1.PingRsp
@@ -277,26 +277,26 @@ var file_proto_service_websvr_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_proto_service_websvr_proto_init() }
-func file_proto_service_websvr_proto_init() {
-	if File_proto_service_websvr_proto != nil {
+func init() { file_service_websvr_proto_init() }
+func file_service_websvr_proto_init() {
+	if File_service_websvr_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_service_websvr_proto_rawDesc), len(file_proto_service_websvr_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_websvr_proto_rawDesc), len(file_service_websvr_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_service_websvr_proto_goTypes,
-		DependencyIndexes: file_proto_service_websvr_proto_depIdxs,
-		MessageInfos:      file_proto_service_websvr_proto_msgTypes,
+		GoTypes:           file_service_websvr_proto_goTypes,
+		DependencyIndexes: file_service_websvr_proto_depIdxs,
+		MessageInfos:      file_service_websvr_proto_msgTypes,
 	}.Build()
-	File_proto_service_websvr_proto = out.File
-	file_proto_service_websvr_proto_goTypes = nil
-	file_proto_service_websvr_proto_depIdxs = nil
+	File_service_websvr_proto = out.File
+	file_service_websvr_proto_goTypes = nil
+	file_service_websvr_proto_depIdxs = nil
 }

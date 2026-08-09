@@ -21,6 +21,11 @@ type MainC2SServiceSS interface {
 	GmGetRole(ctx *ssrpc.Context, req *g1_protocol.GMGetRoleReq) (*g1_protocol.GMGetRoleRsp, error)
 	GmSetRole(ctx *ssrpc.Context, req *g1_protocol.GMSetRoleReq) (*g1_protocol.GMSetRoleRsp, error)
 	GmAddItem(ctx *ssrpc.Context, req *g1_protocol.GMAddItemReq) (*g1_protocol.GMAddItemRsp, error)
+	UseItem(ctx *ssrpc.Context, req *g1_protocol.UseItemReq) (*g1_protocol.UseItemRsp, error)
+	SellItem(ctx *ssrpc.Context, req *g1_protocol.SellItemReq) (*g1_protocol.SellItemRsp, error)
+	DecomposeItem(ctx *ssrpc.Context, req *g1_protocol.DecomposeItemReq) (*g1_protocol.DecomposeItemRsp, error)
+	QueryBackpack(ctx *ssrpc.Context, req *g1_protocol.QueryBackpackReq) (*g1_protocol.QueryBackpackRsp, error)
+	BatchAddItem(ctx *ssrpc.Context, req *g1_protocol.BatchAddItemReq) (*g1_protocol.BatchAddItemRsp, error)
 	MallBuyPackage(ctx *ssrpc.Context, req *g1_protocol.MallBuyPackageReq) (*g1_protocol.MallBuyPackageRsp, error)
 	CreateRoom(ctx *ssrpc.Context, req *g1_protocol.CreateRoomReq) (*g1_protocol.CreateRoomRsp, error)
 	JoinRoom(ctx *ssrpc.Context, req *g1_protocol.JoinRoomReq) (*g1_protocol.JoinRoomRsp, error)
@@ -95,6 +100,26 @@ func (*UnimplementedMainC2SServiceSS) GmSetRole(ctx *ssrpc.Context, req *g1_prot
 
 func (*UnimplementedMainC2SServiceSS) GmAddItem(ctx *ssrpc.Context, req *g1_protocol.GMAddItemReq) (*g1_protocol.GMAddItemRsp, error) {
 	return nil, ssrpc.Unimplemented("MainC2SService.GmAddItem")
+}
+
+func (*UnimplementedMainC2SServiceSS) UseItem(ctx *ssrpc.Context, req *g1_protocol.UseItemReq) (*g1_protocol.UseItemRsp, error) {
+	return nil, ssrpc.Unimplemented("MainC2SService.UseItem")
+}
+
+func (*UnimplementedMainC2SServiceSS) SellItem(ctx *ssrpc.Context, req *g1_protocol.SellItemReq) (*g1_protocol.SellItemRsp, error) {
+	return nil, ssrpc.Unimplemented("MainC2SService.SellItem")
+}
+
+func (*UnimplementedMainC2SServiceSS) DecomposeItem(ctx *ssrpc.Context, req *g1_protocol.DecomposeItemReq) (*g1_protocol.DecomposeItemRsp, error) {
+	return nil, ssrpc.Unimplemented("MainC2SService.DecomposeItem")
+}
+
+func (*UnimplementedMainC2SServiceSS) QueryBackpack(ctx *ssrpc.Context, req *g1_protocol.QueryBackpackReq) (*g1_protocol.QueryBackpackRsp, error) {
+	return nil, ssrpc.Unimplemented("MainC2SService.QueryBackpack")
+}
+
+func (*UnimplementedMainC2SServiceSS) BatchAddItem(ctx *ssrpc.Context, req *g1_protocol.BatchAddItemReq) (*g1_protocol.BatchAddItemRsp, error) {
+	return nil, ssrpc.Unimplemented("MainC2SService.BatchAddItem")
 }
 
 func (*UnimplementedMainC2SServiceSS) MallBuyPackage(ctx *ssrpc.Context, req *g1_protocol.MallBuyPackageReq) (*g1_protocol.MallBuyPackageRsp, error) {
@@ -367,6 +392,71 @@ func RegisterMainC2SServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv
 		func() any { return new(g1_protocol.GMAddItemReq) },
 		func(ctx *ssrpc.Context, in any) (any, error) {
 			return srv.Impl.GmAddItem(ctx, in.(*g1_protocol.GMAddItemReq))
+		},
+	))
+
+	mgr.RegisterCmd(g1_protocol.CMD_MAIN_ITEM_USE_REQ, ssrpc.WrapUnary(
+		ssrpc.MethodDesc{
+			Cmd:     g1_protocol.CMD_MAIN_ITEM_USE_REQ,
+			Timeout: 5000 * time.Millisecond,
+			Name:    "use item",
+		},
+		srv.MW,
+		func() any { return new(g1_protocol.UseItemReq) },
+		func(ctx *ssrpc.Context, in any) (any, error) {
+			return srv.Impl.UseItem(ctx, in.(*g1_protocol.UseItemReq))
+		},
+	))
+
+	mgr.RegisterCmd(g1_protocol.CMD_MAIN_ITEM_SELL_REQ, ssrpc.WrapUnary(
+		ssrpc.MethodDesc{
+			Cmd:     g1_protocol.CMD_MAIN_ITEM_SELL_REQ,
+			Timeout: 5000 * time.Millisecond,
+			Name:    "sell item",
+		},
+		srv.MW,
+		func() any { return new(g1_protocol.SellItemReq) },
+		func(ctx *ssrpc.Context, in any) (any, error) {
+			return srv.Impl.SellItem(ctx, in.(*g1_protocol.SellItemReq))
+		},
+	))
+
+	mgr.RegisterCmd(g1_protocol.CMD_MAIN_ITEM_DECOMPOSE_REQ, ssrpc.WrapUnary(
+		ssrpc.MethodDesc{
+			Cmd:     g1_protocol.CMD_MAIN_ITEM_DECOMPOSE_REQ,
+			Timeout: 5000 * time.Millisecond,
+			Name:    "decompose item",
+		},
+		srv.MW,
+		func() any { return new(g1_protocol.DecomposeItemReq) },
+		func(ctx *ssrpc.Context, in any) (any, error) {
+			return srv.Impl.DecomposeItem(ctx, in.(*g1_protocol.DecomposeItemReq))
+		},
+	))
+
+	mgr.RegisterCmd(g1_protocol.CMD_MAIN_BACKPACK_QUERY_REQ, ssrpc.WrapUnary(
+		ssrpc.MethodDesc{
+			Cmd:     g1_protocol.CMD_MAIN_BACKPACK_QUERY_REQ,
+			Timeout: 5000 * time.Millisecond,
+			Name:    "query backpack with paging",
+		},
+		srv.MW,
+		func() any { return new(g1_protocol.QueryBackpackReq) },
+		func(ctx *ssrpc.Context, in any) (any, error) {
+			return srv.Impl.QueryBackpack(ctx, in.(*g1_protocol.QueryBackpackReq))
+		},
+	))
+
+	mgr.RegisterCmd(g1_protocol.CMD_MAIN_ITEM_BATCH_ADD_REQ, ssrpc.WrapUnary(
+		ssrpc.MethodDesc{
+			Cmd:     g1_protocol.CMD_MAIN_ITEM_BATCH_ADD_REQ,
+			Timeout: 5000 * time.Millisecond,
+			Name:    "batch add item (gm/test)",
+		},
+		srv.MW,
+		func() any { return new(g1_protocol.BatchAddItemReq) },
+		func(ctx *ssrpc.Context, in any) (any, error) {
+			return srv.Impl.BatchAddItem(ctx, in.(*g1_protocol.BatchAddItemReq))
 		},
 	))
 
@@ -985,6 +1075,71 @@ func RegisterMainC2SServiceToDispatcher(d *ssrpc.Dispatcher, srv MainC2SServiceS
 		},
 	))
 
+	d.RegisterCmd(g1_protocol.CMD_MAIN_ITEM_USE_REQ, ssrpc.WrapUnary(
+		ssrpc.MethodDesc{
+			Cmd:     g1_protocol.CMD_MAIN_ITEM_USE_REQ,
+			Timeout: 5000 * time.Millisecond,
+			Name:    "use item",
+		},
+		srv.MW,
+		func() any { return new(g1_protocol.UseItemReq) },
+		func(ctx *ssrpc.Context, in any) (any, error) {
+			return srv.Impl.UseItem(ctx, in.(*g1_protocol.UseItemReq))
+		},
+	))
+
+	d.RegisterCmd(g1_protocol.CMD_MAIN_ITEM_SELL_REQ, ssrpc.WrapUnary(
+		ssrpc.MethodDesc{
+			Cmd:     g1_protocol.CMD_MAIN_ITEM_SELL_REQ,
+			Timeout: 5000 * time.Millisecond,
+			Name:    "sell item",
+		},
+		srv.MW,
+		func() any { return new(g1_protocol.SellItemReq) },
+		func(ctx *ssrpc.Context, in any) (any, error) {
+			return srv.Impl.SellItem(ctx, in.(*g1_protocol.SellItemReq))
+		},
+	))
+
+	d.RegisterCmd(g1_protocol.CMD_MAIN_ITEM_DECOMPOSE_REQ, ssrpc.WrapUnary(
+		ssrpc.MethodDesc{
+			Cmd:     g1_protocol.CMD_MAIN_ITEM_DECOMPOSE_REQ,
+			Timeout: 5000 * time.Millisecond,
+			Name:    "decompose item",
+		},
+		srv.MW,
+		func() any { return new(g1_protocol.DecomposeItemReq) },
+		func(ctx *ssrpc.Context, in any) (any, error) {
+			return srv.Impl.DecomposeItem(ctx, in.(*g1_protocol.DecomposeItemReq))
+		},
+	))
+
+	d.RegisterCmd(g1_protocol.CMD_MAIN_BACKPACK_QUERY_REQ, ssrpc.WrapUnary(
+		ssrpc.MethodDesc{
+			Cmd:     g1_protocol.CMD_MAIN_BACKPACK_QUERY_REQ,
+			Timeout: 5000 * time.Millisecond,
+			Name:    "query backpack with paging",
+		},
+		srv.MW,
+		func() any { return new(g1_protocol.QueryBackpackReq) },
+		func(ctx *ssrpc.Context, in any) (any, error) {
+			return srv.Impl.QueryBackpack(ctx, in.(*g1_protocol.QueryBackpackReq))
+		},
+	))
+
+	d.RegisterCmd(g1_protocol.CMD_MAIN_ITEM_BATCH_ADD_REQ, ssrpc.WrapUnary(
+		ssrpc.MethodDesc{
+			Cmd:     g1_protocol.CMD_MAIN_ITEM_BATCH_ADD_REQ,
+			Timeout: 5000 * time.Millisecond,
+			Name:    "batch add item (gm/test)",
+		},
+		srv.MW,
+		func() any { return new(g1_protocol.BatchAddItemReq) },
+		func(ctx *ssrpc.Context, in any) (any, error) {
+			return srv.Impl.BatchAddItem(ctx, in.(*g1_protocol.BatchAddItemReq))
+		},
+	))
+
 	d.RegisterCmd(g1_protocol.CMD_MAIN_MALL_BUY_PACKAGE_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd:     g1_protocol.CMD_MAIN_MALL_BUY_PACKAGE_REQ,
@@ -1583,6 +1738,66 @@ func MainC2SServiceBindings(srv MainC2SServiceSServer) []ssrpc.Binding {
 			func() any { return new(g1_protocol.GMAddItemReq) },
 			func(ctx *ssrpc.Context, in any) (any, error) {
 				return srv.Impl.GmAddItem(ctx, in.(*g1_protocol.GMAddItemReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_ITEM_USE_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd:     g1_protocol.CMD_MAIN_ITEM_USE_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name:    "MainC2SService.UseItem",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.UseItemReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.UseItem(ctx, in.(*g1_protocol.UseItemReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_ITEM_SELL_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd:     g1_protocol.CMD_MAIN_ITEM_SELL_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name:    "MainC2SService.SellItem",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.SellItemReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.SellItem(ctx, in.(*g1_protocol.SellItemReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_ITEM_DECOMPOSE_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd:     g1_protocol.CMD_MAIN_ITEM_DECOMPOSE_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name:    "MainC2SService.DecomposeItem",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.DecomposeItemReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.DecomposeItem(ctx, in.(*g1_protocol.DecomposeItemReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_BACKPACK_QUERY_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd:     g1_protocol.CMD_MAIN_BACKPACK_QUERY_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name:    "MainC2SService.QueryBackpack",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.QueryBackpackReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.QueryBackpack(ctx, in.(*g1_protocol.QueryBackpackReq))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_ITEM_BATCH_ADD_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd:     g1_protocol.CMD_MAIN_ITEM_BATCH_ADD_REQ,
+				Timeout: 5000 * time.Millisecond,
+				Name:    "MainC2SService.BatchAddItem",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.BatchAddItemReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.BatchAddItem(ctx, in.(*g1_protocol.BatchAddItemReq))
 			},
 		)},
 		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MAIN_MALL_BUY_PACKAGE_REQ, CmdHandler: ssrpc.WrapUnary(
@@ -2204,6 +2419,96 @@ func (c *MainC2SServiceClient) GmAddItem(ctx cmd_handler.IContext, req *g1_proto
 func (c *MainC2SServiceClient) GmAddItemByRouter(ctx cmd_handler.IContext, routerId uint64, req *g1_protocol.GMAddItemReq) (*g1_protocol.GMAddItemRsp, error) {
 	rsp := &g1_protocol.GMAddItemRsp{}
 	if err := ssrpc.CallByCmdWithRouter(ctx, routerId, g1_protocol.CMD_MAIN_GM_ADD_ITEM_REQ, req, rsp); err != nil {
+		return nil, err
+	}
+	return rsp, nil
+}
+
+// UseItem calls use item synchronously.
+func (c *MainC2SServiceClient) UseItem(ctx cmd_handler.IContext, req *g1_protocol.UseItemReq) (*g1_protocol.UseItemRsp, error) {
+	rsp := &g1_protocol.UseItemRsp{}
+	if err := ssrpc.CallByCmd(ctx, g1_protocol.CMD_MAIN_ITEM_USE_REQ, req, rsp); err != nil {
+		return nil, err
+	}
+	return rsp, nil
+}
+
+// UseItemByRouter calls use item synchronously using an explicit routerId.
+func (c *MainC2SServiceClient) UseItemByRouter(ctx cmd_handler.IContext, routerId uint64, req *g1_protocol.UseItemReq) (*g1_protocol.UseItemRsp, error) {
+	rsp := &g1_protocol.UseItemRsp{}
+	if err := ssrpc.CallByCmdWithRouter(ctx, routerId, g1_protocol.CMD_MAIN_ITEM_USE_REQ, req, rsp); err != nil {
+		return nil, err
+	}
+	return rsp, nil
+}
+
+// SellItem calls sell item synchronously.
+func (c *MainC2SServiceClient) SellItem(ctx cmd_handler.IContext, req *g1_protocol.SellItemReq) (*g1_protocol.SellItemRsp, error) {
+	rsp := &g1_protocol.SellItemRsp{}
+	if err := ssrpc.CallByCmd(ctx, g1_protocol.CMD_MAIN_ITEM_SELL_REQ, req, rsp); err != nil {
+		return nil, err
+	}
+	return rsp, nil
+}
+
+// SellItemByRouter calls sell item synchronously using an explicit routerId.
+func (c *MainC2SServiceClient) SellItemByRouter(ctx cmd_handler.IContext, routerId uint64, req *g1_protocol.SellItemReq) (*g1_protocol.SellItemRsp, error) {
+	rsp := &g1_protocol.SellItemRsp{}
+	if err := ssrpc.CallByCmdWithRouter(ctx, routerId, g1_protocol.CMD_MAIN_ITEM_SELL_REQ, req, rsp); err != nil {
+		return nil, err
+	}
+	return rsp, nil
+}
+
+// DecomposeItem calls decompose item synchronously.
+func (c *MainC2SServiceClient) DecomposeItem(ctx cmd_handler.IContext, req *g1_protocol.DecomposeItemReq) (*g1_protocol.DecomposeItemRsp, error) {
+	rsp := &g1_protocol.DecomposeItemRsp{}
+	if err := ssrpc.CallByCmd(ctx, g1_protocol.CMD_MAIN_ITEM_DECOMPOSE_REQ, req, rsp); err != nil {
+		return nil, err
+	}
+	return rsp, nil
+}
+
+// DecomposeItemByRouter calls decompose item synchronously using an explicit routerId.
+func (c *MainC2SServiceClient) DecomposeItemByRouter(ctx cmd_handler.IContext, routerId uint64, req *g1_protocol.DecomposeItemReq) (*g1_protocol.DecomposeItemRsp, error) {
+	rsp := &g1_protocol.DecomposeItemRsp{}
+	if err := ssrpc.CallByCmdWithRouter(ctx, routerId, g1_protocol.CMD_MAIN_ITEM_DECOMPOSE_REQ, req, rsp); err != nil {
+		return nil, err
+	}
+	return rsp, nil
+}
+
+// QueryBackpack calls query backpack with paging synchronously.
+func (c *MainC2SServiceClient) QueryBackpack(ctx cmd_handler.IContext, req *g1_protocol.QueryBackpackReq) (*g1_protocol.QueryBackpackRsp, error) {
+	rsp := &g1_protocol.QueryBackpackRsp{}
+	if err := ssrpc.CallByCmd(ctx, g1_protocol.CMD_MAIN_BACKPACK_QUERY_REQ, req, rsp); err != nil {
+		return nil, err
+	}
+	return rsp, nil
+}
+
+// QueryBackpackByRouter calls query backpack with paging synchronously using an explicit routerId.
+func (c *MainC2SServiceClient) QueryBackpackByRouter(ctx cmd_handler.IContext, routerId uint64, req *g1_protocol.QueryBackpackReq) (*g1_protocol.QueryBackpackRsp, error) {
+	rsp := &g1_protocol.QueryBackpackRsp{}
+	if err := ssrpc.CallByCmdWithRouter(ctx, routerId, g1_protocol.CMD_MAIN_BACKPACK_QUERY_REQ, req, rsp); err != nil {
+		return nil, err
+	}
+	return rsp, nil
+}
+
+// BatchAddItem calls batch add item (gm/test) synchronously.
+func (c *MainC2SServiceClient) BatchAddItem(ctx cmd_handler.IContext, req *g1_protocol.BatchAddItemReq) (*g1_protocol.BatchAddItemRsp, error) {
+	rsp := &g1_protocol.BatchAddItemRsp{}
+	if err := ssrpc.CallByCmd(ctx, g1_protocol.CMD_MAIN_ITEM_BATCH_ADD_REQ, req, rsp); err != nil {
+		return nil, err
+	}
+	return rsp, nil
+}
+
+// BatchAddItemByRouter calls batch add item (gm/test) synchronously using an explicit routerId.
+func (c *MainC2SServiceClient) BatchAddItemByRouter(ctx cmd_handler.IContext, routerId uint64, req *g1_protocol.BatchAddItemReq) (*g1_protocol.BatchAddItemRsp, error) {
+	rsp := &g1_protocol.BatchAddItemRsp{}
+	if err := ssrpc.CallByCmdWithRouter(ctx, routerId, g1_protocol.CMD_MAIN_ITEM_BATCH_ADD_REQ, req, rsp); err != nil {
 		return nil, err
 	}
 	return rsp, nil

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v6.33.2
-// source: proto/service/connservice.proto
+// source: service/connservice.proto
 
 package connsvrv1
 
@@ -22,22 +22,22 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-var File_proto_service_connservice_proto protoreflect.FileDescriptor
+var File_service_connservice_proto protoreflect.FileDescriptor
 
-const file_proto_service_connservice_proto_rawDesc = "" +
+const file_service_connservice_proto_rawDesc = "" +
 	"\n" +
-	"\x1fproto/service/connservice.proto\x12\x0fgame.connsvr.v1\x1a\x1egoone/options/v1/options.proto\x1a\x17proto/core/client.proto2\xba\x02\n" +
+	"\x19service/connservice.proto\x12\x0fgame.connsvr.v1\x1a\x1egoone/options/v1/options.proto\x1a\x11core/client.proto2\xba\x02\n" +
 	"\vConnService\x12\x89\x01\n" +
 	"\aKickOut\x12\x1b.g1.protocol.ConnKickOutReq\x1a\x1b.g1.protocol.ConnKickOutRsp\"D\xca\xe4\x1d@\x18\x01*\x15CMD_CONN_KICK_OUT_REQz%kick websocket session by remote addr\x12\x95\x01\n" +
 	"\tBroadcast\x12\x1d.g1.protocol.ConnBroadcastReq\x1a\x1d.g1.protocol.ConnBroadcastRsp\"J\xca\xe4\x1dF*\x16CMD_CONN_BROADCAST_REQz,broadcast CSPacket payload to websocket zone\x1a\a\xd2\xe4\x1d\x03\b\x88'BBZ@github.com/Iori372552686/GoOne/api/gen/game/connsvr/v1;connsvrv1b\x06proto3"
 
-var file_proto_service_connservice_proto_goTypes = []any{
+var file_service_connservice_proto_goTypes = []any{
 	(*protocol.ConnKickOutReq)(nil),   // 0: g1.protocol.ConnKickOutReq
 	(*protocol.ConnBroadcastReq)(nil), // 1: g1.protocol.ConnBroadcastReq
 	(*protocol.ConnKickOutRsp)(nil),   // 2: g1.protocol.ConnKickOutRsp
 	(*protocol.ConnBroadcastRsp)(nil), // 3: g1.protocol.ConnBroadcastRsp
 }
-var file_proto_service_connservice_proto_depIdxs = []int32{
+var file_service_connservice_proto_depIdxs = []int32{
 	0, // 0: game.connsvr.v1.ConnService.KickOut:input_type -> g1.protocol.ConnKickOutReq
 	1, // 1: game.connsvr.v1.ConnService.Broadcast:input_type -> g1.protocol.ConnBroadcastReq
 	2, // 2: game.connsvr.v1.ConnService.KickOut:output_type -> g1.protocol.ConnKickOutRsp
@@ -49,25 +49,25 @@ var file_proto_service_connservice_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_proto_service_connservice_proto_init() }
-func file_proto_service_connservice_proto_init() {
-	if File_proto_service_connservice_proto != nil {
+func init() { file_service_connservice_proto_init() }
+func file_service_connservice_proto_init() {
+	if File_service_connservice_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_service_connservice_proto_rawDesc), len(file_proto_service_connservice_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_connservice_proto_rawDesc), len(file_service_connservice_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   0,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_service_connservice_proto_goTypes,
-		DependencyIndexes: file_proto_service_connservice_proto_depIdxs,
+		GoTypes:           file_service_connservice_proto_goTypes,
+		DependencyIndexes: file_service_connservice_proto_depIdxs,
 	}.Build()
-	File_proto_service_connservice_proto = out.File
-	file_proto_service_connservice_proto_goTypes = nil
-	file_proto_service_connservice_proto_depIdxs = nil
+	File_service_connservice_proto = out.File
+	file_service_connservice_proto_goTypes = nil
+	file_service_connservice_proto_depIdxs = nil
 }

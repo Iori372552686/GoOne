@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v6.33.2
-// source: proto/service/mainsvrc2s.proto
+// source: service/mainsvrc2s.proto
 
 package mainsvrv1
 
@@ -23,11 +23,11 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-var File_proto_service_mainsvrc2s_proto protoreflect.FileDescriptor
+var File_service_mainsvrc2s_proto protoreflect.FileDescriptor
 
-const file_proto_service_mainsvrc2s_proto_rawDesc = "" +
+const file_service_mainsvrc2s_proto_rawDesc = "" +
 	"\n" +
-	"\x1eproto/service/mainsvrc2s.proto\x12\x0fgame.mainsvr.v1\x1a\x1egoone/options/v1/options.proto\x1a\x17proto/core/client.proto\x1a\x1bgoogle/protobuf/empty.proto2\x87.\n" +
+	"\x18service/mainsvrc2s.proto\x12\x0fgame.mainsvr.v1\x1a\x1egoone/options/v1/options.proto\x1a\x11core/client.proto\x1a\x1bgoogle/protobuf/empty.proto2\xf02\n" +
 	"\x0eMainC2SService\x12a\n" +
 	"\x05Login\x12\x15.g1.protocol.LoginReq\x1a\x15.g1.protocol.LoginRsp\"*\xca\xe4\x1d&*\x12CMD_MAIN_LOGIN_REQz\rmainsvr login\xf0\x01\x01\x12\x84\x01\n" +
 	"\x06Logout\x12\x16.g1.protocol.LogoutReq\x1a\x16.g1.protocol.LogoutRsp\"J\xca\xe4\x1dF*\x13CMD_MAIN_LOGOUT_REQz/mainsvr logout (rsp optional, see req.ByServer)\x12r\n" +
@@ -38,7 +38,12 @@ const file_proto_service_mainsvrc2s_proto_rawDesc = "" +
 	"ChangeIcon\x12\x1a.g1.protocol.ChangeIconReq\x1a\x1a.g1.protocol.ChangeIconRsp\"3\xca\xe4\x1d/*\x18CMD_MAIN_CHANGE_ICON_REQz\x13mainsvr change icon\x12n\n" +
 	"\tGmGetRole\x12\x19.g1.protocol.GMGetRoleReq\x1a\x19.g1.protocol.GMGetRoleRsp\"+\xca\xe4\x1d'*\x18CMD_MAIN_GM_GET_ROLE_REQz\vgm get role\x12n\n" +
 	"\tGmSetRole\x12\x19.g1.protocol.GMSetRoleReq\x1a\x19.g1.protocol.GMSetRoleRsp\"+\xca\xe4\x1d'*\x18CMD_MAIN_GM_SET_ROLE_REQz\vgm set role\x12n\n" +
-	"\tGmAddItem\x12\x19.g1.protocol.GMAddItemReq\x1a\x19.g1.protocol.GMAddItemRsp\"+\xca\xe4\x1d'*\x18CMD_MAIN_GM_ADD_ITEM_REQz\vgm add item\x12\x87\x01\n" +
+	"\tGmAddItem\x12\x19.g1.protocol.GMAddItemReq\x1a\x19.g1.protocol.GMAddItemRsp\"+\xca\xe4\x1d'*\x18CMD_MAIN_GM_ADD_ITEM_REQz\vgm add item\x12b\n" +
+	"\aUseItem\x12\x17.g1.protocol.UseItemReq\x1a\x17.g1.protocol.UseItemRsp\"%\xca\xe4\x1d!*\x15CMD_MAIN_ITEM_USE_REQz\buse item\x12g\n" +
+	"\bSellItem\x12\x18.g1.protocol.SellItemReq\x1a\x18.g1.protocol.SellItemRsp\"'\xca\xe4\x1d#*\x16CMD_MAIN_ITEM_SELL_REQz\tsell item\x12\x80\x01\n" +
+	"\rDecomposeItem\x12\x1d.g1.protocol.DecomposeItemReq\x1a\x1d.g1.protocol.DecomposeItemRsp\"1\xca\xe4\x1d-*\x1bCMD_MAIN_ITEM_DECOMPOSE_REQz\x0edecompose item\x12\x8c\x01\n" +
+	"\rQueryBackpack\x12\x1d.g1.protocol.QueryBackpackReq\x1a\x1d.g1.protocol.QueryBackpackRsp\"=\xca\xe4\x1d9*\x1bCMD_MAIN_BACKPACK_QUERY_REQz\x1aquery backpack with paging\x12\x87\x01\n" +
+	"\fBatchAddItem\x12\x1c.g1.protocol.BatchAddItemReq\x1a\x1c.g1.protocol.BatchAddItemRsp\";\xca\xe4\x1d7*\x1bCMD_MAIN_ITEM_BATCH_ADD_REQz\x18batch add item (gm/test)\x12\x87\x01\n" +
 	"\x0eMallBuyPackage\x12\x1e.g1.protocol.MallBuyPackageReq\x1a\x1e.g1.protocol.MallBuyPackageRsp\"5\xca\xe4\x1d1*\x1dCMD_MAIN_MALL_BUY_PACKAGE_REQz\x10mall buy package\x12|\n" +
 	"\n" +
 	"CreateRoom\x12\x1a.g1.protocol.CreateRoomReq\x1a\x1a.g1.protocol.CreateRoomRsp\"6\xca\xe4\x1d2*\x1dCMD_MAIN_GAME_CREATE_ROOM_REQz\x11texas create room\x12r\n" +
@@ -84,7 +89,7 @@ const file_proto_service_mainsvrc2s_proto_rawDesc = "" +
 	"\vEarlySettle\x12\x1b.g1.protocol.EarlySettleReq\x1a\x1b.g1.protocol.EarlySettleRsp\"?\xca\xe4\x1d;*\x1eCMD_MAIN_GAME_EARLY_SETTLE_REQz\x19texas early settle (stub)\x12\x84\x01\n" +
 	"\fPreoperation\x12\x1c.g1.protocol.PreOperationReq\x1a\x1c.g1.protocol.PreOperationRsp\"8\xca\xe4\x1d4*\x1eCMD_MAIN_GAME_PREOPERATION_REQz\x12texas preoperation\x1a\a\xd2\xe4\x1d\x03\b\x88'BBZ@github.com/Iori372552686/GoOne/api/gen/game/mainsvr/v1;mainsvrv1b\x06proto3"
 
-var file_proto_service_mainsvrc2s_proto_goTypes = []any{
+var file_service_mainsvrc2s_proto_goTypes = []any{
 	(*protocol.LoginReq)(nil),              // 0: g1.protocol.LoginReq
 	(*protocol.LogoutReq)(nil),             // 1: g1.protocol.LogoutReq
 	(*protocol.HeartBeatReq)(nil),          // 2: g1.protocol.HeartBeatReq
@@ -93,90 +98,100 @@ var file_proto_service_mainsvrc2s_proto_goTypes = []any{
 	(*protocol.GMGetRoleReq)(nil),          // 5: g1.protocol.GMGetRoleReq
 	(*protocol.GMSetRoleReq)(nil),          // 6: g1.protocol.GMSetRoleReq
 	(*protocol.GMAddItemReq)(nil),          // 7: g1.protocol.GMAddItemReq
-	(*protocol.MallBuyPackageReq)(nil),     // 8: g1.protocol.MallBuyPackageReq
-	(*protocol.CreateRoomReq)(nil),         // 9: g1.protocol.CreateRoomReq
-	(*protocol.JoinRoomReq)(nil),           // 10: g1.protocol.JoinRoomReq
-	(*protocol.QuickStartReq)(nil),         // 11: g1.protocol.QuickStartReq
-	(*protocol.RoomListReq)(nil),           // 12: g1.protocol.RoomListReq
-	(*protocol.DoBetReq)(nil),              // 13: g1.protocol.DoBetReq
-	(*protocol.FoldReq)(nil),               // 14: g1.protocol.FoldReq
-	(*protocol.MainBuyInDetailReq)(nil),    // 15: g1.protocol.MainBuyInDetailReq
-	(*protocol.GetLookersReq)(nil),         // 16: g1.protocol.GetLookersReq
-	(*protocol.SitDownReq)(nil),            // 17: g1.protocol.SitDownReq
-	(*protocol.StandUpReq)(nil),            // 18: g1.protocol.StandUpReq
-	(*protocol.LeaveGameReq)(nil),          // 19: g1.protocol.LeaveGameReq
-	(*protocol.BuyInReq)(nil),              // 20: g1.protocol.BuyInReq
-	(*protocol.MilitarySuccessReq)(nil),    // 21: g1.protocol.MilitarySuccessReq
-	(*protocol.GetGameLogReq)(nil),         // 22: g1.protocol.GetGameLogReq
-	(*protocol.GetTimeLeftReq)(nil),        // 23: g1.protocol.GetTimeLeftReq
-	(*protocol.VoiceCallReq)(nil),          // 24: g1.protocol.VoiceCallReq
-	(*protocol.BuyThinkTimeReq)(nil),       // 25: g1.protocol.BuyThinkTimeReq
-	(*protocol.AutoBuyinReq)(nil),          // 26: g1.protocol.AutoBuyinReq
-	(*protocol.InteractionReq)(nil),        // 27: g1.protocol.InteractionReq
-	(*protocol.EmoticonReq)(nil),           // 28: g1.protocol.EmoticonReq
-	(*protocol.GetMilitaryDiagramReq)(nil), // 29: g1.protocol.GetMilitaryDiagramReq
-	(*protocol.ShowCardReq)(nil),           // 30: g1.protocol.ShowCardReq
-	(*protocol.GetPlayerInfoReq)(nil),      // 31: g1.protocol.GetPlayerInfoReq
-	(*protocol.MarkPlayerReq)(nil),         // 32: g1.protocol.MarkPlayerReq
-	(*protocol.InsuranceBuyReq)(nil),       // 33: g1.protocol.InsuranceBuyReq
-	(*protocol.RoomSetReq)(nil),            // 34: g1.protocol.RoomSetReq
-	(*protocol.SngGetBlindLevelReq)(nil),   // 35: g1.protocol.SngGetBlindLevelReq
-	(*protocol.GetRoomInfoReq)(nil),        // 36: g1.protocol.GetRoomInfoReq
-	(*protocol.InsuranceThinkTimeReq)(nil), // 37: g1.protocol.InsuranceThinkTimeReq
-	(*protocol.InsuranceOpReq)(nil),        // 38: g1.protocol.InsuranceOpReq
-	(*protocol.GetGameInfoReq)(nil),        // 39: g1.protocol.GetGameInfoReq
-	(*protocol.AddToFavoriteReq)(nil),      // 40: g1.protocol.AddToFavoriteReq
-	(*protocol.ChangeSkinReq)(nil),         // 41: g1.protocol.ChangeSkinReq
-	(*protocol.RabbitHuntingReq)(nil),      // 42: g1.protocol.RabbitHuntingReq
-	(*protocol.EarlySettleReq)(nil),        // 43: g1.protocol.EarlySettleReq
-	(*protocol.PreOperationReq)(nil),       // 44: g1.protocol.PreOperationReq
-	(*protocol.LoginRsp)(nil),              // 45: g1.protocol.LoginRsp
-	(*protocol.LogoutRsp)(nil),             // 46: g1.protocol.LogoutRsp
-	(*protocol.HeartBeatRsp)(nil),          // 47: g1.protocol.HeartBeatRsp
-	(*protocol.ChangeNameRsp)(nil),         // 48: g1.protocol.ChangeNameRsp
-	(*protocol.ChangeIconRsp)(nil),         // 49: g1.protocol.ChangeIconRsp
-	(*protocol.GMGetRoleRsp)(nil),          // 50: g1.protocol.GMGetRoleRsp
-	(*protocol.GMSetRoleRsp)(nil),          // 51: g1.protocol.GMSetRoleRsp
-	(*protocol.GMAddItemRsp)(nil),          // 52: g1.protocol.GMAddItemRsp
-	(*protocol.MallBuyPackageRsp)(nil),     // 53: g1.protocol.MallBuyPackageRsp
-	(*protocol.CreateRoomRsp)(nil),         // 54: g1.protocol.CreateRoomRsp
-	(*protocol.JoinRoomRsp)(nil),           // 55: g1.protocol.JoinRoomRsp
-	(*protocol.QuickStartRsp)(nil),         // 56: g1.protocol.QuickStartRsp
-	(*protocol.RoomListRsp)(nil),           // 57: g1.protocol.RoomListRsp
-	(*protocol.DoBetRsp)(nil),              // 58: g1.protocol.DoBetRsp
-	(*protocol.FoldRsp)(nil),               // 59: g1.protocol.FoldRsp
-	(*protocol.MainBuyInDetailRsp)(nil),    // 60: g1.protocol.MainBuyInDetailRsp
-	(*protocol.GetLookersRsp)(nil),         // 61: g1.protocol.GetLookersRsp
-	(*protocol.SitDownRsp)(nil),            // 62: g1.protocol.SitDownRsp
-	(*protocol.StandUpRsp)(nil),            // 63: g1.protocol.StandUpRsp
-	(*protocol.LeaveGameRsp)(nil),          // 64: g1.protocol.LeaveGameRsp
-	(*emptypb.Empty)(nil),                  // 65: google.protobuf.Empty
-	(*protocol.MilitarySuccessRsp)(nil),    // 66: g1.protocol.MilitarySuccessRsp
-	(*protocol.GetGameLogRsp)(nil),         // 67: g1.protocol.GetGameLogRsp
-	(*protocol.GetTimeLeftRsp)(nil),        // 68: g1.protocol.GetTimeLeftRsp
-	(*protocol.VoiceCallRsp)(nil),          // 69: g1.protocol.VoiceCallRsp
-	(*protocol.BuyThinkTimeRsp)(nil),       // 70: g1.protocol.BuyThinkTimeRsp
-	(*protocol.AutoBuyinRsp)(nil),          // 71: g1.protocol.AutoBuyinRsp
-	(*protocol.InteractionRsp)(nil),        // 72: g1.protocol.InteractionRsp
-	(*protocol.EmoticonRsp)(nil),           // 73: g1.protocol.EmoticonRsp
-	(*protocol.GetMilitaryDiagramRsp)(nil), // 74: g1.protocol.GetMilitaryDiagramRsp
-	(*protocol.ShowCardRsp)(nil),           // 75: g1.protocol.ShowCardRsp
-	(*protocol.GetPlayerInfoRsp)(nil),      // 76: g1.protocol.GetPlayerInfoRsp
-	(*protocol.MarkPlayerRsp)(nil),         // 77: g1.protocol.MarkPlayerRsp
-	(*protocol.InsuranceBuyRsp)(nil),       // 78: g1.protocol.InsuranceBuyRsp
-	(*protocol.RoomSetRsp)(nil),            // 79: g1.protocol.RoomSetRsp
-	(*protocol.SngGetBlindLevelRsp)(nil),   // 80: g1.protocol.SngGetBlindLevelRsp
-	(*protocol.GetRoomInfoRsp)(nil),        // 81: g1.protocol.GetRoomInfoRsp
-	(*protocol.InsuranceThinkTimeRsp)(nil), // 82: g1.protocol.InsuranceThinkTimeRsp
-	(*protocol.InsuranceOpRsp)(nil),        // 83: g1.protocol.InsuranceOpRsp
-	(*protocol.GetGameInfoRsp)(nil),        // 84: g1.protocol.GetGameInfoRsp
-	(*protocol.AddToFavoriteRsp)(nil),      // 85: g1.protocol.AddToFavoriteRsp
-	(*protocol.ChangeSkinRsp)(nil),         // 86: g1.protocol.ChangeSkinRsp
-	(*protocol.RabbitHuntingRsp)(nil),      // 87: g1.protocol.RabbitHuntingRsp
-	(*protocol.EarlySettleRsp)(nil),        // 88: g1.protocol.EarlySettleRsp
-	(*protocol.PreOperationRsp)(nil),       // 89: g1.protocol.PreOperationRsp
+	(*protocol.UseItemReq)(nil),            // 8: g1.protocol.UseItemReq
+	(*protocol.SellItemReq)(nil),           // 9: g1.protocol.SellItemReq
+	(*protocol.DecomposeItemReq)(nil),      // 10: g1.protocol.DecomposeItemReq
+	(*protocol.QueryBackpackReq)(nil),      // 11: g1.protocol.QueryBackpackReq
+	(*protocol.BatchAddItemReq)(nil),       // 12: g1.protocol.BatchAddItemReq
+	(*protocol.MallBuyPackageReq)(nil),     // 13: g1.protocol.MallBuyPackageReq
+	(*protocol.CreateRoomReq)(nil),         // 14: g1.protocol.CreateRoomReq
+	(*protocol.JoinRoomReq)(nil),           // 15: g1.protocol.JoinRoomReq
+	(*protocol.QuickStartReq)(nil),         // 16: g1.protocol.QuickStartReq
+	(*protocol.RoomListReq)(nil),           // 17: g1.protocol.RoomListReq
+	(*protocol.DoBetReq)(nil),              // 18: g1.protocol.DoBetReq
+	(*protocol.FoldReq)(nil),               // 19: g1.protocol.FoldReq
+	(*protocol.MainBuyInDetailReq)(nil),    // 20: g1.protocol.MainBuyInDetailReq
+	(*protocol.GetLookersReq)(nil),         // 21: g1.protocol.GetLookersReq
+	(*protocol.SitDownReq)(nil),            // 22: g1.protocol.SitDownReq
+	(*protocol.StandUpReq)(nil),            // 23: g1.protocol.StandUpReq
+	(*protocol.LeaveGameReq)(nil),          // 24: g1.protocol.LeaveGameReq
+	(*protocol.BuyInReq)(nil),              // 25: g1.protocol.BuyInReq
+	(*protocol.MilitarySuccessReq)(nil),    // 26: g1.protocol.MilitarySuccessReq
+	(*protocol.GetGameLogReq)(nil),         // 27: g1.protocol.GetGameLogReq
+	(*protocol.GetTimeLeftReq)(nil),        // 28: g1.protocol.GetTimeLeftReq
+	(*protocol.VoiceCallReq)(nil),          // 29: g1.protocol.VoiceCallReq
+	(*protocol.BuyThinkTimeReq)(nil),       // 30: g1.protocol.BuyThinkTimeReq
+	(*protocol.AutoBuyinReq)(nil),          // 31: g1.protocol.AutoBuyinReq
+	(*protocol.InteractionReq)(nil),        // 32: g1.protocol.InteractionReq
+	(*protocol.EmoticonReq)(nil),           // 33: g1.protocol.EmoticonReq
+	(*protocol.GetMilitaryDiagramReq)(nil), // 34: g1.protocol.GetMilitaryDiagramReq
+	(*protocol.ShowCardReq)(nil),           // 35: g1.protocol.ShowCardReq
+	(*protocol.GetPlayerInfoReq)(nil),      // 36: g1.protocol.GetPlayerInfoReq
+	(*protocol.MarkPlayerReq)(nil),         // 37: g1.protocol.MarkPlayerReq
+	(*protocol.InsuranceBuyReq)(nil),       // 38: g1.protocol.InsuranceBuyReq
+	(*protocol.RoomSetReq)(nil),            // 39: g1.protocol.RoomSetReq
+	(*protocol.SngGetBlindLevelReq)(nil),   // 40: g1.protocol.SngGetBlindLevelReq
+	(*protocol.GetRoomInfoReq)(nil),        // 41: g1.protocol.GetRoomInfoReq
+	(*protocol.InsuranceThinkTimeReq)(nil), // 42: g1.protocol.InsuranceThinkTimeReq
+	(*protocol.InsuranceOpReq)(nil),        // 43: g1.protocol.InsuranceOpReq
+	(*protocol.GetGameInfoReq)(nil),        // 44: g1.protocol.GetGameInfoReq
+	(*protocol.AddToFavoriteReq)(nil),      // 45: g1.protocol.AddToFavoriteReq
+	(*protocol.ChangeSkinReq)(nil),         // 46: g1.protocol.ChangeSkinReq
+	(*protocol.RabbitHuntingReq)(nil),      // 47: g1.protocol.RabbitHuntingReq
+	(*protocol.EarlySettleReq)(nil),        // 48: g1.protocol.EarlySettleReq
+	(*protocol.PreOperationReq)(nil),       // 49: g1.protocol.PreOperationReq
+	(*protocol.LoginRsp)(nil),              // 50: g1.protocol.LoginRsp
+	(*protocol.LogoutRsp)(nil),             // 51: g1.protocol.LogoutRsp
+	(*protocol.HeartBeatRsp)(nil),          // 52: g1.protocol.HeartBeatRsp
+	(*protocol.ChangeNameRsp)(nil),         // 53: g1.protocol.ChangeNameRsp
+	(*protocol.ChangeIconRsp)(nil),         // 54: g1.protocol.ChangeIconRsp
+	(*protocol.GMGetRoleRsp)(nil),          // 55: g1.protocol.GMGetRoleRsp
+	(*protocol.GMSetRoleRsp)(nil),          // 56: g1.protocol.GMSetRoleRsp
+	(*protocol.GMAddItemRsp)(nil),          // 57: g1.protocol.GMAddItemRsp
+	(*protocol.UseItemRsp)(nil),            // 58: g1.protocol.UseItemRsp
+	(*protocol.SellItemRsp)(nil),           // 59: g1.protocol.SellItemRsp
+	(*protocol.DecomposeItemRsp)(nil),      // 60: g1.protocol.DecomposeItemRsp
+	(*protocol.QueryBackpackRsp)(nil),      // 61: g1.protocol.QueryBackpackRsp
+	(*protocol.BatchAddItemRsp)(nil),       // 62: g1.protocol.BatchAddItemRsp
+	(*protocol.MallBuyPackageRsp)(nil),     // 63: g1.protocol.MallBuyPackageRsp
+	(*protocol.CreateRoomRsp)(nil),         // 64: g1.protocol.CreateRoomRsp
+	(*protocol.JoinRoomRsp)(nil),           // 65: g1.protocol.JoinRoomRsp
+	(*protocol.QuickStartRsp)(nil),         // 66: g1.protocol.QuickStartRsp
+	(*protocol.RoomListRsp)(nil),           // 67: g1.protocol.RoomListRsp
+	(*protocol.DoBetRsp)(nil),              // 68: g1.protocol.DoBetRsp
+	(*protocol.FoldRsp)(nil),               // 69: g1.protocol.FoldRsp
+	(*protocol.MainBuyInDetailRsp)(nil),    // 70: g1.protocol.MainBuyInDetailRsp
+	(*protocol.GetLookersRsp)(nil),         // 71: g1.protocol.GetLookersRsp
+	(*protocol.SitDownRsp)(nil),            // 72: g1.protocol.SitDownRsp
+	(*protocol.StandUpRsp)(nil),            // 73: g1.protocol.StandUpRsp
+	(*protocol.LeaveGameRsp)(nil),          // 74: g1.protocol.LeaveGameRsp
+	(*emptypb.Empty)(nil),                  // 75: google.protobuf.Empty
+	(*protocol.MilitarySuccessRsp)(nil),    // 76: g1.protocol.MilitarySuccessRsp
+	(*protocol.GetGameLogRsp)(nil),         // 77: g1.protocol.GetGameLogRsp
+	(*protocol.GetTimeLeftRsp)(nil),        // 78: g1.protocol.GetTimeLeftRsp
+	(*protocol.VoiceCallRsp)(nil),          // 79: g1.protocol.VoiceCallRsp
+	(*protocol.BuyThinkTimeRsp)(nil),       // 80: g1.protocol.BuyThinkTimeRsp
+	(*protocol.AutoBuyinRsp)(nil),          // 81: g1.protocol.AutoBuyinRsp
+	(*protocol.InteractionRsp)(nil),        // 82: g1.protocol.InteractionRsp
+	(*protocol.EmoticonRsp)(nil),           // 83: g1.protocol.EmoticonRsp
+	(*protocol.GetMilitaryDiagramRsp)(nil), // 84: g1.protocol.GetMilitaryDiagramRsp
+	(*protocol.ShowCardRsp)(nil),           // 85: g1.protocol.ShowCardRsp
+	(*protocol.GetPlayerInfoRsp)(nil),      // 86: g1.protocol.GetPlayerInfoRsp
+	(*protocol.MarkPlayerRsp)(nil),         // 87: g1.protocol.MarkPlayerRsp
+	(*protocol.InsuranceBuyRsp)(nil),       // 88: g1.protocol.InsuranceBuyRsp
+	(*protocol.RoomSetRsp)(nil),            // 89: g1.protocol.RoomSetRsp
+	(*protocol.SngGetBlindLevelRsp)(nil),   // 90: g1.protocol.SngGetBlindLevelRsp
+	(*protocol.GetRoomInfoRsp)(nil),        // 91: g1.protocol.GetRoomInfoRsp
+	(*protocol.InsuranceThinkTimeRsp)(nil), // 92: g1.protocol.InsuranceThinkTimeRsp
+	(*protocol.InsuranceOpRsp)(nil),        // 93: g1.protocol.InsuranceOpRsp
+	(*protocol.GetGameInfoRsp)(nil),        // 94: g1.protocol.GetGameInfoRsp
+	(*protocol.AddToFavoriteRsp)(nil),      // 95: g1.protocol.AddToFavoriteRsp
+	(*protocol.ChangeSkinRsp)(nil),         // 96: g1.protocol.ChangeSkinRsp
+	(*protocol.RabbitHuntingRsp)(nil),      // 97: g1.protocol.RabbitHuntingRsp
+	(*protocol.EarlySettleRsp)(nil),        // 98: g1.protocol.EarlySettleRsp
+	(*protocol.PreOperationRsp)(nil),       // 99: g1.protocol.PreOperationRsp
 }
-var file_proto_service_mainsvrc2s_proto_depIdxs = []int32{
+var file_service_mainsvrc2s_proto_depIdxs = []int32{
 	0,  // 0: game.mainsvr.v1.MainC2SService.Login:input_type -> g1.protocol.LoginReq
 	1,  // 1: game.mainsvr.v1.MainC2SService.Logout:input_type -> g1.protocol.LogoutReq
 	2,  // 2: game.mainsvr.v1.MainC2SService.HeartBeat:input_type -> g1.protocol.HeartBeatReq
@@ -185,114 +200,124 @@ var file_proto_service_mainsvrc2s_proto_depIdxs = []int32{
 	5,  // 5: game.mainsvr.v1.MainC2SService.GmGetRole:input_type -> g1.protocol.GMGetRoleReq
 	6,  // 6: game.mainsvr.v1.MainC2SService.GmSetRole:input_type -> g1.protocol.GMSetRoleReq
 	7,  // 7: game.mainsvr.v1.MainC2SService.GmAddItem:input_type -> g1.protocol.GMAddItemReq
-	8,  // 8: game.mainsvr.v1.MainC2SService.MallBuyPackage:input_type -> g1.protocol.MallBuyPackageReq
-	9,  // 9: game.mainsvr.v1.MainC2SService.CreateRoom:input_type -> g1.protocol.CreateRoomReq
-	10, // 10: game.mainsvr.v1.MainC2SService.JoinRoom:input_type -> g1.protocol.JoinRoomReq
-	11, // 11: game.mainsvr.v1.MainC2SService.QuickStart:input_type -> g1.protocol.QuickStartReq
-	12, // 12: game.mainsvr.v1.MainC2SService.GetRoomList:input_type -> g1.protocol.RoomListReq
-	13, // 13: game.mainsvr.v1.MainC2SService.DoBet:input_type -> g1.protocol.DoBetReq
-	14, // 14: game.mainsvr.v1.MainC2SService.Fold:input_type -> g1.protocol.FoldReq
-	15, // 15: game.mainsvr.v1.MainC2SService.MainBuyInDetail:input_type -> g1.protocol.MainBuyInDetailReq
-	16, // 16: game.mainsvr.v1.MainC2SService.GetLookers:input_type -> g1.protocol.GetLookersReq
-	17, // 17: game.mainsvr.v1.MainC2SService.SitDown:input_type -> g1.protocol.SitDownReq
-	18, // 18: game.mainsvr.v1.MainC2SService.StandUp:input_type -> g1.protocol.StandUpReq
-	19, // 19: game.mainsvr.v1.MainC2SService.LeaveGame:input_type -> g1.protocol.LeaveGameReq
-	20, // 20: game.mainsvr.v1.MainC2SService.BuyIn:input_type -> g1.protocol.BuyInReq
-	21, // 21: game.mainsvr.v1.MainC2SService.MilitarySuccess:input_type -> g1.protocol.MilitarySuccessReq
-	22, // 22: game.mainsvr.v1.MainC2SService.GetGameLog:input_type -> g1.protocol.GetGameLogReq
-	23, // 23: game.mainsvr.v1.MainC2SService.GetTimeLeft:input_type -> g1.protocol.GetTimeLeftReq
-	24, // 24: game.mainsvr.v1.MainC2SService.VoiceCall:input_type -> g1.protocol.VoiceCallReq
-	25, // 25: game.mainsvr.v1.MainC2SService.BuyThinkTime:input_type -> g1.protocol.BuyThinkTimeReq
-	26, // 26: game.mainsvr.v1.MainC2SService.AutoBuyin:input_type -> g1.protocol.AutoBuyinReq
-	27, // 27: game.mainsvr.v1.MainC2SService.Interaction:input_type -> g1.protocol.InteractionReq
-	28, // 28: game.mainsvr.v1.MainC2SService.Emoticon:input_type -> g1.protocol.EmoticonReq
-	29, // 29: game.mainsvr.v1.MainC2SService.GetMilitaryDiagram:input_type -> g1.protocol.GetMilitaryDiagramReq
-	30, // 30: game.mainsvr.v1.MainC2SService.ShowCard:input_type -> g1.protocol.ShowCardReq
-	31, // 31: game.mainsvr.v1.MainC2SService.GetPlayerInfo:input_type -> g1.protocol.GetPlayerInfoReq
-	32, // 32: game.mainsvr.v1.MainC2SService.MarkPlayer:input_type -> g1.protocol.MarkPlayerReq
-	33, // 33: game.mainsvr.v1.MainC2SService.InsuranceBuy:input_type -> g1.protocol.InsuranceBuyReq
-	34, // 34: game.mainsvr.v1.MainC2SService.RoomSet:input_type -> g1.protocol.RoomSetReq
-	35, // 35: game.mainsvr.v1.MainC2SService.SngGetBlindLevel:input_type -> g1.protocol.SngGetBlindLevelReq
-	36, // 36: game.mainsvr.v1.MainC2SService.GetRoomInfo:input_type -> g1.protocol.GetRoomInfoReq
-	37, // 37: game.mainsvr.v1.MainC2SService.InsuranceThinkTime:input_type -> g1.protocol.InsuranceThinkTimeReq
-	38, // 38: game.mainsvr.v1.MainC2SService.InsuranceOp:input_type -> g1.protocol.InsuranceOpReq
-	39, // 39: game.mainsvr.v1.MainC2SService.GetGameInfo:input_type -> g1.protocol.GetGameInfoReq
-	40, // 40: game.mainsvr.v1.MainC2SService.AddToFavorite:input_type -> g1.protocol.AddToFavoriteReq
-	41, // 41: game.mainsvr.v1.MainC2SService.ChangeSkin:input_type -> g1.protocol.ChangeSkinReq
-	42, // 42: game.mainsvr.v1.MainC2SService.RabbitHunting:input_type -> g1.protocol.RabbitHuntingReq
-	43, // 43: game.mainsvr.v1.MainC2SService.EarlySettle:input_type -> g1.protocol.EarlySettleReq
-	44, // 44: game.mainsvr.v1.MainC2SService.Preoperation:input_type -> g1.protocol.PreOperationReq
-	45, // 45: game.mainsvr.v1.MainC2SService.Login:output_type -> g1.protocol.LoginRsp
-	46, // 46: game.mainsvr.v1.MainC2SService.Logout:output_type -> g1.protocol.LogoutRsp
-	47, // 47: game.mainsvr.v1.MainC2SService.HeartBeat:output_type -> g1.protocol.HeartBeatRsp
-	48, // 48: game.mainsvr.v1.MainC2SService.ChangeName:output_type -> g1.protocol.ChangeNameRsp
-	49, // 49: game.mainsvr.v1.MainC2SService.ChangeIcon:output_type -> g1.protocol.ChangeIconRsp
-	50, // 50: game.mainsvr.v1.MainC2SService.GmGetRole:output_type -> g1.protocol.GMGetRoleRsp
-	51, // 51: game.mainsvr.v1.MainC2SService.GmSetRole:output_type -> g1.protocol.GMSetRoleRsp
-	52, // 52: game.mainsvr.v1.MainC2SService.GmAddItem:output_type -> g1.protocol.GMAddItemRsp
-	53, // 53: game.mainsvr.v1.MainC2SService.MallBuyPackage:output_type -> g1.protocol.MallBuyPackageRsp
-	54, // 54: game.mainsvr.v1.MainC2SService.CreateRoom:output_type -> g1.protocol.CreateRoomRsp
-	55, // 55: game.mainsvr.v1.MainC2SService.JoinRoom:output_type -> g1.protocol.JoinRoomRsp
-	56, // 56: game.mainsvr.v1.MainC2SService.QuickStart:output_type -> g1.protocol.QuickStartRsp
-	57, // 57: game.mainsvr.v1.MainC2SService.GetRoomList:output_type -> g1.protocol.RoomListRsp
-	58, // 58: game.mainsvr.v1.MainC2SService.DoBet:output_type -> g1.protocol.DoBetRsp
-	59, // 59: game.mainsvr.v1.MainC2SService.Fold:output_type -> g1.protocol.FoldRsp
-	60, // 60: game.mainsvr.v1.MainC2SService.MainBuyInDetail:output_type -> g1.protocol.MainBuyInDetailRsp
-	61, // 61: game.mainsvr.v1.MainC2SService.GetLookers:output_type -> g1.protocol.GetLookersRsp
-	62, // 62: game.mainsvr.v1.MainC2SService.SitDown:output_type -> g1.protocol.SitDownRsp
-	63, // 63: game.mainsvr.v1.MainC2SService.StandUp:output_type -> g1.protocol.StandUpRsp
-	64, // 64: game.mainsvr.v1.MainC2SService.LeaveGame:output_type -> g1.protocol.LeaveGameRsp
-	65, // 65: game.mainsvr.v1.MainC2SService.BuyIn:output_type -> google.protobuf.Empty
-	66, // 66: game.mainsvr.v1.MainC2SService.MilitarySuccess:output_type -> g1.protocol.MilitarySuccessRsp
-	67, // 67: game.mainsvr.v1.MainC2SService.GetGameLog:output_type -> g1.protocol.GetGameLogRsp
-	68, // 68: game.mainsvr.v1.MainC2SService.GetTimeLeft:output_type -> g1.protocol.GetTimeLeftRsp
-	69, // 69: game.mainsvr.v1.MainC2SService.VoiceCall:output_type -> g1.protocol.VoiceCallRsp
-	70, // 70: game.mainsvr.v1.MainC2SService.BuyThinkTime:output_type -> g1.protocol.BuyThinkTimeRsp
-	71, // 71: game.mainsvr.v1.MainC2SService.AutoBuyin:output_type -> g1.protocol.AutoBuyinRsp
-	72, // 72: game.mainsvr.v1.MainC2SService.Interaction:output_type -> g1.protocol.InteractionRsp
-	73, // 73: game.mainsvr.v1.MainC2SService.Emoticon:output_type -> g1.protocol.EmoticonRsp
-	74, // 74: game.mainsvr.v1.MainC2SService.GetMilitaryDiagram:output_type -> g1.protocol.GetMilitaryDiagramRsp
-	75, // 75: game.mainsvr.v1.MainC2SService.ShowCard:output_type -> g1.protocol.ShowCardRsp
-	76, // 76: game.mainsvr.v1.MainC2SService.GetPlayerInfo:output_type -> g1.protocol.GetPlayerInfoRsp
-	77, // 77: game.mainsvr.v1.MainC2SService.MarkPlayer:output_type -> g1.protocol.MarkPlayerRsp
-	78, // 78: game.mainsvr.v1.MainC2SService.InsuranceBuy:output_type -> g1.protocol.InsuranceBuyRsp
-	79, // 79: game.mainsvr.v1.MainC2SService.RoomSet:output_type -> g1.protocol.RoomSetRsp
-	80, // 80: game.mainsvr.v1.MainC2SService.SngGetBlindLevel:output_type -> g1.protocol.SngGetBlindLevelRsp
-	81, // 81: game.mainsvr.v1.MainC2SService.GetRoomInfo:output_type -> g1.protocol.GetRoomInfoRsp
-	82, // 82: game.mainsvr.v1.MainC2SService.InsuranceThinkTime:output_type -> g1.protocol.InsuranceThinkTimeRsp
-	83, // 83: game.mainsvr.v1.MainC2SService.InsuranceOp:output_type -> g1.protocol.InsuranceOpRsp
-	84, // 84: game.mainsvr.v1.MainC2SService.GetGameInfo:output_type -> g1.protocol.GetGameInfoRsp
-	85, // 85: game.mainsvr.v1.MainC2SService.AddToFavorite:output_type -> g1.protocol.AddToFavoriteRsp
-	86, // 86: game.mainsvr.v1.MainC2SService.ChangeSkin:output_type -> g1.protocol.ChangeSkinRsp
-	87, // 87: game.mainsvr.v1.MainC2SService.RabbitHunting:output_type -> g1.protocol.RabbitHuntingRsp
-	88, // 88: game.mainsvr.v1.MainC2SService.EarlySettle:output_type -> g1.protocol.EarlySettleRsp
-	89, // 89: game.mainsvr.v1.MainC2SService.Preoperation:output_type -> g1.protocol.PreOperationRsp
-	45, // [45:90] is the sub-list for method output_type
-	0,  // [0:45] is the sub-list for method input_type
+	8,  // 8: game.mainsvr.v1.MainC2SService.UseItem:input_type -> g1.protocol.UseItemReq
+	9,  // 9: game.mainsvr.v1.MainC2SService.SellItem:input_type -> g1.protocol.SellItemReq
+	10, // 10: game.mainsvr.v1.MainC2SService.DecomposeItem:input_type -> g1.protocol.DecomposeItemReq
+	11, // 11: game.mainsvr.v1.MainC2SService.QueryBackpack:input_type -> g1.protocol.QueryBackpackReq
+	12, // 12: game.mainsvr.v1.MainC2SService.BatchAddItem:input_type -> g1.protocol.BatchAddItemReq
+	13, // 13: game.mainsvr.v1.MainC2SService.MallBuyPackage:input_type -> g1.protocol.MallBuyPackageReq
+	14, // 14: game.mainsvr.v1.MainC2SService.CreateRoom:input_type -> g1.protocol.CreateRoomReq
+	15, // 15: game.mainsvr.v1.MainC2SService.JoinRoom:input_type -> g1.protocol.JoinRoomReq
+	16, // 16: game.mainsvr.v1.MainC2SService.QuickStart:input_type -> g1.protocol.QuickStartReq
+	17, // 17: game.mainsvr.v1.MainC2SService.GetRoomList:input_type -> g1.protocol.RoomListReq
+	18, // 18: game.mainsvr.v1.MainC2SService.DoBet:input_type -> g1.protocol.DoBetReq
+	19, // 19: game.mainsvr.v1.MainC2SService.Fold:input_type -> g1.protocol.FoldReq
+	20, // 20: game.mainsvr.v1.MainC2SService.MainBuyInDetail:input_type -> g1.protocol.MainBuyInDetailReq
+	21, // 21: game.mainsvr.v1.MainC2SService.GetLookers:input_type -> g1.protocol.GetLookersReq
+	22, // 22: game.mainsvr.v1.MainC2SService.SitDown:input_type -> g1.protocol.SitDownReq
+	23, // 23: game.mainsvr.v1.MainC2SService.StandUp:input_type -> g1.protocol.StandUpReq
+	24, // 24: game.mainsvr.v1.MainC2SService.LeaveGame:input_type -> g1.protocol.LeaveGameReq
+	25, // 25: game.mainsvr.v1.MainC2SService.BuyIn:input_type -> g1.protocol.BuyInReq
+	26, // 26: game.mainsvr.v1.MainC2SService.MilitarySuccess:input_type -> g1.protocol.MilitarySuccessReq
+	27, // 27: game.mainsvr.v1.MainC2SService.GetGameLog:input_type -> g1.protocol.GetGameLogReq
+	28, // 28: game.mainsvr.v1.MainC2SService.GetTimeLeft:input_type -> g1.protocol.GetTimeLeftReq
+	29, // 29: game.mainsvr.v1.MainC2SService.VoiceCall:input_type -> g1.protocol.VoiceCallReq
+	30, // 30: game.mainsvr.v1.MainC2SService.BuyThinkTime:input_type -> g1.protocol.BuyThinkTimeReq
+	31, // 31: game.mainsvr.v1.MainC2SService.AutoBuyin:input_type -> g1.protocol.AutoBuyinReq
+	32, // 32: game.mainsvr.v1.MainC2SService.Interaction:input_type -> g1.protocol.InteractionReq
+	33, // 33: game.mainsvr.v1.MainC2SService.Emoticon:input_type -> g1.protocol.EmoticonReq
+	34, // 34: game.mainsvr.v1.MainC2SService.GetMilitaryDiagram:input_type -> g1.protocol.GetMilitaryDiagramReq
+	35, // 35: game.mainsvr.v1.MainC2SService.ShowCard:input_type -> g1.protocol.ShowCardReq
+	36, // 36: game.mainsvr.v1.MainC2SService.GetPlayerInfo:input_type -> g1.protocol.GetPlayerInfoReq
+	37, // 37: game.mainsvr.v1.MainC2SService.MarkPlayer:input_type -> g1.protocol.MarkPlayerReq
+	38, // 38: game.mainsvr.v1.MainC2SService.InsuranceBuy:input_type -> g1.protocol.InsuranceBuyReq
+	39, // 39: game.mainsvr.v1.MainC2SService.RoomSet:input_type -> g1.protocol.RoomSetReq
+	40, // 40: game.mainsvr.v1.MainC2SService.SngGetBlindLevel:input_type -> g1.protocol.SngGetBlindLevelReq
+	41, // 41: game.mainsvr.v1.MainC2SService.GetRoomInfo:input_type -> g1.protocol.GetRoomInfoReq
+	42, // 42: game.mainsvr.v1.MainC2SService.InsuranceThinkTime:input_type -> g1.protocol.InsuranceThinkTimeReq
+	43, // 43: game.mainsvr.v1.MainC2SService.InsuranceOp:input_type -> g1.protocol.InsuranceOpReq
+	44, // 44: game.mainsvr.v1.MainC2SService.GetGameInfo:input_type -> g1.protocol.GetGameInfoReq
+	45, // 45: game.mainsvr.v1.MainC2SService.AddToFavorite:input_type -> g1.protocol.AddToFavoriteReq
+	46, // 46: game.mainsvr.v1.MainC2SService.ChangeSkin:input_type -> g1.protocol.ChangeSkinReq
+	47, // 47: game.mainsvr.v1.MainC2SService.RabbitHunting:input_type -> g1.protocol.RabbitHuntingReq
+	48, // 48: game.mainsvr.v1.MainC2SService.EarlySettle:input_type -> g1.protocol.EarlySettleReq
+	49, // 49: game.mainsvr.v1.MainC2SService.Preoperation:input_type -> g1.protocol.PreOperationReq
+	50, // 50: game.mainsvr.v1.MainC2SService.Login:output_type -> g1.protocol.LoginRsp
+	51, // 51: game.mainsvr.v1.MainC2SService.Logout:output_type -> g1.protocol.LogoutRsp
+	52, // 52: game.mainsvr.v1.MainC2SService.HeartBeat:output_type -> g1.protocol.HeartBeatRsp
+	53, // 53: game.mainsvr.v1.MainC2SService.ChangeName:output_type -> g1.protocol.ChangeNameRsp
+	54, // 54: game.mainsvr.v1.MainC2SService.ChangeIcon:output_type -> g1.protocol.ChangeIconRsp
+	55, // 55: game.mainsvr.v1.MainC2SService.GmGetRole:output_type -> g1.protocol.GMGetRoleRsp
+	56, // 56: game.mainsvr.v1.MainC2SService.GmSetRole:output_type -> g1.protocol.GMSetRoleRsp
+	57, // 57: game.mainsvr.v1.MainC2SService.GmAddItem:output_type -> g1.protocol.GMAddItemRsp
+	58, // 58: game.mainsvr.v1.MainC2SService.UseItem:output_type -> g1.protocol.UseItemRsp
+	59, // 59: game.mainsvr.v1.MainC2SService.SellItem:output_type -> g1.protocol.SellItemRsp
+	60, // 60: game.mainsvr.v1.MainC2SService.DecomposeItem:output_type -> g1.protocol.DecomposeItemRsp
+	61, // 61: game.mainsvr.v1.MainC2SService.QueryBackpack:output_type -> g1.protocol.QueryBackpackRsp
+	62, // 62: game.mainsvr.v1.MainC2SService.BatchAddItem:output_type -> g1.protocol.BatchAddItemRsp
+	63, // 63: game.mainsvr.v1.MainC2SService.MallBuyPackage:output_type -> g1.protocol.MallBuyPackageRsp
+	64, // 64: game.mainsvr.v1.MainC2SService.CreateRoom:output_type -> g1.protocol.CreateRoomRsp
+	65, // 65: game.mainsvr.v1.MainC2SService.JoinRoom:output_type -> g1.protocol.JoinRoomRsp
+	66, // 66: game.mainsvr.v1.MainC2SService.QuickStart:output_type -> g1.protocol.QuickStartRsp
+	67, // 67: game.mainsvr.v1.MainC2SService.GetRoomList:output_type -> g1.protocol.RoomListRsp
+	68, // 68: game.mainsvr.v1.MainC2SService.DoBet:output_type -> g1.protocol.DoBetRsp
+	69, // 69: game.mainsvr.v1.MainC2SService.Fold:output_type -> g1.protocol.FoldRsp
+	70, // 70: game.mainsvr.v1.MainC2SService.MainBuyInDetail:output_type -> g1.protocol.MainBuyInDetailRsp
+	71, // 71: game.mainsvr.v1.MainC2SService.GetLookers:output_type -> g1.protocol.GetLookersRsp
+	72, // 72: game.mainsvr.v1.MainC2SService.SitDown:output_type -> g1.protocol.SitDownRsp
+	73, // 73: game.mainsvr.v1.MainC2SService.StandUp:output_type -> g1.protocol.StandUpRsp
+	74, // 74: game.mainsvr.v1.MainC2SService.LeaveGame:output_type -> g1.protocol.LeaveGameRsp
+	75, // 75: game.mainsvr.v1.MainC2SService.BuyIn:output_type -> google.protobuf.Empty
+	76, // 76: game.mainsvr.v1.MainC2SService.MilitarySuccess:output_type -> g1.protocol.MilitarySuccessRsp
+	77, // 77: game.mainsvr.v1.MainC2SService.GetGameLog:output_type -> g1.protocol.GetGameLogRsp
+	78, // 78: game.mainsvr.v1.MainC2SService.GetTimeLeft:output_type -> g1.protocol.GetTimeLeftRsp
+	79, // 79: game.mainsvr.v1.MainC2SService.VoiceCall:output_type -> g1.protocol.VoiceCallRsp
+	80, // 80: game.mainsvr.v1.MainC2SService.BuyThinkTime:output_type -> g1.protocol.BuyThinkTimeRsp
+	81, // 81: game.mainsvr.v1.MainC2SService.AutoBuyin:output_type -> g1.protocol.AutoBuyinRsp
+	82, // 82: game.mainsvr.v1.MainC2SService.Interaction:output_type -> g1.protocol.InteractionRsp
+	83, // 83: game.mainsvr.v1.MainC2SService.Emoticon:output_type -> g1.protocol.EmoticonRsp
+	84, // 84: game.mainsvr.v1.MainC2SService.GetMilitaryDiagram:output_type -> g1.protocol.GetMilitaryDiagramRsp
+	85, // 85: game.mainsvr.v1.MainC2SService.ShowCard:output_type -> g1.protocol.ShowCardRsp
+	86, // 86: game.mainsvr.v1.MainC2SService.GetPlayerInfo:output_type -> g1.protocol.GetPlayerInfoRsp
+	87, // 87: game.mainsvr.v1.MainC2SService.MarkPlayer:output_type -> g1.protocol.MarkPlayerRsp
+	88, // 88: game.mainsvr.v1.MainC2SService.InsuranceBuy:output_type -> g1.protocol.InsuranceBuyRsp
+	89, // 89: game.mainsvr.v1.MainC2SService.RoomSet:output_type -> g1.protocol.RoomSetRsp
+	90, // 90: game.mainsvr.v1.MainC2SService.SngGetBlindLevel:output_type -> g1.protocol.SngGetBlindLevelRsp
+	91, // 91: game.mainsvr.v1.MainC2SService.GetRoomInfo:output_type -> g1.protocol.GetRoomInfoRsp
+	92, // 92: game.mainsvr.v1.MainC2SService.InsuranceThinkTime:output_type -> g1.protocol.InsuranceThinkTimeRsp
+	93, // 93: game.mainsvr.v1.MainC2SService.InsuranceOp:output_type -> g1.protocol.InsuranceOpRsp
+	94, // 94: game.mainsvr.v1.MainC2SService.GetGameInfo:output_type -> g1.protocol.GetGameInfoRsp
+	95, // 95: game.mainsvr.v1.MainC2SService.AddToFavorite:output_type -> g1.protocol.AddToFavoriteRsp
+	96, // 96: game.mainsvr.v1.MainC2SService.ChangeSkin:output_type -> g1.protocol.ChangeSkinRsp
+	97, // 97: game.mainsvr.v1.MainC2SService.RabbitHunting:output_type -> g1.protocol.RabbitHuntingRsp
+	98, // 98: game.mainsvr.v1.MainC2SService.EarlySettle:output_type -> g1.protocol.EarlySettleRsp
+	99, // 99: game.mainsvr.v1.MainC2SService.Preoperation:output_type -> g1.protocol.PreOperationRsp
+	50, // [50:100] is the sub-list for method output_type
+	0,  // [0:50] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_proto_service_mainsvrc2s_proto_init() }
-func file_proto_service_mainsvrc2s_proto_init() {
-	if File_proto_service_mainsvrc2s_proto != nil {
+func init() { file_service_mainsvrc2s_proto_init() }
+func file_service_mainsvrc2s_proto_init() {
+	if File_service_mainsvrc2s_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_service_mainsvrc2s_proto_rawDesc), len(file_proto_service_mainsvrc2s_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_service_mainsvrc2s_proto_rawDesc), len(file_service_mainsvrc2s_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   0,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_service_mainsvrc2s_proto_goTypes,
-		DependencyIndexes: file_proto_service_mainsvrc2s_proto_depIdxs,
+		GoTypes:           file_service_mainsvrc2s_proto_goTypes,
+		DependencyIndexes: file_service_mainsvrc2s_proto_depIdxs,
 	}.Build()
-	File_proto_service_mainsvrc2s_proto = out.File
-	file_proto_service_mainsvrc2s_proto_goTypes = nil
-	file_proto_service_mainsvrc2s_proto_depIdxs = nil
+	File_service_mainsvrc2s_proto = out.File
+	file_service_mainsvrc2s_proto_goTypes = nil
+	file_service_mainsvrc2s_proto_depIdxs = nil
 }
