@@ -120,6 +120,12 @@ func SaveProto() error {
 	}
 
 	for fileName, data := range manager.GetProtoMap() {
+		// 外部 proto（-proto-src 载入）只参与类型解析，不输出到 -proto 目录；
+		// 否则会把 core/service/storage proto 复制进配置 proto 目录，
+		// 后续 protoc 编译时会与 core/ 原文件重复定义而失败。
+		if manager.IsExternalProto(fileName) {
+			continue
+		}
 		if err := base.Save(domain.ProtoPath, fileName, []byte(data)); err != nil {
 			return errs.Wrap(err, fileName, "", "", 0, "保存错误", "保存proto失败")
 		}

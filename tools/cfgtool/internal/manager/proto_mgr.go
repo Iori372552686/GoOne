@@ -27,6 +27,12 @@ var (
 	// pb.XXX 语法解析后，XXX 在此查表。
 	externalMsgMgr  = make(map[string]*ExternalType)
 	externalEnumMgr = make(map[string]*ExternalType)
+
+	// externalProtoKeys 记录从 -proto-src 载入的外部 proto key。
+	// 它们只参与类型解析（protoMgr/ParseProto），不应输出到 -proto 目录——
+	// 否则会把 core/service/storage proto 复制进配置 proto 目录，
+	// 后续 protoc 编译时与 core/ 原文件重复定义而失败。
+	externalProtoKeys = make(map[string]struct{})
 )
 
 // ExternalType 描述一个外部 proto 定义的 message 或 enum。
@@ -54,6 +60,7 @@ func Clear() {
 	descMap = make(map[string]*desc.FileDescriptor)
 	externalMsgMgr = make(map[string]*ExternalType)
 	externalEnumMgr = make(map[string]*ExternalType)
+	externalProtoKeys = make(map[string]struct{})
 
 	// table_mgr
 	tableMgr = make(map[string]*base.Table)
@@ -89,6 +96,13 @@ func AddProto(file string, buf *bytes.Buffer) {
 	filename := base.GetProtoName(file)
 	protoMgr[filename] = buf.String()
 	protoList = append(protoList, filename)
+}
+
+// IsExternalProto 判断 key 是否来自 -proto-src 外部 proto 载入。
+// 外部 proto 仅用于类型解析，SaveProto 不把它们输出到 -proto 目录。
+func IsExternalProto(key string) bool {
+	_, ok := externalProtoKeys[key]
+	return ok
 }
 
 func GetProtoList() []string {
@@ -139,6 +153,7 @@ func LoadExternalProtos(dir string) error {
 		if _, exists := protoMgr[protoKey]; !exists {
 			protoMgr[protoKey] = string(content)
 			protoList = append(protoList, protoKey)
+			externalProtoKeys[protoKey] = struct{}{}
 		}
 		relToAbs[protoKey] = abs
 		relPaths = append(relPaths, protoKey)
