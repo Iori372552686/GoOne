@@ -173,7 +173,7 @@ func autoRegisterConfigsExcluding(fp *excelize.File, fileName, feature string, e
 			file = strings.TrimSuffix(filepath.Base(fileName), filepath.Ext(fileName))
 		}
 		manager.AddTableFull(file, sheet, domain.TypeOfConfig, typeName, data, nil, feature, table)
-		logx.Parsef("[%s/%s] 自动注册配置: %s", file, sheet, typeName)
+		logx.Registerf("[%s/%s] 自动注册配置: %s", file, sheet, typeName)
 		any = true
 	}
 	if !any && len(exclude) == 0 {
@@ -490,7 +490,7 @@ func parseConfig(tab *base.Table) {
 		if tab.MapRules == "" {
 			tab.MapRules = "key:" + indexName
 		}
-		logx.Parsef("[%s/%s] 自动主键索引: %s", tab.FileName, tab.Sheet, indexName)
+		logx.Indexf("[%s/%s] 自动主键索引: %s", tab.FileName, tab.Sheet, indexName)
 	}
 
 	// ---- 手动索引（来自生成表 map:/group: 字段名 规则） ----

@@ -20,9 +20,19 @@ func Loadf(format string, args ...interface{}) {
 	fmt.Printf("[%s] 📥 %s\n", ts(), fmt.Sprintf(format, args...))
 }
 
-// 解析（xlsx/sheet/自动注册/索引）
+// 解析（xlsx/sheet）
 func Parsef(format string, args ...interface{}) {
 	fmt.Printf("[%s] 🔍 %s\n", ts(), fmt.Sprintf(format, args...))
+}
+
+// 注册（自动注册配置）
+func Registerf(format string, args ...interface{}) {
+	fmt.Printf("[%s] 📋 %s\n", ts(), fmt.Sprintf(format, args...))
+}
+
+// 索引（自动主键索引）
+func Indexf(format string, args ...interface{}) {
+	fmt.Printf("[%s] 🔑 %s\n", ts(), fmt.Sprintf(format, args...))
 }
 
 func Warnf(format string, args ...interface{}) {
