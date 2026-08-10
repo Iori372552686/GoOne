@@ -33,6 +33,8 @@ var arrayDelimiters = []string{"|", ";", "^"}
 const mapFieldDelim = ";"
 
 func GenData() error {
+	// 各格式成功生成的文件计数（末尾汇总打印）
+	jsonCount, confCount, bytesCount, luaCount := 0, 0, 0, 0
 	for _, cfg := range manager.GetConfigMap() {
 		// 反射new一个对象
 		ary := manager.NewProto(cfg.FileName, cfg.Name+"Ary")
@@ -120,6 +122,7 @@ func GenData() error {
 			if err := base.Save(domain.JsonPath, cfg.Name+".json", bufStr); err != nil {
 				return errs.Wrap(err, cfg.FileName, cfg.Sheet, "", 0, "保存错误", "保存JSON失败")
 			}
+			jsonCount++
 		}
 
 		// save lua数据
@@ -138,6 +141,7 @@ func GenData() error {
 			if err := base.Save(domain.LuaPath, cfg.Name+".lua", buf); err != nil {
 				return errs.Wrap(err, cfg.FileName, cfg.Sheet, "", 0, "保存错误", "保存Lua失败")
 			}
+			luaCount++
 		}
 
 		// 保存pb bytes数据
@@ -149,6 +153,7 @@ func GenData() error {
 			if err := base.Save(domain.BytesPath, cfg.Name+".bytes", buf); err != nil {
 				return errs.Wrap(err, cfg.FileName, cfg.Sheet, "", 0, "保存错误", "保存pb bytes失败")
 			}
+			bytesCount++
 		}
 
 		// 保存pb text数据
@@ -160,6 +165,7 @@ func GenData() error {
 			if err := base.Save(domain.TextPath, cfg.Name+".conf", buf); err != nil {
 				return errs.Wrap(err, cfg.FileName, cfg.Sheet, "", 0, "保存错误", "保存pb text失败")
 			}
+			confCount++
 		}
 
 		// 保存ts数据
@@ -172,6 +178,20 @@ func GenData() error {
 					return err
 				}*/
 		}
+	}
+
+	// 各格式汇总成功提示（仅打印本次实际生成且启用的格式）
+	if jsonCount > 0 {
+		logx.Successf("JSON数据生成完成: %d 个文件 -> %s", jsonCount, domain.JsonPath)
+	}
+	if confCount > 0 {
+		logx.Successf("pbtext数据生成完成: %d 个文件 -> %s", confCount, domain.TextPath)
+	}
+	if bytesCount > 0 {
+		logx.Successf("pb bytes数据生成完成: %d 个文件 -> %s", bytesCount, domain.BytesPath)
+	}
+	if luaCount > 0 {
+		logx.Successf("Lua数据生成完成: %d 个文件 -> %s", luaCount, domain.LuaPath)
 	}
 
 	// 注意：此处不再调用 manager.Clear()。

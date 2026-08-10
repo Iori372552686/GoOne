@@ -11,11 +11,11 @@ func ts() string {
 }
 
 func Infof(format string, args ...interface{}) {
-	fmt.Printf("[%s] ℹ️ %s", ts(), fmt.Sprintf(format, args...))
+	fmt.Printf("[%s] ℹ️ %s\n", ts(), fmt.Sprintf(format, args...))
 }
 
 func Warnf(format string, args ...interface{}) {
-	fmt.Printf("[%s] ⚠️ %s", ts(), fmt.Sprintf(format, args...))
+	fmt.Printf("[%s] ⚠️ %s\n", ts(), fmt.Sprintf(format, args...))
 }
 
 func Successf(format string, args ...interface{}) {
@@ -23,5 +23,5 @@ func Successf(format string, args ...interface{}) {
 }
 
 func Errorf(format string, args ...interface{}) {
-	fmt.Printf("[%s] ❌ %s", ts(), fmt.Sprintf(format, args...))
+	fmt.Printf("[%s] ❌ %s\n", ts(), fmt.Sprintf(format, args...))
 }

@@ -88,8 +88,10 @@ func run() error {
 	}
 	// 预加载外部 proto（必须在 ParseFiles 之前，使 buildField 能识别 pb.XXX 类型、
 	// parseReference 能收集外部 import）。留空则跳过。
+	// -proto-src 支持多目录（按系统路径分隔符拼接，Windows 用分号），
+	// 例如 common/game_proto;api/proto —— service 协议 import 的 goone/options 在主仓。
 	if len(domain.ProtoSrcPath) > 0 {
-		if err := manager.LoadExternalProtos(domain.ProtoSrcPath); err != nil {
+		if err := manager.LoadExternalProtos(filepath.SplitList(domain.ProtoSrcPath)...); err != nil {
 			return errs.Wrap(err, "", "", "", 0, "加载错误", "加载外部proto失败")
 		}
 	}

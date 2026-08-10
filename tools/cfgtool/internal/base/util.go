@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"unicode"
 )
 
 func Sub(a, b int) int {
@@ -26,13 +25,6 @@ func Ifelse[T any](flag bool, a, b T) T {
 		return a
 	}
 	return b
-}
-
-func Prefix[T any](vals []T, pos int) []T {
-	if pos < 0 || pos >= len(vals) {
-		return nil
-	}
-	return vals[:pos]
 }
 
 func Suffix[T any](vals []T, pos int) []T {
@@ -88,14 +80,4 @@ func Glob(dir, pattern string, recursive bool) (rets []string, err error) {
 		return nil
 	})
 	return
-}
-
-func ToCamelCase(s string) string {
-	if s == "" {
-		return s
-	}
-
-	runes := []rune(s)
-	runes[0] = unicode.ToLower(runes[0])
-	return string(runes)
 }

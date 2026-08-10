@@ -114,53 +114,63 @@ func GetProtoMap() map[string]string {
 }
 
 // LoadExternalProtos 加载 -proto-src 目录下所有 .proto 文件：
-//  1. 读入 protoMgr（key 为相对根路径，如 proto/core/struct.proto，与 import 路径风格一致），
+//  1. 读入 protoMgr（key 为相对根路径，如 core/struct.proto，与 import 路径风格一致），
 //     使后续 ParseProto 能统一解析并 cross-link
 //  2. 预解析每个文件，提取 message/enum 短名注册到 externalMsgMgr/externalEnumMgr
 //
-// protoFileRelPath 用于把磁盘绝对路径转换为相对仓库根的 proto 路径（去掉 ProtoSrcPath 前缀，
-// 保证 import 路径与 protoMgr 的 key 对齐）。留空则用文件名。
-func LoadExternalProtos(dir string) error {
-	files, err := base.Glob(dir, `\.proto$`, true)
-	if err != nil {
-		return uerror.New(1, -1, "扫描外部proto目录失败: %v", err)
+// 支持多目录（-proto-src 用路径分隔符拼接，Windows 为分号）：先加载全部目录的文件，
+// 再统一预解析一次——import 图可能跨目录（如 service 协议 import 主仓 api/proto 的
+// goone/options），逐目录解析会因依赖尚未加载而失败刷警告。
+//
+// key 为相对目录根的路径（去掉目录前缀，保证与 proto 内 import 路径一致）。
+func LoadExternalProtos(dirs ...string) error {
+	// 第一遍（所有目录）：读入 protoMgr，记录相对路径
+	var relPaths []string
+	for _, dir := range dirs {
+		files, err := base.Glob(dir, `\.proto$`, true)
+		if err != nil {
+			return uerror.New(1, -1, "扫描外部proto目录失败: %v", err)
+		}
+		if len(files) == 0 {
+			logx.Warnf("外部proto目录 %s 下无 .proto 文件", dir)
+			continue
+		}
+
+		// 归一化目录（去掉末尾分隔符），用于计算相对路径
+		srcRoot := filepath.Clean(dir)
+		for _, abs := range files {
+			rel, err := filepath.Rel(srcRoot, abs)
+			if err != nil {
+				rel = filepath.Base(abs)
+			}
+			// proto import 用正斜杠，统一转换
+			rel = filepath.ToSlash(rel)
+			// 跳过 config/（cfgtool 自己的 -proto 输出目录）：里面是上一次运行生成的
+			// 配置 proto，本次会从 xlsx 重新生成同名文件，预加载会导致 ParseProto
+			// 阶段出现重复符号定义。外部引用只需 core/storage/service 等源 proto。
+			if strings.HasPrefix(rel, "config/") {
+				continue
+			}
+			protoKey := rel
+			content, err := os.ReadFile(abs)
+			if err != nil {
+				return uerror.New(1, -1, "读取外部proto失败 %s: %v", abs, err)
+			}
+			// 仅当 map 中不存在时写入（避免覆盖 cfgtool 自己生成的同名 key）
+			if _, exists := protoMgr[protoKey]; !exists {
+				protoMgr[protoKey] = string(content)
+				protoList = append(protoList, protoKey)
+				externalProtoKeys[protoKey] = struct{}{}
+			}
+			relPaths = append(relPaths, protoKey)
+		}
 	}
-	if len(files) == 0 {
-		logx.Warnf("外部proto目录 %s 下无 .proto 文件", dir)
+	if len(relPaths) == 0 {
 		return nil
 	}
 
-	// 归一化目录（去掉末尾分隔符），用于计算相对路径
-	srcRoot := filepath.Clean(dir)
-
-	// 第一遍：读入 protoMgr，并记录「相对路径 -> 绝对路径」
-	relToAbs := make(map[string]string, len(files))
-	var relPaths []string
-	for _, abs := range files {
-		rel, err := filepath.Rel(srcRoot, abs)
-		if err != nil {
-			rel = filepath.Base(abs)
-		}
-		// proto import 用正斜杠，统一转换
-		rel = filepath.ToSlash(rel)
-		// 外部 proto 的统一路径前缀：proto/...
-		protoKey := rel
-		content, err := os.ReadFile(abs)
-		if err != nil {
-			return uerror.New(1, -1, "读取外部proto失败 %s: %v", abs, err)
-		}
-		// 仅当 map 中不存在时写入（避免覆盖 cfgtool 自己生成的同名 key）
-		if _, exists := protoMgr[protoKey]; !exists {
-			protoMgr[protoKey] = string(content)
-			protoList = append(protoList, protoKey)
-			externalProtoKeys[protoKey] = struct{}{}
-		}
-		relToAbs[protoKey] = abs
-		relPaths = append(relPaths, protoKey)
-	}
-
 	// 第二遍：预解析，提取 message/enum 短名注册。
-	// 容错策略：先尝试一次性解析全部（性能最优，且能 cross-link 同目录内的相互 import）；
+	// 容错策略：先尝试一次性解析全部（性能最优，且能 cross-link 跨文件/跨目录的相互 import）；
 	// 若整体失败（常见于部分 proto import 了仓库外文件如 google/protobuf/*.proto），
 	// 回退为逐文件解析——成功的注册，失败的从 protoMgr 移除（避免污染后续主流程 ParseProto）。
 	subMap := make(map[string]string, len(relPaths))
@@ -169,7 +179,7 @@ func LoadExternalProtos(dir string) error {
 	}
 	subParser := protoparse.Parser{Accessor: protoparse.FileContentsFromMap(subMap)}
 
-	// 先尝试整体解析（支持同目录内跨文件 cross-link，如 struct.proto import role.proto）
+	// 先尝试整体解析（支持跨文件 cross-link，如 struct.proto import role.proto）
 	if descs, err := subParser.ParseFiles(relPaths...); err == nil {
 		for i, k := range relPaths {
 			if fd := descs[i]; fd != nil {
@@ -212,7 +222,6 @@ func removeProto(key string) {
 
 // registerExternalTypes 把一个 FileDescriptor 里的顶层 message/enum 注册到外部注册表。
 func registerExternalTypes(fd *desc.FileDescriptor, protoFile string) {
-	pkg := fd.GetPackage() // 通常为 g1.protocol
 	for _, mt := range fd.GetMessageTypes() {
 		short := mt.GetName()
 		full := mt.GetFullyQualifiedName()
@@ -231,7 +240,6 @@ func registerExternalTypes(fd *desc.FileDescriptor, protoFile string) {
 			ProtoFile: protoFile,
 		}
 	}
-	_ = pkg
 }
 
 // ----- 外部类型检索 -----
@@ -306,6 +314,3 @@ func FindExternalMsgDescriptor(name string) *desc.MessageDescriptor {
 	}
 	return nil
 }
-
-// 兼容：抑制 strings 在部分构建路径下未使用的告警
-var _ = strings.TrimSpace

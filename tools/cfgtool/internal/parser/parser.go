@@ -15,7 +15,7 @@ import (
 
 func ParseFiles(files ...string) error {
 	for _, file := range files {
-		logx.Infof("解析文件: %s\n", filepath.Base(file))
+		logx.Infof("解析文件: %s", filepath.Base(file))
 		if err := parseTable(file); err != nil {
 			return err
 		}
@@ -48,7 +48,7 @@ func parseTable(fileName string) error {
 	if chinese == "" {
 		feature = ""
 	} else {
-		logx.Infof("功能: %s (%s)\n", chinese, feature)
+		logx.Infof("功能: %s (%s)", chinese, feature)
 	}
 
 	// 读取「生成表」规则清单
@@ -178,7 +178,9 @@ func autoRegisterConfigsExcluding(fp *excelize.File, fileName, feature string, e
 		logx.Infof("[%s/%s] 自动注册配置: %s", file, sheet, typeName)
 		any = true
 	}
-	if !any {
+	if !any && len(exclude) == 0 {
+		// 仅在没有生成表声明时提示——sheet 全部由「生成表」声明（如 @enum/@struct）
+		// 的文件是正常形态，没有可自动注册的 sheet 属预期行为。
 		logx.Warnf("%s没有可注册的数据sheet\n", fileName)
 	}
 	return nil
