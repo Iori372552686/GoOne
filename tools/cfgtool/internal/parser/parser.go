@@ -15,7 +15,7 @@ import (
 
 func ParseFiles(files ...string) error {
 	for _, file := range files {
-		logx.Infof("解析文件: %s", filepath.Base(file))
+		logx.Parsef("解析文件: %s", filepath.Base(file))
 		if err := parseTable(file); err != nil {
 			return err
 		}
@@ -47,8 +47,6 @@ func parseTable(fileName string) error {
 	feature, chinese := base.ParseFileFeature(fileName)
 	if chinese == "" {
 		feature = ""
-	} else {
-		logx.Infof("功能: %s (%s)", chinese, feature)
 	}
 
 	// 读取「生成表」规则清单
@@ -175,7 +173,7 @@ func autoRegisterConfigsExcluding(fp *excelize.File, fileName, feature string, e
 			file = strings.TrimSuffix(filepath.Base(fileName), filepath.Ext(fileName))
 		}
 		manager.AddTableFull(file, sheet, domain.TypeOfConfig, typeName, data, nil, feature, table)
-		logx.Infof("[%s/%s] 自动注册配置: %s", file, sheet, typeName)
+		logx.Parsef("[%s/%s] 自动注册配置: %s", file, sheet, typeName)
 		any = true
 	}
 	if !any && len(exclude) == 0 {
@@ -492,7 +490,7 @@ func parseConfig(tab *base.Table) {
 		if tab.MapRules == "" {
 			tab.MapRules = "key:" + indexName
 		}
-		logx.Infof("[%s/%s] 自动主键索引: %s", tab.FileName, tab.Sheet, indexName)
+		logx.Parsef("[%s/%s] 自动主键索引: %s", tab.FileName, tab.Sheet, indexName)
 	}
 
 	// ---- 手动索引（来自生成表 map:/group: 字段名 规则） ----
@@ -511,6 +509,10 @@ func parseConfig(tab *base.Table) {
 		}
 
 		if len(keys) == 0 {
+			// 索引引用的字段被当前 gen 模式过滤（如 group:Groupid 而 Groupid 标了
+			// server/client）——不静默丢弃，显式提示，避免生成代码缺索引方法。
+			logx.Warnf("[%s/%s] 索引规则 %s 引用的字段在当前模式(%s)下不存在，索引未生成\n",
+				tab.FileName, tab.Sheet, val, domain.ConfMode)
 			continue
 		}
 

@@ -234,6 +234,34 @@ Windows 下如果使用 `build.ps1`，对应可执行文件通常在 `build\*.ex
 .\build\websvr.exe -svr_conf=.\etc\config\server_conf_ide.yaml
 ```
 
+### 4.6 配置生成（xlsx → 配置数据 / proto / 查询代码）
+
+策划在 `common/game_conf/xls/*.xlsx`（唯一数据源）填表后，通过 cfgtool 生成：
+
+- 运行时配置数据 `.conf` → `common/game_data/`
+- 配置表 proto → `common/game_proto/config/`
+- Go 查询代码 → `module/gamedata/repository/`
+
+**`main.sh xls` 默认生成 server 版本**（mode=server）：
+
+```bash
+./main.sh xls            # 默认 server
+./main.sh xls client     # 仅客户端标记字段（输出目录见 common/gen_xls_client.bat）
+./main.sh xls all        # 全部字段
+```
+
+> xlsx 第 4 行（标记行）控制字段归属：`key`（主键索引，任何模式都含）/ `all` / `client` / `server`，留空则仅 `all` 模式包含。
+
+**Windows 一键脚本**（在 `common/` 下，环境配置集中在各 bat 顶部可改）：
+
+```bat
+.\common\gen_xls.bat           REM 全量（mode=all）
+.\common\gen_xls_server.bat    REM 一键导出 server（默认）
+.\common\gen_xls_client.bat    REM 一键导出 client（输出暂为 %TEMP%\g1_client_output\，后期改 bat 即可）
+```
+
+> 详细说明见 `[common/game_conf/readme.md](common/game_conf/readme.md)`；编译 cfgtool：`./main.sh build cfgtool`。
+
 ---
 
 ## 5. 部署（Ansible）

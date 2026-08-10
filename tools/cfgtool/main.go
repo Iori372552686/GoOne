@@ -33,7 +33,7 @@ func main() {
 	flag.StringVar(&domain.CodePath, "code", "", "go代码文件目录")
 	flag.StringVar(&domain.CppPath, "cpp", "", "c++代码文件目录")
 	flag.StringVar(&domain.NodeJsPath, "nodejs", "", "node.js/ts代码文件目录")
-	flag.StringVar(&domain.ConfMode, "mode", "all", "配置gen模式（all：全部  client：客户端  server： 服务器）")
+	flag.StringVar(&domain.ConfMode, "mode", "all", "配置gen模式（all：全部  client：客户端  server：服务器）")
 	flag.StringVar(&domain.Module, "module", "github.com/Iori372552686/GoOne", "项目目录")
 	flag.StringVar(&domain.PbPath, "pb", "github.com/Iori372552686/g1_common/protocol", "proto生成路径")
 	flag.StringVar(&domain.UploadURL, "upload", "", "配置中心URL（留空不上传；如 etcd://host:2379?path=/goone/config 或 nacos://host:8848?dataid=...&group=...）")
@@ -136,6 +136,6 @@ func run() error {
 	// 所有 Gen* 完成后统一清理内存表（原先在 GenData 末尾清理，会令后续 GenCode/GenCpp/GenNodeJs 拿到空表）
 	manager.Clear()
 
-	logx.Successf("当前gen模式[%s]:所有的执行已顺利完成,恭喜 ^_^ ！", domain.ConfMode)
+	logx.Finalf("当前gen模式[%s]: All Proc is Done ------- By Iori ^_^!", domain.ConfMode)
 	return nil
 }

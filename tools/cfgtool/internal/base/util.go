@@ -65,6 +65,11 @@ func Glob(dir, pattern string, recursive bool) (rets []string, err error) {
 		return nil, err
 	}
 	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		// 目录不可访问（不存在/权限）时 info 为 nil，直接透传错误，
+		// 避免后续 info.IsDir() 空指针 panic
+		if err != nil {
+			return err
+		}
 		// 不深度迭代
 		if !recursive && info.IsDir() && dir != path {
 			return filepath.SkipDir

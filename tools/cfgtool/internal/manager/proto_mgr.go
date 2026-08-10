@@ -203,7 +203,7 @@ func LoadExternalProtos(dirs ...string) error {
 			}
 		}
 	}
-	logx.Infof("加载外部proto完成: %d 个文件, %d message, %d enum",
+	logx.Loadf("加载外部proto完成: %d 个文件, %d message, %d enum",
 		len(protoList), len(externalMsgMgr), len(externalEnumMgr))
 	return nil
 }
