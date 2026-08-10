@@ -8,8 +8,7 @@ import (
 	"math/rand"
 	"sort"
 
-	"github.com/Iori372552686/GoOne/module/gamedata/repository/drop_group_config"
-	"github.com/Iori372552686/GoOne/module/gamedata/repository/drop_item_config"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/drop"
 	pb "github.com/Iori372552686/g1_common/protocol"
 )
 
@@ -103,7 +102,7 @@ func (r *Role) executeDropOnce(dropGroupID int32, reason *Reason) []*pb.PbItem {
 
 // expandDropId 按 DropId 查 dropItem 表，按 item 级 DropWay 展开产出。
 func expandDropId(dropID int32, mult int32) []*pb.PbItem {
-	entries := drop_item_config.GetByDropId(dropID)
+	entries := drop.GetDropItemByDropId(dropID)
 	if len(entries) == 0 {
 		return nil
 	}
@@ -123,7 +122,7 @@ func expandDropId(dropID int32, mult int32) []*pb.PbItem {
 // depth 限制递归深度(maxDropNestDepth)，visited 防止 groupid 循环引用。
 // 纯函数（不依赖 Role），便于单测。
 func resolveGroup(groupID int32, depth int32, visited map[int32]bool) []packDraw {
-	rows := drop_group_config.GetByGroupid(groupID)
+	rows := drop.GroupDropGroupByGroupid(groupID)
 	if len(rows) == 0 {
 		return nil
 	}
@@ -236,7 +235,7 @@ func selectOnce(row *pb.DropGroupConfig, depth int32, visited map[int32]bool, is
 //   - key 在 DropGroupConfig 表 → 递归 resolveGroup 展开
 //   - key 不在表 → 视为纯 DropId，直接产出
 func pickKeyAsDraws(k int32, depth int32, visited map[int32]bool) []packDraw {
-	if len(drop_group_config.GetByGroupid(k)) == 0 {
+	if len(drop.GroupDropGroupByGroupid(k)) == 0 {
 		return []packDraw{{dropID: k, mult: 1}}
 	}
 	if depth >= maxDropNestDepth {

@@ -3,11 +3,7 @@
 package role
 
 import (
-	"github.com/Iori372552686/GoOne/module/gamedata/repository/decompose_config"
-	"github.com/Iori372552686/GoOne/module/gamedata/repository/item_config"
-	"github.com/Iori372552686/GoOne/module/gamedata/repository/item_rule_config"
-	"github.com/Iori372552686/GoOne/module/gamedata/repository/item_rule_ref_config"
-	"github.com/Iori372552686/GoOne/module/gamedata/repository/item_use_config"
+	itemconf "github.com/Iori372552686/GoOne/module/gamedata/repository/item"
 	pb "github.com/Iori372552686/g1_common/protocol"
 )
 
@@ -52,7 +48,7 @@ func (r *Role) ItemCheckAdd(itemId int32, itemCount int64) int {
 	if itemCount <= 0 {
 		return int(pb.ErrorCode_ERR_ARGV)
 	}
-	itemConf := item_config.GetByItemId(itemId)
+	itemConf := itemconf.GetItemByItemId(itemId)
 	if itemConf == nil {
 		return int(pb.ErrorCode_ERR_CONF)
 	}
@@ -78,11 +74,11 @@ func (r *Role) getItemRule(itemConf *pb.ItemConfig) *pb.ItemRuleConfig {
 	if itemConf == nil {
 		return nil
 	}
-	ref := item_rule_ref_config.GetByItemId(itemConf.ItemId)
+	ref := itemconf.GetItemRuleRefByItemId(itemConf.ItemId)
 	if ref == nil || ref.RuleId == 0 {
 		return nil
 	}
-	return item_rule_config.GetById(ref.RuleId)
+	return itemconf.GetItemRuleById(ref.RuleId)
 }
 
 func (r *Role) ItemsCheckAdd(items *[]*pb.PbItem) pb.ErrorCode {
@@ -109,7 +105,7 @@ func (r *Role) ItemsSee(in *[]*pb.PbItem) *[]*pb.PbItem {
 func (r *Role) ItemSee(item *pb.PbItem) *[]*pb.PbItem {
 	out := make([]*pb.PbItem, 0)
 
-	conf := item_config.GetByItemId(item.Id)
+	conf := itemconf.GetItemByItemId(item.Id)
 	if conf == nil {
 		return &out
 	}
@@ -277,7 +273,7 @@ func (r *Role) itemDoAdd(itemId int32, itemCount int64, reason *Reason) int {
 		return 0
 	}
 
-	itemConf := item_config.GetByItemId(itemId)
+	itemConf := itemconf.GetItemByItemId(itemId)
 	if itemConf == nil {
 		r.Errorf("conf not find, {id=%d}", itemId)
 		return int(pb.ErrorCode_ERR_CONF)
@@ -290,7 +286,7 @@ func (r *Role) itemDoAdd(itemId int32, itemCount int64, reason *Reason) int {
 	// 获得即使用：道具规则 Getuse>0 时，AddItem 不入背包，直接转使用流程。
 	// 典型场景：宝箱/礼包（拿到即开）、碎片（拿到即合成）。
 	if rule := r.getItemRule(itemConf); rule != nil && rule.Getuse > 0 {
-		useConf := item_use_config.GetById(itemId)
+		useConf := itemconf.GetItemUseById(itemId)
 		if useConf != nil && useConf.IsEnable != 0 {
 			return int(r.useItemInner(useConf, int32(itemCount), reason))
 		}
@@ -466,7 +462,7 @@ func (r *Role) ItemUse(itemId int32, count int32, reason *Reason) pb.ErrorCode {
 	if count <= 0 {
 		return pb.ErrorCode_ERR_ARGV
 	}
-	useConf := item_use_config.GetById(itemId)
+	useConf := itemconf.GetItemUseById(itemId)
 	if useConf == nil || useConf.IsEnable == 0 {
 		return pb.ErrorCode_ERR_ITEM_CAN_NOT_USE
 	}
@@ -519,7 +515,7 @@ func (r *Role) ItemSell(itemId int32, count int32, reason *Reason) pb.ErrorCode 
 	if isBasicInfoItem(itemId) {
 		return pb.ErrorCode_ERR_ITEM_CAN_NOT_SELL
 	}
-	itemConf := item_config.GetByItemId(itemId)
+	itemConf := itemconf.GetItemByItemId(itemId)
 	if itemConf == nil || itemConf.Sale <= 0 {
 		return pb.ErrorCode_ERR_ITEM_CAN_NOT_SELL
 	}
@@ -539,7 +535,7 @@ func (r *Role) ItemDecompose(itemId int32, count int32, reason *Reason) (*[]*pb.
 	if isBasicInfoItem(itemId) {
 		return nil, pb.ErrorCode_ERR_ITEM_CAN_NOT_DECOMPOSE
 	}
-	outputs := decompose_config.GetByItemId(itemId)
+	outputs := itemconf.GroupItemDecomposeByItemId(itemId)
 	if len(outputs) == 0 {
 		return nil, pb.ErrorCode_ERR_ITEM_CAN_NOT_DECOMPOSE
 	}
@@ -603,7 +599,7 @@ func (r *Role) buildBackpackViews(bagType int32) []*pb.PbItem {
 		if it == nil || it.Count <= 0 {
 			continue
 		}
-		conf := item_config.GetByItemId(id)
+		conf := itemconf.GetItemByItemId(id)
 		if conf != nil && bagType != 0 && conf.BagType != bagType {
 			continue
 		}
@@ -631,7 +627,7 @@ func sortBackpackViews(views []*pb.PbItem) {
 
 // itemQuality 取道具品质；配置缺失返回 0。
 func itemQuality(itemId int32) int32 {
-	if c := item_config.GetByItemId(itemId); c != nil {
+	if c := itemconf.GetItemByItemId(itemId); c != nil {
 		return c.Quality
 	}
 	return 0

@@ -41,19 +41,30 @@ func parseTable(fileName string) error {
 	}
 	defer fp.Close()
 
-	// 读取所有数据
+	// 解析功能名（从 xlsx 文件名 @ 前段取）。
+	// 仅当文件名含 @（chinese 非空）时启用新命名体系，feature=功能名；
+	// 无 @ 的旧式文件 feature 保持空串，走兼容路径（file 用文件基名，生成代码沿用 Name 推导）。
+	feature, chinese := base.ParseFileFeature(fileName)
+	if chinese == "" {
+		feature = ""
+	} else {
+		logx.Infof("功能: %s (%s)\n", chinese, feature)
+	}
+
+	// 读取「生成表」规则清单
 	rows, err := fp.GetRows("生成表")
 	if err != nil {
 		if _, ok := err.(excelize.ErrSheetNotExist); ok {
-			logx.Warnf("%s没有定义生成表\n", fileName)
-			return nil
+			// 无生成表：把每个数据 sheet 自动注册为 config
+			// （跳过以 _ 开头的辅助 sheet）
+			return autoRegisterConfigs(fp, fileName, feature)
 		}
 		logx.Errorf("获取生成表失败:%s\n", err.Error())
 		return uerror.New(1, -1, "获取生成表失败:%s", err.Error())
 	}
-	file := strings.TrimSuffix(filepath.Base(fileName), filepath.Ext(fileName))
 
-	// 解析生成表
+	// 解析生成表（声明额外规则）；未在生成表里声明的数据 sheet 仍自动注册为 config。
+	declaredSheets := map[string]bool{}
 	for _, items := range rows {
 		for _, val := range items {
 			if len(val) <= 0 {
@@ -61,6 +72,13 @@ func parseTable(fileName string) error {
 			}
 			strs := strings.Split(val, "|")
 			rule := strs[0]
+			// file 默认 = 文件基名（无 @ 的旧式文件）；有 @ 时用功能名。
+			// 兼容旧语法 @config:filename —— :filename 仍可覆盖输出文件名（= 功能名/proto 分桶），
+			// 但不会覆盖 feature（Go 子目录/package 仍由文件名决定）。
+			file := base.ProtoFileName(feature)
+			if feature == "" {
+				file = strings.TrimSuffix(filepath.Base(fileName), filepath.Ext(fileName))
+			}
 			pos := strings.Index(strs[0], ":")
 			if pos > 0 {
 				file = strs[0][pos+1:]
@@ -71,34 +89,97 @@ func parseTable(fileName string) error {
 			   @struct[:filename]|sheet:结构名
 			   @enum[:filename]|sheet
 			   E|道具类型-金币|PropertType|Coin|1
+
+			   新命名体系（推荐）：xlsx 文件名与 sheet 名用 @ 拆分功能名/表名，
+			   普通配置表可不写生成表，工具会自动把数据 sheet 注册为 config。
+			   生成表仅用于声明额外规则（如 group 索引、struct/enum），声明的 sheet 不再自动注册。
 			*/
 			switch strings.ToLower(rule) {
 			case "e":
 				enum := manager.GetOrNewEnum(strs[2])
 				enum.FileName = file
+				enum.Feature = feature
 				enum.AddValue(strs...)
 			case "@enum":
+				table, _ := base.ParseSheetTable(strs[1])
 				data, err := fp.GetRows(strs[1])
 				if err != nil {
 					return uerror.New(1, -1, "%s枚举表不存在%s  %v", fileName, strs[0], err.Error())
 				}
-				manager.AddTable(file, strs[1], domain.TypeOfEnum, "", data, nil)
+				manager.AddTableFull(file, strs[1], domain.TypeOfEnum, "", data, nil, feature, table)
+				declaredSheets[strs[1]] = true
 			case "@struct":
 				pos := strings.Index(strs[1], ":")
+				table, _ := base.ParseSheetTable(strs[1][:pos])
 				data, err := fp.GetRows(strs[1][:pos])
 				if err != nil {
 					return uerror.New(1, -1, "%s结构表不存在%s  %v", fileName, strs[0], err.Error())
 				}
-				manager.AddTable(file, strs[1], domain.TypeOfStruct, strs[1][pos+1:], data, nil)
+				manager.AddTableFull(file, strs[1], domain.TypeOfStruct, strs[1][pos+1:], data, nil, feature, table)
+				declaredSheets[strs[1][:pos]] = true
 			case "@config":
 				pos := strings.Index(strs[1], ":")
 				data, err := fp.GetRows(strs[1][:pos])
 				if err != nil {
 					return uerror.New(1, -1, "%s配置表不存在%s  %v", fileName, strs[0], err.Error())
 				}
-				manager.AddTable(file, strs[1], domain.TypeOfConfig, strs[1][pos+1:], data, base.Suffix(strs, 2))
+				table, _ := base.ParseSheetTable(strs[1][:pos])
+				manager.AddTableFull(file, strs[1], domain.TypeOfConfig, strs[1][pos+1:], data, base.Suffix(strs, 2), feature, table)
+				declaredSheets[strs[1][:pos]] = true
 			}
 		}
+	}
+
+	// 有生成表时，未声明的数据 sheet 仍自动注册为 config（混合模式）
+	return autoRegisterConfigsExcluding(fp, fileName, feature, declaredSheets)
+}
+
+// autoRegisterConfigs 在 xlsx 没有「生成表」sheet 时，自动把所有数据 sheet 注册为 config。
+// sheet 名支持 @ 语法：掉落组表@group -> 表名=group；无 @ 则表名=sheet 名本身。
+// 类型名 = ConfigTypeName(feature, table)，如 drop+group -> DropGroupConfig。
+// 跳过以 _ 开头的辅助 sheet（如 _说明）。
+func autoRegisterConfigs(fp *excelize.File, fileName, feature string) error {
+	return autoRegisterConfigsExcluding(fp, fileName, feature, nil)
+}
+
+// autoRegisterConfigsExcluding 自动注册数据 sheet 为 config，但跳过 exclude 里已声明的 sheet。
+// 用于混合模式：生成表声明的 sheet 走规则，其余 sheet 自动注册。
+func autoRegisterConfigsExcluding(fp *excelize.File, fileName, feature string, exclude map[string]bool) error {
+	sheets := fp.GetSheetList()
+	if len(sheets) == 0 {
+		logx.Warnf("%s没有任何sheet，已跳过\n", fileName)
+		return nil
+	}
+
+	any := false
+	for _, sheet := range sheets {
+		// 跳过辅助 sheet（_ 开头）、生成表本身、已在生成表声明的 sheet
+		if strings.HasPrefix(sheet, "_") || sheet == "生成表" || exclude[sheet] {
+			continue
+		}
+		data, err := fp.GetRows(sheet)
+		if err != nil {
+			logx.Warnf("%s读取sheet[%s]失败：%v\n", fileName, sheet, err)
+			continue
+		}
+		if len(data) < 4 {
+			// 配置表至少需要 4 行表头（描述/字段名/类型/标记）
+			logx.Warnf("%s sheet[%s]表头不足4行，已跳过\n", fileName, sheet)
+			continue
+		}
+		table, _ := base.ParseSheetTable(sheet)
+		typeName := base.ConfigTypeName(feature, table)
+		// file：有 @ 时=功能名；无 @ 时=文件基名（旧式兼容）
+		file := base.ProtoFileName(feature)
+		if feature == "" {
+			file = strings.TrimSuffix(filepath.Base(fileName), filepath.Ext(fileName))
+		}
+		manager.AddTableFull(file, sheet, domain.TypeOfConfig, typeName, data, nil, feature, table)
+		logx.Infof("[%s/%s] 自动注册配置: %s", file, sheet, typeName)
+		any = true
+	}
+	if !any {
+		logx.Warnf("%s没有可注册的数据sheet\n", fileName)
 	}
 	return nil
 }
@@ -113,6 +194,7 @@ func parseEnum(tab *base.Table) {
 			strs := strings.Split(val, "|")
 			enum := manager.GetOrNewEnum(strs[2])
 			enum.FileName = tab.FileName
+			enum.Feature = tab.Feature
 			enum.Sheet = tab.Sheet
 			enum.AddValue(strs...)
 		}
@@ -306,7 +388,7 @@ func parseStruct(tab *base.Table) {
 		return
 	}
 
-	st := manager.GetOrNewStruct(tab.FileName, tab.Sheet, tab.Type)
+	st := manager.GetOrNewStruct(tab.FileName, tab.Sheet, tab.Type, tab.Feature, tab.Table)
 	for i, val := range tab.Rows[2] {
 		if i >= len(tab.Rows[0]) || len(val) <= 0 || len(tab.Rows[0][i]) <= 0 {
 			continue
@@ -342,7 +424,7 @@ func parseConfig(tab *base.Table) {
 		return
 	}
 
-	cfg := manager.GetOrNewConfig(tab.FileName, tab.Sheet, tab.Type)
+	cfg := manager.GetOrNewConfig(tab.FileName, tab.Sheet, tab.Type, tab.Feature, tab.Table)
 
 	// 收集第四行标记为 "key"/"KEY" 的字段，用于自动生成主键索引
 	var autoKeyFields []*base.Field
@@ -411,9 +493,13 @@ func parseConfig(tab *base.Table) {
 		logx.Infof("[%s/%s] 自动主键索引: %s", tab.FileName, tab.Sheet, indexName)
 	}
 
-	// ---- 手动索引（来自生成表 map:字段名 规则） ----
+	// ---- 手动索引（来自生成表 map:/group: 字段名 规则） ----
 	for _, val := range tab.Rules {
 		strs := strings.Split(val, ":")
+		ruleKind := strings.ToLower(strs[0])
+		if ruleKind != "map" && ruleKind != "group" {
+			continue
+		}
 		keys := []*base.Field{}
 		for _, field := range strings.Split(strs[1], ",") {
 			key := cfg.Fields[field]
@@ -422,11 +508,15 @@ func parseConfig(tab *base.Table) {
 			}
 		}
 
-		if len(keys) == 0 || strs[0] != "map" {
+		if len(keys) == 0 {
 			continue
 		}
 
-		tab.MapRules = val
+		// map 索引影响 JSON 输出格式（map[key]obj）；group 不影响（仍是 list）
+		if ruleKind == "map" {
+			tab.MapRules = val
+		}
+		valueOf := base.Ifelse(ruleKind == "map", int(domain.ValueOfMap), int(domain.ValueOfGroup))
 		switch len(strs) {
 		case 2:
 			cfg.AddIndex(&base.Index{
@@ -434,7 +524,7 @@ func parseConfig(tab *base.Table) {
 				Type: &base.Type{
 					Name:    base.FieldList(keys).GetIndexName(),
 					TypeOf:  base.Ifelse(len(keys) > 1, int(domain.TypeOfStruct), int(domain.TypeOfBase)),
-					ValueOf: base.Ifelse(strings.ToLower(strs[0]) == "map", int(domain.ValueOfMap), int(domain.ValueOfBase)),
+					ValueOf: valueOf,
 				},
 				List: keys,
 			})
@@ -444,7 +534,7 @@ func parseConfig(tab *base.Table) {
 				Type: &base.Type{
 					Name:    base.FieldList(keys).GetIndexName(),
 					TypeOf:  base.Ifelse(len(keys) > 1, int(domain.TypeOfStruct), int(domain.TypeOfBase)),
-					ValueOf: base.Ifelse(strings.ToLower(strs[0]) == "map", int(domain.ValueOfMap), int(domain.ValueOfBase)),
+					ValueOf: valueOf,
 				},
 				List: keys,
 			})

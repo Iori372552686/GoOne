@@ -56,6 +56,30 @@ func (d *Index) Value(ref, split string) string {
 	return strings.Join(strs, split)
 }
 
+// KeyStructInit 生成复合键 Index 结构体的命名字段初始化表达式。
+// ref 为字段来源引用前缀（如 "item"），为空则用裸字段名。
+// 字段名约定与 index_tpl.go 的 member 模板一致：T{N}, T{N-1}, ..., T{1}
+// （高位在前），与 List 顺序对应（List[0]=T{N}, List[1]=T{N-1}, ...）。
+//
+// 示例（2 维，ref="item"）：
+//
+//	T2: item.RoomStage, T1: item.CoinType
+//
+// 用于替代位置初始化 {a, b}，消除 go vet 的 unkeyed fields 警告。
+func (d *Index) KeyStructInit(ref string) string {
+	n := len(d.List)
+	strs := make([]string, 0, n)
+	for i, val := range d.List {
+		field := val.Name
+		if ref != "" {
+			field = ref + "." + val.Name
+		}
+		// List[i] 对应 T{n-i}：List[0]=T{n}, List[1]=T{n-1}...
+		strs = append(strs, fmt.Sprintf("T%d: %s", n-i, field))
+	}
+	return strings.Join(strs, ", ")
+}
+
 func (d *Type) arrayDepth() int {
 	if d.ArrayDepth > 0 {
 		return d.ArrayDepth
@@ -220,6 +244,11 @@ func (d *Field) Convert(vals ...string) (rets []interface{}) {
 
 type FieldList []*Field
 
+// indexPkg 是复合键容器类型（Index2/3/4）所在的 Go 包名。
+// 这些类型手写在 module/gamedata/index.go，生成代码已 import gamedata（用于 Register），
+// 故直接引用 gamedata.Index{N}，不再依赖 protocol 包或单独生成的 index.gen.go。
+const indexPkg = "gamedata"
+
 func (d FieldList) GetIndexName() string {
 	if len(d) == 1 {
 		return d[0].Type.GetType()
@@ -228,8 +257,5 @@ func (d FieldList) GetIndexName() string {
 	for _, val := range d {
 		strs = append(strs, val.Type.GetType())
 	}
-	if len(domain.PkgName) > 0 {
-		return fmt.Sprintf("%s.Index%d[%s]", domain.PkgName, len(d), strings.Join(strs, ","))
-	}
-	return fmt.Sprintf("Index%d[%s]", len(d), strings.Join(strs, ","))
+	return fmt.Sprintf("%s.Index%d[%s]", indexPkg, len(d), strings.Join(strs, ","))
 }

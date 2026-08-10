@@ -37,7 +37,9 @@ type Struct struct {
 	FieldList []*Field            // 字段类型
 	Converts  map[string][]*Field // 转换表
 	Sheet     string
-	FileName  string // 文件名
+	FileName  string // 文件名（= 功能名，决定 proto 分桶）
+	Feature   string // 功能名（从 xlsx 文件名 @ 前解析；= FileName，保留以便生成阶段直读）
+	Table     string // 表名（从 sheet 名 @ 前解析）；struct 通常为空
 }
 
 type Index struct {
@@ -53,7 +55,9 @@ type Config struct {
 	Indexs    map[int][]*Index
 	IndexList []*Index
 	Sheet     string
-	FileName  string
+	FileName  string // 文件名（= 功能名，决定 proto 分桶）
+	Feature   string // 功能名（从 xlsx 文件名 @ 前解析）；决定 Go 子目录/package
+	Table     string // 表名（从 sheet 名 @ 前解析）；决定 Go 文件名 gdata_<feature>_<table>.go
 }
 
 type EValue struct {
@@ -67,14 +71,17 @@ type Enum struct {
 	Values    map[string]*EValue
 	ValueList []*EValue
 	Sheet     string
-	FileName  string
+	FileName  string // 文件名（= 功能名，决定 proto 分桶）
+	Feature   string // 功能名（从 xlsx 文件名 @ 前解析）
 }
 
 type Table struct {
 	TypeOf   int
 	Sheet    string
 	Type     string
-	FileName string
+	FileName string // 文件名（= 功能名，决定 proto 分桶）
+	Feature  string // 功能名（从 xlsx 文件名 @ 前解析；= FileName，保留以便生成阶段直读）
+	Table    string // 表名（从 sheet 名 @ 前解析）
 	Rules    []string
 	Rows     [][]string
 	LuaRules string // lua规则

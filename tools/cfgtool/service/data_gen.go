@@ -174,7 +174,9 @@ func GenData() error {
 		}
 	}
 
-	manager.Clear()
+	// 注意：此处不再调用 manager.Clear()。
+	// GenCode/GenCpp/GenNodeJs 在本函数之后执行，它们仍需读取 configMgr/structMgr；
+	// Clear 统一由 main.run() 在所有 Gen* 完成后调用。
 	return nil
 }
 

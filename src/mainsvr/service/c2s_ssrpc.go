@@ -3,8 +3,8 @@
 import (
 	"strconv"
 
-	"github.com/Iori372552686/GoOne/module/gamedata/repository/mall_config"
-	"github.com/Iori372552686/GoOne/module/gamedata/repository/texas_config"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/mall"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/texas"
 	"github.com/Iori372552686/GoOne/lib/api/gerr"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
@@ -300,7 +300,7 @@ func (s *MainC2SServiceImpl) MallBuyPackage(ctx *ssrpc.Context, req *g1_protocol
 		return rsp, gerr.New(code, "mall_check", "")
 	}
 
-	conf := mall_config.GetById(req.GetConfId())
+	conf := mall.GetMallById(req.GetConfId())
 	if conf == nil {
 		return rsp, gerr.New(g1_protocol.ErrorCode_ERR_CONF, "conf_not_found", "")
 	}
@@ -379,7 +379,7 @@ func (s *MainC2SServiceImpl) Fold(ctx *ssrpc.Context, req *g1_protocol.FoldReq) 
 func (s *MainC2SServiceImpl) MainBuyInDetail(ctx *ssrpc.Context, req *g1_protocol.MainBuyInDetailReq) (*g1_protocol.MainBuyInDetailRsp, error) {
 	_ = ctx
 	rsp := &g1_protocol.MainBuyInDetailRsp{Ret: &g1_protocol.Ret{}}
-	cfg := texas_config.GetByRoomStageCoinType(req.GetRoomStage(), int32(req.GetCoinType()))
+	cfg := texas.GetTexasByRoomStageCoinType(req.GetRoomStage(), int32(req.GetCoinType()))
 	if cfg == nil {
 		return rsp, gerr.New(g1_protocol.ErrorCode_ERR_CONF, "conf_not_found",
 			"missing texas config: stage=%d coinType=%d", req.GetRoomStage(), req.GetCoinType())

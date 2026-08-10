@@ -12,6 +12,7 @@ import (
 )
 
 type ProtoInfo struct {
+	GoPackage     string // option go_package 值，由 domain.PbPath 推导
 	RefList       []string
 	EnumList      []*base.Enum
 	StructList    []*base.Struct
@@ -100,6 +101,11 @@ func GenProto() error {
 		buf.Reset()
 		data.RefList = manager.GetRefList(fileName)
 		data.ArrayWrappers = collectArrayWrappers(fileName, data)
+		// go_package：与 -pb 指向的包路径一致，便于 protoc --go_opt=module 剥前缀后
+		// 落到 protocol/ 目录；分号后是 Go package 名（与 core proto 一致用 g1_protocol）。
+		// 例如 -pb=github.com/Iori372552686/g1_common/protocol
+		//     -> option go_package = "github.com/Iori372552686/g1_common/protocol;g1_protocol";
+		data.GoPackage = domain.PbPath + ";g1_protocol"
 		if err := templ.ProtoTpl.Execute(buf, data); err != nil {
 			return errs.Wrap(err, fileName, "", "", 0, "生成错误", "生成proto文件内容失败")
 		}

@@ -52,11 +52,13 @@ func TestConfig(t *testing.T) {
 	resetGlobals(t)
 	root := repoRoot(t)
 
+	// 输出到临时目录，避免测试产物污染仓库（历史缺陷：曾写入 tools/cfgtool/gen/）
+	tmpDir := t.TempDir()
 	domain.XlsxPath = filepath.Join(root, "tools", "cfgtool", "xls")
-	domain.JsonPath = filepath.Join(root, "tools", "cfgtool", "gen", "json")
-	domain.ProtoPath = filepath.Join(root, "tools", "cfgtool", "gen", "proto")
-	domain.CodePath = filepath.Join(root, "tools", "cfgtool", "gen", "code")
-	domain.LuaPath = filepath.Join(root, "tools", "cfgtool", "gen", "lua")
+	domain.JsonPath = filepath.Join(tmpDir, "gen", "json")
+	domain.ProtoPath = filepath.Join(tmpDir, "gen", "proto")
+	domain.CodePath = filepath.Join(tmpDir, "gen", "code")
+	domain.LuaPath = filepath.Join(tmpDir, "gen", "lua")
 	domain.Module = "github.com/Iori372552686/GoOne"
 	domain.PbPath = "github.com/Iori372552686/g1_common/protocol"
 	domain.PkgName = filepath.Base(domain.PbPath)

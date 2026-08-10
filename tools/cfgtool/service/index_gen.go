@@ -2,31 +2,11 @@ package service
 
 import (
 	"bytes"
-	"github.com/Iori372552686/GoOne/lib/api/uerror"
-	"github.com/Iori372552686/GoOne/tools/cfgtool/domain"
-	"github.com/Iori372552686/GoOne/tools/cfgtool/internal/base"
-	"github.com/Iori372552686/GoOne/tools/cfgtool/internal/manager"
-	"github.com/Iori372552686/GoOne/tools/cfgtool/internal/templ"
-
-	"sort"
 )
 
 func genIndex(buf *bytes.Buffer) error {
-	indexs := &IndexInfo{
-		Pkg:       "g1_protocol",
-		IndexList: manager.GetIndexMap(),
-	}
-
-	if len(indexs.IndexList) > 0 {
-		sort.Slice(indexs.IndexList, func(i, j int) bool {
-			return indexs.IndexList[i] < indexs.IndexList[j]
-		})
-
-		buf.Reset()
-		if err := templ.IndexTpl.Execute(buf, indexs); err != nil {
-			return uerror.New(1, -1, "gen index file error: %s", err.Error())
-		}
-		return base.SaveGo(domain.ProtoPath, "index.gen.go", buf.Bytes())
-	}
+	// 复合键容器类型（Index2/3/4）已内置到 module/gamedata/index.go（手写，永久稳定），
+	// 不再生成 index.gen.go。此函数保留为 no-op 以维持调用链不变。
+	// 如未来需要生成其他索引相关产物，可在此扩展。
 	return nil
 }

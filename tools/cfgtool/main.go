@@ -63,12 +63,18 @@ func init() {
 	flag.Usage = func() {
 		flag.PrintDefaults()
 		fmt.Fprint(flag.CommandLine.Output(), fmt.Sprintf(`
+		命名约定（功能名@表名 体系）：
+		  xlsx 文件名: <中文名>@<功能名>.xlsx   例如 掉落系统@drop.xlsx  -> 功能名=drop
+		  sheet    名: <中文名>@<表名>          例如 掉落组表@group      -> 表名=group
+		  普通配置表可不写生成表，工具会自动把数据 sheet 注册为 config。
+		  派生命名：类型名=DropGroupConfig / proto=drop.proto / Go文件=gdata_drop_group.go / 子目录=drop
+
 		枚举类型说明：
 		E|道具类型-金币|PropertType|Coin|1	
 		
-		配置规则说明：
-		@config|sheet@结构名|map:[字段名,字段名]:别名|lua:[args,args2]
-		@struct|sheet@结构名
+		配置规则说明（生成表中填写；配置了生成表则覆盖默认 sheet 规则）：
+		@config|sheet:结构名|map:[字段名,字段名]:别名|lua:[args,args2]
+		@struct|sheet:结构名
 		@enum|sheet
 		`))
 	}
@@ -124,6 +130,9 @@ func run() error {
 	if err := service.GenNodeJs(); err != nil {
 		return errs.Wrap(err, "", "", "", 0, "生成错误", "生成Node.js代码失败")
 	}
+
+	// 所有 Gen* 完成后统一清理内存表（原先在 GenData 末尾清理，会令后续 GenCode/GenCpp/GenNodeJs 拿到空表）
+	manager.Clear()
 
 	logx.Successf("当前gen模式[%s]:所有的执行已顺利完成,恭喜 ^_^ ！", domain.ConfMode)
 	return nil

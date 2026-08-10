@@ -1,7 +1,7 @@
 package role
 
 import (
-	"github.com/Iori372552686/GoOne/module/gamedata/repository/mall_config"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/mall"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
@@ -34,7 +34,7 @@ func (r *Role) MallAddBuyCount(confId int32) {
 }
 
 func (r *Role) MallCheckBuyCondition(confId int32) g1_protocol.ErrorCode {
-	conf := mall_config.GetById(confId)
+	conf := mall.GetMallById(confId)
 	if conf == nil {
 		return g1_protocol.ErrorCode_ERR_CONF
 	}

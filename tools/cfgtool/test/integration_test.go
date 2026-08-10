@@ -170,8 +170,9 @@ func TestIntegration_AllFeatures(t *testing.T) {
 		`repeated TexasGameEndInfo EndInfos`,
 		`map<int32, TexasGameEndInfo> EndMap`,
 		`CardType CType`,
-		`import "proto/core/struct.proto"`,
-		`import "proto/core/game_enum.proto"`,
+		// import 基名 = 外部 proto 相对 ProtoSrcPath（common/game_proto）的路径
+		`import "core/struct.proto"`,
+		`import "core/game_enum.proto"`,
 	}
 	for _, want := range checks {
 		if !strings.Contains(protoText, want) {
