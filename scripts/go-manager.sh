@@ -17,9 +17,18 @@ shopt -s nullglob
 readonly GO_INSTALL_DIR="${HOME}/.go/versions"
 readonly GO_CURRENT_LINK="${HOME}/.go/current"
 readonly SCRIPT_NAME="$(basename "$0")"
-readonly SCRIPT_VERSION="4.0.2"
+readonly SCRIPT_VERSION="4.0.3"
 # 自定义主镜像（可选），例如: export GO_MIRROR="https://mirrors.aliyun.com/golang"
 readonly GO_MIRROR="${GO_MIRROR:-}"
+# 下载重试与网络参数（可通过环境变量覆盖）
+readonly GO_DL_RETRIES="${GO_DL_RETRIES:-3}"
+readonly GO_DL_CONNECT_TIMEOUT="${GO_DL_CONNECT_TIMEOUT:-12}"
+readonly GO_DL_MAX_TIME="${GO_DL_MAX_TIME:-240}"
+readonly GO_DL_BACKOFF_BASE="${GO_DL_BACKOFF_BASE:-3}"
+readonly GO_DL_FORCE_IPV4="${GO_DL_FORCE_IPV4:-true}"
+readonly GO_DL_PROBE_ENABLED="${GO_DL_PROBE_ENABLED:-auto}"
+readonly GO_DL_PROBE_TIMEOUT="${GO_DL_PROBE_TIMEOUT:-4}"
+readonly GO_DL_FAST_FAIL_HTTP="${GO_DL_FAST_FAIL_HTTP:-true}"
 # 是否在校验失败时保留下载的压缩包，便于手动检查
 # 可通过环境变量覆盖: export GO_KEEP_BAD_ARCHIVE=false
 readonly KEEP_BAD_ARCHIVE="${GO_KEEP_BAD_ARCHIVE:-true}"
@@ -103,8 +112,6 @@ generate_user_agent() {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0"
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/121.0"
         "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/121.0"
-        "curl/7.81.0"
-        "Wget/1.21.2"
     )
     
     local idx=$(( RANDOM % ${#uas[@]} ))
@@ -149,6 +156,29 @@ Sec-Fetch-Site: cross-site
 Pragma: no-cache
 Cache-Control: no-cache
 EOF
+}
+
+build_download_referer() {
+    local url="$1"
+
+    # 常见镜像使用更贴近站点结构的 Referer，减少异常风控概率。
+    case "$url" in
+        *"mirrors.aliyun.com/golang/"*) echo "https://mirrors.aliyun.com/golang/"; return 0 ;;
+        *"mirrors.ustc.edu.cn/golang/"*) echo "https://mirrors.ustc.edu.cn/golang/"; return 0 ;;
+        *"mirrors.cloud.tencent.com/golang/"*) echo "https://mirrors.cloud.tencent.com/golang/"; return 0 ;;
+        *"mirrors.tuna.tsinghua.edu.cn/golang/"*) echo "https://mirrors.tuna.tsinghua.edu.cn/golang/"; return 0 ;;
+        *"mirrors.bfsu.edu.cn/golang/"*) echo "https://mirrors.bfsu.edu.cn/golang/"; return 0 ;;
+        *"go.dev/dl/"*|*"golang.org/dl/"*|*"golang.google.cn/dl/"*) echo "https://go.dev/dl/"; return 0 ;;
+        *"dl.google.com/go/"*|*"storage.googleapis.com/golang/"*) echo "https://go.dev/dl/"; return 0 ;;
+    esac
+
+    local host
+    host="$(echo "$url" | sed -E 's#^https?://([^/]+)/?.*#\1#' 2>/dev/null || true)"
+    if [[ -n "$host" ]]; then
+        echo "https://${host}/dl/"
+    else
+        echo "https://go.dev/dl/"
+    fi
 }
 
 # ============================================
@@ -274,25 +304,62 @@ download_with_curl_fixed() {
     # 生成随机 User-Agent
     local user_agent
     user_agent="$(generate_user_agent)"
+    local referer
+    referer="$(build_download_referer "$url")"
+    local cookie_file="${output_file}.cookies"
+    local part_file="${output_file}.part"
 
     # 适度随机延迟，避免触发防护，但不要过长
     local delay=$(( RANDOM % 3 + 1 ))  # 1-3 秒
     log_debug "等待 ${delay} 秒以避免请求过快..."
     sleep "$delay"
 
-    # 构建 curl 命令（简化版）
+    # 先请求下载页面，模拟浏览器访问流程并获取 cookie（失败不终止主下载）
+    local preflight_opts=(
+        "--location"
+        "--silent"
+        "--show-error"
+        "--connect-timeout" "$GO_DL_CONNECT_TIMEOUT"
+        "--max-time" "20"
+        "--cookie-jar" "$cookie_file"
+        "-H" "User-Agent: $user_agent"
+        "-H" "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    )
+    if [[ "$GO_DL_FORCE_IPV4" == "true" ]]; then
+        preflight_opts+=("--ipv4")
+    fi
+    curl "${preflight_opts[@]}" "$referer" -o /dev/null 2>/dev/null || true
+
+    # 构建 curl 命令（增强版）
     local curl_opts=(
         "--location"                # 自动跟随重定向
         "--fail"                    # 4xx/5xx 视为失败
         "--silent"                  # 静默输出
-        "--show-error"             # 仍输出错误信息
-        "--connect-timeout" "30"
-        "--max-time" "300"
+        "--show-error"              # 仍输出错误信息
+        "--http1.1"                 # 避免部分网络环境中的 HTTP/2 兼容问题
+        "--continue-at" "-"        # 断点续传，提高长链路成功率
+        "--retry" "$GO_DL_RETRIES"
+        "--retry-delay" "2"
+        "--retry-all-errors"
+        "--connect-timeout" "$GO_DL_CONNECT_TIMEOUT"
+        "--max-time" "$GO_DL_MAX_TIME"
+        "--cookie" "$cookie_file"
         "-H" "User-Agent: $user_agent"
         "-H" "Accept: */*"
         "-H" "Accept-Language: en-US,en;q=0.9"
-        "-H" "Referer: https://golang.org/dl/"
+        "-H" "Accept-Encoding: identity"
+        "-H" "Referer: $referer"
+        "-H" "DNT: 1"
+        "-H" "Connection: keep-alive"
+        "-H" "Sec-Fetch-Dest: document"
+        "-H" "Sec-Fetch-Mode: navigate"
+        "-H" "Sec-Fetch-Site: cross-site"
+        "-H" "Pragma: no-cache"
+        "-H" "Cache-Control: no-cache"
     )
+    if [[ "$GO_DL_FORCE_IPV4" == "true" ]]; then
+        curl_opts+=("--ipv4")
+    fi
 
     # 进度显示
     if [[ -t 1 ]]; then
@@ -301,23 +368,45 @@ download_with_curl_fixed() {
         curl_opts+=("--no-progress-meter")
     fi
 
-    log_debug "执行命令: curl ${curl_opts[*]} \"$url\" -o \"$output_file\""
+    log_debug "执行命令: curl ${curl_opts[*]} \"$url\" -o \"$part_file\""
 
-    if ! curl "${curl_opts[@]}" "$url" -o "$output_file"; then
-        local ec=$?
-        log_warn "curl 下载失败，退出码: $ec"
-        rm -f "$output_file" 2>/dev/null || true
+    # set -e 下显式捕获退出码，避免命令失败导致脚本提前退出
+    local http_code="000"
+    set +e
+    http_code="$(curl "${curl_opts[@]}" --write-out "%{http_code}" "$url" -o "$part_file")"
+    local ec=$?
+    set -e
+    http_code="$(echo "$http_code" | tr -d '[:space:]')"
+    if [[ $ec -ne 0 ]]; then
+        log_warn "curl 下载失败，退出码: $ec, HTTP状态: ${http_code:-unknown}"
+        if [[ "$GO_DL_FAST_FAIL_HTTP" == "true" && $ec -eq 22 ]]; then
+            case "$http_code" in
+                403|404|410)
+                    log_warn "检测到确定性 HTTP 错误(${http_code})，该镜像本轮不再重试"
+                    rm -f "$part_file" "$cookie_file" 2>/dev/null || true
+                    return 2
+                    ;;
+            esac
+        fi
+        rm -f "$part_file" "$cookie_file" 2>/dev/null || true
         return 1
     fi
 
-    if [[ ! -s "$output_file" ]]; then
+    if [[ ! -s "$part_file" ]]; then
         log_warn "curl 下载完成，但文件为空"
-        rm -f "$output_file" 2>/dev/null || true
+        rm -f "$part_file" "$cookie_file" 2>/dev/null || true
         return 1
     fi
+
+    mv -f "$part_file" "$output_file" 2>/dev/null || {
+        log_warn "curl 下载成功，但写入目标文件失败"
+        rm -f "$part_file" "$cookie_file" 2>/dev/null || true
+        return 1
+    }
 
     local file_size
     file_size="$(wc -c < "$output_file" 2>/dev/null || echo 0)"
+    rm -f "$cookie_file" 2>/dev/null || true
     log_success "curl 下载成功: $((file_size/1024/1024)) MB"
     return 0
 }
@@ -333,24 +422,43 @@ download_with_wget_fixed() {
     # 生成随机 User-Agent
     local user_agent
     user_agent="$(generate_user_agent)"
-    
+    local referer
+    referer="$(build_download_referer "$url")"
+    local part_file="${output_file}.part"
+
     # 适度随机延迟
     local delay=$(( RANDOM % 3 + 1 ))
     log_debug "等待 ${delay} 秒以避免请求过快..."
     sleep "$delay"
     
-    # 构建 wget 命令（简化版）
+    # 构建 wget 命令（增强版）
     local wget_opts=(
-        "--tries=2"
-        "--timeout=45"
-        "--waitretry=5"
+        "--tries=${GO_DL_RETRIES}"
+        "--connect-timeout=${GO_DL_CONNECT_TIMEOUT}"
+        "--read-timeout=90"
+        "--dns-timeout=${GO_DL_CONNECT_TIMEOUT}"
+        "--waitretry=3"
         "--retry-connrefused"
+        "--continue"
+        "--max-redirect=10"
+        "--no-iri"
         "--user-agent=$user_agent"
         "--header=Accept: */*"
         "--header=Accept-Language: en-US,en;q=0.9"
-        "--header=Referer: https://golang.org/dl/"
+        "--header=Accept-Encoding: identity"
+        "--header=Referer: $referer"
+        "--header=DNT: 1"
+        "--header=Connection: keep-alive"
+        "--header=Sec-Fetch-Dest: document"
+        "--header=Sec-Fetch-Mode: navigate"
+        "--header=Sec-Fetch-Site: cross-site"
+        "--header=Pragma: no-cache"
+        "--header=Cache-Control: no-cache"
     )
-    
+    if [[ "$GO_DL_FORCE_IPV4" == "true" ]]; then
+        wget_opts+=("--inet4-only")
+    fi
+
     # 进度显示
     if [[ -t 1 ]]; then
         wget_opts+=("--show-progress")
@@ -358,21 +466,31 @@ download_with_wget_fixed() {
         wget_opts+=("--quiet")
     fi
     
-    log_debug "执行命令: wget ${wget_opts[*]} -O \"$output_file\" \"$url\""
-    
-    if ! wget "${wget_opts[@]}" -O "$output_file" "$url"; then
-        local ec=$?
+    log_debug "执行命令: wget ${wget_opts[*]} -O \"$part_file\" \"$url\""
+
+    # set -e 下显式捕获退出码，避免命令失败导致脚本提前退出
+    set +e
+    wget "${wget_opts[@]}" -O "$part_file" "$url"
+    local ec=$?
+    set -e
+    if [[ $ec -ne 0 ]]; then
         log_warn "wget 下载失败，退出码: $ec"
-        rm -f "$output_file" 2>/dev/null || true
+        rm -f "$part_file" 2>/dev/null || true
         return 1
     fi
     
-    if [[ ! -s "$output_file" ]]; then
+    if [[ ! -s "$part_file" ]]; then
         log_warn "wget 下载完成，但文件为空"
-        rm -f "$output_file" 2>/dev/null || true
+        rm -f "$part_file" 2>/dev/null || true
         return 1
     fi
-    
+
+    mv -f "$part_file" "$output_file" 2>/dev/null || {
+        log_warn "wget 下载成功，但写入目标文件失败"
+        rm -f "$part_file" 2>/dev/null || true
+        return 1
+    }
+
     local file_size
     file_size="$(wc -c < "$output_file" 2>/dev/null || echo 0)"
     log_success "wget 下载成功: $((file_size/1024/1024)) MB"
@@ -607,43 +725,60 @@ download_file_fixed() {
     local attempt=1
     while [[ $attempt -le $max_attempts ]]; do
         log_info "=== 下载尝试 $attempt/$max_attempts ==="
-        
+        local deterministic_http_error=false
+
         for tool in "${tools[@]}"; do
+            local tool_rc=1
             case "$tool" in
                 curl)
                     if download_with_curl_fixed "$url" "$output_file" "$attempt"; then
                         return 0
+                    else
+                        tool_rc=$?
                     fi
                     ;;
                 wget)
                     if download_with_wget_fixed "$url" "$output_file" "$attempt"; then
                         return 0
+                    else
+                        tool_rc=$?
                     fi
                     ;;
                 python)
                     if download_with_python_fixed "$url" "$output_file" "$attempt"; then
                         return 0
+                    else
+                        tool_rc=$?
                     fi
                     ;;
             esac
-            
+
+            if [[ $tool_rc -eq 2 ]]; then
+                deterministic_http_error=true
+            fi
+
             # 清理失败的文件
             rm -f "$output_file" 2>/dev/null || true
             
             # 在不同工具之间添加延迟
             sleep 2
         done
-        
+
+        if [[ "$deterministic_http_error" == "true" ]]; then
+            log_warn "检测到确定性 HTTP 错误，跳过该镜像的后续重试"
+            return 2
+        fi
+
         attempt=$((attempt + 1))
         
         if [[ $attempt -le $max_attempts ]]; then
-            local wait_time=$((attempt * 3 + RANDOM % 5))
+            local wait_time=$((attempt * GO_DL_BACKOFF_BASE + RANDOM % 5))
             log_warn "所有工具尝试失败，等待 ${wait_time} 秒后重试..."
             sleep "$wait_time"
         fi
     done
     
-    log_error "所有下载方法均失败 (403 Forbidden)"
+    log_error "所有下载方法均失败 (网络超时/连接失败/403)"
     log_info "可能的原因："
     log_info "1. 服务器临时限制或维护"
     log_info "2. 您的IP地址被暂时限制"
@@ -701,6 +836,101 @@ get_mirror_urls_fixed() {
     printf '%s\n' "${mirrors[@]}"
 }
 
+probe_mirror_url() {
+    local url="$1"
+    local user_agent
+    user_agent="$(generate_user_agent)"
+
+    # 先尝试 HEAD；若被目标站点策略拦截，再尝试 0-1 字节范围 GET
+    if command -v curl &>/dev/null; then
+        local probe_opts=(
+            "--location"
+            "--silent"
+            "--show-error"
+            "--connect-timeout" "$GO_DL_PROBE_TIMEOUT"
+            "--max-time" "$GO_DL_PROBE_TIMEOUT"
+            "-H" "User-Agent: $user_agent"
+            "-H" "Accept: */*"
+        )
+        if [[ "$GO_DL_FORCE_IPV4" == "true" ]]; then
+            probe_opts+=("--ipv4")
+        fi
+
+        if curl "${probe_opts[@]}" --fail --head "$url" -o /dev/null 2>/dev/null; then
+            return 0
+        fi
+        if curl "${probe_opts[@]}" --fail -H "Range: bytes=0-1" "$url" -o /dev/null 2>/dev/null; then
+            return 0
+        fi
+    fi
+
+    if command -v wget &>/dev/null; then
+        local wget_probe_opts=(
+            "--spider"
+            "--tries=1"
+            "--connect-timeout=${GO_DL_PROBE_TIMEOUT}"
+            "--read-timeout=${GO_DL_PROBE_TIMEOUT}"
+            "--timeout=${GO_DL_PROBE_TIMEOUT}"
+            "--user-agent=$user_agent"
+            "--header=Accept: */*"
+            "--quiet"
+        )
+        if [[ "$GO_DL_FORCE_IPV4" == "true" ]]; then
+            wget_probe_opts+=("--inet4-only")
+        fi
+
+        if wget "${wget_probe_opts[@]}" "$url"; then
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+select_mirror_candidates() {
+    local version="$1"
+    local os="$2"
+    local arch="$3"
+
+    local all_mirrors=()
+    mapfile -t all_mirrors < <(get_mirror_urls_fixed "$version" "$os" "$arch")
+
+    if [[ "${GO_DL_PROBE_ENABLED}" == "false" || ${#all_mirrors[@]} -le 1 ]]; then
+        printf '%s\n' "${all_mirrors[@]}"
+        return 0
+    fi
+
+    if [[ "${GO_DL_PROBE_ENABLED}" != "true" && "${GO_DL_PROBE_ENABLED}" != "auto" ]]; then
+        log_warn "未知 GO_DL_PROBE_ENABLED=${GO_DL_PROBE_ENABLED}，回退到 auto" >&2
+    fi
+
+    # 注意：本函数会被 mapfile 捕获 stdout，日志必须写到 stderr，避免污染 URL 列表。
+    log_info "快速探测镜像可达性（超时 ${GO_DL_PROBE_TIMEOUT}s）..." >&2
+
+    local reachable=()
+    local degraded=()
+    local url
+    for url in "${all_mirrors[@]}"; do
+        if [[ -z "$url" ]]; then
+            continue
+        fi
+        if probe_mirror_url "$url"; then
+            reachable+=("$url")
+            log_debug "探测通过: $url" >&2
+        else
+            degraded+=("$url")
+            log_debug "探测失败（仍保留兜底）: $url" >&2
+        fi
+    done
+
+    if [[ ${#reachable[@]} -gt 0 ]]; then
+        printf '%s\n' "${reachable[@]}"
+    fi
+    if [[ ${#degraded[@]} -gt 0 ]]; then
+        printf '%s\n' "${degraded[@]}"
+    fi
+}
+
 # 验证下载的 Go 压缩包
 validate_go_archive() {
     local archive_file="$1"
@@ -733,9 +963,9 @@ validate_go_archive() {
             
             # 显示文件开头以帮助调试
             log_debug "文件开头内容:"
-            head -3 "$archive_file" | while read -r line; do
+            while read -r line; do
                 log_debug "  $line"
-            done
+            done < <(head -3 "$archive_file" || true)
         fi
         
         return 1
@@ -748,9 +978,9 @@ validate_go_archive() {
 
     # 调试时展示前若干行，便于排查
     log_debug "压缩包内容示例（前 20 行）："
-    printf '%s\n' "$file_list" | head -20 | while read -r line; do
+    while read -r line; do
         log_debug "  $line"
-    done
+    done < <(printf '%s\n' "$file_list" | head -20 || true)
 
     # 检查 VERSION 文件是否存在且内容合理（进一步确认是 Go SDK）
     local version_file
@@ -872,9 +1102,20 @@ install_go_version_fixed() {
         temp_file="$(mktemp /tmp/go-${version}-XXXXXX.tar.gz 2>/dev/null || echo "/tmp/go-${version}-$$.tar.gz")"
         GLOBAL_TEMP_FILE="$temp_file"
         
-        # 获取镜像列表
+        # 获取镜像列表（探测可达性后优先尝试可用镜像）
+        local candidate_mirrors=()
+        mapfile -t candidate_mirrors < <(select_mirror_candidates "$version" "$os" "$arch")
+
         local mirror_index=0
-        while IFS= read -r mirror_url && [[ -n "$mirror_url" ]]; do
+        for mirror_url in "${candidate_mirrors[@]}"; do
+            [[ -z "$mirror_url" ]] && continue
+
+            # 防御性校验：仅处理 http/https URL，防止日志串或异常内容被当作镜像地址。
+            if [[ ! "$mirror_url" =~ ^https?:// ]]; then
+                log_warn "跳过无效镜像地址: $mirror_url"
+                continue
+            fi
+
             mirror_index=$((mirror_index + 1))
             
             # 提取镜像名称用于显示
@@ -917,7 +1158,7 @@ install_go_version_fixed() {
             
             # 在镜像之间添加延迟
             sleep 3
-        done < <(get_mirror_urls_fixed "$version" "$os" "$arch")
+        done
     fi
     
     if [[ "$download_success" != "true" ]]; then
@@ -927,10 +1168,10 @@ install_go_version_fixed() {
         log_info ""
         log_info "📋 手动下载指南:"
         log_info "1. 请访问以下任意链接下载:"
-        get_mirror_urls_fixed "$version" "$os" "$arch" | head -5 | while read -r url; do
+        while read -r url; do
             log_info "   - $url"
-        done
-        
+        done < <(get_mirror_urls_fixed "$version" "$os" "$arch" | head -5 || true)
+
         log_info ""
         log_info "2. 将下载的文件保存为: $filename"
         log_info "3. 放置到以下任意位置:"
@@ -989,7 +1230,11 @@ install_go_version_fixed() {
         if [[ -x "${install_path}/bin/go" ]]; then
             local installed_version
             installed_version="$("${install_path}/bin/go" version 2>/dev/null | awk '{print $3}' | sed 's/go//')"
-            
+            if [[ -z "$installed_version" ]]; then
+                installed_version="$version"
+                log_warn "无法读取 go version 输出，回退显示为请求版本: $version"
+            fi
+
             log_success "Go 安装成功: $installed_version"
             [[ -n "$final_download_url" ]] && log_info "下载来源: $final_download_url"
             
@@ -1231,6 +1476,16 @@ ${BOLD}手动下载示例:${NC}
   wget https://mirrors.aliyun.com/golang/go1.25.0.linux-amd64.tar.gz
   mv go1.25.0.linux-amd64.tar.gz /tmp/
   $0 install 1.25.0
+
+${BOLD}下载参数（可选环境变量）:${NC}
+  GO_DL_RETRIES=3             # 每次下载命令重试次数
+  GO_DL_CONNECT_TIMEOUT=12    # TCP连接超时秒数
+  GO_DL_MAX_TIME=240          # 单次 curl 最大耗时秒数
+  GO_DL_BACKOFF_BASE=3        # 多轮重试回退基数秒
+  GO_DL_FORCE_IPV4=true       # 优先使用 IPv4
+  GO_DL_PROBE_ENABLED=auto    # 镜像探测: true/false/auto
+  GO_DL_PROBE_TIMEOUT=4       # 镜像探测超时秒数
+  GO_DL_FAST_FAIL_HTTP=true   # 对 403/404/410 快速失败并切换镜像
 EOF
 }
 
@@ -1242,7 +1497,14 @@ check_system() {
     echo "  当前用户: $(whoami 2>/dev/null || echo "未知")"
     echo "  家目录: $HOME"
     echo "  Shell配置文件: $SHELL_PROFILE"
-    
+    echo "  下载重试: $GO_DL_RETRIES"
+    echo "  连接超时(秒): $GO_DL_CONNECT_TIMEOUT"
+    echo "  单次最大耗时(秒): $GO_DL_MAX_TIME"
+    echo "  强制IPv4: $GO_DL_FORCE_IPV4"
+    echo "  镜像探测: $GO_DL_PROBE_ENABLED"
+    echo "  探测超时(秒): $GO_DL_PROBE_TIMEOUT"
+    echo "  HTTP快速失败: $GO_DL_FAST_FAIL_HTTP"
+
     log_info "可用下载工具:"
     for tool in curl wget python3 python; do
         if command -v "$tool" &>/dev/null; then

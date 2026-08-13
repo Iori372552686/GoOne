@@ -9,9 +9,9 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/nacos-group/nacos-sdk-go/vo"
+	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 
-	"github.com/nacos-group/nacos-sdk-go/clients/naming_client"
+	"github.com/nacos-group/nacos-sdk-go/v2/clients/naming_client"
 )
 
 var (
