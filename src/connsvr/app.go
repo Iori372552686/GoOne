@@ -84,9 +84,12 @@ func (gatewayComponent) Name() string { return "gateway_listeners" }
 func (gatewayComponent) Start(_ context.Context) error {
 	// 用已加载的 capacity 配置构造过载保护闸门，注入共享 SessionHub。
 	// 三传输 OnConn 与 pack_proc 首次登录通过 hub 间接调用闸门。off 模式直通。
+	// capacity 段可选：缺省时零值即 OverloadModeOff（不限制），向后兼容。
 	var cap gconf.ConnCapacityConfig
-	if err := conf.Unmarshal("connsvr.capacity", &cap); err != nil {
-		return err
+	if conf.Has("connsvr.capacity") {
+		if err := conf.Unmarshal("connsvr.capacity", &cap); err != nil {
+			return err
+		}
 	}
 	globals.SessionHub.SetAdmission(net_mgr.NewAdmissionController(globals.SessionHub, net_mgr.AdmissionLimits{
 		MaxConnections:                cap.MaxConnections,

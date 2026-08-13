@@ -96,6 +96,14 @@ connsvr:
   debug:
     log_dir: ./logs/
     log_level: debug
+  # 过载保护参数（可选；缺省 0 = 不限制，向后兼容）。需要限流时取消注释：
+  # capacity:
+  #   max_connections: 0                  # 总连接上限，0 = 不限
+  #   max_unauthenticated_connections: 0  # 未认证连接上限，0 = 不限
+  #   connection_rate: 0                  # 每秒新建连接，0 = 不限
+  #   login_rate: 0                       # 每秒登录(BindClient)，0 = 不限
+  #   max_inflight: 0                     # 全局在途 SSRPC，0 = 不限
+  #   overload_mode: off                  # off / shadow / enforce
 
 infosvr:
   identity:
