@@ -2,7 +2,7 @@
 
 import (
 	"fmt"
-	"github.com/Iori372552686/GoOne/module/gamedata/repository/texas_config"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/texas"
 	"github.com/Iori372552686/GoOne/module/gfunc"
 	"github.com/Iori372552686/GoOne/module/misc"
 	id "github.com/Iori372552686/GoOne/src/roomcentersvr/globals/idgen"
@@ -15,7 +15,7 @@ import (
 
 // OnAiInitRoom checks if the AI can create rooms for all game types
 func OnAiInitRoom() {
-	gameconfs := texas_config.GetAll()
+	gameconfs := texas.GetTexasAll()
 
 	time.Sleep(2 * time.Second)
 	if gameconfs != nil {
@@ -28,7 +28,7 @@ func OnAiInitRoom() {
 
 func OnAiCreateRoom(gameId pb.GameTypeId, stage, coinType int32) (*pb.RoomBaseInfo, error) {
 	sysUid := uint64(100000)
-	conf := texas_config.GetByRoomStageCoinType(stage, coinType)
+	conf := texas.GetTexasByRoomStageCoinType(stage, coinType)
 	if conf == nil {
 		return nil, fmt.Errorf("room config not found for stage: %d, coinType: %d", stage, coinType)
 	}

@@ -13,12 +13,23 @@ var (
 )
 
 func AddTable(file, sheet string, typeOf int, t string, rows [][]string, rules []string) {
+	AddTableFull(file, sheet, typeOf, t, rows, rules, file, "")
+}
+
+// AddTableFull 是 AddTable 的完整版本，额外携带 feature/table 元信息。
+//   file    : 文件名（= 功能名，决定 proto 分桶；保持与旧 key 一致）
+//   sheet   : 原始 sheet 名（保持与 GetTable 的 key 一致）
+//   feature : 功能名（从 xlsx 文件名 @ 前解析；默认 = file）
+//   table   : 表名（从 sheet 名 @ 前解析）
+func AddTableFull(file, sheet string, typeOf int, t string, rows [][]string, rules []string, feature, table string) {
 	key := file + ":" + sheet
 	val := &base.Table{
-		Type:     t,
 		TypeOf:   typeOf,
 		Sheet:    sheet,
+		Type:     t,
 		FileName: file,
+		Feature:  feature,
+		Table:    table,
 		Rules:    rules,
 		Rows:     rows,
 	}

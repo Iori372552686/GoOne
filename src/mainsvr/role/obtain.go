@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/service/router"
-	"github.com/Iori372552686/GoOne/module/gamedata/repository/item_config"
-	"github.com/Iori372552686/GoOne/module/gamedata/repository/obtain_policy_config"
+	itemconf "github.com/Iori372552686/GoOne/module/gamedata/repository/item"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/obtain"
 	pb "github.com/Iori372552686/g1_common/protocol"
 )
 
@@ -132,7 +132,7 @@ type obtainPolicy struct {
 
 func obtainPolicyForSource(source string) obtainPolicy {
 	policy := defaultObtainPolicyForSource(source)
-	cfg := obtain_policy_config.GetBySource(source)
+	cfg := obtain.GetObtainPolicyBySource(source)
 	if cfg == nil || cfg.IsEnable == 0 {
 		return policy
 	}
@@ -265,7 +265,7 @@ func buildObtainRewardItems(param *ObtainNotifyParam, policy obtainPolicy) ([]*p
 
 // fillObtainDisplayInfo 从 ItemConfig 填充 Name/Icon/Quality。
 func fillObtainDisplayInfo(item *pb.ObtainRewardItem) {
-	cfg := item_config.GetByItemId(item.ItemId)
+	cfg := itemconf.GetItemByItemId(item.ItemId)
 	if cfg == nil {
 		return
 	}

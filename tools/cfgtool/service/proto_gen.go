@@ -12,6 +12,7 @@ import (
 )
 
 type ProtoInfo struct {
+	GoPackage     string // option go_package 值，由 domain.PbPath 推导
 	RefList       []string
 	EnumList      []*base.Enum
 	StructList    []*base.Struct
@@ -100,6 +101,11 @@ func GenProto() error {
 		buf.Reset()
 		data.RefList = manager.GetRefList(fileName)
 		data.ArrayWrappers = collectArrayWrappers(fileName, data)
+		// go_package：与 -pb 指向的包路径一致，便于 protoc --go_opt=module 剥前缀后
+		// 落到 protocol/ 目录；分号后是 Go package 名（与 core proto 一致用 g1_protocol）。
+		// 例如 -pb=github.com/Iori372552686/g1_common/protocol
+		//     -> option go_package = "github.com/Iori372552686/g1_common/protocol;g1_protocol";
+		data.GoPackage = domain.PbPath + ";g1_protocol"
 		if err := templ.ProtoTpl.Execute(buf, data); err != nil {
 			return errs.Wrap(err, fileName, "", "", 0, "生成错误", "生成proto文件内容失败")
 		}
@@ -114,6 +120,12 @@ func SaveProto() error {
 	}
 
 	for fileName, data := range manager.GetProtoMap() {
+		// 外部 proto（-proto-src 载入）只参与类型解析，不输出到 -proto 目录；
+		// 否则会把 core/service/storage proto 复制进配置 proto 目录，
+		// 后续 protoc 编译时会与 core/ 原文件重复定义而失败。
+		if manager.IsExternalProto(fileName) {
+			continue
+		}
 		if err := base.Save(domain.ProtoPath, fileName, []byte(data)); err != nil {
 			return errs.Wrap(err, fileName, "", "", 0, "保存错误", "保存proto失败")
 		}

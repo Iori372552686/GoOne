@@ -46,7 +46,7 @@ ${COLOR_BOLD}Usage${COLOR_RESET}
   ./main.sh ${COLOR_CYAN}doctor${COLOR_RESET}
   ./main.sh ${COLOR_CYAN}check-genproto${COLOR_RESET} [--full]
   ./main.sh ${COLOR_CYAN}proto${COLOR_RESET} [game|full|help]
-  ./main.sh ${COLOR_CYAN}xls${COLOR_RESET} [all|client|server]
+  ./main.sh ${COLOR_CYAN}xls${COLOR_RESET} [all|client|server]  # default: server
   ./main.sh ${COLOR_CYAN}install${COLOR_RESET} ansible [--venv <dir>]
   ./main.sh ${COLOR_CYAN}go${COLOR_RESET} <install|list|current|use|uninstall|check|help> [args...]
   ./main.sh ${COLOR_CYAN}docker${COLOR_RESET} <install|up|restart|down|status|logs> --env <dev> [options...]
@@ -68,9 +68,10 @@ ${COLOR_BOLD}Examples${COLOR_RESET}
   ./main.sh proto game
   ./main.sh proto full
 
-  # xls (game config from xlsx)
+  # xls (game config from xlsx; default = server)
   ./main.sh xls
-  ./main.sh xls server
+  ./main.sh xls client
+  ./main.sh xls all
 
   # build
   ./main.sh build
@@ -258,7 +259,7 @@ EOF
 }
 
 run_xls() {
-  local mode="${1:-all}"
+  local mode="${1:-server}"
   print_header
   require_file "${ROOT_DIR}/common/gen_xls.sh"
   log_info "Generating xlsx game config (mode=${mode})..."
@@ -317,7 +318,7 @@ case "$cmd" in
     ;;
 
   xls)
-    run_xls "${1:-all}"
+    run_xls "${1:-server}"
     ;;
 
   env)

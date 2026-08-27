@@ -181,7 +181,7 @@ func (t *Transaction) ParseMsg(data []byte, msg proto.Message) error {
 		t.Warningf("Fail to unmarshal req | %v", err)
 		return err
 	}
-	t.Debugf("parse msg {bodyLen:%d, msgType:%s}", len(data), protoMessageType(msg))
+	t.Debugf("parse msg {bodyLen:%d, data:%v}", len(data), msg)
 	return nil
 }
 

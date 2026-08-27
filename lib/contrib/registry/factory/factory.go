@@ -16,9 +16,9 @@ import (
 
 	"github.com/hashicorp/consul/api"
 
-	"github.com/nacos-group/nacos-sdk-go/clients"
-	"github.com/nacos-group/nacos-sdk-go/common/constant"
-	"github.com/nacos-group/nacos-sdk-go/vo"
+	"github.com/nacos-group/nacos-sdk-go/v2/clients"
+	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
+	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -60,6 +60,8 @@ type Config struct {
 	NacosKind        string
 	NacosWeight      float64
 	NacosNamespaceID string
+	NacosUserName    string
+	NacosPassword    string
 
 	// Kubernetes options.
 	KubeConfig string
@@ -227,6 +229,12 @@ func ParseConfig(addr string) (Config, error) {
 	if v := strings.TrimSpace(q.Get("nacos_namespace")); v != "" {
 		cfg.NacosNamespaceID = v
 	}
+	if v := strings.TrimSpace(q.Get("username")); v != "" {
+		cfg.NacosUserName = v
+	}
+	if v := strings.TrimSpace(q.Get("password")); v != "" {
+		cfg.NacosPassword = v
+	}
 
 	// Kubernetes query params.
 	if v := strings.TrimSpace(q.Get("kubeconfig")); v != "" {
@@ -295,6 +303,8 @@ func NewClient(cfg Config) (registry.Client, error) {
 		cc := constant.ClientConfig{
 			NamespaceId: cfg.NacosNamespaceID,
 			TimeoutMs:   uint64(maxInt64(1000, cfg.Timeout.Milliseconds())),
+			Username:    cfg.NacosUserName,
+			Password:    cfg.NacosPassword,
 		}
 		nc, err := clients.NewNamingClient(vo.NacosClientParam{
 			ClientConfig:  &cc,

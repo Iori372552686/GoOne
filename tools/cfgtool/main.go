@@ -33,7 +33,7 @@ func main() {
 	flag.StringVar(&domain.CodePath, "code", "", "go代码文件目录")
 	flag.StringVar(&domain.CppPath, "cpp", "", "c++代码文件目录")
 	flag.StringVar(&domain.NodeJsPath, "nodejs", "", "node.js/ts代码文件目录")
-	flag.StringVar(&domain.ConfMode, "mode", "all", "配置gen模式（all：全部  client：客户端  server： 服务器）")
+	flag.StringVar(&domain.ConfMode, "mode", "all", "配置gen模式（all：全部  client：客户端  server：服务器）")
 	flag.StringVar(&domain.Module, "module", "github.com/Iori372552686/GoOne", "项目目录")
 	flag.StringVar(&domain.PbPath, "pb", "github.com/Iori372552686/g1_common/protocol", "proto生成路径")
 	flag.StringVar(&domain.UploadURL, "upload", "", "配置中心URL（留空不上传；如 etcd://host:2379?path=/goone/config 或 nacos://host:8848?dataid=...&group=...）")
@@ -63,12 +63,18 @@ func init() {
 	flag.Usage = func() {
 		flag.PrintDefaults()
 		fmt.Fprint(flag.CommandLine.Output(), fmt.Sprintf(`
+		命名约定（功能名@表名 体系）：
+		  xlsx 文件名: <中文名>@<功能名>.xlsx   例如 掉落系统@drop.xlsx  -> 功能名=drop
+		  sheet    名: <中文名>@<表名>          例如 掉落组表@group      -> 表名=group
+		  普通配置表可不写生成表，工具会自动把数据 sheet 注册为 config。
+		  派生命名：类型名=DropGroupConfig / proto=drop.proto / Go文件=gdata_drop_group.go / 子目录=drop
+
 		枚举类型说明：
 		E|道具类型-金币|PropertType|Coin|1	
 		
-		配置规则说明：
-		@config|sheet@结构名|map:[字段名,字段名]:别名|lua:[args,args2]
-		@struct|sheet@结构名
+		配置规则说明（生成表中填写；配置了生成表则覆盖默认 sheet 规则）：
+		@config|sheet:结构名|map:[字段名,字段名]:别名|lua:[args,args2]
+		@struct|sheet:结构名
 		@enum|sheet
 		`))
 	}
@@ -82,8 +88,10 @@ func run() error {
 	}
 	// 预加载外部 proto（必须在 ParseFiles 之前，使 buildField 能识别 pb.XXX 类型、
 	// parseReference 能收集外部 import）。留空则跳过。
+	// -proto-src 支持多目录（按系统路径分隔符拼接，Windows 用分号），
+	// 例如 common/game_proto;api/proto —— service 协议 import 的 goone/options 在主仓。
 	if len(domain.ProtoSrcPath) > 0 {
-		if err := manager.LoadExternalProtos(domain.ProtoSrcPath); err != nil {
+		if err := manager.LoadExternalProtos(filepath.SplitList(domain.ProtoSrcPath)...); err != nil {
 			return errs.Wrap(err, "", "", "", 0, "加载错误", "加载外部proto失败")
 		}
 	}
@@ -125,6 +133,9 @@ func run() error {
 		return errs.Wrap(err, "", "", "", 0, "生成错误", "生成Node.js代码失败")
 	}
 
-	logx.Successf("当前gen模式[%s]:所有的执行已顺利完成,恭喜 ^_^ ！", domain.ConfMode)
+	// 所有 Gen* 完成后统一清理内存表（原先在 GenData 末尾清理，会令后续 GenCode/GenCpp/GenNodeJs 拿到空表）
+	manager.Clear()
+
+	logx.Finalf("当前gen模式[%s]: All Proc is Done ------- By Iori ^_^!", domain.ConfMode)
 	return nil
 }

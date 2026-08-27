@@ -126,7 +126,7 @@ func convertInt64(str string) interface{} {
 
 func convertUint32(str string) interface{} {
 	if str == "" {
-		return int32(0)
+		return uint32(0)
 	}
 
 	str, err := extractDigits(str)
@@ -138,7 +138,7 @@ func convertUint32(str string) interface{} {
 
 func convertUint64(str string) interface{} {
 	if str == "" {
-		return int64(0)
+		return uint64(0)
 	}
 
 	str, err := extractDigits(str)

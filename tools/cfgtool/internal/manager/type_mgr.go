@@ -28,7 +28,7 @@ func GetIndexMap() (rets []int) {
 }
 
 // -----config-------
-func GetOrNewConfig(file, sheet, name string) *base.Config {
+func GetOrNewConfig(file, sheet, name, feature, table string) *base.Config {
 	if val, ok := configMgr[name]; ok {
 		return val
 	}
@@ -36,6 +36,8 @@ func GetOrNewConfig(file, sheet, name string) *base.Config {
 		Name:     name,
 		FileName: file,
 		Sheet:    sheet,
+		Feature:  feature,
+		Table:    table,
 		Fields:   make(map[string]*base.Field),
 		Indexs:   make(map[int][]*base.Index),
 	}
@@ -64,7 +66,7 @@ func GetConfig(name string) *base.Config {
 }
 
 // -----struct-------
-func GetOrNewStruct(file, sheet, name string) *base.Struct {
+func GetOrNewStruct(file, sheet, name, feature, table string) *base.Struct {
 	if val, ok := structMgr[name]; ok {
 		return val
 	}
@@ -72,6 +74,8 @@ func GetOrNewStruct(file, sheet, name string) *base.Struct {
 		Name:     name,
 		Sheet:    sheet,
 		FileName: file,
+		Feature:  feature,
+		Table:    table,
 		Fields:   make(map[string]*base.Field),
 		Converts: make(map[string][]*base.Field),
 	}

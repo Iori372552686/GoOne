@@ -42,7 +42,7 @@ syntax = "proto3";
 
 package g1.protocol;
 
-option go_package = "./g1_protocol";
+option go_package = "{{.GoPackage}}";
 
 {{range $item := .RefList -}}
 import "{{$item}}.proto";

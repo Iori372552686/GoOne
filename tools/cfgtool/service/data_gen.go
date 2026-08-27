@@ -33,6 +33,8 @@ var arrayDelimiters = []string{"|", ";", "^"}
 const mapFieldDelim = ";"
 
 func GenData() error {
+	// 各格式成功生成的文件名列表（末尾汇总打印）
+	var jsonFiles, confFiles, bytesFiles, luaFiles []string
 	for _, cfg := range manager.GetConfigMap() {
 		// 反射new一个对象
 		ary := manager.NewProto(cfg.FileName, cfg.Name+"Ary")
@@ -120,6 +122,7 @@ func GenData() error {
 			if err := base.Save(domain.JsonPath, cfg.Name+".json", bufStr); err != nil {
 				return errs.Wrap(err, cfg.FileName, cfg.Sheet, "", 0, "保存错误", "保存JSON失败")
 			}
+			jsonFiles = append(jsonFiles, cfg.Name+".json")
 		}
 
 		// save lua数据
@@ -138,6 +141,7 @@ func GenData() error {
 			if err := base.Save(domain.LuaPath, cfg.Name+".lua", buf); err != nil {
 				return errs.Wrap(err, cfg.FileName, cfg.Sheet, "", 0, "保存错误", "保存Lua失败")
 			}
+			luaFiles = append(luaFiles, cfg.Name+".lua")
 		}
 
 		// 保存pb bytes数据
@@ -149,6 +153,7 @@ func GenData() error {
 			if err := base.Save(domain.BytesPath, cfg.Name+".bytes", buf); err != nil {
 				return errs.Wrap(err, cfg.FileName, cfg.Sheet, "", 0, "保存错误", "保存pb bytes失败")
 			}
+			bytesFiles = append(bytesFiles, cfg.Name+".bytes")
 		}
 
 		// 保存pb text数据
@@ -160,6 +165,7 @@ func GenData() error {
 			if err := base.Save(domain.TextPath, cfg.Name+".conf", buf); err != nil {
 				return errs.Wrap(err, cfg.FileName, cfg.Sheet, "", 0, "保存错误", "保存pb text失败")
 			}
+			confFiles = append(confFiles, cfg.Name+".conf")
 		}
 
 		// 保存ts数据
@@ -174,8 +180,27 @@ func GenData() error {
 		}
 	}
 
-	manager.Clear()
+	// 各格式汇总成功提示（仅打印本次实际生成且启用的格式），并列出生成的文件
+	printDataSummary("JSON数据", jsonFiles, domain.JsonPath)
+	printDataSummary("pbtext数据", confFiles, domain.TextPath)
+	printDataSummary("pb bytes数据", bytesFiles, domain.BytesPath)
+	printDataSummary("Lua数据", luaFiles, domain.LuaPath)
+
+	// 注意：此处不再调用 manager.Clear()。
+	// GenCode/GenCpp/GenNodeJs 在本函数之后执行，它们仍需读取 configMgr/structMgr；
+	// Clear 统一由 main.run() 在所有 Gen* 完成后调用。
 	return nil
+}
+
+// printDataSummary 打印某格式的数据生成汇总：数量 + 输出目录 + 每个文件名。
+func printDataSummary(kind string, files []string, dir string) {
+	if len(files) == 0 {
+		return
+	}
+	logx.Successf("%s生成完成: %d 个文件 -> %s", kind, len(files), dir)
+	for _, f := range files {
+		logx.Infof("  - %s", f)
+	}
 }
 
 func configValue(f *base.Config, rowIndex int, vals ...string) (interface{}, error) {

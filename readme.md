@@ -1,16 +1,17 @@
 ## GoOne
 
-GoOne 是一套基于 Go 实现的微服务分布式游戏服务器框架，核心思路是 **Reactor + CSP**（并发消息驱动）且继承了很多C++游戏架构的思想，并配套提供：服务治理、配置中心、消息总线、网络层、部署控制台等“工程化”能力，适用于中小型游戏、MMO 等游戏后端业务。
+GoOne 是一套基于 Go 实现的微服务分布式游戏服务器框架，核心思路是 **Reactor + CSP**（并发消息驱动）且继承了很多C++游戏架构的思想，并配套提供：服务治理、配置中心、消息总线、网络层、部署控制台等“工程化”能力，适用于中小型游戏、MMO 等游戏后端业务与中台Web业务。
 
-[Go Version](go.mod)
-[License](LICENSE)
-[Stars](https://github.com/Iori372552686/GoOne/stargazers)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/Iori372552686/GoOne)](go.mod)
+[![License](https://img.shields.io/github/license/Iori372552686/GoOne)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/Iori372552686/GoOne?style=flat)](https://github.com/Iori372552686/GoOne/stargazers)
 
 ---
 
+
 ## 1. 架构概览
 
-image
+![image](https://github.com/user-attachments/assets/991e2091-dbd9-4f8f-9e0b-5c24ed98bf3b)
 
 - **网关服（connsvr）**：管理客户端连接，接入并转发消息
 - **核心逻辑服（mainsvr）**：核心业务逻辑
@@ -22,13 +23,7 @@ image
 更详细的运行时与协议说明见：
 
 - `[docs/ssrpc_idl.md](docs/ssrpc_idl.md)`（ssrpc / IDL 方案）
-- `[docs/modernization_execution_plan_2026-07-v4.md](docs/modernization_execution_plan_2026-07-v4.md)`（V4 生产闭环现代化实施计划：当前主计划）
-- `[docs/architecture_review_2026-07-v2.md](docs/architecture_review_2026-07-v2.md)`（架构复审 v2：生命周期、模块化与性能治理 · 历史归档，已被 v4 取代）
-- `[docs/optimization_roadmap.md](docs/optimization_roadmap.md)`（核心现代化 P0/P1/P2 执行计划 · 历史归档，已被 v4 取代）
 - `[docs/STYLE.md](docs/STYLE.md)`（代码风格规范）
-- `[docs/observability/README.md](docs/observability/README.md)`（可观测性：指标 / Trace / 日志）
-- `[docs/benchmarks/baseline.md](docs/benchmarks/baseline.md)`（性能基线与优化对比）
-
 ---
 
 ## 2. 优势
@@ -233,6 +228,34 @@ Windows 下如果使用 `build.ps1`，对应可执行文件通常在 `build\*.ex
 .\build\roomcentersvr.exe -svr_conf=.\etc\config\server_conf_ide.yaml
 .\build\websvr.exe -svr_conf=.\etc\config\server_conf_ide.yaml
 ```
+
+### 4.6 配置生成（xlsx → 配置数据 / proto / 查询代码）
+
+策划在 `common/game_conf/xls/*.xlsx`（唯一数据源）填表后，通过 cfgtool 生成：
+
+- 运行时配置数据 `.conf` → `common/game_data/`
+- 配置表 proto → `common/game_proto/config/`
+- Go 查询代码 → `module/gamedata/repository/`
+
+**`main.sh xls` 默认生成 server 版本**（mode=server）：
+
+```bash
+./main.sh xls            # 默认 server
+./main.sh xls client     # 仅客户端标记字段（输出目录见 common/gen_xls_client.bat）
+./main.sh xls all        # 全部字段
+```
+
+> xlsx 第 4 行（标记行）控制字段归属：`key`（主键索引，任何模式都含）/ `all` / `client` / `server`，留空则仅 `all` 模式包含。
+
+**Windows 一键脚本**（在 `common/` 下，环境配置集中在各 bat 顶部可改）：
+
+```bat
+.\common\gen_xls.bat           REM 全量（mode=all）
+.\common\gen_xls_server.bat    REM 一键导出 server（默认）
+.\common\gen_xls_client.bat    REM 一键导出 client（输出暂为 %TEMP%\g1_client_output\，后期改 bat 即可）
+```
+
+> 详细说明见 `[common/game_conf/readme.md](common/game_conf/readme.md)`；编译 cfgtool：`./main.sh build cfgtool`。
 
 ---
 

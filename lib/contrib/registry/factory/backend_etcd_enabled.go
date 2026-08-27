@@ -1,6 +1,3 @@
-//go:build registry_etcd
-// +build registry_etcd
-
 package factory
 
 import (
