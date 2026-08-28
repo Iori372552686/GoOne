@@ -104,19 +104,25 @@ func NewApp() *runtime.App {
 		return nil
 	})
 
-	// 角色落盘：原 OnShutdownExtra。TransMgr 排空后没有 handler 并发修改角色，安全地
-	// 全量落盘，避免 write-behind 防抖窗口内的变更在停机时丢失。作为 Drainer 在
-	// TransMgr Drain 之后执行（注册顺序：roleFlush 在 transMgr 之后）。
+	// 角色落盘：原 OnShutdownExtra。作为 Drainer 全量落盘在线角色。
+	//
+	// 注册顺序说明（重要，Drain 顺序修复）：
+	// runtime 对 Quiesce/Drain/Stop 一律按注册序的【逆序】执行（run.go drainComponents）。
+	// 因此要让 roleFlush 在 TransMgr 排空【之后】执行（此时已无 handler 并发修改角色），
+	// 必须把它注册在 transMgr【之前】。旧实现注册在最后，导致 FlushAllToDB 与
+	// 在途事务并发读写同一 *Role，存在停机丢数据/数据竞争风险。
 	roleFlush := &roleFlushComponent{}
 
 	// Start 顺序：datetime（WithConfLoader 自动注册，隐含在最前）→ logger → admin
-	// → tracing → 业务依赖 → SSRPC 注册 → TransMgr → router/bus → SelfLogoutSender
-	// → roleTick(Task) → roleFlush(Drainer)。datetime_tick 必须最前：logger/xorm 等
+	// → tracing → 业务依赖 → SSRPC 注册 → roleFlush(Start 空操作) → TransMgr
+	// → router/bus → SelfLogoutSender → roleTick(Task)。
+	// Drain 逆序：roleTick → selfLogout → routerComp → transMgr → roleFlush
+	// —— TransMgr 排空后才全量落盘角色。datetime_tick 必须最前：logger/xorm 等
 	// 启动期即读 datetime，由 WithConfLoader 自动注册保证。
 	// 用 MustRegister 一次注册全部组件。
 	app.MustRegister(
-		businessDeps, registerHandlers, transMgr, routerComp,
-		selfLogout, roleTick, roleFlush,
+		businessDeps, registerHandlers, roleFlush, transMgr, routerComp,
+		selfLogout, roleTick,
 	)
 	return app
 }

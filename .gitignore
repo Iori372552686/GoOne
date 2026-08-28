@@ -24,3 +24,4 @@ deploy/hosts/host_dev.txt
 /.zcode/plans
 /.GoOne
 /lib/contrib/protoc/include
+/.artifacts

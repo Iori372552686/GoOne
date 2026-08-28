@@ -27,23 +27,25 @@ var File_service_roomcentersvr_proto protoreflect.FileDescriptor
 
 const file_service_roomcentersvr_proto_rawDesc = "" +
 	"\n" +
-	"\x1bservice/roomcentersvr.proto\x12\x12game.roomcenter.v1\x1a\x1egoone/options/v1/options.proto\x1a\x11core/client.proto\x1a\x0fcore/room.proto\x1a\x11core/struct.proto\x1a\x1bgoogle/protobuf/empty.proto2\xa2\x05\n" +
+	"\x1bservice/roomcentersvr.proto\x12\x12game.roomcenter.v1\x1a\x1egoone/options/v1/options.proto\x1a\x11core/client.proto\x1a\x0fcore/room.proto\x1a\x11core/struct.proto\x1a\x1bgoogle/protobuf/empty.proto2\xd2\x06\n" +
 	"\x16RoomCenterInnerService\x12c\n" +
 	"\x04Tick\x12\x19.g1.protocol.InnerTickReq\x1a\x16.google.protobuf.Empty\"(\xca\xe4\x1d$\b\x88\xa0,\x18\x01z\x1croomcentersvr tick (one-way)\x12t\n" +
 	"\bRoomList\x12\x18.g1.protocol.RoomListReq\x1a\x18.g1.protocol.RoomListRsp\"4\xca\xe4\x1d0*#CMD_ROOM_CENTER_INNER_ROOM_LIST_REQz\troom list\x12~\n" +
 	"\n" +
 	"QuickStart\x12\x1a.g1.protocol.QuickStartReq\x1a\x1a.g1.protocol.QuickStartRsp\"8\xca\xe4\x1d4*%CMD_ROOM_CENTER_INNER_QUICK_START_REQz\vquick start\x12\x93\x01\n" +
 	"\x0eUpdateRoomInfo\x12\x19.g1.protocol.RoomShowInfo\x1a\x16.google.protobuf.Empty\"N\xca\xe4\x1dJ\x18\x01**CMD_ROOM_CENTER_INNER_UPDATE_ROOM_INFO_REQz\x1aupdate room info (one-way)\x12\x8d\x01\n" +
-	"\vDelRoomInfo\x12\x19.g1.protocol.RoomShowInfo\x1a\x16.google.protobuf.Empty\"K\xca\xe4\x1dG\x18\x01*'CMD_ROOM_CENTER_INNER_DEL_ROOM_INFO_REQz\x1adelete room info (one-way)\x1a\a\xd2\xe4\x1d\x03\b\x88'BHZFgithub.com/Iori372552686/GoOne/api/gen/game/roomcenter/v1;roomcenterv1b\x06proto3"
+	"\vDelRoomInfo\x12\x19.g1.protocol.RoomShowInfo\x1a\x16.google.protobuf.Empty\"K\xca\xe4\x1dG\x18\x01*'CMD_ROOM_CENTER_INNER_DEL_ROOM_INFO_REQz\x1adelete room info (one-way)\x12\xad\x01\n" +
+	"\x12QuickStartRollback\x12\".g1.protocol.QuickStartRollbackReq\x1a\x16.google.protobuf.Empty\"[\xca\xe4\x1dW\x18\x01*.CMD_ROOM_CENTER_INNER_QUICK_START_ROLLBACK_REQz#quick start seat rollback (one-way)\x1a\a\xd2\xe4\x1d\x03\b\x88'BHZFgithub.com/Iori372552686/GoOne/api/gen/game/roomcenter/v1;roomcenterv1b\x06proto3"
 
 var file_service_roomcentersvr_proto_goTypes = []any{
-	(*protocol.InnerTickReq)(nil),  // 0: g1.protocol.InnerTickReq
-	(*protocol.RoomListReq)(nil),   // 1: g1.protocol.RoomListReq
-	(*protocol.QuickStartReq)(nil), // 2: g1.protocol.QuickStartReq
-	(*protocol.RoomShowInfo)(nil),  // 3: g1.protocol.RoomShowInfo
-	(*emptypb.Empty)(nil),          // 4: google.protobuf.Empty
-	(*protocol.RoomListRsp)(nil),   // 5: g1.protocol.RoomListRsp
-	(*protocol.QuickStartRsp)(nil), // 6: g1.protocol.QuickStartRsp
+	(*protocol.InnerTickReq)(nil),          // 0: g1.protocol.InnerTickReq
+	(*protocol.RoomListReq)(nil),           // 1: g1.protocol.RoomListReq
+	(*protocol.QuickStartReq)(nil),         // 2: g1.protocol.QuickStartReq
+	(*protocol.RoomShowInfo)(nil),          // 3: g1.protocol.RoomShowInfo
+	(*protocol.QuickStartRollbackReq)(nil), // 4: g1.protocol.QuickStartRollbackReq
+	(*emptypb.Empty)(nil),                  // 5: google.protobuf.Empty
+	(*protocol.RoomListRsp)(nil),           // 6: g1.protocol.RoomListRsp
+	(*protocol.QuickStartRsp)(nil),         // 7: g1.protocol.QuickStartRsp
 }
 var file_service_roomcentersvr_proto_depIdxs = []int32{
 	0, // 0: game.roomcenter.v1.RoomCenterInnerService.Tick:input_type -> g1.protocol.InnerTickReq
@@ -51,13 +53,15 @@ var file_service_roomcentersvr_proto_depIdxs = []int32{
 	2, // 2: game.roomcenter.v1.RoomCenterInnerService.QuickStart:input_type -> g1.protocol.QuickStartReq
 	3, // 3: game.roomcenter.v1.RoomCenterInnerService.UpdateRoomInfo:input_type -> g1.protocol.RoomShowInfo
 	3, // 4: game.roomcenter.v1.RoomCenterInnerService.DelRoomInfo:input_type -> g1.protocol.RoomShowInfo
-	4, // 5: game.roomcenter.v1.RoomCenterInnerService.Tick:output_type -> google.protobuf.Empty
-	5, // 6: game.roomcenter.v1.RoomCenterInnerService.RoomList:output_type -> g1.protocol.RoomListRsp
-	6, // 7: game.roomcenter.v1.RoomCenterInnerService.QuickStart:output_type -> g1.protocol.QuickStartRsp
-	4, // 8: game.roomcenter.v1.RoomCenterInnerService.UpdateRoomInfo:output_type -> google.protobuf.Empty
-	4, // 9: game.roomcenter.v1.RoomCenterInnerService.DelRoomInfo:output_type -> google.protobuf.Empty
-	5, // [5:10] is the sub-list for method output_type
-	0, // [0:5] is the sub-list for method input_type
+	4, // 5: game.roomcenter.v1.RoomCenterInnerService.QuickStartRollback:input_type -> g1.protocol.QuickStartRollbackReq
+	5, // 6: game.roomcenter.v1.RoomCenterInnerService.Tick:output_type -> google.protobuf.Empty
+	6, // 7: game.roomcenter.v1.RoomCenterInnerService.RoomList:output_type -> g1.protocol.RoomListRsp
+	7, // 8: game.roomcenter.v1.RoomCenterInnerService.QuickStart:output_type -> g1.protocol.QuickStartRsp
+	5, // 9: game.roomcenter.v1.RoomCenterInnerService.UpdateRoomInfo:output_type -> google.protobuf.Empty
+	5, // 10: game.roomcenter.v1.RoomCenterInnerService.DelRoomInfo:output_type -> google.protobuf.Empty
+	5, // 11: game.roomcenter.v1.RoomCenterInnerService.QuickStartRollback:output_type -> google.protobuf.Empty
+	6, // [6:12] is the sub-list for method output_type
+	0, // [0:6] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name

@@ -62,6 +62,12 @@ token = ""
 enabled = true
 
 # 背包/道具/掉落/恭喜获得 4 系统回归（移植自 seed-server）
+# 本轮聚焦战斗系统（房间链路），暂不启用。
 [modules.inventory]
-enabled = true
+enabled = false
 order = 20
+
+# 房间链路回归：RoomList/QuickStart/Join/Leave（依赖 tools/gamesim 模拟游戏服）
+[modules.room]
+enabled = true
+order = 10

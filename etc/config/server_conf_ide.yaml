@@ -151,3 +151,12 @@ roomcentersvr:
     log_dir: ../logs
     log_level: debug
 
+
+# gamesvr 模拟器（tools/gamesim）：模拟外部 TexasGameSvr 的最小行为，
+# 供 tester 联调 roomcentersvr/mainsvr 的房间链路。funcID=0x50(80)=TexasGameSvr。
+gamesim:
+  identity:
+    self_bus_id: 2.1.80.251
+  debug:
+    log_dir: ./logs/
+    log_level: debug

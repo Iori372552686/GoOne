@@ -18,6 +18,7 @@ type RoomCenterInnerServiceSS interface {
 	QuickStart(ctx *ssrpc.Context, req *g1_protocol.QuickStartReq) (*g1_protocol.QuickStartRsp, error)
 	UpdateRoomInfo(ctx *ssrpc.Context, req *g1_protocol.RoomShowInfo) (*emptypb.Empty, error)
 	DelRoomInfo(ctx *ssrpc.Context, req *g1_protocol.RoomShowInfo) (*emptypb.Empty, error)
+	QuickStartRollback(ctx *ssrpc.Context, req *g1_protocol.QuickStartRollbackReq) (*emptypb.Empty, error)
 }
 
 // UnimplementedRoomCenterInnerServiceSS can be embedded/used to have forward compatible implementations.
@@ -43,6 +44,10 @@ func (*UnimplementedRoomCenterInnerServiceSS) UpdateRoomInfo(ctx *ssrpc.Context,
 
 func (*UnimplementedRoomCenterInnerServiceSS) DelRoomInfo(ctx *ssrpc.Context, req *g1_protocol.RoomShowInfo) (*emptypb.Empty, error) {
 	return nil, ssrpc.Unimplemented("RoomCenterInnerService.DelRoomInfo")
+}
+
+func (*UnimplementedRoomCenterInnerServiceSS) QuickStartRollback(ctx *ssrpc.Context, req *g1_protocol.QuickStartRollbackReq) (*emptypb.Empty, error) {
+	return nil, ssrpc.Unimplemented("RoomCenterInnerService.QuickStartRollback")
 }
 
 // DefaultRoomCenterInnerServiceSSMiddlewares returns the standard middleware chain for RoomCenterInnerService.
@@ -134,6 +139,20 @@ func RegisterRoomCenterInnerServiceToTransactionMgr(mgr transaction.ITransaction
 		},
 	))
 
+	mgr.RegisterCmd(g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_ROLLBACK_REQ, ssrpc.WrapUnary(
+		ssrpc.MethodDesc{
+			Cmd:     g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_ROLLBACK_REQ,
+			OneWay:  true,
+			Timeout: 5000 * time.Millisecond,
+			Name:    "quick start seat rollback (one-way)",
+		},
+		srv.MW,
+		func() any { return new(g1_protocol.QuickStartRollbackReq) },
+		func(ctx *ssrpc.Context, in any) (any, error) {
+			return srv.Impl.QuickStartRollback(ctx, in.(*g1_protocol.QuickStartRollbackReq))
+		},
+	))
+
 }
 
 // RegisterRoomCenterInnerServiceToDispatcher registers cmd/http/ws/grpc bindings into a unified ssrpc.Dispatcher.
@@ -210,6 +229,20 @@ func RegisterRoomCenterInnerServiceToDispatcher(d *ssrpc.Dispatcher, srv RoomCen
 		},
 	))
 
+	d.RegisterCmd(g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_ROLLBACK_REQ, ssrpc.WrapUnary(
+		ssrpc.MethodDesc{
+			Cmd:     g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_ROLLBACK_REQ,
+			OneWay:  true,
+			Timeout: 5000 * time.Millisecond,
+			Name:    "quick start seat rollback (one-way)",
+		},
+		srv.MW,
+		func() any { return new(g1_protocol.QuickStartRollbackReq) },
+		func(ctx *ssrpc.Context, in any) (any, error) {
+			return srv.Impl.QuickStartRollback(ctx, in.(*g1_protocol.QuickStartRollbackReq))
+		},
+	))
+
 }
 
 // RoomCenterInnerServiceBindings returns the authoritative ssrpc binding slice for RoomCenterInnerService.
@@ -280,6 +313,19 @@ func RoomCenterInnerServiceBindings(srv RoomCenterInnerServiceSServer) []ssrpc.B
 			func() any { return new(g1_protocol.RoomShowInfo) },
 			func(ctx *ssrpc.Context, in any) (any, error) {
 				return srv.Impl.DelRoomInfo(ctx, in.(*g1_protocol.RoomShowInfo))
+			},
+		)},
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_ROLLBACK_REQ, CmdHandler: ssrpc.WrapUnary(
+			ssrpc.MethodDesc{
+				Cmd:     g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_ROLLBACK_REQ,
+				OneWay:  true,
+				Timeout: 5000 * time.Millisecond,
+				Name:    "RoomCenterInnerService.QuickStartRollback",
+			},
+			srv.MW,
+			func() any { return new(g1_protocol.QuickStartRollbackReq) },
+			func(ctx *ssrpc.Context, in any) (any, error) {
+				return srv.Impl.QuickStartRollback(ctx, in.(*g1_protocol.QuickStartRollbackReq))
 			},
 		)},
 	}
@@ -429,4 +475,34 @@ func (c *RoomCenterInnerServiceClient) DelRoomInfoByBusIdSimple(busId uint32, ui
 // DelRoomInfoByRouterSimple sends delete room info (one-way) to an explicit routerId without an IContext (one-way, no response).
 func (c *RoomCenterInnerServiceClient) DelRoomInfoByRouterSimple(routerId, uid uint64, zone uint32, req *g1_protocol.RoomShowInfo) error {
 	return ssrpc.SendByCmdWithRouterSimple(routerId, uid, zone, g1_protocol.CMD_ROOM_CENTER_INNER_DEL_ROOM_INFO_REQ, req)
+}
+
+// QuickStartRollback sends quick start seat rollback (one-way) (one-way, no response).
+func (c *RoomCenterInnerServiceClient) QuickStartRollback(ctx cmd_handler.IContext, req *g1_protocol.QuickStartRollbackReq) error {
+	return ssrpc.SendByCmd(ctx, g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_ROLLBACK_REQ, req)
+}
+
+// QuickStartRollbackByRouter sends quick start seat rollback (one-way) to an explicit routerId (one-way, no response).
+func (c *RoomCenterInnerServiceClient) QuickStartRollbackByRouter(ctx cmd_handler.IContext, routerId uint64, req *g1_protocol.QuickStartRollbackReq) error {
+	return ssrpc.SendByCmdWithRouter(ctx, routerId, g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_ROLLBACK_REQ, req)
+}
+
+// QuickStartRollbackByBusId sends quick start seat rollback (one-way) to an explicit busId (one-way, no response).
+func (c *RoomCenterInnerServiceClient) QuickStartRollbackByBusId(ctx cmd_handler.IContext, busId uint32, req *g1_protocol.QuickStartRollbackReq) error {
+	return ssrpc.SendByCmdToBusId(ctx, busId, g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_ROLLBACK_REQ, req)
+}
+
+// QuickStartRollbackSimple sends quick start seat rollback (one-way) without an IContext (one-way, no response).
+func (c *RoomCenterInnerServiceClient) QuickStartRollbackSimple(uid uint64, zone uint32, req *g1_protocol.QuickStartRollbackReq) error {
+	return ssrpc.SendByCmdSimple(uid, zone, g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_ROLLBACK_REQ, req)
+}
+
+// QuickStartRollbackByBusIdSimple sends quick start seat rollback (one-way) to an explicit busId without an IContext (one-way, no response).
+func (c *RoomCenterInnerServiceClient) QuickStartRollbackByBusIdSimple(busId uint32, uid uint64, req *g1_protocol.QuickStartRollbackReq) error {
+	return ssrpc.SendByCmdToBusIdSimple(busId, uid, g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_ROLLBACK_REQ, req)
+}
+
+// QuickStartRollbackByRouterSimple sends quick start seat rollback (one-way) to an explicit routerId without an IContext (one-way, no response).
+func (c *RoomCenterInnerServiceClient) QuickStartRollbackByRouterSimple(routerId, uid uint64, zone uint32, req *g1_protocol.QuickStartRollbackReq) error {
+	return ssrpc.SendByCmdWithRouterSimple(routerId, uid, zone, g1_protocol.CMD_ROOM_CENTER_INNER_QUICK_START_ROLLBACK_REQ, req)
 }

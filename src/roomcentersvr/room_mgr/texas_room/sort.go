@@ -1,16 +1,48 @@
-package logic
+package texas_room
 
 import (
-	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 	"runtime"
 	"sort"
+
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 const (
-	minChunkSize = 5000 // 分片大小（小于该值直接单线程排序）
+	minChunkSize = 5000 // 并行排序分片大小（小于该值直接单线程排序）
 )
 
-// parallelSort 对 rooms 进行排序。
+// sortRoomsLocked 按请求的排序类型原地排序房间列表，返回错误码。
+//
+// 调用约定（重要）：必须在持有 TexasRoomCenterMgr 读锁时调用 ——
+// less 比较器会读取 Base.CurPlayerNum/EndTime 等会被并发修改的字段，
+// 锁外排序既是数据竞争也会得到撕裂的比较结果。
+//
+// 比较字段统一取自 Base（收集阶段已过滤 Base==nil 的条目）：
+// 不使用 RoomShowInfo 顶层冗余字段 RoomId，规避"上报方漏填顶层字段导致排序失效"。
+func sortRoomsLocked(rooms []*g1_protocol.RoomShowInfo, sortType g1_protocol.RoomSortType) g1_protocol.ErrorCode {
+	if len(rooms) <= 1 {
+		return g1_protocol.ErrorCode_ERR_OK
+	}
+
+	var less func(i, j int) bool
+	switch sortType {
+	case g1_protocol.RoomSortType_SORT_TYPE_NONE:
+		return g1_protocol.ErrorCode_ERR_OK // 不排序
+	case g1_protocol.RoomSortType_SORT_TYPE_ID:
+		less = func(i, j int) bool { return rooms[i].Base.RoomId < rooms[j].Base.RoomId }
+	case g1_protocol.RoomSortType_SORT_TYPE_PLAYER:
+		less = func(i, j int) bool { return rooms[i].Base.CurPlayerNum > rooms[j].Base.CurPlayerNum }
+	case g1_protocol.RoomSortType_SORT_TYPE_TIME:
+		less = func(i, j int) bool { return rooms[i].Base.EndTime > rooms[j].Base.EndTime }
+	default:
+		return g1_protocol.ErrorCode_ERR_ARGV
+	}
+
+	parallelSort(rooms, less)
+	return g1_protocol.ErrorCode_ERR_OK
+}
+
+// parallelSort 对 rooms 进行排序（大数据量时并行分片排序 + 串行多路归并）。
 // 说明：
 //   - less(i,j) 中的 i、j 始终是 rooms 的全局下标（与调用方约定保持一致）
 //   - 小数据量直接使用 sort.Slice

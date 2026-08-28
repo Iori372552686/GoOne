@@ -104,16 +104,16 @@ func NewApp() *runtime.App {
 	// DriverRegistry 只注册 rabbitmq。
 	routerComp := bussvc.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry())
 
-	// 房间初始化：RoomListMgr.Init + 从 Redis 恢复房间快照 + AI 初始化房间。必须在
-	// router 起来之后。
+	// 房间初始化：RoomListMgr.Init + AI 初始化房间。必须在 router 起来之后。
+	// 房间快照恢复不再在启动时全量执行（旧 LoadAllFromDB 因 zone/stage 懒创建而
+	// 恒为空转），改为 GetTexasObj 首次创建 stage 时在临界区内懒恢复（见
+	// texas_room/data_proc.go），精确恢复本实例负责的分片。
 	roomInit := &bussvc.FuncComponent{
 		ComponentName: "room_init",
 		OnStart: func(_ context.Context) error {
 			if err := globals.RoomListMgr.Init(); err != nil {
 				return err
 			}
-			// 启动时从 Redis 恢复房间快照。
-			globals.RoomListMgr.LoadAllFromDB()
 			safego.Go(func() {
 				room_ai.OnAiInitRoom()
 			})
@@ -133,17 +133,25 @@ func NewApp() *runtime.App {
 		return nil
 	})
 
-	// 房间落盘：原 OnExit。TransMgr 排空后全量落盘，避免数据丢失。作为 Drainer。
+	// 房间落盘：原 OnExit。作为 Drainer 全量落盘所有房间。
+	//
+	// 注册顺序说明（重要，Drain 顺序修复）：
+	// runtime 对 Quiesce/Drain/Stop 一律按注册序的【逆序】执行（run.go drainComponents）。
+	// 因此要让 roomFlush 在 TransMgr 排空【之后】执行（此时已无 handler 并发修改房间），
+	// 必须把它注册在 transMgr【之前】。旧实现注册在最后，导致 Flush 与在途事务并发，
+	// 存在停机丢数据/数据竞争风险。
 	roomFlush := &roomFlushComponent{}
 
 	// Start 顺序：datetime（WithConfLoader 自动注册，隐含在最前）→ logger → admin
-	// → tracing → 业务依赖 → SSRPC 注册 → TransMgr → router/bus → 房间初始化
-	// → roomTick → roomPersist → roomFlush(Drainer)。datetime_tick 必须最前：
-	// room tick/房间初始化都依赖 datetime.NowMs()，由 WithConfLoader 自动注册保证。
+	// → tracing → 业务依赖 → SSRPC 注册 → roomFlush(Start 空操作) → TransMgr
+	// → router/bus → 房间初始化 → roomTick → roomPersist。
+	// Drain 逆序：roomPersist → roomTick → roomInit → routerComp → transMgr → roomFlush
+	// —— TransMgr 排空后才全量落盘。datetime_tick 必须最前：room tick/房间初始化
+	// 都依赖 datetime.NowMs()，由 WithConfLoader 自动注册保证。
 	// 用 MustRegister 一次注册全部组件。
 	app.MustRegister(
-		businessDeps, registerHandlers, cmdBacklist, transMgr, routerComp,
-		roomInit, roomTick, roomPersist, roomFlush,
+		businessDeps, registerHandlers, cmdBacklist, roomFlush, transMgr, routerComp,
+		roomInit, roomTick, roomPersist,
 	)
 	return app
 }
