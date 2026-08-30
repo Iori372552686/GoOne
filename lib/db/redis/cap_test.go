@@ -38,11 +38,21 @@ func lastColon(s string) int {
 	return -1
 }
 
+// capKeyPrefix 容量测试 key 的命名空间前缀：共享 Redis 中与业务 key 隔离，
+// 便于识别与批量清理（历史版本无前缀裸写 0x%08x，污染过 dev 实例）。
+const capKeyPrefix = "goone:test:cap:"
+
+func capKey(i int) string { return fmt.Sprintf("%s0x%08x", capKeyPrefix, i) }
+
 func TestCap(t *testing.T) {
 	host, port, addr, pass := redisTestAddr()
 	itest.Require(t, addr)
 
-	const c = 1 * 1024
+	const (
+		c      = 1 * 1024
+		n      = 100
+		ttlSec = 600 // 兜底 TTL：测试进程被杀也不会留下永久 key
+	)
 
 	b := [c]byte{}
 	for i := 0; i < c; i++ {
@@ -54,9 +64,15 @@ func TestCap(t *testing.T) {
 	if err != nil {
 		t.Skipf("redis unavailable, skipping integration test: %v", err)
 	}
+	t.Cleanup(func() {
+		for i := 0; i < n; i++ {
+			_ = redisMgr.DelKey(1, capKey(i))
+		}
+		_ = redisMgr.Close()
+	})
 	now := time.Now()
-	for i := 0; i < 100; i++ {
-		err = redisMgr.SetBytes(1, fmt.Sprintf("0x%08x", i), b[:])
+	for i := 0; i < n; i++ {
+		err = redisMgr.SetBytesEx(1, capKey(i), b[:], ttlSec)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -73,6 +89,10 @@ func TestIncBy(t *testing.T) {
 	if err != nil {
 		t.Skipf("redis unavailable, skipping integration test: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = redisMgr.DelKey(1, "IncrTest2")
+		_ = redisMgr.Close()
+	})
 
 	for i := 1; i <= 24; i++ {
 		ret, err := redisMgr.IncrByKey(1, "IncrTest2", 2)
