@@ -125,3 +125,6 @@ func WrapGRPCUnary(desc MethodDesc, mws []Middleware, invoke func(ctx *Context, 
 		return rsp, nil
 	}
 }
+
+// setUID 以鉴权结果覆盖 uid（x-uid 头客户端可伪造，鉴权中间件验证成功后调用）。
+func (g *grpcIContext) setUID(uid uint64) { g.uid = uid }

@@ -3,6 +3,8 @@ package orm
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -52,8 +54,13 @@ func (self *OrmSql) AddInstance(conf Config, tables ...interface{}) (*xorm.Engin
 	self.syncFlag = conf.InitFlag
 	self.driveName = conf.DriveName
 
+	// DSN 说明（2026-08 加固）：
+	//   charset=utf8mb4 —— utf8(3字节) 无法传输 emoji/生僻字，游戏昵称场景必踩
+	//     Incorrect string value；utf8mb4 对既有 utf8 数据向后兼容；
+	//   readTimeout/writeTimeout —— 防慢查询长期占用连接（无超时会把
+	//     MaxOpen 连接池占满，故障放大）；timeout 为拨号超时。
 	self.dsn = append(self.dsn,
-		fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=3s&parseTime=true&loc=Local&charset=utf8",
+		fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=3s&readTimeout=10s&writeTimeout=15s&parseTime=true&loc=Local&charset=utf8mb4",
 			conf.Master.User,
 			conf.Master.Password,
 			conf.Master.IP,
@@ -62,7 +69,7 @@ func (self *OrmSql) AddInstance(conf Config, tables ...interface{}) (*xorm.Engin
 	)
 	for _, slaveCfg := range conf.Slaves {
 		self.dsn = append(self.dsn,
-			fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=3s&parseTime=true&loc=Local&charset=utf8",
+			fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=3s&readTimeout=10s&writeTimeout=15s&parseTime=true&loc=Local&charset=utf8mb4",
 				slaveCfg.User,
 				slaveCfg.Password,
 				slaveCfg.IP,
@@ -82,6 +89,11 @@ func (self *OrmSql) AddInstance(conf Config, tables ...interface{}) (*xorm.Engin
 	impl.ShowSQL(conf.ShowSQL)
 	impl.SetMaxIdleConns(conf.MaxIdle)
 	impl.SetMaxOpenConns(conf.MaxOpen)
+	// 连接生命周期（2026-08 加固）：无 MaxLifetime 的长连接会被 MySQL
+	// wait_timeout / 中间代理静默回收，复用时报 invalid connection；
+	// 主动过期使连接池自愈（旧版 xorm EngineGroup 无 IdleTime 接口，
+	// MaxLifetime 已覆盖自愈语义）。可按需在 Config 暴露为配置项。
+	impl.SetConnMaxLifetime(5 * time.Minute)
 	impl.ShowExecTime(true)
 	self.Engine = impl
 	registerOrmMetrics(self.name, self)

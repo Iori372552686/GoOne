@@ -24,7 +24,6 @@ type httpIContext struct {
 
 var _ cmd_handler.IContext = (*httpIContext)(nil)
 
-func (h *httpIContext) Uid() uint64         { return 0 }
 func (h *httpIContext) Zone() uint32        { return 0 }
 func (h *httpIContext) Rid() uint64         { return 0 }
 func (h *httpIContext) OriSrcBusId() uint32 { return 0 }
@@ -155,3 +154,6 @@ func WrapHTTPGin(desc MethodDesc, mws []Middleware, newReq func() any, invoke fu
 		c.JSON(http.StatusOK, gin.H{"code": g1_protocol.ErrorCode_ERR_OK, "data": raw, "msg": g1_protocol.ErrorCode_ERR_OK.String()})
 	}
 }
+
+// setUID 写入鉴权后的可信 uid（供 Context.SetUID 调用）。
+func (h *httpIContext) setUID(uid uint64) { h.uid = uid }

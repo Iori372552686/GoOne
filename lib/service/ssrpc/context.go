@@ -58,6 +58,18 @@ func WrapIContext(ic cmd_handler.IContext, cmd g1_protocol.CMD) *Context {
 	return WrapIContextWithContext(baseContextFromIContext(ic), ic, cmd)
 }
 
+// SetUID 写入鉴权后的可信 uid：Authenticator 验证成功后调用，使 UIDLock()
+// 中间件按真实身份串行化（取代 transport 层可伪造的 x-uid 头；HTTP 侧
+// Uid() 曾恒返回 0，uid_lock 注解不生效）。未鉴权请求 uid 保持原值。
+func (c *Context) SetUID(uid uint64) {
+	if c == nil || c.IContext == nil {
+		return
+	}
+	if setter, ok := c.IContext.(interface{ setUID(uint64) }); ok {
+		setter.setUID(uid)
+	}
+}
+
 func WrapIContextWithContext(base context.Context, ic cmd_handler.IContext, cmd g1_protocol.CMD) *Context {
 	if base == nil {
 		base = context.Background()
