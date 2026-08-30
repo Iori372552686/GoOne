@@ -20,10 +20,12 @@ import (
 
 type httpIContext struct {
 	gin *gin.Context
+	uid  uint64 // 由鉴权中间件写入的可信 uid（SetUID），0 表示未鉴权
 }
 
 var _ cmd_handler.IContext = (*httpIContext)(nil)
 
+func (h *httpIContext) Uid() uint64         { return h.uid }
 func (h *httpIContext) Zone() uint32        { return 0 }
 func (h *httpIContext) Rid() uint64         { return 0 }
 func (h *httpIContext) OriSrcBusId() uint32 { return 0 }
