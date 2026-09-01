@@ -94,6 +94,54 @@ func TestCheckSign_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestCheckSignRejectsAlgorithmDowngrade(t *testing.T) {
+	server := BuildHttpSign("sign", "mysecret", 0, "timestamp", "", "1").
+		WithSignType(Sign_HMacSha256)
+	body := []byte(`{"hello":"world"}`)
+
+	tests := []struct {
+		name     string
+		wireType string
+	}{
+		{name: "missing sign_type"},
+		{name: "explicit md5", wireType: string(Sign_Md5)},
+		{name: "unknown type", wireType: "unknown"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			params := map[string]string{"timestamp": strconv.FormatInt(time.Now().Unix(), 10)}
+			if tc.wireType != "" {
+				params[Const_SignType_Name] = tc.wireType
+			}
+			legacy := BuildHttpSign("sign", "mysecret", 0, "timestamp", "", "1")
+			params["sign"], _ = legacy.buildSign(params, body, Sign_Md5, Version_NewV1)
+
+			if code, err := server.CheckSign(params, body, ""); err == nil || code != ErrSignType {
+				t.Fatalf("downgrade accepted: code=%v err=%v", code, err)
+			}
+		})
+	}
+}
+
+func TestCheckSignConfiguredAlgorithmCompatibility(t *testing.T) {
+	body := []byte(`{"hello":"world"}`)
+	hmacSigner := BuildHttpSign("sign", "mysecret", 0, "timestamp", "", "1").
+		WithSignType(Sign_HMacSha256)
+	hmacParams := hmacSigner.PushSign(map[string]string{}, body)
+	if code, err := hmacSigner.CheckSign(hmacParams, body, ""); err != nil || code != SignOK {
+		t.Fatalf("configured HMAC rejected: code=%v err=%v", code, err)
+	}
+
+	legacyMD5 := BuildHttpSign("sign", "mysecret", 0, "timestamp", "", "1")
+	legacyParams := legacyMD5.PushSign(map[string]string{}, body)
+	if _, exists := legacyParams[Const_SignType_Name]; exists {
+		t.Fatal("legacy MD5 wire format must omit sign_type")
+	}
+	if code, err := legacyMD5.CheckSign(legacyParams, body, ""); err != nil || code != SignOK {
+		t.Fatalf("legacy MD5 rejected: code=%v err=%v", code, err)
+	}
+}
+
 // TestPushSign_WireTypePriority 验证报文 sign_type 字段优先级高于实例默认：
 // 即便实例默认是 md5，报文显式带 hmac_sha256 时应以 hmac 签名，
 // 反之实例默认 hmac 时报文不带字段则以 md5 兼容旧客户端。

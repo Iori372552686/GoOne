@@ -8,7 +8,7 @@ toolchain go1.25.12
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	github.com/Iori372552686/g1_common v0.0.0-00010101000000-000000000000
+	github.com/Iori372552686/g1_common v0.0.0-20260901025958-f1e3cd85c96f
 	github.com/apache/rocketmq-client-go/v2 v2.1.2
 	github.com/apolloconfig/agollo/v4 v4.4.0
 	github.com/bugsnag/bugsnag-go/v2 v2.6.2

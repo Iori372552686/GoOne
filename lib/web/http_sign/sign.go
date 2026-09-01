@@ -76,6 +76,7 @@ const (
 	ErrSignNotFound  ErrorCode = -4 // 签名字段缺失
 	ErrArguments     ErrorCode = -5 // 入参非法
 	ErrVerifyFailure ErrorCode = -6 // 签名比对不一致
+	ErrSignType      ErrorCode = -7 // 签名算法缺失、未知或与服务端配置不一致
 )
 
 var errorCodeMsg = map[ErrorCode]string{
@@ -86,6 +87,7 @@ var errorCodeMsg = map[ErrorCode]string{
 	ErrSignNotFound:  "SIGN_NOT_FOUND",
 	ErrArguments:     "ARGUMENTS_INVALID",
 	ErrVerifyFailure: "VERIFY_FAILURE",
+	ErrSignType:      "SIGN_TYPE_INVALID",
 }
 
 func (c ErrorCode) String() string { return errorCodeMsg[c] }
@@ -156,13 +158,29 @@ func (s *HttpSign) CheckSign(params map[string]string, body []byte, sign string)
 		}
 	}
 
+	// 服务端配置的算法是验签唯一真相源。MD5 仅保留历史报文省略 sign_type
+	// 的兼容；强算法必须由报文显式声明且与配置一致，禁止降级或未知值回退。
+	signType, ok := s.verifySignType(params)
+	if !ok {
+		return ErrSignType, errors.New(ErrSignType.String())
+	}
+
 	// 重建签名并恒定时间比较
-	local, debugURI := s.buildSign(params, body, toSignType(params[Const_SignType_Name]), s.versionType)
+	local, debugURI := s.buildSign(params, body, signType, s.versionType)
 	if !hmac.Equal([]byte(sign), []byte(local)) {
 		logger.Errorf("CheckSign -- 签名不一致, 期望签名内容 uriStr: %s", debugURI)
 		return ErrVerifyFailure, errors.New(ErrVerifyFailure.String())
 	}
 	return SignOK, nil
+}
+
+func (s *HttpSign) verifySignType(params map[string]string) (ESignType, bool) {
+	wire := strings.ToLower(strings.TrimSpace(params[Const_SignType_Name]))
+	if s.defaultSign == Sign_Md5 && wire == "" {
+		return Sign_Md5, true
+	}
+	parsed, exists := signType[wire]
+	return parsed, exists && parsed == s.defaultSign
 }
 
 // PushSign 向 params 注入时间戳、请求唯一标识与签名（就地修改并返回），

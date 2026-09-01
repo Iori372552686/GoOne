@@ -47,6 +47,10 @@ func errorCodeToGRPCCode(code g1_protocol.ErrorCode) codes.Code {
 		return codes.Internal
 	case g1_protocol.ErrorCode_ERR_CONF:
 		return codes.Internal
+	case g1_protocol.ErrorCode_ERR_UNAUTHENTICATED:
+		return codes.Unauthenticated
+	case g1_protocol.ErrorCode_ERR_UNIMPLEMENTED:
+		return codes.Unimplemented
 	default:
 		return codes.Internal
 	}
@@ -68,6 +72,10 @@ func grpcCodeToErrorCode(c codes.Code) g1_protocol.ErrorCode {
 		return g1_protocol.ErrorCode_ERR_INTERNAL
 	case codes.Unavailable:
 		return g1_protocol.ErrorCode_ERR_FAIL
+	case codes.Unauthenticated:
+		return g1_protocol.ErrorCode_ERR_UNAUTHENTICATED
+	case codes.Unimplemented:
+		return g1_protocol.ErrorCode_ERR_UNIMPLEMENTED
 	default:
 		return g1_protocol.ErrorCode_ERR_INTERNAL
 	}

@@ -68,13 +68,12 @@ func Wrap(code g1_protocol.ErrorCode, msg string, err error) *Error {
 }
 
 // Unimplemented is a helper for generated scaffold implementations.
-// It maps to ERR_INTERNAL by default (you can adjust mapping later if needed).
 func Unimplemented(method string) *Error {
 	method = strings.TrimSpace(method)
 	if method == "" {
-		return Wrap(g1_protocol.ErrorCode_ERR_INTERNAL, "unimplemented", nil)
+		return Wrap(g1_protocol.ErrorCode_ERR_UNIMPLEMENTED, "unimplemented", nil)
 	}
-	return Wrap(g1_protocol.ErrorCode_ERR_INTERNAL, "unimplemented: "+method, nil)
+	return Wrap(g1_protocol.ErrorCode_ERR_UNIMPLEMENTED, "unimplemented: "+method, nil)
 }
 
 func ToErrorCode(err error) g1_protocol.ErrorCode {
@@ -153,5 +152,4 @@ func setInt32Field(v reflect.Value, name string, val int32) bool {
 	}
 	return false
 }
-
 

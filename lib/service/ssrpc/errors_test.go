@@ -61,3 +61,10 @@ func TestToErrorCodePlainError(t *testing.T) {
 		t.Fatalf("ToErrorCode(plain) = %v, want ERR_INTERNAL", code)
 	}
 }
+
+func TestUnimplementedUsesDedicatedCode(t *testing.T) {
+	err := Unimplemented("AccountService.FutureMethod")
+	if code := ToErrorCode(err); code != g1_protocol.ErrorCode_ERR_UNIMPLEMENTED {
+		t.Fatalf("Unimplemented code = %v, want ERR_UNIMPLEMENTED", code)
+	}
+}

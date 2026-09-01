@@ -29,6 +29,8 @@ func TestToGRPCError_MapsCorrectly(t *testing.T) {
 		{g1_protocol.ErrorCode_ERR_HAS_EXIST, codes.AlreadyExists},
 		{g1_protocol.ErrorCode_ERR_INTERNAL, codes.Internal},
 		{g1_protocol.ErrorCode_ERR_FAIL, codes.Internal},
+		{g1_protocol.ErrorCode_ERR_UNAUTHENTICATED, codes.Unauthenticated},
+		{g1_protocol.ErrorCode_ERR_UNIMPLEMENTED, codes.Unimplemented},
 	}
 
 	for _, tt := range tests {
@@ -65,6 +67,8 @@ func TestFromGRPCError_MapsCorrectly(t *testing.T) {
 		{codes.DeadlineExceeded, g1_protocol.ErrorCode_ERR_TIMEOUT},
 		{codes.Internal, g1_protocol.ErrorCode_ERR_INTERNAL},
 		{codes.Unavailable, g1_protocol.ErrorCode_ERR_FAIL},
+		{codes.Unauthenticated, g1_protocol.ErrorCode_ERR_UNAUTHENTICATED},
+		{codes.Unimplemented, g1_protocol.ErrorCode_ERR_UNIMPLEMENTED},
 		{codes.PermissionDenied, g1_protocol.ErrorCode_ERR_INTERNAL}, // unmapped -> INTERNAL
 	}
 
@@ -84,6 +88,8 @@ func TestRoundTrip_ErrorCode_GRPC_ErrorCode(t *testing.T) {
 		g1_protocol.ErrorCode_ERR_NOT_EXIST,
 		g1_protocol.ErrorCode_ERR_HAS_EXIST,
 		g1_protocol.ErrorCode_ERR_INTERNAL,
+		g1_protocol.ErrorCode_ERR_UNAUTHENTICATED,
+		g1_protocol.ErrorCode_ERR_UNIMPLEMENTED,
 	}
 
 	for _, code := range roundTrip {
