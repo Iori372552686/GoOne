@@ -13,7 +13,7 @@ import (
 )
 
 // Version 是 GoOne 框架版本，发版时手动维护。
-const Version = "v1.3.3"
+const Version = "v1.3.4"
 
 const logoArt = ` 
  ██████╗  ██████╗  ██████╗ ███╗   ██╗███████╗
