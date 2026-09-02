@@ -1,6 +1,7 @@
 package texas_room
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
@@ -75,7 +76,7 @@ func (impl *TexasRoomCenterMgr) FlushAllRoomsToDB() (saved int, failed int) {
 			continue
 		}
 		key := roomRedisKey(impl.Index, stage)
-		if err := rds.RedisMgr.SetBytes(instID, key, buf); err != nil {
+		if err := rds.RedisMgr.SetBytes(context.Background(), instID, key, buf, 0); err != nil {
 			logger.Errorf("flush room snapshot error {key:%s} | %v", key, err)
 			failed++
 			continue
@@ -101,7 +102,7 @@ func saveStageSnapshot(instID uint32, index uint64, stage int32, roomInfo *texas
 		return false
 	}
 	key := roomRedisKey(index, stage)
-	if err := rds.RedisMgr.SetBytes(instID, key, buf); err != nil {
+	if err := rds.RedisMgr.SetBytes(context.Background(), instID, key, buf, 0); err != nil {
 		logger.Errorf("save room snapshot error {key:%s} | %v", key, err)
 		return false
 	}
@@ -157,7 +158,7 @@ func (impl *TexasRoomCenterMgr) restoreStageLocked(stage int32, room *texas.Texa
 
 	instID := uint32(g1_protocol.DBType_DB_TYPE_TEXAS_ROOM)
 	key := roomRedisKey(impl.Index, stage)
-	buf, err := rds.RedisMgr.GetBytes(instID, key)
+	buf, err := rds.RedisMgr.GetBytes(context.Background(), instID, key)
 	if err != nil {
 		// Redis 异常不阻塞创建：保持空表，由 gamesvr 上报重建。
 		logger.Errorf("restore room snapshot redis error {key:%s} | %v", key, err)

@@ -35,8 +35,8 @@ func (c *Component) Name() string { return c.name }
 
 // Start 实现 runtime.Component：初始化所有 Redis 实例。失败时 RedisMgr 自身已逆序回滚
 // 已成功实例（见 InitAndRun），Component 不做额外清理。
-func (c *Component) Start(_ context.Context) error {
-	if err := c.mgr.InitAndRun(c.conf); err != nil {
+func (c *Component) Start(ctx context.Context) error {
+	if err := c.mgr.InitAndRun(ctx, c.conf); err != nil {
 		return fmt.Errorf("redis component %q start: %w", c.name, err)
 	}
 	return nil

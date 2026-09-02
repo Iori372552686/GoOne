@@ -17,8 +17,8 @@ package gconf
 
 import (
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
+	gormdb "github.com/Iori372552686/GoOne/lib/db/gorm"
 	"github.com/Iori372552686/GoOne/lib/db/redis"
-	orm "github.com/Iori372552686/GoOne/lib/db/xorm"
 	"github.com/Iori372552686/GoOne/lib/web/http_sign"
 	"github.com/Iori372552686/GoOne/lib/web/rest_api"
 	"github.com/Iori372552686/GoOne/lib/web/web_gin"
@@ -51,7 +51,7 @@ type BaseDependenciesConfig struct {
 	GameDataDir        string             `json:"game_data_dir" yaml:"game_data_dir"`               // 游戏数据目录
 	SensitiveWordsFile string             `json:"sensitive_words_file" yaml:"sensitive_words_file"` // 敏感词文件
 	NacosConf          net_conf.NacosConf `json:"nacos_conf" yaml:"nacos_conf"`                     // nacos配置
-	OrmConf            []orm.Config       `json:"orm_instances" yaml:"orm_instances"`               // mysql配置
+	OrmConf            []gormdb.Config    `json:"orm_instances" yaml:"orm_instances"`               // mysql配置
 	HTTPSigns          []http_sign.Config `json:"http_sign" yaml:"http_sign"`                       // http签名配置
 	RestApiConf        []rest_api.Config  `json:"rest_api_config" yaml:"rest_api_config"`           // restapi配置
 	DbInstances        []redis.Config     `json:"db_instances" yaml:"db_instances"`                 // redis配置

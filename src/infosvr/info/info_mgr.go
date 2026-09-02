@@ -1,6 +1,7 @@
 package info
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Iori372552686/GoOne/lib/db/redis"
@@ -28,7 +29,7 @@ func NewInfoMgr() *InfoMgr {
 	return mgr
 }
 
-func (m *InfoMgr) GetInfo(uidList *[]uint64) (*[]*g1_protocol.PbRoleBriefInfo, int) {
+func (m *InfoMgr) GetInfo(ctx context.Context, uidList *[]uint64) (*[]*g1_protocol.PbRoleBriefInfo, int) {
 	missUid := make([]uint64, 0)
 	briefs := make([]*g1_protocol.PbRoleBriefInfo, 0)
 	for _, uid := range *uidList {
@@ -45,7 +46,7 @@ func (m *InfoMgr) GetInfo(uidList *[]uint64) (*[]*g1_protocol.PbRoleBriefInfo, i
 
 	// 如果miss了一部分，则去db拉取
 	if len(missUid) > 0 {
-		rsp, _ := m.loadBriefFromDB(missUid)
+		rsp, _ := m.loadBriefFromDB(ctx, missUid)
 		if rsp != nil {
 			for _, brief := range *rsp {
 				briefs = append(briefs, brief)
@@ -57,19 +58,19 @@ func (m *InfoMgr) GetInfo(uidList *[]uint64) (*[]*g1_protocol.PbRoleBriefInfo, i
 	return &briefs, 0
 }
 
-func (m *InfoMgr) SetInfo(uid uint64, brief *g1_protocol.PbRoleBriefInfo) int {
+func (m *InfoMgr) SetInfo(ctx context.Context, uid uint64, brief *g1_protocol.PbRoleBriefInfo) int {
 	_ = m.data.Set(uid, brief)
-	return m.saveBriefToDB(uid, brief)
+	return m.saveBriefToDB(ctx, uid, brief)
 }
 
-func (m *InfoMgr) loadBriefFromDB(uidList []uint64) (*[]*g1_protocol.PbRoleBriefInfo, int) {
+func (m *InfoMgr) loadBriefFromDB(ctx context.Context, uidList []uint64) (*[]*g1_protocol.PbRoleBriefInfo, int) {
 	dbType := uint32(g1_protocol.DBType_DB_TYPE_BRIEF_INFO)
 	keys := make([]string, 0, len(uidList))
 	for _, v := range uidList {
 		key := fmt.Sprintf("%v:%d", g1_protocol.DBType_DB_TYPE_BRIEF_INFO.String(), v)
 		keys = append(keys, key)
 	}
-	rsp, err := m.RedisMgr.MGetBytes(dbType, keys)
+	rsp, err := m.RedisMgr.MGetBytes(ctx, dbType, keys...)
 	if err != nil {
 		logger.Error("get db brief error: ", err)
 		return nil, int(g1_protocol.ErrorCode_ERR_DB)
@@ -77,17 +78,20 @@ func (m *InfoMgr) loadBriefFromDB(uidList []uint64) (*[]*g1_protocol.PbRoleBrief
 	ret := make([]*g1_protocol.PbRoleBriefInfo, 0, len(uidList))
 	for _, v := range rsp {
 		brief := &g1_protocol.PbRoleBriefInfo{}
-		_ = proto.Unmarshal([]byte(v), brief)
+		if len(v) == 0 {
+			continue
+		}
+		_ = proto.Unmarshal(v, brief)
 		ret = append(ret, brief)
 	}
 	return &ret, 0
 }
 
-func (m *InfoMgr) saveBriefToDB(uid uint64, brief *g1_protocol.PbRoleBriefInfo) int {
+func (m *InfoMgr) saveBriefToDB(ctx context.Context, uid uint64, brief *g1_protocol.PbRoleBriefInfo) int {
 	dbType := uint32(g1_protocol.DBType_DB_TYPE_BRIEF_INFO)
 	key := fmt.Sprintf("%v:%d", g1_protocol.DBType_DB_TYPE_BRIEF_INFO.String(), uid)
 	data, _ := proto.Marshal(brief)
-	err := m.RedisMgr.SetBytes(dbType, key, data)
+	err := m.RedisMgr.SetBytes(ctx, dbType, key, data, 0)
 	if err != nil {
 		logger.Errorf("set db brief err: ", err)
 		return int(g1_protocol.ErrorCode_ERR_DB)

@@ -44,8 +44,8 @@ func TestRedisComponentName(t *testing.T) {
 
 // TestRedisComponentStartFailureSurfacesError 验证 Start 失败（无效实例）返回带组件名的 error。
 func TestRedisComponentStartFailureSurfacesError(t *testing.T) {
-	// 用一个非法配置触发 AddInstance 失败。
-	bad := Config{InstanceID: 1, IP: "127.0.0.1", Port: 1, Password: "", DbIndex: 0, IsCluster: true}
+	// 用一个缺少 master_name 的 Sentinel 配置触发校验失败。
+	bad := Config{InstanceID: 1, Mode: string(ModeSentinel), Addresses: []string{"127.0.0.1:26379"}}
 	c := NewComponent("redis_bad", NewRedisMgr(), []Config{bad})
 	err := c.Start(context.Background())
 	if err == nil {

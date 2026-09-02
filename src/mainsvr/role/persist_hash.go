@@ -1,6 +1,7 @@
 package role
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -23,7 +24,6 @@ import (
 // 注：RoleInfo 的 GiftInfo 无对应 ERoleSectionFlag，ConnSvrInfo 为运行时状态不落盘，
 // 前者在 force 全量写时覆盖；增量更新期间若仅变更了 GiftInfo（当前无此路径），
 // 需为其补充 section flag。
-
 
 // roleSectionAccessor 把一个 ERoleSectionFlag 绑定到 RoleInfo 子 message 的
 // 读访问器，用于 marshal 写入 hash field。
@@ -87,7 +87,7 @@ func saveRoleHash(r *Role, force bool) error {
 			return err
 		}
 		// HSET key field value
-		if err := rds.RedisMgr.DoFlatCmd(instID, nil, "HSET", key, acc.name, buf); err != nil {
+		if err := rds.RedisMgr.HSetBytes(context.Background(), instID, key, acc.name, buf); err != nil {
 			logger.Errorf("role hash HSET error {uid:%v, field:%s} | %v", r.Uid(), acc.name, err)
 			return errors.New("role hash HSET error")
 		}
@@ -98,7 +98,7 @@ func saveRoleHash(r *Role, force bool) error {
 	// ConnSvrInfo 为运行时状态，不持久化。
 	if force && r.PbRole.GiftInfo != nil {
 		if buf, err := proto.Marshal(r.PbRole.GiftInfo); err == nil {
-			if err := rds.RedisMgr.DoFlatCmd(instID, nil, "HSET", key, "gift", buf); err != nil {
+			if err := rds.RedisMgr.HSetBytes(context.Background(), instID, key, "gift", buf); err != nil {
 				logger.Errorf("role hash HSET gift error {uid:%v} | %v", r.Uid(), err)
 				return errors.New("role hash HSET gift error")
 			}
@@ -118,8 +118,8 @@ func loadRoleHash(uid uint64) (*g1_protocol.RoleInfo, error) {
 	key := roleHashKey(uid)
 
 	// HGETALL key → map[field]value
-	var fields map[string][]byte
-	if err := rds.RedisMgr.DoFlatCmd(instID, &fields, "HGETALL", key); err != nil {
+	fields, err := rds.RedisMgr.HGetAllBytes(context.Background(), instID, key)
+	if err != nil {
 		return nil, fmt.Errorf("role hash HGETALL error {uid:%v} | %w", uid, err)
 	}
 	if len(fields) == 0 {

@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -60,19 +61,19 @@ func TestCap(t *testing.T) {
 	}
 
 	redisMgr := NewRedisMgr()
-	err := redisMgr.AddInstance(1, host, port, pass, 0, false)
+	err := redisMgr.AddInstance(context.Background(), Config{InstanceID: 1, IP: host, Port: port, Password: pass})
 	if err != nil {
 		t.Skipf("redis unavailable, skipping integration test: %v", err)
 	}
 	t.Cleanup(func() {
 		for i := 0; i < n; i++ {
-			_ = redisMgr.DelKey(1, capKey(i))
+			_ = redisMgr.Delete(context.Background(), 1, capKey(i))
 		}
 		_ = redisMgr.Close()
 	})
 	now := time.Now()
 	for i := 0; i < n; i++ {
-		err = redisMgr.SetBytesEx(1, capKey(i), b[:], ttlSec)
+		err = redisMgr.SetBytes(context.Background(), 1, capKey(i), b[:], ttlSec*time.Second)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -85,17 +86,17 @@ func TestIncBy(t *testing.T) {
 	itest.Require(t, addr)
 
 	redisMgr := NewRedisMgr()
-	err := redisMgr.AddInstance(1, host, port, pass, 0, false)
+	err := redisMgr.AddInstance(context.Background(), Config{InstanceID: 1, IP: host, Port: port, Password: pass})
 	if err != nil {
 		t.Skipf("redis unavailable, skipping integration test: %v", err)
 	}
 	t.Cleanup(func() {
-		_ = redisMgr.DelKey(1, "IncrTest2")
+		_ = redisMgr.Delete(context.Background(), 1, "IncrTest2")
 		_ = redisMgr.Close()
 	})
 
 	for i := 1; i <= 24; i++ {
-		ret, err := redisMgr.IncrByKey(1, "IncrTest2", 2)
+		ret, err := redisMgr.IncrBy(context.Background(), 1, "IncrTest2", 2)
 		if err != nil {
 			t.Fatal(err)
 		}

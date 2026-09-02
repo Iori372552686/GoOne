@@ -1,6 +1,7 @@
 package role
 
 import (
+	"context"
 	"os"
 	"strconv"
 	"testing"
@@ -27,7 +28,7 @@ func initE2ERedis(t *testing.T) (cleanup func()) {
 	oldMgr := rds.RedisMgr
 	rds.RedisMgr = redis.NewRedisMgr()
 	host, port := splitHostPortE2E(addr)
-	if err := rds.RedisMgr.AddInstance(1, host, port, pass, 0, false); err != nil {
+	if err := rds.RedisMgr.AddInstance(context.Background(), redis.Config{InstanceID: 1, IP: host, Port: port, Password: pass}); err != nil {
 		t.Fatalf("redis AddInstance err: %v", err)
 	}
 	return func() { rds.RedisMgr = oldMgr }
@@ -58,7 +59,7 @@ func TestRoleHashE2EFullThenIncremental(t *testing.T) {
 	uid := uint64(990001)
 	key := roleKeyE2E(uid)
 	instID := uint32(g1_protocol.DBType_DB_TYPE_ROLE)
-	rds.RedisMgr.DelKey(instID, key)
+	_ = rds.RedisMgr.Delete(context.Background(), instID, key)
 
 	// 1) 构造角色并全量写
 	r := NewRole(uid)
@@ -71,8 +72,8 @@ func TestRoleHashE2EFullThenIncremental(t *testing.T) {
 		if err := r.SaveToDBSync(); err != nil {
 			t.Fatalf("SaveToDBSync: %v", err)
 		}
-		var fields map[string][]byte
-		if err := rds.RedisMgr.DoFlatCmd(instID, &fields, "HGETALL", key); err != nil {
+		fields, err := rds.RedisMgr.HGetAllBytes(context.Background(), instID, key)
+		if err != nil {
 			t.Fatalf("HGETALL: %v", err)
 		}
 		t.Logf("hash fields after full write: %d", len(fields))
@@ -82,8 +83,7 @@ func TestRoleHashE2EFullThenIncremental(t *testing.T) {
 	})
 
 	t.Run("IncrementalWriteBasicOnly", func(t *testing.T) {
-		var invBefore []byte
-		rds.RedisMgr.DoFlatCmd(instID, &invBefore, "HGET", key, "inventory")
+		invBefore, _ := rds.RedisMgr.HGetBytes(context.Background(), instID, key, "inventory")
 
 		r.TouchBasicInfo("test_modify")
 		r.PbRole.BasicInfo.Exp = 99999
@@ -92,14 +92,12 @@ func TestRoleHashE2EFullThenIncremental(t *testing.T) {
 		}
 		r.clearPersistDirtyMask()
 
-		var basicAfter []byte
-		rds.RedisMgr.DoFlatCmd(instID, &basicAfter, "HGET", key, "basic")
+		basicAfter, _ := rds.RedisMgr.HGetBytes(context.Background(), instID, key, "basic")
 		if len(basicAfter) == 0 {
 			t.Fatal("basic field missing after incremental write")
 		}
 
-		var invAfter []byte
-		rds.RedisMgr.DoFlatCmd(instID, &invAfter, "HGET", key, "inventory")
+		invAfter, _ := rds.RedisMgr.HGetBytes(context.Background(), instID, key, "inventory")
 		if string(invAfter) != string(invBefore) {
 			t.Fatal("inventory field changed during basic-only incremental write")
 		}
@@ -129,5 +127,5 @@ func TestRoleHashE2EFullThenIncremental(t *testing.T) {
 		t.Log("load back data consistent with memory")
 	})
 
-	rds.RedisMgr.DelKey(instID, key)
+	_ = rds.RedisMgr.Delete(context.Background(), instID, key)
 }

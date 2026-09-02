@@ -1,9 +1,9 @@
 package globals
 
 import (
-	orm "github.com/Iori372552686/GoOne/lib/db/xorm"
+	gormdb "github.com/Iori372552686/GoOne/lib/db/gorm"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 )
 
 var TransMgr = transaction.NewTransactionMgr()
-var OrmMgr = orm.NewOrmMgr()
+var DBMgr = gormdb.NewManager()

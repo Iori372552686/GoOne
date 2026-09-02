@@ -36,8 +36,8 @@ func Start() {
 	}
 }
 
-func Push(id int64, f func()) {
-	handlers[id%ASYNC_COUNT].Push(f)
+func Push(id uint64, f func()) error {
+	return handlers[id%uint64(ASYNC_COUNT)].PushE(f)
 }
 
 func Close() {

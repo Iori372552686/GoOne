@@ -59,7 +59,7 @@ if (-not $goExe) {
 
 if (Test-Path (Join-Path $repoRoot "common/game_proto/gen_code.bat")) {
   Write-Host "[proto_goone] step 1/2: generate common/protocol"
-  Push-Location (Join-Path $repoRoot "commongame_proto")
+  Push-Location (Join-Path $repoRoot "common\game_proto")
   try {
     cmd /c gen_code.bat
     if ($LASTEXITCODE -ne 0) {

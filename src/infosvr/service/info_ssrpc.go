@@ -14,7 +14,7 @@ type InfoServiceImpl struct{}
 func (s *InfoServiceImpl) GetBriefInfo(ctx *ssrpc.Context, req *g1_protocol.InfoGetBriefInfoReq) (*g1_protocol.InfoGetBriefInfoRsp, error) {
 	rsp := &g1_protocol.InfoGetBriefInfoRsp{Ret: &g1_protocol.Ret{Code: g1_protocol.ErrorCode_ERR_OK}}
 
-	res, ret := globals.InfoMgr.GetInfo(&req.UidList)
+	res, ret := globals.InfoMgr.GetInfo(ctx, &req.UidList)
 	if ret != 0 {
 		return rsp, gerr.New(g1_protocol.ErrorCode(ret), "get_info", "")
 	}
@@ -27,7 +27,7 @@ func (s *InfoServiceImpl) GetBriefInfo(ctx *ssrpc.Context, req *g1_protocol.Info
 func (s *InfoServiceImpl) GetIconDesc(ctx *ssrpc.Context, req *g1_protocol.InfoGetIconDescReq) (*g1_protocol.InfoGetIconDescRsp, error) {
 	rsp := &g1_protocol.InfoGetIconDescRsp{Ret: &g1_protocol.Ret{Code: g1_protocol.ErrorCode_ERR_OK}}
 
-	res, ret := globals.InfoMgr.GetInfo(&req.UidList)
+	res, ret := globals.InfoMgr.GetInfo(ctx, &req.UidList)
 	if ret != 0 {
 		return rsp, gerr.New(g1_protocol.ErrorCode(ret), "get_info", "")
 	}
@@ -46,7 +46,7 @@ func (s *InfoServiceImpl) GetIconDesc(ctx *ssrpc.Context, req *g1_protocol.InfoG
 func (s *InfoServiceImpl) SetBriefInfo(ctx *ssrpc.Context, req *g1_protocol.InfoSetBriefInfoReq) (*g1_protocol.InfoSetBriefInfoRsp, error) {
 	rsp := &g1_protocol.InfoSetBriefInfoRsp{
 		Ret: &g1_protocol.Ret{
-			Code: g1_protocol.ErrorCode(globals.InfoMgr.SetInfo(req.GetUid(), req.GetInfo())),
+			Code: g1_protocol.ErrorCode(globals.InfoMgr.SetInfo(ctx, req.GetUid(), req.GetInfo())),
 		},
 	}
 	if req.GetIgnoreRsp() {

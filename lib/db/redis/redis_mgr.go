@@ -2,208 +2,110 @@ package redis
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/module/conf"
-
-	"github.com/mediocregopher/radix/v3"
+	goredis "github.com/redis/go-redis/v9"
 )
 
-const POOL_SIZE = 100
-
-/*
-*  RedisMgr
-*  @Description:
- */
-type RedisMgr struct {
-	clients sync.Map // map[uint32]radix.Client
-}
-
-/**
-* @Description:  new redis mgr
-* @return: *RedisMgr
-* @Author: Iori
-* @Date: 2022-02-26 11:42:47
-**/
-func NewRedisMgr() *RedisMgr {
-	m := new(RedisMgr)
-	return m
-}
-
-// DefaultConfKey 是 RedisMgr 默认读取的 Redis 实例配置 key。
 const DefaultConfKey = "base_cfg.dependencies.db_instances"
 
-// OnStart 是组件启动钩子：从 module/conf 读取默认 key（DefaultConfKey）下的
-// Redis 实例配置并初始化。空配置时静默跳过（不视为错误），兼容把 redis 作为可选
-// 依赖的服务（如 roomcentersvr）；非空但任一实例初始化失败时返回该 error。
-//
-// 设计意图：把 "Unmarshal 默认 key → InitAndRun" 这段在多个服务 app.go 内重复的
-// 样板收敛到一处，调用方只需 globals.X.RedisMgr.OnStart(ctx)。
-func (self *RedisMgr) OnStart(_ context.Context) error {
+var ErrInstanceNotFound = errors.New("redis instance not found")
+
+type redisClientFactory func(normalizedConfig, *tls.Config) (goredis.UniversalClient, error)
+
+type RedisMgr struct {
+	clients   sync.Map // map[uint32]goredis.UniversalClient
+	newClient redisClientFactory
+}
+
+func NewRedisMgr() *RedisMgr {
+	return &RedisMgr{newClient: newUniversalClient}
+}
+
+func (m *RedisMgr) OnStart(ctx context.Context) error {
 	var dbs []Config
 	if err := conf.Unmarshal(DefaultConfKey, &dbs); err != nil {
 		return err
 	}
 	if len(dbs) == 0 {
-		// 空配置：静默跳过，保留 "redis 可选" 的服务语义。
-		// 必填服务由 module/conf/registry 的 mustNonEmptyList 在启动期强制校验。
 		return nil
 	}
-	return self.InitAndRun(dbs)
+	return m.InitAndRun(ctx, dbs)
 }
 
-// OnStop 是组件停止钩子：关闭所有 Redis 实例的连接池，与 OnStart 对称。
-// 直接代理幂等的 Close（重复调用不 panic、不重复释放，返回聚合 Close error），
-// 使服务 app.go 可直接 globals.X.RedisMgr.OnStop 作为 FuncComponent.OnStop 引用。
-func (self *RedisMgr) OnStop(_ context.Context) error {
-	return self.Close()
-}
+func (m *RedisMgr) OnStop(context.Context) error { return m.Close() }
 
-/**
-* @Description: InitAndRun
-* @receiver: self
-* @param: dbIns
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-26 11:42:42
-**/
-func (self *RedisMgr) InitAndRun(dbIns []Config) error {
-	safe := make([]string, len(dbIns))
-	for i, ds := range dbIns {
-		safe[i] = ds.SafeString()
+func (m *RedisMgr) InitAndRun(ctx context.Context, configs []Config) error {
+	safe := make([]string, len(configs))
+	for i, config := range configs {
+		safe[i] = config.SafeString()
 	}
-	logger.Infof("RedisMgr   InsInit.. | %v", safe)
+	logger.Infof("RedisMgr InsInit.. | %v", safe)
 
-	// 记录已成功添加的实例 ID，用于中途失败时逆序关闭（多实例初始化失败
-	// 必须回滚已成功实例，避免连接泄漏）。
-	added := make([]uint32, 0, len(dbIns))
-	for _, ds := range dbIns {
-		instID := uint32(ds.InstanceID)
-		err := self.AddInstance(instID, ds.IP, ds.Port, ds.Password, ds.DbIndex, ds.IsCluster)
-		if err != nil {
-			// 逆序关闭已成功添加的实例（清理路径，忽略各自的 Close error）。
+	added := make([]uint32, 0, len(configs))
+	for _, config := range configs {
+		if err := m.AddInstance(ctx, config); err != nil {
 			for i := len(added) - 1; i >= 0; i-- {
-				_ = self.closeInstance(added[i])
+				_ = m.closeInstance(added[i])
 			}
 			return err
 		}
-		added = append(added, instID)
+		added = append(added, uint32(config.InstanceID))
 	}
-
-	logger.Infof("RedisMgr   InsInit... Done !")
+	logger.Infof("RedisMgr InsInit... Done !")
 	return nil
 }
 
-// Close 关闭所有 Redis 实例的连接池。幂等：重复调用不 panic、不重复释放
-// （Redis Manager 增加 Close，使资源由 Component 统一关闭）。
-//
-// 错误聚合：聚合每个实例 Close 的 error，不再静默忽略。任一实例关闭失败时
-// 返回 errors.Join 的聚合错误；全部成功返回 nil。
-func (m *RedisMgr) Close() error {
-	var errs []error
-	m.clients.Range(func(key, value any) bool {
-		if err := m.closeInstance(key.(uint32)); err != nil {
-			errs = append(errs, fmt.Errorf("redis instance %d close: %w", key.(uint32), err))
-		}
-		return true
-	})
-	return errors.Join(errs...)
-}
-
-// closeInstance 关闭并移除指定实例。已不存在时安全返回。返回 client.Close 的 error
-// 。
-func (m *RedisMgr) closeInstance(instID uint32) error {
-	v, ok := m.clients.LoadAndDelete(instID)
-	if !ok {
-		return nil
-	}
-	if client, ok := v.(radix.Client); ok {
-		return client.Close()
-	}
-	return nil
-}
-
-/**
-* @Description: AddInstance
-* @receiver: m
-* @param: instID
-* @param: ip
-* @param: port
-* @param: password
-* @param: dbIndex
-* @param: isCluster
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-26 11:42:37
-**/
-func (m *RedisMgr) AddInstance(instID uint32, ip string, port int, password string, dbIndex int, isCluster bool) error {
-
-	addr := fmt.Sprintf("%v:%v", ip, port)
-	connFunc := func(network, addr string) (radix.Conn, error) {
-		if isCluster {
-			return radix.Dial(network, addr,
-				radix.DialTimeout(10*time.Second),
-				radix.DialAuthPass(password),
-			)
-		} else {
-			return radix.Dial(network, addr,
-				radix.DialTimeout(10*time.Second),
-				radix.DialAuthPass(password),
-				radix.DialSelectDB(dbIndex),
-			)
-		}
-	}
-	poolFunc := func(network, addr string) (radix.Client, error) {
-		pingOpt := radix.PoolPingInterval(time.Second)
-		return radix.NewPool(network, addr, POOL_SIZE, radix.PoolConnFunc(connFunc), pingOpt)
-	}
-
-	var err error
-	var client radix.Client
-	if isCluster {
-		client, err = radix.NewCluster([]string{addr}, radix.ClusterPoolFunc(poolFunc))
-	} else {
-		client, err = poolFunc("tcp", addr)
-	}
+func (m *RedisMgr) AddInstance(ctx context.Context, config Config) error {
+	normalized, err := config.normalize()
 	if err != nil {
-		return fmt.Errorf("failed to create redis client | %w", err)
+		return err
+	}
+	tlsConfig, err := buildTLSConfig(normalized.TLS)
+	if err != nil {
+		return fmt.Errorf("redis instance %d tls: %w", config.InstanceID, err)
+	}
+	client, err := m.newClient(normalized, tlsConfig)
+	if err != nil {
+		return fmt.Errorf("redis instance %d create client: %w", config.InstanceID, err)
+	}
+	instanceID := uint32(config.InstanceID)
+	client.AddHook(redisMetricsHook{instanceID: instanceID})
+	if err := client.Ping(ctx).Err(); err != nil {
+		_ = client.Close()
+		return fmt.Errorf("redis instance %d ping: %w", config.InstanceID, err)
 	}
 
-	m.clients.Load(instID)
-
-	if v, exist := m.clients.Load(instID); exist {
-		logger.Warningf("overwrite a redis instance")
-		if oldClient, ok := v.(radix.Client); ok {
+	if previous, loaded := m.clients.Swap(instanceID, client); loaded {
+		logger.Warningf("overwrite redis instance %d", instanceID)
+		if oldClient, ok := previous.(goredis.UniversalClient); ok && oldClient != nil {
 			_ = oldClient.Close()
 		}
-		m.clients.Delete(instID)
 	}
-
-	m.clients.Store(instID, client)
-
 	return nil
 }
 
-/**
-* @Description: GetClient
-* @receiver: m
-* @param: instID
-* @return: radix.Client
-* @Author: Iori
-* @Date: 2022-02-26 11:42:31
-**/
-func (m *RedisMgr) GetClient(instID uint32) radix.Client {
-	v, exist := m.clients.Load(instID)
-	client, ok := v.(radix.Client)
-	if !exist || !ok || client == nil {
-		logger.Errorf("failed to get a redis client")
-		return nil
+func (m *RedisMgr) Client(instanceID uint32) (goredis.UniversalClient, error) {
+	if m == nil {
+		return nil, fmt.Errorf("%w: %d", ErrInstanceNotFound, instanceID)
 	}
-	return client
+	value, ok := m.clients.Load(instanceID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %d", ErrInstanceNotFound, instanceID)
+	}
+	client, ok := value.(goredis.UniversalClient)
+	if !ok || client == nil {
+		return nil, fmt.Errorf("%w: %d", ErrInstanceNotFound, instanceID)
+	}
+	return client, nil
 }
 
 func (m *RedisMgr) InstanceCount() int {
@@ -218,195 +120,213 @@ func (m *RedisMgr) InstanceCount() int {
 	return count
 }
 
-/**
-* @Description: DoFlatCmd
-* @receiver: m
-* @param: instID
-* @param: result
-* @param: cmd
-* @param: key
-* @param: args
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-26 11:42:27
-**/
-func (m *RedisMgr) DoFlatCmd(instID uint32, result interface{}, cmd, key string, args ...interface{}) error {
-	client := m.GetClient(instID)
-	if client == nil {
-		return fmt.Errorf("RedisDoCmd cannot get a client {id:%v, cmd:%s}", instID, cmd)
+func (m *RedisMgr) Close() error {
+	if m == nil {
+		return nil
 	}
-	finish := beginRedisObserve(instID, cmd)
-	err := client.Do(radix.FlatCmd(result, cmd, key, args...))
-	finish(err)
-	return err
+	var errs []error
+	m.clients.Range(func(key, _ any) bool {
+		instanceID := key.(uint32)
+		if err := m.closeInstance(instanceID); err != nil {
+			errs = append(errs, fmt.Errorf("redis instance %d close: %w", instanceID, err))
+		}
+		return true
+	})
+	return errors.Join(errs...)
 }
 
-/**
-* @Description: DoCmd
-* @receiver: m
-* @param: instID
-* @param: result
-* @param: cmd
-* @param: args
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-26 11:42:22
-**/
-func (m *RedisMgr) DoCmd(instID uint32, result interface{}, cmd string, args ...string) error {
-	client := m.GetClient(instID)
-	if client == nil {
-		return fmt.Errorf("RedisDoCmd cannot get a client {id:%v, cmd:%s}", instID, cmd)
+func (m *RedisMgr) closeInstance(instanceID uint32) error {
+	value, ok := m.clients.LoadAndDelete(instanceID)
+	if !ok {
+		return nil
 	}
-	finish := beginRedisObserve(instID, cmd)
-	err := client.Do(radix.Cmd(result, cmd, args...))
-	finish(err)
-	return err
+	client, ok := value.(goredis.UniversalClient)
+	if !ok || client == nil {
+		return nil
+	}
+	return client.Close()
 }
 
-/**
-* @Description: SetBytes
-* @receiver: m
-* @param: instID
-* @param: key
-* @param: value
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-26 11:42:18
-**/
-func (m *RedisMgr) SetBytes(instID uint32, key string, value []byte) error {
-	return m.DoFlatCmd(instID, nil, "SET", key, value)
-}
-func (m *RedisMgr) SetBytesEx(instID uint32, key string, value []byte, second int64) error {
-	return m.DoFlatCmd(instID, nil, "SET", key, value, "ex", second)
+func (m *RedisMgr) SetBytes(ctx context.Context, instanceID uint32, key string, value []byte, ttl time.Duration) error {
+	client, err := m.Client(instanceID)
+	if err != nil {
+		return err
+	}
+	return client.Set(ctx, key, value, ttl).Err()
 }
 
-/**
-* @Description: GetBytes
-* @receiver: m
-* @param: instID
-* @param: key
-* @return: []byte
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-26 11:42:14
-**/
-func (m *RedisMgr) GetBytes(instID uint32, key string) ([]byte, error) {
-	var result []byte
-	mn := radix.MaybeNil{Rcv: &result}
-	err := m.DoFlatCmd(instID, &mn, "GET", key)
+func (m *RedisMgr) GetBytes(ctx context.Context, instanceID uint32, key string) ([]byte, error) {
+	client, err := m.Client(instanceID)
 	if err != nil {
 		return nil, err
 	}
-	if mn.Nil {
+	value, err := client.Get(ctx, key).Bytes()
+	if errors.Is(err, goredis.Nil) {
 		return nil, nil
+	}
+	return value, err
+}
+
+func (m *RedisMgr) MGetBytes(ctx context.Context, instanceID uint32, keys ...string) ([][]byte, error) {
+	client, err := m.Client(instanceID)
+	if err != nil {
+		return nil, err
+	}
+	values, err := client.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil, err
+	}
+	result := make([][]byte, len(values))
+	for i, value := range values {
+		switch typed := value.(type) {
+		case nil:
+		case string:
+			result[i] = []byte(typed)
+		case []byte:
+			result[i] = append([]byte(nil), typed...)
+		default:
+			result[i] = []byte(fmt.Sprint(typed))
+		}
 	}
 	return result, nil
 }
 
-/**
-* @Description: MGetBytes
-* @receiver: m
-* @param: instID
-* @param: keys
-* @return: []string
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-26 11:42:10
-**/
-func (m *RedisMgr) MGetBytes(instID uint32, keys []string) ([]string, error) {
-	var result []string
-	mn := radix.MaybeNil{Rcv: &result}
-	err := m.DoCmd(instID, &mn, "MGET", keys...)
+func (m *RedisMgr) Delete(ctx context.Context, instanceID uint32, keys ...string) error {
+	client, err := m.Client(instanceID)
+	if err != nil {
+		return err
+	}
+	return client.Del(ctx, keys...).Err()
+}
+
+func (m *RedisMgr) HSetBytes(ctx context.Context, instanceID uint32, key, field string, value []byte) error {
+	client, err := m.Client(instanceID)
+	if err != nil {
+		return err
+	}
+	return client.HSet(ctx, key, field, value).Err()
+}
+
+func (m *RedisMgr) HGetBytes(ctx context.Context, instanceID uint32, key, field string) ([]byte, error) {
+	client, err := m.Client(instanceID)
 	if err != nil {
 		return nil, err
 	}
-	if mn.Nil {
+	value, err := client.HGet(ctx, key, field).Bytes()
+	if errors.Is(err, goredis.Nil) {
 		return nil, nil
+	}
+	return value, err
+}
+
+func (m *RedisMgr) HGetAllBytes(ctx context.Context, instanceID uint32, key string) (map[string][]byte, error) {
+	client, err := m.Client(instanceID)
+	if err != nil {
+		return nil, err
+	}
+	values, err := client.HGetAll(ctx, key).Result()
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string][]byte, len(values))
+	for field, value := range values {
+		result[field] = []byte(value)
 	}
 	return result, nil
 }
 
-/**
-* @Description: DelKey
-* @receiver: m
-* @param: instID
-* @param: key
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-26 11:42:06
-**/
-func (m *RedisMgr) DelKey(instID uint32, key string) error {
-	return m.DoFlatCmd(instID, nil, "DEL", key)
+func (m *RedisMgr) IncrBy(ctx context.Context, instanceID uint32, key string, value int64) (int64, error) {
+	client, err := m.Client(instanceID)
+	if err != nil {
+		return 0, err
+	}
+	return client.IncrBy(ctx, key, value).Result()
 }
 
-/**
-* @Description: ZsetSet
-* @receiver: m
-* @param: instID
-* @param: setName
-* @param: key
-* @param: score
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-26 11:42:01
-**/
-func (m *RedisMgr) ZsetSet(instID uint32, setName string, key string, score int32) error {
-	return m.DoFlatCmd(instID, nil, "ZADD", setName, key, score)
+func (m *RedisMgr) ZAdd(ctx context.Context, instanceID uint32, key string, members ...goredis.Z) error {
+	client, err := m.Client(instanceID)
+	if err != nil {
+		return err
+	}
+	return client.ZAdd(ctx, key, members...).Err()
 }
 
-/**
-* @Description: ZsetRange
-* @receiver: m
-* @param: instID
-* @param: setName
-* @param: beginIdx
-* @param: endIdx
-* @return: []string
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-26 11:41:55
-**/
-func (m *RedisMgr) ZsetRange(instID uint32, setName string, beginIdx, endIdx int32) ([]string, error) {
-	var result []string
-	mn := radix.MaybeNil{Rcv: &result}
-	err := m.DoFlatCmd(instID, &mn, "ZRANGE", setName, beginIdx, endIdx)
+func (m *RedisMgr) ZRange(ctx context.Context, instanceID uint32, key string, start, stop int64) ([]string, error) {
+	client, err := m.Client(instanceID)
 	if err != nil {
 		return nil, err
 	}
-	if mn.Nil {
+	return client.ZRange(ctx, key, start, stop).Result()
+}
+
+func buildTLSConfig(config TLSConfig) (*tls.Config, error) {
+	if !config.Enabled {
 		return nil, nil
 	}
-	return result, nil
+	tlsConfig := &tls.Config{
+		MinVersion:         tls.VersionTLS12,
+		ServerName:         config.ServerName,
+		InsecureSkipVerify: config.InsecureSkipVerify, //nolint:gosec // explicit deployment option
+	}
+	if config.CAFile != "" {
+		pem, err := os.ReadFile(config.CAFile)
+		if err != nil {
+			return nil, fmt.Errorf("read ca_file: %w", err)
+		}
+		roots := x509.NewCertPool()
+		if !roots.AppendCertsFromPEM(pem) {
+			return nil, errors.New("ca_file contains no valid certificates")
+		}
+		tlsConfig.RootCAs = roots
+	}
+	if config.CertFile != "" {
+		certificate, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("load client certificate: %w", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{certificate}
+	}
+	return tlsConfig, nil
 }
 
-/**
-* @Description: INCR（自增）
-* @receiver: m
-* @param: instID
-* @param: key
-* @return: int64
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-26 11:41:35
-**/
-func (m *RedisMgr) IncrKey(instID uint32, key string) (int64, error) {
-	result := int64(0)
-	err := m.DoCmd(instID, &result, "INCR", key)
-	return result, err
+func newUniversalClient(config normalizedConfig, tlsConfig *tls.Config) (goredis.UniversalClient, error) {
+	dialTimeout := durationMS(config.DialTimeoutMS)
+	readTimeout := durationMS(config.ReadTimeoutMS)
+	writeTimeout := durationMS(config.WriteTimeoutMS)
+	poolTimeout := durationMS(config.PoolTimeoutMS)
+
+	switch config.Mode {
+	case ModeStandalone:
+		return goredis.NewClient(&goredis.Options{
+			Addr: config.Addresses[0], Username: config.Username, Password: config.Password,
+			DB: config.DbIndex, PoolSize: config.PoolSize, MinIdleConns: config.MinIdleConns,
+			DialTimeout: dialTimeout, ReadTimeout: readTimeout, WriteTimeout: writeTimeout,
+			PoolTimeout: poolTimeout, TLSConfig: tlsConfig,
+		}), nil
+	case ModeSentinel:
+		return goredis.NewFailoverClient(&goredis.FailoverOptions{
+			MasterName: config.MasterName, SentinelAddrs: config.Addresses,
+			SentinelUsername: config.SentinelUsername, SentinelPassword: config.SentinelPassword,
+			Username: config.Username, Password: config.Password, DB: config.DbIndex,
+			PoolSize: config.PoolSize, MinIdleConns: config.MinIdleConns,
+			DialTimeout: dialTimeout, ReadTimeout: readTimeout, WriteTimeout: writeTimeout,
+			PoolTimeout: poolTimeout, TLSConfig: tlsConfig,
+		}), nil
+	case ModeCluster:
+		return goredis.NewClusterClient(&goredis.ClusterOptions{
+			Addrs: config.Addresses, Username: config.Username, Password: config.Password,
+			PoolSize: config.PoolSize, MinIdleConns: config.MinIdleConns,
+			DialTimeout: dialTimeout, ReadTimeout: readTimeout, WriteTimeout: writeTimeout,
+			PoolTimeout: poolTimeout, TLSConfig: tlsConfig,
+		}), nil
+	default:
+		return nil, fmt.Errorf("unsupported redis mode %q", config.Mode)
+	}
 }
 
-/**
-* @Description: INCRBY（自增自定义数）
-* @receiver: m
-* @param: instID
-* @param: key
-* @return: int64
-* @return: error
-* @Author: Iori
-* @Date: 2022-02-26 11:41:35
-**/
-func (m *RedisMgr) IncrByKey(instID uint32, key string, value int64) (int64, error) {
-	result := int64(0)
-	err := m.DoFlatCmd(instID, &result, "INCRBY", key, value)
-	return result, err
+func durationMS(value int) time.Duration {
+	if value == 0 {
+		return 0
+	}
+	return time.Duration(value) * time.Millisecond
 }

@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -9,7 +10,41 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	goredis "github.com/redis/go-redis/v9"
 )
+
+type redisMetricsHook struct {
+	instanceID uint32
+}
+
+func (h redisMetricsHook) DialHook(next goredis.DialHook) goredis.DialHook { return next }
+
+func (h redisMetricsHook) ProcessHook(next goredis.ProcessHook) goredis.ProcessHook {
+	return func(ctx context.Context, cmd goredis.Cmder) error {
+		finish := beginRedisObserve(h.instanceID, cmd.Name())
+		err := next(ctx, cmd)
+		finish(err)
+		return err
+	}
+}
+
+func (h redisMetricsHook) ProcessPipelineHook(next goredis.ProcessPipelineHook) goredis.ProcessPipelineHook {
+	return func(ctx context.Context, cmds []goredis.Cmder) error {
+		finishes := make([]func(error), len(cmds))
+		for i, cmd := range cmds {
+			finishes[i] = beginRedisObserve(h.instanceID, cmd.Name())
+		}
+		err := next(ctx, cmds)
+		for i, cmd := range cmds {
+			cmdErr := cmd.Err()
+			if cmdErr == nil && err != nil {
+				cmdErr = err
+			}
+			finishes[i](cmdErr)
+		}
+		return err
+	}
+}
 
 var redisDurationBuckets = []float64{
 	0.0005,
@@ -55,6 +90,7 @@ func beginRedisObserve(instID uint32, cmd string) func(err error) {
 	redisCommandsInFlight.WithLabelValues(instanceLabel, cmdLabel).Inc()
 	start := time.Now()
 	return func(err error) {
+		err = redisOperationalError(err)
 		redisCommandsInFlight.WithLabelValues(instanceLabel, cmdLabel).Dec()
 		redisCommandsTotal.WithLabelValues(instanceLabel, cmdLabel, redisResultLabel(err)).Inc()
 		redisCommandDuration.WithLabelValues(instanceLabel, cmdLabel).Observe(time.Since(start).Seconds())
@@ -76,6 +112,7 @@ func normalizeRedisCmd(cmd string) string {
 }
 
 func redisResultLabel(err error) string {
+	err = redisOperationalError(err)
 	if err == nil {
 		return "ok"
 	}
@@ -85,9 +122,19 @@ func redisResultLabel(err error) string {
 	return "error"
 }
 
+func redisOperationalError(err error) error {
+	if errors.Is(err, goredis.Nil) {
+		return nil
+	}
+	return err
+}
+
 func redisIsTimeoutErr(err error) bool {
 	if err == nil {
 		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
 	}
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {

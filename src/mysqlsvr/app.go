@@ -5,7 +5,7 @@ import (
 
 	mysqlsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/mysqlsvr/v1"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	orm "github.com/Iori372552686/GoOne/lib/db/xorm"
+	gormdb "github.com/Iori372552686/GoOne/lib/db/gorm"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
@@ -14,6 +14,7 @@ import (
 	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/globals"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/manager"
+	"github.com/Iori372552686/GoOne/src/mysqlsvr/repository"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/service"
 )
 
@@ -26,6 +27,7 @@ func NewApp() *runtime.App {
 
 	// TransMgr：Start 启动分片 worker；Drain 排空在途事务（受 ctx 超时约束）。
 	transMgr := &bussvc.TransMgrComponent{Mgr: globals.TransMgr}
+	repo := repository.New(globals.DBMgr)
 
 	// SSRPC 注册：必须在 Seal（于 router/bus Start 之前）完成，且在 TransMgr Start
 	// 之后（RegisterToTransactionMgr 依赖已 InitAndRun 的 TransMgr）。这里作为
@@ -34,7 +36,7 @@ func NewApp() *runtime.App {
 	registerHandlers := ssrpc.NewRegistryComponent(
 		"ssrpc_registry",
 		func(r *ssrpc.Registry) error {
-			srv := mysqlsvrv1.NewMysqlServiceSServer(&service.MysqlServiceImpl{}, ssrpc.DefaultMWOptions{})
+			srv := mysqlsvrv1.NewMysqlServiceSServer(service.NewMysqlServiceImpl(repo), ssrpc.DefaultMWOptions{})
 			return mysqlsvrv1.RegisterMysqlServiceToRegistry(r, srv)
 		},
 		ssrpc.WithTransactionManager(globals.TransMgr),
@@ -45,20 +47,23 @@ func NewApp() *runtime.App {
 	// 产生 goroutine，生命周期由 Component 统一管理。
 	ormDeps := &bussvc.FuncComponent{
 		ComponentName: "orm_deps",
-		OnStart: func(_ context.Context) error {
-			manager.Start()
-			var ormConf []orm.Config
+		OnStart: func(ctx context.Context) error {
+			var ormConf []gormdb.Config
 			if err := conf.Unmarshal("base_cfg.dependencies.orm_instances", &ormConf); err != nil {
 				return err
 			}
-			return globals.OrmMgr.InitAndRun(ormConf, manager.GetTables()...)
+			if err := globals.DBMgr.InitAndRun(ctx, ormConf, manager.GetTables()...); err != nil {
+				return err
+			}
+			manager.Start()
+			return nil
 		},
 		OnStop: func(_ context.Context) error {
 			manager.Close()
 			// 同时关闭 ORM Engine（此前只关 async worker，Engine 靠 OS 回收）。
-			_ = globals.OrmMgr.Close()
+			err := globals.DBMgr.Close()
 			logger.Infof("================== mysqlsvr Stop =========================")
-			return nil
+			return err
 		},
 	}
 
