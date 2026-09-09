@@ -242,6 +242,9 @@ func defaultConfig() *Config {
 }
 
 func applyEnvOverrides(cfg *Config) {
+	if v := strings.TrimSpace(os.Getenv("GOONE_TESTER_HOST")); v != "" {
+		cfg.Server.Host = v
+	}
 	if v := strings.TrimSpace(os.Getenv("GOONE_TESTER_ACCOUNT_PREFIX")); v != "" {
 		cfg.Player.AccountPrefix = v
 	}

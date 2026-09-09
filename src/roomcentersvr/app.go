@@ -5,7 +5,6 @@ import (
 	"time"
 
 	roomcenterv1 "github.com/Iori372552686/GoOne/api/gen/game/roomcenter/v1"
-	"github.com/Iori372552686/GoOne/module/gamedata"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
@@ -18,6 +17,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/util/idgen"
 	"github.com/Iori372552686/GoOne/lib/util/safego"
 	"github.com/Iori372552686/GoOne/module/conf"
+	"github.com/Iori372552686/GoOne/module/gamedata"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/globals"
 	id "github.com/Iori372552686/GoOne/src/roomcentersvr/globals/idgen"
 	rds "github.com/Iori372552686/GoOne/src/roomcentersvr/globals/rds"
@@ -51,7 +51,7 @@ func NewApp() *runtime.App {
 
 	businessDeps := &bussvc.FuncComponent{
 		ComponentName: "business_deps",
-		OnStart: func(_ context.Context) error {
+		OnStart: func(ctx context.Context) error {
 			idGen, err := idgen.NewIDGen()
 			if err != nil {
 				return err
@@ -59,7 +59,7 @@ func NewApp() *runtime.App {
 			id.IDGen = idGen
 			// 初始化 Redis（房间快照持久化用）。OnStart 内部对空配置静默跳过，
 			// 保留 "redis 可选" 的向后兼容语义。
-			if err := rds.RedisMgr.OnStart(nil); err != nil {
+			if err := rds.RedisMgr.OnStart(ctx); err != nil {
 				return err
 			}
 			var nacosConf net_conf.NacosConf

@@ -89,6 +89,11 @@ weight = 3
 enabled = true
 weight = 1
 
+[modules.inventory]
+# 背包压测：GM 加道具 + 查背包，覆盖角色 Redis 读写高频路径
+enabled = true
+weight = 1
+
 [collect]
 # 控制台/统计采样间隔，如 "5s", "10s"
 sample_interval = "5s"

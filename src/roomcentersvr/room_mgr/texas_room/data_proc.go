@@ -22,13 +22,8 @@ func (impl *TexasRoomCenterMgr) SaveRoomDataToDB() error {
 	if !impl.checkOpen() {
 		return nil
 	}
-	if rds.RedisMgr.InstanceCount() == 0 {
-		return nil // 未配置 Redis，跳过持久化
-	}
 
-	instID := uint32(g1_protocol.DBType_DB_TYPE_TEXAS_ROOM)
 	saved := 0
-
 	impl.RLock()
 	defer impl.RUnlock()
 
@@ -36,7 +31,7 @@ func (impl *TexasRoomCenterMgr) SaveRoomDataToDB() error {
 		if roomInfo == nil || !roomInfo.CheckChange() {
 			continue
 		}
-		if code := saveStageSnapshot(instID, impl.Index, stage, roomInfo); code {
+		if code := saveStageSnapshot(uint32(g1_protocol.DBType_DB_TYPE_TEXAS_ROOM), impl.Index, stage, roomInfo); code {
 			saved++
 		}
 	}
@@ -50,9 +45,6 @@ func (impl *TexasRoomCenterMgr) SaveRoomDataToDB() error {
 // FlushAllRoomsToDB 强制全量写所有房间（停机 Drain 用）。无视 dirty 标志。
 func (impl *TexasRoomCenterMgr) FlushAllRoomsToDB() (saved int, failed int) {
 	if !impl.checkOpen() {
-		return 0, 0
-	}
-	if rds.RedisMgr.InstanceCount() == 0 {
 		return 0, 0
 	}
 

@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Iori372552686/GoOne/module/gamedata"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
@@ -20,6 +19,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/web/rest_api"
 	"github.com/Iori372552686/GoOne/lib/web/web_gin"
 	"github.com/Iori372552686/GoOne/module/conf"
+	"github.com/Iori372552686/GoOne/module/gamedata"
 	"github.com/Iori372552686/GoOne/module/gconf"
 	"github.com/Iori372552686/GoOne/src/web_svr/controller"
 	"github.com/Iori372552686/GoOne/src/web_svr/globals"
@@ -68,11 +68,11 @@ func (w *webRuntimeComponent) reportRuntimeErr(err error) {
 }
 
 // Start 实现 runtime.Component：初始化依赖 + 启动 HTTP/gRPC。Start 失败时自行清理。
-func (w *webRuntimeComponent) Start(_ context.Context) error {
+func (w *webRuntimeComponent) Start(ctx context.Context) error {
 	if w.runtimeErrCh == nil {
 		w.runtimeErrCh = make(chan error, 1)
 	}
-	if err := globals.RedisMgr.OnStart(nil); err != nil {
+	if err := globals.RedisMgr.OnStart(ctx); err != nil {
 		return err
 	}
 	var signs []http_sign.Config

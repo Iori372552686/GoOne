@@ -6,7 +6,6 @@ import (
 	"time"
 
 	mainsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/mainsvr/v1"
-	"github.com/Iori372552686/GoOne/module/gamedata"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
 	"github.com/Iori372552686/GoOne/lib/service/bus/driver/rabbitmq"
@@ -18,6 +17,7 @@ import (
 	"github.com/Iori372552686/GoOne/lib/util/idgen"
 	"github.com/Iori372552686/GoOne/lib/util/sensitive_words"
 	"github.com/Iori372552686/GoOne/module/conf"
+	"github.com/Iori372552686/GoOne/module/gamedata"
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals"
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals/rds"
 	"github.com/Iori372552686/GoOne/src/mainsvr/role"
@@ -43,9 +43,9 @@ func NewApp() *runtime.App {
 
 	businessDeps := &bussvc.FuncComponent{
 		ComponentName: "business_deps",
-		OnStart: func(_ context.Context) error {
+		OnStart: func(ctx context.Context) error {
 			sensitive_words.Init(conf.Get("base_cfg.dependencies.sensitive_words_file").String())
-			if err := rds.RedisMgr.OnStart(nil); err != nil {
+			if err := rds.RedisMgr.OnStart(ctx); err != nil {
 				return err
 			}
 			idGen, err := idgen.NewIDGen()
