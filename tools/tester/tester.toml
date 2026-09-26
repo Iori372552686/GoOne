@@ -70,3 +70,8 @@ order = 20
 [modules.room]
 enabled = true
 order = 10
+
+# 架构迭代（F01-F09）专项回归：登录/互踢/持久化/心跳/快开属性/回滚。
+[modules.archreg]
+enabled = true
+order = 30

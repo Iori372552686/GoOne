@@ -115,11 +115,29 @@ func (c *InventoryComponent) testQueryBackpack(ctx context.Context) error {
 	return nil
 }
 
-// T03: 使用道具(掉落组礼包 90101001)应成功。
+// T03: 使用道具链路。
+//   a) getuse 宝箱（90101001，规则3 Getuse=1）：添加即自动开启——背包中不存在该道具，
+//      后续显式使用应返回 ERR_ITEM_NOT_ENOUGH（获得即使用是有意的配置驱动行为）；
+//   b) 普通道具（20101001，规则2 可使用无 Getuse）：添加后显式使用应成功。
 func (c *InventoryComponent) testUseItem(ctx context.Context) error {
-	// 先确保有该道具
-	_ = c.gmAddItem(ctx, 90101001, 1)
-	req := &g1_protocol.UseItemReq{ItemId: 90101001, Count: 1}
+	// a) getuse 边界：添加成功 + 显式使用不足。
+	if err := c.gmAddItem(ctx, 90101001, 1); err != nil {
+		return fmt.Errorf("gm add getuse item: %w", err)
+	}
+	reqA := &g1_protocol.UseItemReq{ItemId: 90101001, Count: 1}
+	rspA := &g1_protocol.UseItemRsp{Ret: &g1_protocol.Ret{}}
+	if err := c.requester.RequestProto(ctx, uint32(g1_protocol.CMD_MAIN_ITEM_USE_REQ), reqA, rspA, 10*time.Second); err != nil {
+		return err
+	}
+	if rspA.GetRet().GetCode() != g1_protocol.ErrorCode_ERR_ITEM_NOT_ENOUGH {
+		return fmt.Errorf("getuse 道具添加即开启，显式使用应返回 ERR_ITEM_NOT_ENOUGH(-10002)，实际 code=%d", rspA.GetRet().GetCode())
+	}
+
+	// b) 普通道具：添加 → 显式使用成功。
+	if err := c.gmAddItem(ctx, 20101001, 2); err != nil {
+		return fmt.Errorf("gm add normal item: %w", err)
+	}
+	req := &g1_protocol.UseItemReq{ItemId: 20101001, Count: 1}
 	rsp := &g1_protocol.UseItemRsp{Ret: &g1_protocol.Ret{}}
 	if err := c.requester.RequestProto(ctx, uint32(g1_protocol.CMD_MAIN_ITEM_USE_REQ), req, rsp, 10*time.Second); err != nil {
 		return err

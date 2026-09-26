@@ -33,7 +33,7 @@ transport = "tcp"
 [player]
 # 模拟玩家总数，必须 > 0
 # 环境变量覆盖：GOONE_TESTER_PLAYERS
-players = 50
+players = 100
 
 # 首个玩家的 uid，后续玩家依次递增：start_uid, start_uid+1, ...
 # 环境变量覆盖：GOONE_TESTER_START_UID
@@ -66,7 +66,7 @@ loop = true
 
 # 压测总时长，使用 Go duration 格式，如 "10m", "1h", "30s"。
 # "0" 表示无限时长，需手动输入 stop 或 Ctrl+C 结束。
-duration = "10m"
+duration = "5m"
 
 # 每秒上线的玩家数；0 表示一次性全部上线
 ramp_up_per_sec = 20
@@ -93,6 +93,11 @@ weight = 1
 # 背包压测：GM 加道具 + 查背包，覆盖角色 Redis 读写高频路径
 enabled = true
 weight = 1
+
+[modules.archreg]
+# 架构迭代路径压测：每轮心跳 + 快开/离房（覆盖今日改动路径）
+enabled = true
+weight = 2
 
 [collect]
 # 控制台/统计采样间隔，如 "5s", "10s"
