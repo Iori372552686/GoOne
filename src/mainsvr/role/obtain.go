@@ -1,5 +1,4 @@
 /// 恭喜获得系统：统一聚合奖励展示数据，不承担资产落账的权威存储职责。
-// 移植自 seed-server component/base/obtain.go，本土化为 *Role 方法。
 // 资产状态仍以背包/货币同步协议（CMD_SC_SYNC_USER_DATA_V2）为准；
 // 本系统只做展示聚合推送（CMD_SC_OBTAIN_NOTICE），与资产存储解耦。
 
@@ -17,17 +16,17 @@ import (
 )
 
 const (
-	obtainDefaultMaxShowCount   = 20
-	obtainDefaultRarePopup      = 4
-	obtainMaxConfiguredShow     = 100
-	obtainRewardTypeItem        = 1
-	obtainRewardTypeCurrency    = 2
+	obtainDefaultMaxShowCount = 20
+	obtainDefaultRarePopup    = 4
+	obtainMaxConfiguredShow   = 100
+	obtainRewardTypeItem      = 1
+	obtainRewardTypeCurrency  = 2
 )
 
 const (
-	obtainMergeModeNone     int32 = 0 // 不合并
-	obtainMergeModeItemID   int32 = 1 // 按 itemId 合并
-	obtainMergeModeQuality  int32 = 2 // 按品质保留
+	obtainMergeModeNone    int32 = 0 // 不合并
+	obtainMergeModeItemID  int32 = 1 // 按 itemId 合并
+	obtainMergeModeQuality int32 = 2 // 按品质保留
 )
 
 // obtainState 每个玩家的获得展示运行时状态（source 冷却）。
@@ -89,14 +88,14 @@ func (r *Role) ObtainNotify(param *ObtainNotifyParam) pb.ErrorCode {
 		return pb.ErrorCode_ERR_NOT_EXIST_PLAYER
 	}
 	msg := &pb.S2CObtainNotice{
-		RequestId:       param.RequestID,
-		Source:          param.Source,
-		SourceRefId:     param.SourceRefID,
-		DisplayMode:     policy.displayMode,
-		Items:           items,
-		HasMore:         hasMore,
-		TotalItemCount:  totalCount,
-		ServerTime:      time.Now().Unix(),
+		RequestId:      param.RequestID,
+		Source:         param.Source,
+		SourceRefId:    param.SourceRefID,
+		DisplayMode:    policy.displayMode,
+		Items:          items,
+		HasMore:        hasMore,
+		TotalItemCount: totalCount,
+		ServerTime:     time.Now().Unix(),
 	}
 	if err := router.SendPbMsgByBusIdSimple(connsvrBusID, r.Uid(), pb.CMD_SC_OBTAIN_NOTICE, msg); err != nil {
 		r.Errorf("OBTAIN|push failed {source:%s, err:%v}", param.Source, err)

@@ -1,5 +1,4 @@
 /// 掉落系统：双层模型（掉落组 → 掉落包 → 物品）
-// 移植自 seed-server component/base/drop.go，本土化为 *Role 方法 + 纯函数。
 // 核心算法（resolveGroup/selectOnce/pickKeyAsDraws）保持原语义，去掉 Actor/Component 框架。
 
 package role
@@ -33,10 +32,10 @@ const (
 
 // 掉落包 item 级 DropWay
 const (
-	dropItemWayAll      int32 = 1 // 全产出
-	dropItemWayRandom1  int32 = 2 // 随机选1
-	dropItemWayWeight1  int32 = 3 // 权重选1
-	dropItemWayIndep    int32 = 4 // 独立概率(每项按自身 probability 万分比判定)
+	dropItemWayAll     int32 = 1 // 全产出
+	dropItemWayRandom1 int32 = 2 // 随机选1
+	dropItemWayWeight1 int32 = 3 // 权重选1
+	dropItemWayIndep   int32 = 4 // 独立概率(每项按自身 probability 万分比判定)
 )
 
 const (

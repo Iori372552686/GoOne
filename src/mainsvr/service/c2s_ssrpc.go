@@ -3,13 +3,13 @@
 import (
 	"strconv"
 
-	"github.com/Iori372552686/GoOne/module/gamedata/repository/mall"
-	"github.com/Iori372552686/GoOne/module/gamedata/repository/texas"
 	"github.com/Iori372552686/GoOne/lib/api/gerr"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/util/sensitive_words"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/mall"
+	"github.com/Iori372552686/GoOne/module/gamedata/repository/texas"
 	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals"
 	"github.com/Iori372552686/GoOne/src/mainsvr/role"
@@ -216,7 +216,7 @@ func (s *MainC2SServiceImpl) GmAddItem(ctx *ssrpc.Context, req *g1_protocol.GMAd
 	return &g1_protocol.GMAddItemRsp{Ret: &g1_protocol.Ret{Code: ret}}, nil
 }
 
-// ===== 背包/道具系统 handler（移植自 seed-server）=====
+// ===== 背包/道具系统 handler=====
 
 func (s *MainC2SServiceImpl) UseItem(ctx *ssrpc.Context, req *g1_protocol.UseItemReq) (*g1_protocol.UseItemRsp, error) {
 	myRole := globals.RoleMgr.GetOrLoadRole(ctx.Uid(), ctx)

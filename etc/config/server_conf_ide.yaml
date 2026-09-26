@@ -96,6 +96,7 @@ connsvr:
   debug:
     log_dir: ./logs/
     log_level: debug
+  game_id: GoOne
   # 过载保护参数（可选；缺省 0 = 不限制，向后兼容）。需要限流时取消注释：
   # capacity:
   #   max_connections: 0                  # 总连接上限，0 = 不限

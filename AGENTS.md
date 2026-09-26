@@ -61,7 +61,6 @@ Prefer code over README or older docs when they disagree.
 - Tester builds: `./build.sh tester stress` (or `.uild.ps1 tester stress` on Windows).
 
 ## Tester And Stress Client
-- `tools/tester/` is the standalone client testing framework, ported from `seed-tester` and adapted to GoOne's `CSPacketHeader` + protobuf wire protocol.
 - It supports two modes driven by `tools/tester/tester.toml` / `tools/tester/stress.toml`:
   - `regression`: `go run ./tools/tester/cmd/tester -config ./tools/tester/tester.toml`
   - `stress`: `go run ./tools/tester/cmd/stress -config ./tools/tester/stress.toml`
