@@ -225,4 +225,6 @@ require (
 )
 
 // MIGRATED-TO-POKERGO: 本仓 replace 已迁移至 PokerGo 仓（PokerGo/common 为协议真源）；本仓独立构建走模块缓存发布版 g1_common。如需本地子模块调试可临时还原下行：
-// replace github.com/Iori372552686/g1_common => ./common
+// F03 预约协议迭代期临时启用本地 replace：common/protocol 新增 reservation_id 字段，
+// 待 g1_common 发布新版后恢复注释并升级上方版本号。
+replace github.com/Iori372552686/g1_common => ./common

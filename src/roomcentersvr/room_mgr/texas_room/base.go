@@ -5,14 +5,33 @@ import (
 
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/src/roomcentersvr/room_ai"
+	"github.com/Iori372552686/GoOne/src/roomcentersvr/globals/idgen"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/room_mgr/texas_room/texas"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
+// RoomSpec 建房条件（报告 §7.3）：具名字段 + 各自的枚举类型，消除同为 int32
+// 的位置参数歧义（F02 即此类缺陷：stage/coinType 互换编译期无法发现）。
+type RoomSpec struct {
+	GameID   g1_protocol.GameTypeId
+	Stage    g1_protocol.RoomStage
+	CoinType g1_protocol.CoinType
+}
+
 // CreateRoomFunc 建房工厂签名：生成新房间 Base 信息并向游戏服发送创建请求（one-way）。
 // 以可注入字段暴露（默认 room_ai.OnAiCreateRoom），便于单元测试替换与未来多玩法扩展。
-type CreateRoomFunc func(gameId g1_protocol.GameTypeId, stage, coinType int32) (*g1_protocol.RoomBaseInfo, error)
+type CreateRoomFunc func(spec RoomSpec) (*g1_protocol.RoomBaseInfo, error)
+
+// reservation 一次座位占位的预约票据（F03）：回滚按票据至多执行一次。
+type reservation struct {
+	roomID    uint64
+	stage     int32
+	createdAt int64 // 秒
+	expireAt  int64 // 秒；过期后票据不可再取消（加入结果未知的占位由 gamesvr 上报收敛）
+}
+
+// reservationExpireSec 预约票据有效期：覆盖 mainsvr 3 次重试 × 5s RPC 超时 + 余量。
+const reservationExpireSec = 60
 
 // TexasRoomCenterMgr 单个路由分片（zone）的房间中心管理器。
 //
@@ -33,18 +52,27 @@ type TexasRoomCenterMgr struct {
 
 	//private
 	sync.RWMutex
-	isOpen      bool
-	lastTick    int64        // 上次 tick 时间戳（ms）
+	isOpen       bool
+	lastTick     int64        // 上次 tick 时间戳（ms）
 	createRoomFn CreateRoomFunc // 建房工厂（可注入，测试/多玩法用）
+	// reservations 是座位占位预约表（F03）：reservationID -> 票据。由 zone 锁
+	// 保护（与 TexasMap/RoomsMap 同一把）。回滚按票据至多执行一次。
+	reservations map[uint64]*reservation
+	// resvSeq 进程内预约号兜底序列（IDGen 未注入时保证 zone 内唯一）。
+	resvSeq uint64
+	// resvIDFn 可注入的票据生成器（测试用）；nil 时走默认实现。
+	resvIDFn func() uint64
 }
 
 // NewTexasRoomCenterMgr 创建 zone 级房间中心管理器。
+// 默认建房工厂由装配层（room_mgr.GetRoomMgrObj）注入 room_ai.OnAiCreateRoom，
+// 避免本包反向依赖 room_ai 形成导入环；未注入时建房分支返回错误（见 QuickStart）。
 func NewTexasRoomCenterMgr(index uint64) *TexasRoomCenterMgr {
 	ins := &TexasRoomCenterMgr{
-		Index:    index,
-		TexasMap: make(map[int32]*texas.TexasRoom),
+		Index:        index,
+		TexasMap:     make(map[int32]*texas.TexasRoom),
+		reservations: make(map[uint64]*reservation),
 	}
-	ins.createRoomFn = room_ai.OnAiCreateRoom
 	ins.init()
 	return ins
 }
@@ -52,6 +80,51 @@ func NewTexasRoomCenterMgr(index uint64) *TexasRoomCenterMgr {
 // SetCreateRoomFn 替换建房工厂（仅测试/启动装配期调用，不保证运行期并发安全）。
 func (impl *TexasRoomCenterMgr) SetCreateRoomFn(fn CreateRoomFunc) {
 	impl.createRoomFn = fn
+}
+
+// SetReservationIDFn 替换预约票据生成器（仅测试注入用）。
+func (impl *TexasRoomCenterMgr) SetReservationIDFn(fn func() uint64) {
+	impl.resvIDFn = fn
+}
+
+// nextReservationID 生成预约票据：优先全局 IDGen（雪花，跨进程唯一）；
+// 未初始化（测试/未启动完成）时退化为 时间戳<<20 | 进程内序列，保证 zone 内唯一。
+// 调用方必须已持锁。
+func (impl *TexasRoomCenterMgr) nextReservationID() uint64 {
+	if impl.resvIDFn != nil {
+		return impl.resvIDFn()
+	}
+	if g := id.IDGen; g != nil {
+		if rid, err := g.GenID(); err == nil {
+			return rid
+		}
+		logger.Warningf("IDGen.GenID failed, fallback to local sequence {index:%d}", impl.Index)
+	}
+	impl.resvSeq++
+	return uint64(datetime.NowMs())<<20 | (impl.resvSeq & 0xFFFFF)
+}
+
+// issueReservation 记录一张占位票据并返回票据 ID。调用方必须已持写锁。
+func (impl *TexasRoomCenterMgr) issueReservation(roomID uint64, stage int32, nowSec int64) uint64 {
+	rid := impl.nextReservationID()
+	impl.reservations[rid] = &reservation{
+		roomID:    roomID,
+		stage:     stage,
+		createdAt: nowSec,
+		expireAt:  nowSec + reservationExpireSec,
+	}
+	return rid
+}
+
+// sweepExpiredReservations 清理过期票据（Tick 驱动）。过期 ≠ 释放座位：加入结果
+// 未知的占位由 gamesvr 周期上报的真实人数收敛（报告 §7.5 的回收策略）。
+// 调用方必须已持写锁。
+func (impl *TexasRoomCenterMgr) sweepExpiredReservations(nowSec int64) {
+	for rid, resv := range impl.reservations {
+		if nowSec > resv.expireAt {
+			delete(impl.reservations, rid)
+		}
+	}
 }
 
 func (impl *TexasRoomCenterMgr) checkOpen() bool {
@@ -126,8 +199,9 @@ func (impl *TexasRoomCenterMgr) DelRoomInfo(req *g1_protocol.RoomShowInfo) g1_pr
 //     的房间会被选中、有空位的房间永远不命中，快速开始退化为"每次都建新房"。
 //   - 选房规则：RoomId 最小的未满员房。map 遍历顺序随机，确定性选房让行为可复现、
 //     日志可对账、测试可断言。
-//   - 占位语义：分配即 CurPlayerNum++；mainsvr 调 gamesvr 加入对局失败时会回调
-//     QuickStartRollback 归还占位，gamesvr 的周期上报最终收敛为真实人数。
+//   - 占位语义：分配即 CurPlayerNum++，并签发唯一 reservationID 一并返回；
+//     mainsvr 加入对局失败时凭票据回调 QuickStartRollback，同一票据至多释放一次
+//     （F03 幂等）。gamesvr 的周期上报最终收敛为真实人数。
 //   - 建房分支采用两阶段：锁内只做选房判定，建房（含 ID 生成与总线发布）在锁外执行，
 //     避免总线抖动时长时间持有 zone 锁拖垮房间列表与巡检；随后重新加锁做乐观登记。
 func (impl *TexasRoomCenterMgr) QuickStart(req *g1_protocol.QuickStartReq) *g1_protocol.QuickStartRsp {
@@ -140,6 +214,7 @@ func (impl *TexasRoomCenterMgr) QuickStart(req *g1_protocol.QuickStartReq) *g1_p
 	}
 
 	room := impl.GetTexasObj(int32(req.Stage))
+	nowSec := datetime.NowMs() / datetime.MS_PER_SECOND
 
 	// 第一阶段：锁内确定性选房 + 占位。
 	var picked *g1_protocol.RoomShowInfo
@@ -157,6 +232,7 @@ func (impl *TexasRoomCenterMgr) QuickStart(req *g1_protocol.QuickStartReq) *g1_p
 	if picked != nil {
 		picked.Base.CurPlayerNum++
 		room.Save()
+		rsp.ReservationId = impl.issueReservation(picked.Base.RoomId, int32(req.Stage), nowSec)
 		impl.Unlock()
 		rsp.RoomInfo = picked.Base
 		return rsp
@@ -164,9 +240,17 @@ func (impl *TexasRoomCenterMgr) QuickStart(req *g1_protocol.QuickStartReq) *g1_p
 	impl.Unlock()
 
 	// 第二阶段：全部满员，建房（锁外执行，工厂内含总线发布）。
-	// 工厂签名是 (gameId, stage, coinType)：注意与请求字段对应，历史缺陷曾在此
-	// 互换 stage/coinType 导致查错配置或建错场次（F02，有回归测试守护）。
-	base, err := impl.createRoomFn(req.GameId, int32(req.Stage), int32(req.CoinType))
+	// 工厂签名按 RoomSpec 具名字段传递（F02：历史缺陷曾在此互换 stage/coinType）。
+	if impl.createRoomFn == nil {
+		logger.Errorf("quick start create branch without factory wired {index:%d}", impl.Index)
+		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_TEXAS_SEAT_NOT_FOUND
+		return rsp
+	}
+	base, err := impl.createRoomFn(RoomSpec{
+		GameID:   req.GameId,
+		Stage:    req.Stage,
+		CoinType: req.CoinType,
+	})
 	if err != nil || base == nil {
 		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_TEXAS_SEAT_NOT_FOUND
 		if err != nil {
@@ -185,6 +269,7 @@ func (impl *TexasRoomCenterMgr) QuickStart(req *g1_protocol.QuickStartReq) *g1_p
 			existing.Base.CurPlayerNum++
 			room.Save()
 		}
+		rsp.ReservationId = impl.issueReservation(existing.Base.RoomId, int32(req.Stage), nowSec)
 		rsp.RoomInfo = existing.Base
 		impl.Unlock()
 		return rsp
@@ -195,19 +280,21 @@ func (impl *TexasRoomCenterMgr) QuickStart(req *g1_protocol.QuickStartReq) *g1_p
 	base.CurPlayerNum = 1
 	room.RoomsMap[base.RoomId] = &g1_protocol.RoomShowInfo{Base: base}
 	room.Save()
+	rsp.ReservationId = impl.issueReservation(base.RoomId, int32(req.Stage), nowSec)
 	impl.Unlock()
 
 	rsp.RoomInfo = base
 	return rsp
 }
 
-// QuickStartRollback 归还快速开始占用的座位（mainsvr 对局加入失败时回调，one-way）。
-//
-// 幂等与边界：
-//   - 房间已删除/不存在：视为已归还，直接成功；
-//   - 计数只减到 0：重复回滚不会把计数减成负数；
-//   - 局限（有意取舍）：按"房间计数"而非"玩家票据"回滚，若与其它玩家的加入交错
-//     可能多减一席，由 gamesvr 周期上报的真实人数收敛修正。
+// QuickStartRollback 凭预约票据归还快速开始占用的座位（mainsvr 对局加入失败时
+// 回调，one-way）。幂等与边界（F03）：
+//   - 携带票据（推荐路径）：票据存在且房间匹配 → 删除票据并减一，同一票据第二次
+//     调用直接成功不再减（至多执行一次）；票据未知（未签发/已取消/已过期/重启
+//     丢失）→ 幂等成功；票据与房间不匹配 → ERR_ARGV（不得用 A 的票据释放 B 的座位）。
+//   - 未携带票据（旧版兼容）：退回按"房间计数"回滚——每次调用减一、只保证不减为
+//     负。与其它玩家加入交错时可能多减一席，由 gamesvr 周期上报的真实人数收敛修正。
+//   - 房间已删除/不存在：视为已归还，直接成功。
 func (impl *TexasRoomCenterMgr) QuickStartRollback(req *g1_protocol.QuickStartRollbackReq) g1_protocol.ErrorCode {
 	if req == nil || req.RoomId == 0 {
 		return g1_protocol.ErrorCode_ERR_ARGV
@@ -218,6 +305,25 @@ func (impl *TexasRoomCenterMgr) QuickStartRollback(req *g1_protocol.QuickStartRo
 	impl.Lock()
 	defer impl.Unlock()
 
+	if rid := req.GetReservationId(); rid != 0 {
+		resv, ok := impl.reservations[rid]
+		if !ok {
+			return g1_protocol.ErrorCode_ERR_OK // 未知票据：幂等成功，不重复扣减
+		}
+		if resv.roomID != req.RoomId {
+			logger.Errorf("rollback reservation mismatch {resv:%d room:%d, req room:%d}", rid, resv.roomID, req.RoomId)
+			return g1_protocol.ErrorCode_ERR_ARGV
+		}
+		delete(impl.reservations, rid)
+		info := room.RoomsMap[resv.roomID]
+		if info != nil && info.Base != nil && info.Base.CurPlayerNum > 0 {
+			info.Base.CurPlayerNum--
+			room.Save()
+		}
+		return g1_protocol.ErrorCode_ERR_OK
+	}
+
+	// 旧版路径：按房间计数回滚。
 	info, ok := room.RoomsMap[req.RoomId]
 	if !ok || info == nil || info.Base == nil {
 		return g1_protocol.ErrorCode_ERR_OK
@@ -317,6 +423,7 @@ func (impl *TexasRoomCenterMgr) RoomListPage(req *g1_protocol.RoomListReq) *g1_p
 //	  1. 过期清理：删除 EndTime 已过的登记房。房间真实生命周期由 gamesvr 决定，
 //	     此处只回收列表登记（含乐观登记但 gamesvr 未建成的残留房）；gamesvr 若
 //	     仍存活会通过 UpdateRoomInfo 重新上报恢复。
+//	  1b. 预约票据清扫：删除过期 reservation（F03；过期不释放座位，人数由上报收敛）。
 //	  2. 补房判定：某 stage 下全部房间满员时收集补房任务（每 stage 一间）。
 //	第二阶段（锁外）：执行建房（含总线发布），避免持锁做网络 IO。
 func (impl *TexasRoomCenterMgr) CheckAndCreateRooms(nowMs int64) {
@@ -324,15 +431,11 @@ func (impl *TexasRoomCenterMgr) CheckAndCreateRooms(nowMs int64) {
 		return
 	}
 
-	type createJob struct {
-		gameId   g1_protocol.GameTypeId
-		stage    int32
-		coinType int32
-	}
-	var jobs []createJob
+	var jobs []RoomSpec
 	nowSec := nowSecOf(nowMs)
 
 	impl.Lock()
+	impl.sweepExpiredReservations(nowSec)
 	for _, rstage := range impl.TexasMap {
 		if rstage == nil {
 			continue
@@ -366,10 +469,10 @@ func (impl *TexasRoomCenterMgr) CheckAndCreateRooms(nowMs int64) {
 			}
 		}
 		if sample != nil && fullCnt == len(rstage.RoomsMap) {
-			jobs = append(jobs, createJob{
-				gameId:   sample.Base.GameId,
-				stage:    int32(sample.Base.Stage),
-				coinType: int32(sample.Base.CoinType),
+			jobs = append(jobs, RoomSpec{
+				GameID:   sample.Base.GameId,
+				Stage:    sample.Base.Stage,
+				CoinType: sample.Base.CoinType,
 			})
 		}
 	}
@@ -377,9 +480,13 @@ func (impl *TexasRoomCenterMgr) CheckAndCreateRooms(nowMs int64) {
 
 	// 第二阶段：锁外补房。新房间经 gamesvr 上报进入列表后，下一轮巡检自然收敛。
 	for _, j := range jobs {
-		if _, err := impl.createRoomFn(j.gameId, j.stage, j.coinType); err != nil {
+		if impl.createRoomFn == nil {
+			logger.Errorf("checkAndCreate without factory wired {index:%d}", impl.Index)
+			break
+		}
+		if _, err := impl.createRoomFn(j); err != nil {
 			logger.Warningf("checkAndCreate auto create room failed {index:%d, stage:%d} | %v",
-				impl.Index, j.stage, err)
+				impl.Index, j.Stage, err)
 		}
 	}
 }

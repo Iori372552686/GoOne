@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
@@ -16,14 +17,14 @@ import (
 func newTestMgr(index uint64) (mgr *TexasRoomCenterMgr, created *int32) {
 	mgr = NewTexasRoomCenterMgr(index)
 	cnt := int32(0)
-	mgr.SetCreateRoomFn(func(gameId g1_protocol.GameTypeId, stage, coinType int32) (*g1_protocol.RoomBaseInfo, error) {
+	mgr.SetCreateRoomFn(func(spec RoomSpec) (*g1_protocol.RoomBaseInfo, error) {
 		atomic.AddInt32(&cnt, 1)
 		id := atomic.LoadInt32(&cnt)
 		return &g1_protocol.RoomBaseInfo{
 			RoomId:       uint64(9000 + id), // 与预置房间错开的房号
-			GameId:       gameId,
-			Stage:        g1_protocol.RoomStage(stage),
-			CoinType:     g1_protocol.CoinType(coinType),
+			GameId:       spec.GameID,
+			Stage:        spec.Stage,
+			CoinType:     spec.CoinType,
 			MaxPlayer:    9,
 			MaxMember:    100,
 			CurPlayerNum: 0,
@@ -123,14 +124,14 @@ func TestQuickStartAllFullPassesCorrectStageCoin(t *testing.T) {
 
 	var gotStage, gotCoin int32
 	var calls int32
-	mgr.SetCreateRoomFn(func(gameId g1_protocol.GameTypeId, stage, coinType int32) (*g1_protocol.RoomBaseInfo, error) {
+	mgr.SetCreateRoomFn(func(spec RoomSpec) (*g1_protocol.RoomBaseInfo, error) {
 		atomic.AddInt32(&calls, 1)
-		gotStage, gotCoin = stage, coinType
+		gotStage, gotCoin = int32(spec.Stage), int32(spec.CoinType)
 		return &g1_protocol.RoomBaseInfo{
 			RoomId:    9100,
-			GameId:    gameId,
-			Stage:     g1_protocol.RoomStage(stage),
-			CoinType:  g1_protocol.CoinType(coinType),
+			GameId:    spec.GameID,
+			Stage:     spec.Stage,
+			CoinType:  spec.CoinType,
 			MaxPlayer: 9,
 			EndTime:   9999999999,
 		}, nil
@@ -164,10 +165,86 @@ func TestQuickStartStageAllRejected(t *testing.T) {
 	}
 }
 
-// ---- 快速开始回滚：幂等与边界 ----
+// ---- 快速开始回滚：预约票据幂等（F03）与旧版兼容 ----
 
-// TestQuickStartRollback 归还占位；重复回滚不减为负；房间不存在幂等成功。
-func TestQuickStartRollback(t *testing.T) {
+// F03 验收：同一票据取消两次只释放一次；A/B 交错预约互不影响。
+func TestQuickStartRollbackIdempotentByReservation(t *testing.T) {
+	mgr, _ := newTestMgr(1)
+	seedRoom(t, mgr, 100, 3, 9, g1_protocol.RoomStage_LOW, 9999999999)
+
+	// 玩家 A、B 各占一个座位（拿到不同票据）。
+	rspA := mgr.QuickStart(&g1_protocol.QuickStartReq{Stage: g1_protocol.RoomStage_LOW, GameId: 1})
+	rspB := mgr.QuickStart(&g1_protocol.QuickStartReq{Stage: g1_protocol.RoomStage_LOW, GameId: 1})
+	if rspA.ReservationId == 0 || rspB.ReservationId == 0 || rspA.ReservationId == rspB.ReservationId {
+		t.Fatalf("应签发两张不同票据, A=%d B=%d", rspA.ReservationId, rspB.ReservationId)
+	}
+	if got := roomOf(t, mgr, g1_protocol.RoomStage_LOW, 100).Base.CurPlayerNum; got != 5 {
+		t.Fatalf("两次占位后应为 5，实际 %d", got)
+	}
+
+	// 同一票据取消两次：只释放一次（3+2 -> 4，不是 3）。
+	reqA := &g1_protocol.QuickStartRollbackReq{RoomId: 100, Stage: g1_protocol.RoomStage_LOW, ReservationId: rspA.ReservationId}
+	if code := mgr.QuickStartRollback(reqA); code != g1_protocol.ErrorCode_ERR_OK {
+		t.Fatalf("rollback A failed: %v", code)
+	}
+	if code := mgr.QuickStartRollback(reqA); code != g1_protocol.ErrorCode_ERR_OK {
+		t.Fatalf("重复回滚应幂等成功: %v", code)
+	}
+	if got := roomOf(t, mgr, g1_protocol.RoomStage_LOW, 100).Base.CurPlayerNum; got != 4 {
+		t.Fatalf("同一票据两次取消只应释放一次（期望 4），实际 %d", got)
+	}
+
+	// 取消 A 不影响 B：B 的票据仍可正常释放一次。
+	reqB := &g1_protocol.QuickStartRollbackReq{RoomId: 100, Stage: g1_protocol.RoomStage_LOW, ReservationId: rspB.ReservationId}
+	if code := mgr.QuickStartRollback(reqB); code != g1_protocol.ErrorCode_ERR_OK {
+		t.Fatalf("rollback B failed: %v", code)
+	}
+	if got := roomOf(t, mgr, g1_protocol.RoomStage_LOW, 100).Base.CurPlayerNum; got != 3 {
+		t.Fatalf("B 票据应再释放一席（期望 3），实际 %d", got)
+	}
+}
+
+// F03 验收：未知票据（未签发/已取消/过期）幂等成功，不重复扣减；
+// 票据与房间不匹配被拒绝。
+func TestQuickStartRollbackUnknownAndMismatchedReservation(t *testing.T) {
+	mgr, _ := newTestMgr(1)
+	seedRoom(t, mgr, 100, 2, 9, g1_protocol.RoomStage_LOW, 9999999999)
+
+	rsp := mgr.QuickStart(&g1_protocol.QuickStartReq{Stage: g1_protocol.RoomStage_LOW, GameId: 1}) // 2->3
+
+	// 未签发的票据：幂等成功且不减员。
+	if code := mgr.QuickStartRollback(&g1_protocol.QuickStartRollbackReq{
+		RoomId: 100, Stage: g1_protocol.RoomStage_LOW, ReservationId: 999999,
+	}); code != g1_protocol.ErrorCode_ERR_OK {
+		t.Fatalf("未知票据应幂等成功: %v", code)
+	}
+	if got := roomOf(t, mgr, g1_protocol.RoomStage_LOW, 100).Base.CurPlayerNum; got != 3 {
+		t.Fatalf("未知票据不应减员（期望 3），实际 %d", got)
+	}
+
+	// 票据与房间不匹配：拒绝且不减员。
+	if code := mgr.QuickStartRollback(&g1_protocol.QuickStartRollbackReq{
+		RoomId: 404, Stage: g1_protocol.RoomStage_LOW, ReservationId: rsp.ReservationId,
+	}); code != g1_protocol.ErrorCode_ERR_ARGV {
+		t.Fatalf("票据房间不匹配应 ERR_ARGV: %v", code)
+	}
+	if got := roomOf(t, mgr, g1_protocol.RoomStage_LOW, 100).Base.CurPlayerNum; got != 3 {
+		t.Fatalf("不匹配票据不应减员（期望 3），实际 %d", got)
+	}
+
+	// 正常释放后票据即失效：再取消同票据幂等成功。
+	if code := mgr.QuickStartRollback(&g1_protocol.QuickStartRollbackReq{
+		RoomId: 100, Stage: g1_protocol.RoomStage_LOW, ReservationId: rsp.ReservationId,
+	}); code != g1_protocol.ErrorCode_ERR_OK {
+		t.Fatalf("rollback failed: %v", code)
+	}
+	if got := roomOf(t, mgr, g1_protocol.RoomStage_LOW, 100).Base.CurPlayerNum; got != 2 {
+		t.Fatalf("释放后应为 2，实际 %d", got)
+	}
+}
+
+// 旧版兼容路径：未携带票据时退回按房间计数回滚（每次减一、不减为负）。
+func TestQuickStartRollbackLegacyWithoutReservation(t *testing.T) {
 	mgr, _ := newTestMgr(1)
 	seedRoom(t, mgr, 100, 2, 9, g1_protocol.RoomStage_LOW, 9999999999)
 
@@ -192,6 +269,26 @@ func TestQuickStartRollback(t *testing.T) {
 	// 不存在的房间：幂等成功
 	if code := mgr.QuickStartRollback(&g1_protocol.QuickStartRollbackReq{RoomId: 404, Stage: g1_protocol.RoomStage_LOW}); code != g1_protocol.ErrorCode_ERR_OK {
 		t.Fatalf("回滚不存在房间应幂等成功，实际 %v", code)
+	}
+}
+
+// 过期票据经 Tick 清扫后不可再取消（加入结果未知的占位由上报收敛，不重复扣减）。
+func TestQuickStartRollbackExpiredReservationSwept(t *testing.T) {
+	mgr, _ := newTestMgr(1)
+	seedRoom(t, mgr, 100, 2, 9, g1_protocol.RoomStage_LOW, 9999999999)
+
+	rsp := mgr.QuickStart(&g1_protocol.QuickStartReq{Stage: g1_protocol.RoomStage_LOW, GameId: 1}) // 2->3
+
+	// 推进时间超过票据有效期（60s）并触发巡检清扫。
+	mgr.CheckAndCreateRooms((datetime.NowMs()/1000 + reservationExpireSec + 10) * 1000)
+
+	if code := mgr.QuickStartRollback(&g1_protocol.QuickStartRollbackReq{
+		RoomId: 100, Stage: g1_protocol.RoomStage_LOW, ReservationId: rsp.ReservationId,
+	}); code != g1_protocol.ErrorCode_ERR_OK {
+		t.Fatalf("过期票据应幂等成功: %v", code)
+	}
+	if got := roomOf(t, mgr, g1_protocol.RoomStage_LOW, 100).Base.CurPlayerNum; got != 3 {
+		t.Fatalf("过期票据不应再释放席位（期望 3），实际 %d", got)
 	}
 }
 

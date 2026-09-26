@@ -69,16 +69,17 @@ func OnMainQuickStart(c cmd_handler.IContext, req *g1_protocol.QuickStartReq, my
 		rsp = roomRsp
 
 		if rsp.Ret.Code == g1_protocol.ErrorCode_ERR_OK && rsp.RoomInfo != nil {
-			// 先保存分配到的房间号：下方 CallMsgByRouter 复用 rsp 作为响应缓冲，
-			// 对局侧的错误回包若不含 room_info，Unmarshal 会把 rsp.RoomInfo 覆盖为 nil，
+			// 先保存分配到的房间号与预约票据：下方 CallMsgByRouter 复用 rsp 作为响应缓冲，
+			// 对局侧的错误回包若不含这些字段，Unmarshal 会把 rsp 内对应字段覆盖为零值，
 			// 之后再取 rsp.RoomInfo.RoomId 即空指针解引用（模拟测试已捕获的真实缺陷）。
 			allocRoomId := rsp.RoomInfo.RoomId
+			allocReservationId := rsp.ReservationId
 
 			err = c.CallMsgByRouter(misc.ServerType_TexasGameSvr, allocRoomId, g1_protocol.CMD_TEXAS_INNER_QUICK_START_REQ, req, rsp)
 			if err != nil || rsp.Ret.Code != g1_protocol.ErrorCode_ERR_OK {
-				// 加入对局失败（网络错误或对局侧拒绝）：归还 roomcenter 侧的座位占位。
-				// one-way 尽力而为；回滚幂等（计数只减到 0），失败或重复由 gamesvr
-				// 周期上报真实人数收敛修正。
+				// 加入对局失败（网络错误或对局侧拒绝）：凭预约票据归还 roomcenter 侧的
+				// 座位占位。one-way 尽力而为；按票据回滚至多释放一次（F03），重复投递
+				// 或超时重试不会多减席位，残余误差由 gamesvr 周期上报真实人数收敛。
 				if err != nil {
 					rsp.Ret.Msg = err.Error()
 					logger.Errorf("quick start call TexasGameSvr cur:%d | err: %v", i, err)
@@ -86,10 +87,11 @@ func OnMainQuickStart(c cmd_handler.IContext, req *g1_protocol.QuickStartReq, my
 					logger.Errorf("quick start join rejected cur:%d | code: %s", i, rsp.Ret.Code.String())
 				}
 				_ = roomCenterClient.QuickStartRollbackByRouter(c, routerID, &g1_protocol.QuickStartRollbackReq{
-					RoomId:   allocRoomId,
-					GameId:   req.GameId,
-					CoinType: req.CoinType,
-					Stage:    req.Stage,
+					RoomId:        allocRoomId,
+					GameId:        req.GameId,
+					CoinType:      req.CoinType,
+					Stage:         req.Stage,
+					ReservationId: allocReservationId,
 				})
 				continue
 			}
