@@ -16,7 +16,28 @@ func (s *ConnServiceImpl) KickOut(ctx *ssrpc.Context, req *g1_protocol.ConnKickO
 	}
 
 	ctx.Infof("conn kickout reason=%v remote_addr=%s", req.GetReason(), req.GetRemoteAddr())
-	globals.ConnWsSvr.KickByRemoteAddr(ctx.Uid(), req.GetReason(), req.GetRemoteAddr())
+
+	// 精确定位会话：优先按 RemoteAddr（调用方携带 ConnSvrInfo.ClientPos），
+	// 回退按 uid。随后按 Client.Transport 路由到拥有正确写路径的传输——
+	// 旧实现固定走 WS，TCP/KCP 会话的服务端踢人（如心跳过期）不生效。
+	client := globals.SessionHub.GetClientByRemoteAddr(req.GetRemoteAddr())
+	if client == nil {
+		client = globals.SessionHub.ClientForSend(ctx.Uid())
+	}
+	if client == nil || client.Conn == nil {
+		ctx.Infof("conn kickout target not found {uid:%d, addr:%q}", ctx.Uid(), req.GetRemoteAddr())
+		return nil, nil
+	}
+
+	switch client.Transport {
+	case "tcp":
+		globals.ConnTcpSvr.Kick(client.Uid, req.GetReason())
+	case "kcp":
+		globals.ConnKcpSvr.Kick(client.Uid, req.GetReason())
+	default:
+		// 兼容旧路径（含未打标记的存量会话）：按 remoteAddr 踢 WS。
+		globals.ConnWsSvr.KickByRemoteAddr(client.Uid, req.GetReason(), client.RemoteAddr)
+	}
 	return nil, nil
 }
 

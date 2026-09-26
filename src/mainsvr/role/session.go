@@ -16,16 +16,17 @@ const (
 // kickExpiredSession 在 UID 串行域内确认过期后踢掉对应连接（F06：原实现在
 // Tick 协程未复检即踢，排队期间重连的新会话可能被旧过期任务误踢）。
 // busId 未记录（离线后重载等）时跳过——连接本就不在。
+// RemoteAddr 取 ConnSvrInfo.ClientPos，使 connsvr 精确定位会话并按其传输踢出。
 func kickExpiredSession(r *Role) {
-	busId := uint32(0)
-	if r.PbRole.ConnSvrInfo != nil {
-		busId = r.PbRole.ConnSvrInfo.BusId
-	}
-	if busId == 0 {
+	connInfo := r.PbRole.ConnSvrInfo
+	if connInfo == nil || connInfo.BusId == 0 {
 		return
 	}
-	req := &g1_protocol.ConnKickOutReq{Reason: g1_protocol.EKickOutReason_HEARTBEAT_TIMEOUT}
-	if err := connsvrv1.NewConnServiceClient().KickOutByBusIdSimple(busId, r.Uid(), req); err != nil {
+	req := &g1_protocol.ConnKickOutReq{
+		Reason:     g1_protocol.EKickOutReason_HEARTBEAT_TIMEOUT,
+		RemoteAddr: connInfo.ClientPos,
+	}
+	if err := connsvrv1.NewConnServiceClient().KickOutByBusIdSimple(connInfo.BusId, r.Uid(), req); err != nil {
 		r.Errorf("kick expired session failed | %v", err)
 	}
 }

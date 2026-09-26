@@ -200,7 +200,7 @@ func (t *ConnTcpSvr) kick(conn net.Conn, uid uint64, reason g1_protocol.EKickOut
 func (t *ConnTcpSvr) UpdateClientByUid(conn net.Conn, uid uint64, zone uint32) *Client {
 	// 用 BindClient 原子完成查旧+写新索引，IPv6 兼容（net.SplitHostPort），
 	// 锁外 kick 旧连接。
-	newIns, oldCli, err := t.hub.BindClient(conn, uid, zone)
+	newIns, oldCli, err := t.hub.BindClientWithTag(conn, uid, zone, "tcp")
 	if err != nil {
 		logger.Errorf("BindClient failed {uid: %v}: %v", uid, err)
 		return nil

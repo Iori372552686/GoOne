@@ -134,7 +134,9 @@ func onKcpPacket(conn net.Conn, data []byte) {
 
 // busMsg proc cb func
 func onRecvSSPacket(packet *sharedstruct.SSPacket) {
-	if misc.IsClientCmd(packet.Header.Cmd) {
+	// GM 响应（类型 0xa）与客户端命令一样需要下发；与上行 GM 放行策略保持一致
+	//（PokerGo 同款：仅放行 GM 响应的下行，上行放行见 handleClientPacket）。
+	if misc.IsClientCmd(packet.Header.Cmd) || misc.IsGmCmd(packet.Header.Cmd) {
 		csPacketHeader := sharedstruct.CSPacketHeader{
 			Uid:     packet.Header.Uid,
 			Cmd:     packet.Header.Cmd,
@@ -156,9 +158,10 @@ func onRecvSSPacket(packet *sharedstruct.SSPacket) {
 			logger.Debugf("downstream packet dropped, uid not on tcp/ws/kcp {uid:%v, cmd:%v}",
 				packet.Header.Uid, packet.Header.Cmd)
 		}
-	} else if packet.Header.Cmd == uint32(g1_protocol.CMD_CONN_KICK_OUT_REQ) {
-		//onSSPacketConnKickout(packet)
 	} else {
+		// 其余命令（含 CMD_CONN_KICK_OUT_REQ：由 IDL 注册的 ConnService.KickOut
+		// 在 TransMgr 内处理）进入事务分发。历史代码曾在此拦截 kick 命令并
+		// 调用注释掉的本地 handler，导致服务端踢人包被吞、会话永不踢断。
 		globals.TransMgr.ProcessSSPacket(packet)
 		packet = nil // packet所有权转交给transmgr，后面不能再用packet（包括data）
 	}

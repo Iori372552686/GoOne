@@ -163,7 +163,7 @@ func (t *ConnWsTcpSvr) kick(conn net.Conn, uid uint64, reason g1_protocol.EKickO
 
 func (t *ConnWsTcpSvr) UpdateClientByUid(conn net.Conn, uid uint64, zone uint32) *Client {
 	// 原子绑定 + IPv6 兼容 + 锁外 kick 旧连接。
-	newIns, oldCli, err := t.hub.BindClient(conn, uid, zone)
+	newIns, oldCli, err := t.hub.BindClientWithTag(conn, uid, zone, "ws")
 	if err != nil {
 		logger.Errorf("BindClient failed {uid: %v}: %v", uid, err)
 		return nil

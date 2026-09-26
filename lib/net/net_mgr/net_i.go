@@ -16,6 +16,10 @@ type Client struct {
 	Ip         uint32
 	Port       uint32
 	RemoteAddr string
+	// Transport 是该会话的接入传输（"tcp"/"ws"/"kcp"，BindClientWithTag 填充）。
+	// 服务端主动踢人（ConnService.KickOut）据此路由到拥有正确写路径的传输，
+	// 避免跨传输写产生坏帧。空值按 ws 兼容旧行为。
+	Transport string
 }
 
 // GatewayServer is the unified session-facing interface every gateway

@@ -129,6 +129,12 @@ func (h *SessionHub) Accepting() bool {
 //   - 地址解析用 net.SplitHostPort（兼容 IPv4/IPv6/带 zone），失败返回 error，不制造
 //     错误 IP/port。
 func (h *SessionHub) BindClient(conn net.Conn, uid uint64, zone uint32) (*Client, *Client, error) {
+	return h.BindClientWithTag(conn, uid, zone, "")
+}
+
+// BindClientWithTag 同 BindClient，并为 Client 标记接入传输（tcp/ws/kcp）。
+// 供服务端主动踢人按传输路由（见 connsvr ConnService.KickOut）。
+func (h *SessionHub) BindClientWithTag(conn net.Conn, uid uint64, zone uint32, transport string) (*Client, *Client, error) {
 	remoteAddr := conn.RemoteAddr().String()
 	host, portStr, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
@@ -140,6 +146,7 @@ func (h *SessionHub) BindClient(conn net.Conn, uid uint64, zone uint32) (*Client
 		Zone:       zone,
 		Conn:       conn,
 		RemoteAddr: remoteAddr,
+		Transport:  transport,
 		Ip:         bus.IpStringToInt(host),
 		Port:       uint32(convert.StrToInt(portStr)),
 	}
@@ -217,6 +224,22 @@ func (h *SessionHub) ConnByRemoteAddr(remoteAddr string) net.Conn {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return h.remoteAddrConnMap[remoteAddr]
+}
+
+// GetClientByRemoteAddr 返回 remoteAddr 对应的 Client（含 Transport 标记），
+// 供服务端主动踢人精确定位会话与所属传输。未找到返回 nil。
+func (h *SessionHub) GetClientByRemoteAddr(remoteAddr string) *Client {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	conn, ok := h.remoteAddrConnMap[remoteAddr]
+	if !ok {
+		return nil
+	}
+	uid, ok := h.connUidMap[conn]
+	if !ok {
+		return nil
+	}
+	return h.uidConnMap[uid]
 }
 
 // MarkKick 标记某 remoteAddr 正在被 kick（其 OnClose 不应触发登出包）。
