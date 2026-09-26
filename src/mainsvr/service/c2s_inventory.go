@@ -9,7 +9,7 @@ import (
 // ===== 背包 / 道具 =====
 
 func (s *MainC2SServiceImpl) UseItem(ctx *ssrpc.Context, req *g1_protocol.UseItemReq) (*g1_protocol.UseItemRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}
@@ -19,7 +19,7 @@ func (s *MainC2SServiceImpl) UseItem(ctx *ssrpc.Context, req *g1_protocol.UseIte
 }
 
 func (s *MainC2SServiceImpl) SellItem(ctx *ssrpc.Context, req *g1_protocol.SellItemReq) (*g1_protocol.SellItemRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}
@@ -29,7 +29,7 @@ func (s *MainC2SServiceImpl) SellItem(ctx *ssrpc.Context, req *g1_protocol.SellI
 }
 
 func (s *MainC2SServiceImpl) DecomposeItem(ctx *ssrpc.Context, req *g1_protocol.DecomposeItemReq) (*g1_protocol.DecomposeItemRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}
@@ -47,7 +47,7 @@ func (s *MainC2SServiceImpl) DecomposeItem(ctx *ssrpc.Context, req *g1_protocol.
 }
 
 func (s *MainC2SServiceImpl) QueryBackpack(ctx *ssrpc.Context, req *g1_protocol.QueryBackpackReq) (*g1_protocol.QueryBackpackRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}

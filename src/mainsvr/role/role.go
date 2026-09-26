@@ -161,14 +161,14 @@ func (r *Role) Zone() uint32 {
 	return uint32(r.PbRole.RegisterInfo.Zone)
 }
 
-func (r *Role) SaveToDB(trans cmd_handler.IContext) error {
+func (r *Role) SaveHash(trans cmd_handler.IContext) error {
 	if r.Uid() != trans.Uid() {
 		r.Errorf("inconsistent uid {roleUid:%v, transUid:%v}", r.Uid(), trans.Uid())
 		return errors.New("inconsistent uid")
 	}
 
 	// 运行期事务保存：IContext 不暴露标准 ctx，时限上界由 Redis 客户端
-	// read/write timeout 配置承担；停机排空的取消预算走 SaveToDBSync(ctx)。
+	// read/write timeout 配置承担；停机排空的取消预算走 SaveHashSync(ctx)。
 	// 按模块增量写 Redis hash（落盘格式详见 persist_hash.go）。
 	if err := saveRoleHash(context.Background(), r, false); err != nil {
 		return err
@@ -199,10 +199,10 @@ func (r *Role) SaveToMysql(trans cmd_handler.IContext) error {
 	return nil
 }
 
-// SaveToDBSync 同步持久化角色数据到 redis，不依赖事务上下文。
+// SaveHashSync 同步持久化角色数据到 redis，不依赖事务上下文。
 // 用于优雅停机等没有 transaction 可用的场景。force=true 全量写所有模块。
 // ctx 透传至 Redis 调用：Drain 路径传入排空预算 ctx，取消可传导（F07）。
-func (r *Role) SaveToDBSync(ctx context.Context) error {
+func (r *Role) SaveHashSync(ctx context.Context) error {
 	if err := saveRoleHash(ctx, r, true); err != nil {
 		return err
 	}

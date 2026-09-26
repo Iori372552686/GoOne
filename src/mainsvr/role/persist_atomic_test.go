@@ -116,7 +116,7 @@ func TestSaveRoleHashFailureWritesNothing(t *testing.T) {
 	}
 }
 
-// 成功路径清 dirty mask（经 SaveToDBSync 入口，mask 清除是调用方契约）。
+// 成功路径清 dirty mask（经 SaveHashSync 入口，mask 清除是调用方契约）。
 func TestSaveRoleHashSuccessClearsMask(t *testing.T) {
 	stub := &capturingRedisClient{}
 	restore := withCapturingRedis(stub)
@@ -124,7 +124,7 @@ func TestSaveRoleHashSuccessClearsMask(t *testing.T) {
 
 	role := NewRole(4004)
 	role.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_INVENTORY_INFO, "test")
-	if err := role.SaveToDBSync(context.Background()); err != nil {
+	if err := role.SaveHashSync(context.Background()); err != nil {
 		t.Fatalf("保存应成功: %v", err)
 	}
 	if hasRoleSection(role.persistDirtyMask, g1_protocol.ERoleSectionFlag_INVENTORY_INFO) {

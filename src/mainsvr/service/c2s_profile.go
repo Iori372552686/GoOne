@@ -10,7 +10,7 @@ import (
 // ===== 资料：改名 / 头像装扮 =====
 
 func (s *MainC2SServiceImpl) ChangeName(ctx *ssrpc.Context, req *g1_protocol.ChangeNameReq) (*g1_protocol.ChangeNameRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}
@@ -38,7 +38,7 @@ func (s *MainC2SServiceImpl) ChangeName(ctx *ssrpc.Context, req *g1_protocol.Cha
 }
 
 func (s *MainC2SServiceImpl) ChangeIcon(ctx *ssrpc.Context, req *g1_protocol.ChangeIconReq) (*g1_protocol.ChangeIconRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}

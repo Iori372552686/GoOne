@@ -69,8 +69,8 @@ func TestRoleHashE2EFullThenIncremental(t *testing.T) {
 	r.PbRole.GameInfo.PlayRoomIds = []uint64{100, 200, 300}
 
 	t.Run("FirstFullWrite", func(t *testing.T) {
-		if err := r.SaveToDBSync(context.Background()); err != nil {
-			t.Fatalf("SaveToDBSync: %v", err)
+		if err := r.SaveHashSync(context.Background()); err != nil {
+			t.Fatalf("SaveHashSync: %v", err)
 		}
 		fields, err := rds.RedisMgr.HGetAllBytes(context.Background(), instID, key)
 		if err != nil {

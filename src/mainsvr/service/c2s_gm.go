@@ -15,7 +15,7 @@ func (s *MainC2SServiceImpl) GmGetRole(ctx *ssrpc.Context, req *g1_protocol.GMGe
 	ret := g1_protocol.ErrorCode_ERR_OK
 	rsp := &g1_protocol.GMGetRoleRsp{}
 
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		ctx.Infof("Gm try to get not existing role.")
 		ret = g1_protocol.ErrorCode_ERR_DB
@@ -32,7 +32,7 @@ func (s *MainC2SServiceImpl) GmGetRole(ctx *ssrpc.Context, req *g1_protocol.GMGe
 }
 
 func (s *MainC2SServiceImpl) GmSetRole(ctx *ssrpc.Context, req *g1_protocol.GMSetRoleReq) (*g1_protocol.GMSetRoleRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}
@@ -61,7 +61,7 @@ func (s *MainC2SServiceImpl) GmSetRole(ctx *ssrpc.Context, req *g1_protocol.GMSe
 }
 
 func (s *MainC2SServiceImpl) GmAddItem(ctx *ssrpc.Context, req *g1_protocol.GMAddItemReq) (*g1_protocol.GMAddItemRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}
@@ -72,7 +72,7 @@ func (s *MainC2SServiceImpl) GmAddItem(ctx *ssrpc.Context, req *g1_protocol.GMAd
 }
 
 func (s *MainC2SServiceImpl) BatchAddItem(ctx *ssrpc.Context, req *g1_protocol.BatchAddItemReq) (*g1_protocol.BatchAddItemRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}

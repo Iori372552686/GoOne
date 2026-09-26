@@ -5,7 +5,7 @@ import (
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
-func (r *Role) MallGetItem(confId int32) *g1_protocol.PbMallItem {
+func (r *Role) EnsureMallItem(confId int32) *g1_protocol.PbMallItem {
 	info := r.PbRole.MallInfo
 
 	if info.ItemMap == nil {
@@ -27,7 +27,7 @@ func (r *Role) MallDailyRefresh() {
 }
 
 func (r *Role) MallAddBuyCount(confId int32) {
-	item := r.MallGetItem(confId)
+	item := r.EnsureMallItem(confId)
 	item.DailyBuyCount++
 	item.TotalBuyCount++
 	r.MarkMallDirty(confId, false)
@@ -45,7 +45,7 @@ func (r *Role) MallCheckBuyCondition(confId int32) g1_protocol.ErrorCode {
 			return g1_protocol.ErrorCode_ERR_MALL_OUT_OF_TIME
 		}*/
 
-	item := r.MallGetItem(confId)
+	item := r.EnsureMallItem(confId)
 	if item.DailyBuyCount >= conf.DailyBuyLimit && conf.DailyBuyLimit > 0 {
 		return g1_protocol.ErrorCode_ERR_MALL_DAILY_LIMIT
 	}

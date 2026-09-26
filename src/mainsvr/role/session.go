@@ -58,7 +58,7 @@ func (m *RoleMgr) Logout(uid uint64, trans cmd_handler.IContext, byServer bool, 
 	}
 
 	role.PbRole.LoginInfo.LastLogoutTime = role.Now()
-	if err := role.SaveToDB(trans); err != nil {
+	if err := role.SaveHash(trans); err != nil {
 		role.Errorf("logout save failed, role retained for retry | %v", err)
 		return err
 	}

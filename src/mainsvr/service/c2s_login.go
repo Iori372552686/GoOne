@@ -20,7 +20,7 @@ func (s *MainC2SServiceImpl) Login(ctx *ssrpc.Context, req *g1_protocol.LoginReq
 		ctx.Uid(), req.GetAccount(), req.GetChannelId(), req.GetLoginType())
 
 	rsp := &g1_protocol.LoginRsp{Ret: &g1_protocol.Ret{Code: g1_protocol.ErrorCode_ERR_OK}}
-	myRole := s.roles.GetOrLoadOrCreateRole(ctx.Uid(), ctx)
+	myRole := s.roles.LoadOrCreate(ctx.Uid(), ctx)
 	if myRole == nil {
 		ctx.Errorf("Failed to get role. {req:%v}", req)
 		return rsp, gerr.New(g1_protocol.ErrorCode_ERR_NOT_EXIST_PLAYER, "biz_error", "")
@@ -67,7 +67,7 @@ func (s *MainC2SServiceImpl) Logout(ctx *ssrpc.Context, req *g1_protocol.LogoutR
 }
 
 func (s *MainC2SServiceImpl) HeartBeat(ctx *ssrpc.Context, req *g1_protocol.HeartBeatReq) (*g1_protocol.HeartBeatRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}

@@ -9,6 +9,9 @@ package bussvc
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
+	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
@@ -210,10 +213,88 @@ type RouterComponent struct {
 	// 创建 bus，只链接注册的 driver。nil 时 Start 返回 ErrDriversNotConfigured（不再
 	// 回退到 driver/all）。websvr 不装配 bus，故不创建 RouterComponent。
 	Drivers *bus.DriverRegistry
+
+	// runtimeErrCh 是施加恢复预算后升级的组件运行期错误通道（见 RuntimeErrors）。
+	runtimeErrCh chan error
+	pumpOnce     sync.Once
+	pumpStop     chan struct{}
+	pumpStopOnce sync.Once
 }
+
+// busRecoveryBudget 是 bus 断线后的恢复预算（报告 §6.2 的错误分级策略）：
+//   - 预算内恢复：driver 自动重连成功，只记录日志；摘流由 readyz
+//     （ReadyCheck → bus 健康值）承担，进程继续服务；
+//   - 超预算未恢复：作为组件运行期错误上报 App，触发标准 Drain/Failed。
+const busRecoveryBudget = 30 * time.Second
 
 // Name 实现 runtime.Component。
 func (r *RouterComponent) Name() string { return "router_bus" }
+
+// RuntimeErrors 实现 RuntimeErrorSource（报告 §6.2：driver 已有错误上报接口，
+// 但组件未接入监督——本方法补上转发，并施加恢复预算避免瞬时断连误杀进程）。
+func (r *RouterComponent) RuntimeErrors() <-chan error {
+	r.pumpOnce.Do(func() {
+		r.runtimeErrCh = make(chan error, 1)
+	})
+	return r.runtimeErrCh
+}
+
+// watchBusRuntimeErrors 在 Start 成功后启动转发泵：读取 driver 断线事件，
+// 预算内恢复则吸收，超预算才升级。
+func (r *RouterComponent) watchBusRuntimeErrors() {
+	src := router.BusRuntimeErrors()
+	if src == nil {
+		return // driver 未实现 RuntimeErrorSource：保持旧行为（仅 readyz 摘流）
+	}
+	r.pumpOnce.Do(func() {
+		r.runtimeErrCh = make(chan error, 1)
+	})
+	r.pumpStop = make(chan struct{})
+	stop := r.pumpStop
+	escalated := r.runtimeErrCh
+
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			case err, ok := <-src:
+				if !ok || err == nil {
+					return
+				}
+				logger.Warningf("bus runtime error, waiting for recovery (budget %v) | %v", busRecoveryBudget, err)
+				if r.awaitBusRecovery(stop) {
+					logger.Warningf("bus recovered within budget, keep serving")
+					continue
+				}
+				select {
+				case <-stop:
+				case escalated <- fmt.Errorf("bus not recovered within %v: %w", busRecoveryBudget, err):
+				}
+				return // 升级一次后结束泵；App 将进入 Drain/Failed
+			}
+		}
+	}()
+}
+
+// awaitBusRecovery 在预算内轮询 bus 健康：恢复返回 true；超预算或组件停止
+// 返回 false。
+func (r *RouterComponent) awaitBusRecovery(stop <-chan struct{}) bool {
+	deadline := time.Now().Add(busRecoveryBudget)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	for time.Now().Before(deadline) {
+		select {
+		case <-stop:
+			return false
+		case <-ticker.C:
+			if router.BusHealthy() {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 // Start 实现 runtime.Component：启动 router（含 bus 连接与服务注册）。
 //
@@ -237,7 +318,11 @@ func (r *RouterComponent) Start(_ context.Context) error {
 	busCtor := func(onRecvMsg bus.MsgHandler) (bus.IBus, error) {
 		return drivers.CreateBus(selfBusInt, onRecvMsg, addr)
 	}
-	return router.InitAndRunWithBusCtor(c.SelfBusId, onRecv, busCtor, misc.ServerRouteRules, c.RegisterAddr)
+	if err := router.InitAndRunWithBusCtor(c.SelfBusId, onRecv, busCtor, misc.ServerRouteRules, c.RegisterAddr); err != nil {
+		return err
+	}
+	r.watchBusRuntimeErrors()
+	return nil
 }
 
 // Quiesce 实现 runtime.Quiescer：从服务注册中心注销，admission gate 拒绝新请求，但仍
@@ -247,8 +332,13 @@ func (r *RouterComponent) Quiesce(_ context.Context) error {
 	return nil
 }
 
-// Stop 实现 runtime.Component：关闭 bus 连接、producer、watcher。
+// Stop 实现 runtime.Component：关闭 bus 连接、producer、watcher，并结束转发泵。
 func (r *RouterComponent) Stop(_ context.Context) error {
+	r.pumpStopOnce.Do(func() {
+		if r.pumpStop != nil {
+			close(r.pumpStop)
+		}
+	})
 	return router.Close()
 }
 

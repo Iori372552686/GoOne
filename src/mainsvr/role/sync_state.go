@@ -319,7 +319,7 @@ func (r *Role) MaybeFlushPersist(trans cmd_handler.IContext, force bool) error {
 		return nil
 	}
 
-	if err := r.SaveToDB(trans); err != nil {
+	if err := r.SaveHash(trans); err != nil {
 		return err
 	}
 

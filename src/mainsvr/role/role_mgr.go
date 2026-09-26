@@ -24,11 +24,11 @@ func NewRoleMgr() *RoleMgr {
 	return &RoleMgr{}
 }
 
-func (m *RoleMgr) GetOrLoadOrCreateRole(uid uint64, trans cmd_handler.IContext) *Role {
+func (m *RoleMgr) LoadOrCreate(uid uint64, trans cmd_handler.IContext) *Role {
 	return m.obtainRole(uid, trans, true)
 }
 
-func (m *RoleMgr) GetOrLoadRole(uid uint64, trans cmd_handler.IContext) *Role {
+func (m *RoleMgr) Load(uid uint64, trans cmd_handler.IContext) *Role {
 	return m.obtainRole(uid, trans, false)
 }
 
@@ -47,7 +47,7 @@ func (m *RoleMgr) DeleteRole(uid uint64) {
 }
 
 // PutRole 直接插入/替换内存中的角色对象（测试与装配期注入用）。
-// 运行期业务代码应走 GetOrLoadOrCreateRole 的正规加载路径。
+// 运行期业务代码应走 LoadOrCreate 的正规加载路径。
 func (m *RoleMgr) PutRole(uid uint64, r *Role) {
 	m.setRole(uid, r)
 }
@@ -65,7 +65,7 @@ func (m *RoleMgr) FlushAllToDB(ctx context.Context) (saved int, failed int) {
 		if !ok || role == nil {
 			return true
 		}
-		if err := role.SaveToDBSync(ctx); err != nil {
+		if err := role.SaveHashSync(ctx); err != nil {
 			failed++
 		} else {
 			saved++
@@ -83,17 +83,19 @@ func (m *RoleMgr) setRole(uid uint64, role *Role) {
 	m.mapUidToRole.Store(uid, role)
 }
 
-func loadRole(uid uint64, trans cmd_handler.IContext) (error, *Role) {
+// loadRole 从 Redis hash 读回角色（报告 7.7：结果在前、error 在后的 Go 惯例；
+// 旧签名为 (error, *Role) 顺序相反）。
+func loadRole(uid uint64, trans cmd_handler.IContext) (*Role, error) {
 	if uid != trans.Uid() {
 		logger.Errorf("inconsistent uid {uid:%v, transUid:%v}", uid, trans.Uid())
-		return errors.New("inconsistent uid"), nil
+		return nil, errors.New("inconsistent uid")
 	}
 
 	key := fmt.Sprintf("%s:%d", g1_protocol.DBType_DB_TYPE_ROLE.String(), uid)
 	info, err := loadRoleHash(uid)
 	if err != nil {
 		logger.Errorf("get redis error {err:%v, uid:%v}", err, uid)
-		return err, nil
+		return nil, err
 	}
 	if info == nil {
 		logger.Debugf("get role redis nil {key=%v}", key)
@@ -104,7 +106,7 @@ func loadRole(uid uint64, trans cmd_handler.IContext) (error, *Role) {
 	role.PbRole = info
 	// 这里主要是老的数据添加新增的数据段，不然新数据段就是nil
 	role.RoleInitField(info.RegisterInfo.Uid)
-	return nil, &role
+	return &role, nil
 }
 
 func (m *RoleMgr) obtainRole(uid uint64, trans cmd_handler.IContext, createIfNotExist bool) *Role {
@@ -114,7 +116,7 @@ func (m *RoleMgr) obtainRole(uid uint64, trans cmd_handler.IContext, createIfNot
 	}
 
 	createHere := false
-	err, role := loadRole(uid, trans)
+	role, err := loadRole(uid, trans)
 	if err != nil {
 		logger.Errorf("failed to load role {uid:%v} | %v", uid, err)
 		return nil
@@ -135,10 +137,10 @@ func (m *RoleMgr) obtainRole(uid uint64, trans cmd_handler.IContext, createIfNot
 	}
 	m.setRole(uid, role)
 
-	// SaveToDB必须放在上面对mapUidToRole的二次检测之后，
-	// 因为在loadRole的过程中，可能已经有其他协程save了一个role，这里不能覆盖它。
+	// SaveHash 必须放在上面对 mapUidToRole 的二次检测之后，
+	// 因为在 loadRole 的过程中，可能已经有其他协程 save 了一个 role，这里不能覆盖它。
 	if createHere {
-		role.SaveToDB(trans)
+		role.SaveHash(trans)
 		role.SaveToMysql(trans)
 	}
 
@@ -197,7 +199,7 @@ func (m *RoleMgr) removeExpiredRoles(ctx context.Context) {
 		// 兜底路径（未注入时）：保存成功才删除；失败保留角色由下一轮 Tick 重试
 		//（F04：保存失败不再无条件丢弃内存状态）。
 		if role := m.GetRole(c.uid); role != nil {
-			if err := role.SaveToDBSync(ctx); err != nil {
+			if err := role.SaveHashSync(ctx); err != nil {
 				logger.Errorf("failed to save expired role, retained for retry {uid:%v} | %v", c.uid, err)
 				continue
 			}

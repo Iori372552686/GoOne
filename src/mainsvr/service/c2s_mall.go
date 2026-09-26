@@ -11,7 +11,7 @@ import (
 // ===== 商城 =====
 
 func (s *MainC2SServiceImpl) MallBuyPackage(ctx *ssrpc.Context, req *g1_protocol.MallBuyPackageReq) (*g1_protocol.MallBuyPackageRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}

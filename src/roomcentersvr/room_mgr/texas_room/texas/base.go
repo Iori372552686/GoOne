@@ -45,8 +45,9 @@ func (impl *TexasRoom) Get() *pb.DBTexasRoomCenterInfo {
 	return impl.DBTexasRoomCenterInfo
 }
 
-// Save 标记房间表有变更，等待周期持久化（TickPersist 10s 节拍）落盘。
-func (impl *TexasRoom) Save() {
+// MarkDirty 标记房间表有变更，等待周期持久化（TickPersist 10s 节拍）落盘。
+// 命名收敛（报告 7.7）：旧名 Save 让读者误以为执行 I/O，实际仅标脏。
+func (impl *TexasRoom) MarkDirty() {
 	impl.isChange.Store(true)
 }
 

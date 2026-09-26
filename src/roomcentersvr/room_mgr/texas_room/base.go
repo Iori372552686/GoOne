@@ -164,7 +164,7 @@ func (impl *TexasRoomCenterMgr) UpdateRoomInfo(req *g1_protocol.RoomShowInfo) g1
 		room.RoomsMap = make(map[uint64]*g1_protocol.RoomShowInfo)
 	}
 	room.RoomsMap[req.Base.RoomId] = req
-	room.Save()
+	room.MarkDirty()
 	return g1_protocol.ErrorCode_ERR_OK
 }
 
@@ -187,7 +187,7 @@ func (impl *TexasRoomCenterMgr) DelRoomInfo(req *g1_protocol.RoomShowInfo) g1_pr
 		return g1_protocol.ErrorCode_ERR_OK // 幂等：重复删除直接成功
 	}
 	delete(room.RoomsMap, req.Base.RoomId)
-	room.Save()
+	room.MarkDirty()
 	return g1_protocol.ErrorCode_ERR_OK
 }
 
@@ -231,7 +231,7 @@ func (impl *TexasRoomCenterMgr) QuickStart(req *g1_protocol.QuickStartReq) *g1_p
 	}
 	if picked != nil {
 		picked.Base.CurPlayerNum++
-		room.Save()
+		room.MarkDirty()
 		rsp.ReservationId = impl.issueReservation(picked.Base.RoomId, int32(req.Stage), nowSec)
 		impl.Unlock()
 		rsp.RoomInfo = picked.Base
@@ -267,7 +267,7 @@ func (impl *TexasRoomCenterMgr) QuickStart(req *g1_protocol.QuickStartReq) *g1_p
 		// gamesvr 已抢先上报该房：以权威上报为准，未满员则在其上占位。
 		if existing.Base.CurPlayerNum < existing.Base.MaxPlayer {
 			existing.Base.CurPlayerNum++
-			room.Save()
+			room.MarkDirty()
 		}
 		rsp.ReservationId = impl.issueReservation(existing.Base.RoomId, int32(req.Stage), nowSec)
 		rsp.RoomInfo = existing.Base
@@ -279,7 +279,7 @@ func (impl *TexasRoomCenterMgr) QuickStart(req *g1_protocol.QuickStartReq) *g1_p
 	}
 	base.CurPlayerNum = 1
 	room.RoomsMap[base.RoomId] = &g1_protocol.RoomShowInfo{Base: base}
-	room.Save()
+	room.MarkDirty()
 	rsp.ReservationId = impl.issueReservation(base.RoomId, int32(req.Stage), nowSec)
 	impl.Unlock()
 
@@ -318,7 +318,7 @@ func (impl *TexasRoomCenterMgr) QuickStartRollback(req *g1_protocol.QuickStartRo
 		info := room.RoomsMap[resv.roomID]
 		if info != nil && info.Base != nil && info.Base.CurPlayerNum > 0 {
 			info.Base.CurPlayerNum--
-			room.Save()
+			room.MarkDirty()
 		}
 		return g1_protocol.ErrorCode_ERR_OK
 	}
@@ -330,7 +330,7 @@ func (impl *TexasRoomCenterMgr) QuickStartRollback(req *g1_protocol.QuickStartRo
 	}
 	if info.Base.CurPlayerNum > 0 {
 		info.Base.CurPlayerNum--
-		room.Save()
+		room.MarkDirty()
 	}
 	return g1_protocol.ErrorCode_ERR_OK
 }
@@ -448,7 +448,7 @@ func (impl *TexasRoomCenterMgr) CheckAndCreateRooms(nowMs int64) {
 			}
 			if room.Base.EndTime > 0 && nowSec > room.Base.EndTime {
 				delete(rstage.RoomsMap, roomId)
-				rstage.Save()
+				rstage.MarkDirty()
 			}
 		}
 

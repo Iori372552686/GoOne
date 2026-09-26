@@ -208,9 +208,9 @@ func TestLogoutDisconnectProceedsWithFreshHeartbeat(t *testing.T) {
 	}
 }
 
-// F07 验收：SaveToDBSync 的 ctx（Drain 排空预算）能传导到 Redis 调用，
+// F07 验收：SaveHashSync 的 ctx（Drain 排空预算）能传导到 Redis 调用，
 // 取消后快速失败且保留 dirty 供后续重试。
-func TestSaveToDBSyncRespectsCancelledContext(t *testing.T) {
+func TestSaveHashSyncRespectsCancelledContext(t *testing.T) {
 	stub := &stubRedisClient{}
 	restore := withStubRedis(stub)
 	defer restore()
@@ -219,7 +219,7 @@ func TestSaveToDBSyncRespectsCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := role.SaveToDBSync(ctx)
+	err := role.SaveHashSync(ctx)
 	if err == nil {
 		t.Fatal("取消的 ctx 应使保存快速失败")
 	}

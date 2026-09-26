@@ -15,7 +15,7 @@ import (
 // 对局操作直接按 RoomId 路由到 TexasGameSvr（当前 checkout 不含游戏服实现）。
 
 func (s *MainC2SServiceImpl) CreateRoom(ctx *ssrpc.Context, req *g1_protocol.CreateRoomReq) (*g1_protocol.CreateRoomRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}
@@ -23,7 +23,7 @@ func (s *MainC2SServiceImpl) CreateRoom(ctx *ssrpc.Context, req *g1_protocol.Cre
 }
 
 func (s *MainC2SServiceImpl) JoinRoom(ctx *ssrpc.Context, req *g1_protocol.JoinRoomReq) (*g1_protocol.JoinRoomRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}
@@ -31,7 +31,7 @@ func (s *MainC2SServiceImpl) JoinRoom(ctx *ssrpc.Context, req *g1_protocol.JoinR
 }
 
 func (s *MainC2SServiceImpl) QuickStart(ctx *ssrpc.Context, req *g1_protocol.QuickStartReq) (*g1_protocol.QuickStartRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}
@@ -39,7 +39,7 @@ func (s *MainC2SServiceImpl) QuickStart(ctx *ssrpc.Context, req *g1_protocol.Qui
 }
 
 func (s *MainC2SServiceImpl) GetRoomList(ctx *ssrpc.Context, req *g1_protocol.RoomListReq) (*g1_protocol.RoomListRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_ARGV, "role not found")
 	}
@@ -47,7 +47,7 @@ func (s *MainC2SServiceImpl) GetRoomList(ctx *ssrpc.Context, req *g1_protocol.Ro
 }
 
 func (s *MainC2SServiceImpl) LeaveGame(ctx *ssrpc.Context, req *g1_protocol.LeaveGameReq) (*g1_protocol.LeaveGameRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return &g1_protocol.LeaveGameRsp{Ret: &g1_protocol.Ret{Code: g1_protocol.ErrorCode_ERR_ARGV}}, nil
 	}
@@ -55,7 +55,7 @@ func (s *MainC2SServiceImpl) LeaveGame(ctx *ssrpc.Context, req *g1_protocol.Leav
 }
 
 func (s *MainC2SServiceImpl) SitDown(ctx *ssrpc.Context, req *g1_protocol.SitDownReq) (*g1_protocol.SitDownRsp, error) {
-	myRole := s.roles.GetOrLoadRole(ctx.Uid(), ctx)
+	myRole := s.roles.Load(ctx.Uid(), ctx)
 	if myRole == nil {
 		return &g1_protocol.SitDownRsp{Ret: &g1_protocol.Ret{Code: g1_protocol.ErrorCode_ERR_ARGV}}, nil
 	}

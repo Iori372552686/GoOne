@@ -438,6 +438,24 @@ func SendMsgByConn(uid, routerId uint64, zone, cmd uint32, srcTransId uint32, da
 	return defaultRouter.SendMsgByConn(uid, routerId, zone, cmd, srcTransId, data, ip, port)
 }
 
+// busRuntimeErrorSource 是 bus driver 可选实现的运行期错误源接口
+//（BusImplRabbitMQ 已实现）。Router 侧局部声明，避免反向依赖具体 driver。
+type busRuntimeErrorSource interface {
+	RuntimeErrors() <-chan error
+}
+
+// BusRuntimeErrors 返回底层 bus driver 的运行期错误通道；driver 未实现该
+// 接口或 bus 未启动时返回 nil。
+func (r *Router) BusRuntimeErrors() <-chan error {
+	if rs, ok := r.busImpl.(busRuntimeErrorSource); ok {
+		return rs.RuntimeErrors()
+	}
+	return nil
+}
+
+// BusRuntimeErrors 的包级便捷入口（操作进程默认 router）。
+func BusRuntimeErrors() <-chan error { return defaultRouter.BusRuntimeErrors() }
+
 func SendPbMsgBySvrType(svrType uint32, routerId, uid uint64, zone uint32, cmd g1_protocol.CMD, sendSeq uint16, srcTransId uint32, pbMsg proto.Message) error {
 	data, err := proto.Marshal(pbMsg)
 	if err != nil {
