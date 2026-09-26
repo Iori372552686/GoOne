@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"sync"
 
-	connsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/connsvr/v1"
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
@@ -151,39 +150,44 @@ func (m *RoleMgr) obtainRole(uid uint64, trans cmd_handler.IContext, createIfNot
 // handler 串行执行，避免 Tick 协程与 handler 并发读写同一 *Role。
 var SelfLogoutSender func(uid uint64, zone uint32, req *g1_protocol.LogoutReq)
 
-// 删除内存中没有心跳的角色数据。
-// 本函数运行在 Tick 协程：只做过期检测与踢人 RPC，角色的落盘与删除
-// 通过 SelfLogoutSender 交由事务串行执行（Logout handler 内完成）。
+// 删除内存中没有心跳的角色数据（F06：过期判定/踢人/保存/删除收敛到 UID 串行域）。
+//
+// 本函数运行在 Tick 调度协程，只做两件事：
+//  1. 只读原子心跳快照（heartbeatSnapshot）筛选过期候选——不读 PbRole 字段，
+//     与业务 handler 的心跳写入无数据竞争；
+//  2. 经 SelfLogoutSender 把过期登出投递到该 uid 的事务串行队列。
+//
+// 权威过期复检、踢连接、保存与删除在 Logout 用例（session.go）内于 UID 串行域
+// 完成：排队期间玩家合法重连刷新心跳后，旧过期任务在复检处放行跳过。
+// HeartBeatExpiryTime 仅由本协程读写，用于防止重复投递。
 func (m *RoleMgr) removeExpiredRoles(ctx context.Context) {
 	now := datetime.Now()
-	expiredUidList := make([]uint64, 0)
-	busIdList := make([]uint32, 0)
-	zoneList := make([]uint32, 0)
+	expiryThreshold := int32(60 * 2)
 
-	expiryThreshold := 60 * 2
+	type candidate struct {
+		uid  uint64
+		zone uint32
+	}
+	var candidates []candidate
+
 	m.mapUidToRole.Range(func(key, value interface{}) bool {
 		role, ok := value.(*Role)
-		if ok && role != nil && now-role.PbRole.LoginInfo.LastHartBeatTime > int32(expiryThreshold) &&
+		if !ok || role == nil {
+			return true
+		}
+		if now-int32(role.heartbeatSnapshot()) > expiryThreshold &&
 			now > role.HeartBeatExpiryTime+1 {
-			expiredUidList = append(expiredUidList, role.Uid())
-			busIdList = append(busIdList, role.PbRole.ConnSvrInfo.BusId)
-			zoneList = append(zoneList, role.Zone())
-			// HeartBeatExpiryTime 仅由本 Tick 协程读写，用于防止重复投递。
 			role.HeartBeatExpiryTime = now
+			candidates = append(candidates, candidate{uid: role.Uid(), zone: role.Zone()})
 		}
 		return true
 	})
 
-	connClient := connsvrv1.NewConnServiceClient()
-	for i, uid := range expiredUidList {
-		logger.Infof("Logout for heartbeat expired {uid:%v}", uid)
-
-		req := g1_protocol.ConnKickOutReq{}
-		req.Reason = g1_protocol.EKickOutReason_HEARTBEAT_TIMEOUT
-		_ = connClient.KickOutByBusIdSimple(busIdList[i], uid, &req)
+	for _, c := range candidates {
+		logger.Infof("logout queued for heartbeat expired {uid:%v}", c.uid)
 
 		if SelfLogoutSender != nil {
-			SelfLogoutSender(uid, zoneList[i], &g1_protocol.LogoutReq{
+			SelfLogoutSender(c.uid, c.zone, &g1_protocol.LogoutReq{
 				ByServer: true,
 				Reason:   LogoutReasonHeartbeatExpired,
 			})
@@ -192,12 +196,12 @@ func (m *RoleMgr) removeExpiredRoles(ctx context.Context) {
 
 		// 兜底路径（未注入时）：保存成功才删除；失败保留角色由下一轮 Tick 重试
 		//（F04：保存失败不再无条件丢弃内存状态）。
-		if role := m.GetRole(uid); role != nil {
+		if role := m.GetRole(c.uid); role != nil {
 			if err := role.SaveToDBSync(ctx); err != nil {
-				logger.Errorf("failed to save expired role, retained for retry {uid:%v} | %v", uid, err)
+				logger.Errorf("failed to save expired role, retained for retry {uid:%v} | %v", c.uid, err)
 				continue
 			}
 		}
-		m.mapUidToRole.Delete(uid)
+		m.mapUidToRole.Delete(c.uid)
 	}
 }

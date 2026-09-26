@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	infosvrv1 "github.com/Iori372552686/GoOne/api/gen/game/infosvr/v1"
 	mysqlsvrv1 "github.com/Iori372552686/GoOne/api/gen/game/mysqlsvr/v1"
@@ -24,6 +25,12 @@ type Role struct {
 	// 下面可以添加临时内存数据，不会持久化到数据库
 	HeartBeatExpiryTime int32
 	HeartBeatCount      int32
+
+	// lastHeartbeatUnix 心跳时间原子快照（F06）：OnClientHeartbeat 在 UID 串行域
+	// 内写；role_tick 调度协程只读此快照做过期候选筛选，不读 PbRole 字段
+	//（PbRole 字段无锁，跨域读写是数据竞争）。权威过期判定在 Logout 用例内
+	// 于 UID 串行域完成。
+	lastHeartbeatUnix atomic.Int64
 
 	pendingFullSyncMask g1_protocol.ERoleSectionFlag
 	pendingPatchMask    g1_protocol.ERoleSectionFlag
@@ -270,6 +277,12 @@ func (r *Role) OnClientHeartbeat(now int32) {
 
 	r.HeartBeatCount++
 	r.PbRole.LoginInfo.LastHartBeatTime = now
+	r.lastHeartbeatUnix.Store(int64(now))
+}
+
+// heartbeatSnapshot 返回心跳时间的原子快照（role_tick 候选筛选专用）。
+func (r *Role) heartbeatSnapshot() int64 {
+	return r.lastHeartbeatUnix.Load()
 }
 
 // 返回同步数据的Flag
