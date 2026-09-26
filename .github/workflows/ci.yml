@@ -56,7 +56,9 @@ jobs:
 
       - name: Race (core packages)
         # race 覆盖 net、runtime、router、svrinstmgr、bus、ssrpc、
-        # transaction、scheduler、async 与 gamedata 等并发敏感包。
+        # transaction、scheduler、async、gamedata 等并发敏感包，
+        # 以及有真实状态的业务包（报告 §8：role 的心跳/过期/保存并发、
+        # 房间目录的快开/回滚/巡检并发）。
         # 注：lib/service 下不存在 appconfig 子包；bus/... 含 nsq 手动联调用例，
         # 这里只跑其并发核心，driver 的真实联调由 integration job 覆盖。
         run: >
@@ -71,6 +73,9 @@ jobs:
           ./lib/service/scheduler/...
           ./lib/service/async/...
           ./module/gamedata/...
+          ./src/mainsvr/role/...
+          ./src/roomcentersvr/room_mgr/...
+          ./src/connsvr/...
 
   integration:
     # V4 P0-09：真实中间件集成。GOONE_INTEGRATION=1 时依赖不可达必须失败

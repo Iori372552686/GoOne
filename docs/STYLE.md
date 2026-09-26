@@ -159,15 +159,15 @@
 - 不手改 `api/gen/**`；改 proto/生成器后跑 `go run ./tools/cmd/genproto` 并过
   `./main.sh check-genproto`。
 
-### 11.4 不可变配置与安全重载
+### 11.4 不可变配置
 
-- 配置发布后不可变：`appconfig.Store[T]` 用 `atomic.Pointer[T]` 发布快照，读者
-  （`Current()`）无锁读。
-- Loader 每次返回全新对象；`Merger` 深拷贝 map/slice，**绝不别名**候选或旧快照。
-- 热更新只走白名单（日志级别、tracing 相关字段）；其余字段（端口、MQ、DB、身份、
-  容量等）差异上报为 `restart_required`，**不应用**。
-- 重载先预构建候选（如 Trace Provider）成功后再原子交换；失败时旧状态不变，绝不出现
-  部分提交（logger 新、tracing 旧、config 新）。
+- 配置入口统一是 `module/conf`：Load 一次发布 `atomic.Pointer` 不可变快照，
+  `conf.Get("a.b.c")` / `conf.Unmarshal("a.b", &v)` 无锁读；再次 Load 返回
+  `ErrAlreadyLoaded`（启动不可变模型）。
+- 运行配置**不支持热更**：`conf.Watch` 当前返回 `ErrWatchNotSupported`（签名
+  已定型，未来接 fsnotify + 白名单 Merger 时再启用）。声称"配置可热更"的旧
+  设计（appconfig.Store、restart_required 白名单）已随 `module/conf` 迁移删除。
+- 唯一的热更来源是 gamedata：本地目录或 Nacos 远端，单表快照原子发布。
 - 不打印完整配置与敏感字段（DSN、Password、Token、Secret、Headers）；只记字段名。
 
 ### 11.5 按需 Driver
@@ -178,7 +178,20 @@
 - 未链接的 driver 是配置错误，返回明确 error，**不静默回退**。
 - 默认二进制只链接 RabbitMQ；其他 driver 按需引入，缩小二进制与漏洞面。
 
-### 11.6 性能与门禁
+### 11.6 总线消息可靠性契约
+
+RabbitMQ 是当前通信传输，不是可靠业务任务队列（非持久队列 + 自动 ACK +
+无 publisher confirm）。据此把消息分为两类，契约如下：
+
+- **实时消息**（心跳、广播、目录 tick、房间上报等）：允许丢失/超时，靠周期
+  重发与上报收敛；失败计指标，不重试、不落盘。断连期间 readyz 摘流，恢复
+  预算（30s）内自动重连即继续服务，超预算才由组件监督终止进程。
+- **重要操作**（奖励、购买、结算、占位预约等）：以业务响应 + 唯一操作 ID
+  （如 reservation_id）+ 可查询结果闭环；重试以幂等为前提——同一票据至多
+  生效一次。需要 broker 级不丢时再单独启用持久化队列与 confirm，不为
+  "可靠"把每条实时消息都改成持久任务。
+
+### 11.7 性能与门禁
 
 - 每项性能修改必须附 benchmark 前后对比（见 [`benchmarks/baseline.md`](benchmarks/baseline.md)），
   同机、同 Go 版本、同参数至少 10 次；核心吞吐中位数不得回退超过 5%，0-alloc 热路

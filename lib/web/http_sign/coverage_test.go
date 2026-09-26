@@ -56,15 +56,17 @@ func TestMapParam2Uri(t *testing.T) {
 		t.Fatalf("nil 入参应返回空串: got %q", got)
 	}
 
-	// 不编码
+	// 不编码：sortKeys=false 时输出顺序是 map 遍历序（不保证稳定），
+	// 只断言成分而非固定顺序（历史断言 "b=2&a=1" 依赖遍历运气，间歇失败）。
 	params := map[string]string{"b": "2", "a": "1"}
-	if got := MapParam2Uri(params, false); got != "b=2&a=1" {
-		t.Fatalf("不排序不编码应原样输出: got %q", got)
+	got := MapParam2Uri(params, false)
+	if got != "b=2&a=1" && got != "a=1&b=2" {
+		t.Fatalf("不编码应包含全部键值对: got %q", got)
 	}
 
 	// 带 URL 编码：空格应被转成 +
 	enc := map[string]string{"q": "hello world", "x": "a&b"}
-	got := MapParam2Uri(enc, true)
+	got = MapParam2Uri(enc, true)
 	if !strings.Contains(got, "q=hello+world") {
 		t.Fatalf("URL 编码应转空格为 +: got %q", got)
 	}
