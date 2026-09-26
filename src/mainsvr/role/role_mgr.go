@@ -47,6 +47,12 @@ func (m *RoleMgr) DeleteRole(uid uint64) {
 	m.mapUidToRole.Delete(uid)
 }
 
+// PutRole 直接插入/替换内存中的角色对象（测试与装配期注入用）。
+// 运行期业务代码应走 GetOrLoadOrCreateRole 的正规加载路径。
+func (m *RoleMgr) PutRole(uid uint64, r *Role) {
+	m.setRole(uid, r)
+}
+
 func (m *RoleMgr) Tick(ctx context.Context) {
 	m.removeExpiredRoles(ctx)
 }

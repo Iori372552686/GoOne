@@ -72,10 +72,12 @@ func NewApp() *runtime.App {
 	}
 
 	// 用 RegistryComponent 替代 "NewDispatcher→ToDispatcher→丢弃" 闭包。
+	// 服务依赖经构造显式注入（报告 §7.1 试点）：RoleMgr 由 app 装配层传入，
+	// handler 不再直接访问包级 globals。
 	registerHandlers := ssrpc.NewRegistryComponent(
 		"ssrpc_registry",
 		func(r *ssrpc.Registry) error {
-			srv := mainsvrv1.NewMainC2SServiceSServer(&service.MainC2SServiceImpl{}, ssrpc.DefaultMWOptions{})
+			srv := mainsvrv1.NewMainC2SServiceSServer(service.NewMainC2SServiceImpl(globals.RoleMgr), ssrpc.DefaultMWOptions{})
 			return mainsvrv1.RegisterMainC2SServiceToRegistry(r, srv)
 		},
 		ssrpc.WithTransactionManager(globals.TransMgr),
