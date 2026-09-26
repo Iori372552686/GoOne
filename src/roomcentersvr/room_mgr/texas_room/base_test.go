@@ -1,6 +1,7 @@
 package texas_room
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -422,7 +423,7 @@ func TestConcurrentMixedAccess(t *testing.T) {
 	go func() { // 持久化者（无 Redis 配置时为 no-op）
 		defer wg.Done()
 		for j := 0; j < 50; j++ {
-			_ = mgr.SaveRoomDataToDB()
+			_ = mgr.SaveRoomDataToDB(context.Background())
 		}
 	}()
 	wg.Add(1)

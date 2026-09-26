@@ -99,8 +99,8 @@ func NewApp() *runtime.App {
 
 	// 角色 Tick：原 OnTick 每分钟翻转触发一次 RoleMgr.Tick()。现替换为精确 1 分钟周期
 	// 的 Task（NonOverlap 默认禁止重入），空闲服务不再每 10ms 被唤醒。
-	roleTick := scheduler.New("role_tick", time.Minute, func(_ context.Context) error {
-		globals.RoleMgr.Tick()
+	roleTick := scheduler.New("role_tick", time.Minute, func(ctx context.Context) error {
+		globals.RoleMgr.Tick(ctx)
 		return nil
 	})
 
@@ -134,8 +134,9 @@ func (roleFlushComponent) Name() string                  { return "role_flush" }
 func (roleFlushComponent) Start(_ context.Context) error { return nil }
 
 // Drain 实现 runtime.Drainer：TransMgr 已排空，此时没有 handler 并发修改角色。
-func (roleFlushComponent) Drain(_ context.Context) error {
-	if _, failed := globals.RoleMgr.FlushAllToDB(); failed > 0 {
+// ctx 透传至 Redis 调用，遵守排空预算（F07）。
+func (roleFlushComponent) Drain(ctx context.Context) error {
+	if _, failed := globals.RoleMgr.FlushAllToDB(ctx); failed > 0 {
 		return errors.New("failed to flush all roles to db on shutdown")
 	}
 	logger.Infof("================== mainsvr Stop =========================")

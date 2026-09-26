@@ -2,7 +2,6 @@ package role
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
@@ -62,7 +61,8 @@ func roleRedisInstance() uint32 {
 
 // saveRoleHash 按 persistDirtyMask 把变更模块写入 Redis hash。
 // force=true 时无视 mask，全量写所有模块（用于停机 flush、首次创建）。
-func saveRoleHash(r *Role, force bool) error {
+// ctx 透传至底层 Redis 调用（F07）：调用方决定取消与预算语义。
+func saveRoleHash(ctx context.Context, r *Role, force bool) error {
 	instID := roleRedisInstance()
 	key := roleHashKey(r.Uid())
 
@@ -86,10 +86,10 @@ func saveRoleHash(r *Role, force bool) error {
 			r.Errorf("role hash marshal error {uid:%v, field:%s} | %v", r.Uid(), acc.name, err)
 			return err
 		}
-		// HSET key field value
-		if err := rds.RedisMgr.HSetBytes(context.Background(), instID, key, acc.name, buf); err != nil {
+		// HSET key field value（%w 保留底层原因：ctx 取消/连接错误可被上层识别）
+		if err := rds.RedisMgr.HSetBytes(ctx, instID, key, acc.name, buf); err != nil {
 			logger.Errorf("role hash HSET error {uid:%v, field:%s} | %v", r.Uid(), acc.name, err)
-			return errors.New("role hash HSET error")
+			return fmt.Errorf("role hash HSET error {uid:%v, field:%s}: %w", r.Uid(), acc.name, err)
 		}
 		wrote++
 	}
@@ -98,9 +98,9 @@ func saveRoleHash(r *Role, force bool) error {
 	// ConnSvrInfo 为运行时状态，不持久化。
 	if force && r.PbRole.GiftInfo != nil {
 		if buf, err := proto.Marshal(r.PbRole.GiftInfo); err == nil {
-			if err := rds.RedisMgr.HSetBytes(context.Background(), instID, key, "gift", buf); err != nil {
+			if err := rds.RedisMgr.HSetBytes(ctx, instID, key, "gift", buf); err != nil {
 				logger.Errorf("role hash HSET gift error {uid:%v} | %v", r.Uid(), err)
-				return errors.New("role hash HSET gift error")
+				return fmt.Errorf("role hash HSET gift error {uid:%v}: %w", r.Uid(), err)
 			}
 			wrote++
 		}

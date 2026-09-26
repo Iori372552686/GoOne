@@ -2,6 +2,7 @@ package roomcentersvr
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	roomcenterv1 "github.com/Iori372552686/GoOne/api/gen/game/roomcenter/v1"
@@ -128,8 +129,8 @@ func NewApp() *runtime.App {
 		globals.RoomListMgr.Tick(time.Now().UnixMilli())
 		return nil
 	})
-	roomPersist := scheduler.New("room_persist", 10*time.Second, func(_ context.Context) error {
-		globals.RoomListMgr.TickPersist(time.Now().UnixMilli())
+	roomPersist := scheduler.New("room_persist", 10*time.Second, func(ctx context.Context) error {
+		globals.RoomListMgr.TickPersist(ctx, time.Now().UnixMilli())
 		return nil
 	})
 
@@ -163,9 +164,14 @@ func (roomFlushComponent) Name() string                  { return "room_flush" }
 func (roomFlushComponent) Start(_ context.Context) error { return nil }
 
 // Drain 实现 runtime.Drainer：TransMgr 已排空，强制全量写所有房间。
-func (roomFlushComponent) Drain(_ context.Context) error {
-	saved, failed := globals.RoomListMgr.FlushAllToDB()
+// ctx 透传至底层 Redis 调用，遵守排空预算；快照写失败汇总为错误上抛（F07：
+// 上层生命周期可据失败区分成功/失败停机）。
+func (roomFlushComponent) Drain(ctx context.Context) error {
+	saved, failed := globals.RoomListMgr.FlushAllToDB(ctx)
 	logger.Infof("roomcentersvr flush rooms on drain {saved:%d, failed:%d}", saved, failed)
+	if failed > 0 {
+		return fmt.Errorf("failed to flush %d room snapshots on shutdown", failed)
+	}
 	logger.Infof("================== roomcentersvr Stop =========================")
 	return nil
 }

@@ -2,6 +2,7 @@ package texas_room
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
@@ -18,12 +19,16 @@ func roomRedisKey(index uint64, stage int32) string {
 }
 
 // SaveRoomDataToDB 把有变更的房间快照写入 Redis（周期持久化，10s 节拍驱动）。
-func (impl *TexasRoomCenterMgr) SaveRoomDataToDB() error {
+// ctx 全链路透传（F07）：周期任务传任务 ctx，Drain 路径传排空预算 ctx，
+// 慢存储时取消可传导到底层 Redis 调用。任一 stage 写失败即聚合返回错误。
+func (impl *TexasRoomCenterMgr) SaveRoomDataToDB(ctx context.Context) error {
 	if !impl.checkOpen() {
 		return nil
 	}
 
 	saved := 0
+	var errs []error
+
 	impl.RLock()
 	defer impl.RUnlock()
 
@@ -31,19 +36,22 @@ func (impl *TexasRoomCenterMgr) SaveRoomDataToDB() error {
 		if roomInfo == nil || !roomInfo.CheckChange() {
 			continue
 		}
-		if code := saveStageSnapshot(uint32(g1_protocol.DBType_DB_TYPE_TEXAS_ROOM), impl.Index, stage, roomInfo); code {
-			saved++
+		if err := saveStageSnapshot(ctx, uint32(g1_protocol.DBType_DB_TYPE_TEXAS_ROOM), impl.Index, stage, roomInfo); err != nil {
+			errs = append(errs, err)
+			continue
 		}
+		saved++
 	}
 
 	if saved > 0 {
 		logger.Debugf("room snapshot saved {index:%d, count:%d}", impl.Index, saved)
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // FlushAllRoomsToDB 强制全量写所有房间（停机 Drain 用）。无视 dirty 标志。
-func (impl *TexasRoomCenterMgr) FlushAllRoomsToDB() (saved int, failed int) {
+// ctx 透传到 Redis 调用，遵守调用方（Drain 预算/取消）的时限约束。
+func (impl *TexasRoomCenterMgr) FlushAllRoomsToDB(ctx context.Context) (saved int, failed int) {
 	if !impl.checkOpen() {
 		return 0, 0
 	}
@@ -68,7 +76,7 @@ func (impl *TexasRoomCenterMgr) FlushAllRoomsToDB() (saved int, failed int) {
 			continue
 		}
 		key := roomRedisKey(impl.Index, stage)
-		if err := rds.RedisMgr.SetBytes(context.Background(), instID, key, buf, 0); err != nil {
+		if err := rds.RedisMgr.SetBytes(ctx, instID, key, buf, 0); err != nil {
 			logger.Errorf("flush room snapshot error {key:%s} | %v", key, err)
 			failed++
 			continue
@@ -81,25 +89,25 @@ func (impl *TexasRoomCenterMgr) FlushAllRoomsToDB() (saved int, failed int) {
 	return saved, failed
 }
 
-// saveStageSnapshot 序列化并写入单个 stage 的快照，成功返回 true 并清 dirty。
-// 调用方必须已持有读锁。
-func saveStageSnapshot(instID uint32, index uint64, stage int32, roomInfo *texas.TexasRoom) bool {
+// saveStageSnapshot 序列化并写入单个 stage 的快照，成功清 dirty 并返回 nil。
+// 调用方必须已持有读锁。失败保留 dirty，由下一轮周期或 Drain 重试。
+func saveStageSnapshot(ctx context.Context, instID uint32, index uint64, stage int32, roomInfo *texas.TexasRoom) error {
 	data := roomInfo.Get()
 	if data == nil {
-		return false
+		return nil
 	}
 	buf, err := proto.Marshal(data)
 	if err != nil {
 		logger.Errorf("marshal room snapshot error {index:%d, stage:%d} | %v", index, stage, err)
-		return false
+		return err
 	}
 	key := roomRedisKey(index, stage)
-	if err := rds.RedisMgr.SetBytes(context.Background(), instID, key, buf, 0); err != nil {
+	if err := rds.RedisMgr.SetBytes(ctx, instID, key, buf, 0); err != nil {
 		logger.Errorf("save room snapshot error {key:%s} | %v", key, err)
-		return false
+		return err
 	}
 	roomInfo.MarkSaved()
-	return true
+	return nil
 }
 
 // ----------------------------------------------public----------------------------------------------

@@ -51,16 +51,21 @@ func (f *stubIContext) Debugf(string, ...interface{})   {}
 
 var _ cmd_handler.IContext = (*stubIContext)(nil)
 
-// stubRedisClient 可控失败的 Redis 桩：err 非 nil 时 HSet 返回错误。
+// stubRedisClient 可控失败的 Redis 桩：err 非 nil 时 HSet 返回错误；
+// 始终尊重传入 ctx 的取消（模拟真实客户端行为，验证 ctx 贯通）。
 type stubRedisClient struct {
 	goredis.UniversalClient
 	err   error
 	calls int
 }
 
-func (c *stubRedisClient) HSet(_ context.Context, _ string, _ ...interface{}) *goredis.IntCmd {
-	cmd := goredis.NewIntCmd(context.Background())
+func (c *stubRedisClient) HSet(ctx context.Context, _ string, _ ...interface{}) *goredis.IntCmd {
+	cmd := goredis.NewIntCmd(ctx)
 	c.calls++
+	if err := ctx.Err(); err != nil {
+		cmd.SetErr(err)
+		return cmd
+	}
 	if c.err != nil {
 		cmd.SetErr(c.err)
 	} else {
@@ -200,5 +205,28 @@ func TestLogoutDisconnectProceedsWithFreshHeartbeat(t *testing.T) {
 	}
 	if mgr.GetRole(1005) != nil {
 		t.Fatal("disconnect 登出应移除角色")
+	}
+}
+
+// F07 验收：SaveToDBSync 的 ctx（Drain 排空预算）能传导到 Redis 调用，
+// 取消后快速失败且保留 dirty 供后续重试。
+func TestSaveToDBSyncRespectsCancelledContext(t *testing.T) {
+	stub := &stubRedisClient{}
+	restore := withStubRedis(stub)
+	defer restore()
+
+	role := NewRole(1006)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := role.SaveToDBSync(ctx)
+	if err == nil {
+		t.Fatal("取消的 ctx 应使保存快速失败")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("错误应包含 context.Canceled，实际: %v", err)
+	}
+	if stub.calls == 0 {
+		t.Fatal("ctx 应已传导到 Redis 调用")
 	}
 }

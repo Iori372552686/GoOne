@@ -69,7 +69,7 @@ func TestRoleHashE2EFullThenIncremental(t *testing.T) {
 	r.PbRole.GameInfo.PlayRoomIds = []uint64{100, 200, 300}
 
 	t.Run("FirstFullWrite", func(t *testing.T) {
-		if err := r.SaveToDBSync(); err != nil {
+		if err := r.SaveToDBSync(context.Background()); err != nil {
 			t.Fatalf("SaveToDBSync: %v", err)
 		}
 		fields, err := rds.RedisMgr.HGetAllBytes(context.Background(), instID, key)
@@ -87,7 +87,7 @@ func TestRoleHashE2EFullThenIncremental(t *testing.T) {
 
 		r.TouchBasicInfo("test_modify")
 		r.PbRole.BasicInfo.Exp = 99999
-		if err := saveRoleHash(r, false); err != nil {
+		if err := saveRoleHash(context.Background(), r, false); err != nil {
 			t.Fatalf("incremental saveRoleHash: %v", err)
 		}
 		r.clearPersistDirtyMask()

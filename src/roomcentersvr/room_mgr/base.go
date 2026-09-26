@@ -1,10 +1,13 @@
 package room_mgr
 
 import (
+	"context"
+	"errors"
 	"sync"
 
 	roomcenterv1 "github.com/Iori372552686/GoOne/api/gen/game/roomcenter/v1"
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
+	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/room_mgr/texas_room"
@@ -88,8 +91,8 @@ func (impl *RoomMgr) Tick(nowMs int64) {
 const persistIntervalMs = 10 * datetime.MS_PER_SECOND
 
 // TickPersist 周期持久化变更的房间快照，与 Tick 解耦独立节拍。
-// 无 Redis 配置时 SaveDirtyToDB 内部跳过。
-func (impl *RoomMgr) TickPersist(nowMs int64) {
+// 无 Redis 配置时 SaveDirtyToDB 内部跳过。ctx 透传至底层 Redis 调用。
+func (impl *RoomMgr) TickPersist(ctx context.Context, nowMs int64) {
 	if !impl.checkOpen() {
 		return
 	}
@@ -97,14 +100,17 @@ func (impl *RoomMgr) TickPersist(nowMs int64) {
 		return
 	}
 	impl.eventTick = nowMs
-	impl.SaveDirtyToDB()
+	if err := impl.SaveDirtyToDB(ctx); err != nil {
+		logger.Errorf("TickPersist save dirty rooms failed | %v", err)
+	}
 }
 
 // FlushAllToDB 强制全量写所有 zone 的房间快照（停机 Drain 用）。
 // 必须在 TransMgr 排空之后调用（组件注册顺序保证），此时已无 handler 并发修改。
-func (impl *RoomMgr) FlushAllToDB() (totalSaved, totalFailed int) {
+// ctx 透传以遵守 Drain 的取消与时间预算（F07）。
+func (impl *RoomMgr) FlushAllToDB(ctx context.Context) (totalSaved, totalFailed int) {
 	for _, zone := range impl.snapshotZonesLocked() {
-		s, f := zone.FlushAllRoomsToDB()
+		s, f := zone.FlushAllRoomsToDB(ctx)
 		totalSaved += s
 		totalFailed += f
 	}
@@ -112,10 +118,15 @@ func (impl *RoomMgr) FlushAllToDB() (totalSaved, totalFailed int) {
 }
 
 // SaveDirtyToDB 周期持久化所有 zone 中变更的房间（TickPersist 调用）。
-func (impl *RoomMgr) SaveDirtyToDB() {
+// 任一 zone 失败即聚合返回错误（F07：失败不再被静默吞掉）。
+func (impl *RoomMgr) SaveDirtyToDB(ctx context.Context) error {
+	var errs []error
 	for _, zone := range impl.snapshotZonesLocked() {
-		_ = zone.SaveRoomDataToDB()
+		if err := zone.SaveRoomDataToDB(ctx); err != nil {
+			errs = append(errs, err)
+		}
 	}
+	return errors.Join(errs...)
 }
 
 func (impl *RoomMgr) checkOpen() bool {

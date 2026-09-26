@@ -1,6 +1,7 @@
 package role
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -159,8 +160,10 @@ func (r *Role) SaveToDB(trans cmd_handler.IContext) error {
 		return errors.New("inconsistent uid")
 	}
 
+	// 运行期事务保存：IContext 不暴露标准 ctx，时限上界由 Redis 客户端
+	// read/write timeout 配置承担；停机排空的取消预算走 SaveToDBSync(ctx)。
 	// 按模块增量写 Redis hash（落盘格式详见 persist_hash.go）。
-	if err := saveRoleHash(r, false); err != nil {
+	if err := saveRoleHash(context.Background(), r, false); err != nil {
 		return err
 	}
 	r.clearPersistDirtyMask()
@@ -191,8 +194,9 @@ func (r *Role) SaveToMysql(trans cmd_handler.IContext) error {
 
 // SaveToDBSync 同步持久化角色数据到 redis，不依赖事务上下文。
 // 用于优雅停机等没有 transaction 可用的场景。force=true 全量写所有模块。
-func (r *Role) SaveToDBSync() error {
-	if err := saveRoleHash(r, true); err != nil {
+// ctx 透传至 Redis 调用：Drain 路径传入排空预算 ctx，取消可传导（F07）。
+func (r *Role) SaveToDBSync(ctx context.Context) error {
+	if err := saveRoleHash(ctx, r, true); err != nil {
 		return err
 	}
 	r.needPersist = false

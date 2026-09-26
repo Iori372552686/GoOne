@@ -3,6 +3,7 @@
 package role
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -46,19 +47,20 @@ func (m *RoleMgr) DeleteRole(uid uint64) {
 	m.mapUidToRole.Delete(uid)
 }
 
-func (m *RoleMgr) Tick() {
-	m.removeExpiredRoles()
+func (m *RoleMgr) Tick(ctx context.Context) {
+	m.removeExpiredRoles(ctx)
 }
 
 // FlushAllToDB 同步落盘内存中的全部角色数据。
 // 用于优雅停机：必须在 TransactionMgr 排空之后调用，保证没有 handler 并发修改角色。
-func (m *RoleMgr) FlushAllToDB() (saved int, failed int) {
+// ctx 透传至 Redis 调用，遵守 Drain 的取消与时间预算（F07）。
+func (m *RoleMgr) FlushAllToDB(ctx context.Context) (saved int, failed int) {
 	m.mapUidToRole.Range(func(key, value interface{}) bool {
 		role, ok := value.(*Role)
 		if !ok || role == nil {
 			return true
 		}
-		if err := role.SaveToDBSync(); err != nil {
+		if err := role.SaveToDBSync(ctx); err != nil {
 			failed++
 		} else {
 			saved++
@@ -146,7 +148,7 @@ var SelfLogoutSender func(uid uint64, zone uint32, req *g1_protocol.LogoutReq)
 // 删除内存中没有心跳的角色数据。
 // 本函数运行在 Tick 协程：只做过期检测与踢人 RPC，角色的落盘与删除
 // 通过 SelfLogoutSender 交由事务串行执行（Logout handler 内完成）。
-func (m *RoleMgr) removeExpiredRoles() {
+func (m *RoleMgr) removeExpiredRoles(ctx context.Context) {
 	now := datetime.Now()
 	expiredUidList := make([]uint64, 0)
 	busIdList := make([]uint32, 0)
@@ -185,7 +187,7 @@ func (m *RoleMgr) removeExpiredRoles() {
 		// 兜底路径（未注入时）：保存成功才删除；失败保留角色由下一轮 Tick 重试
 		//（F04：保存失败不再无条件丢弃内存状态）。
 		if role := m.GetRole(uid); role != nil {
-			if err := role.SaveToDBSync(); err != nil {
+			if err := role.SaveToDBSync(ctx); err != nil {
 				logger.Errorf("failed to save expired role, retained for retry {uid:%v} | %v", uid, err)
 				continue
 			}
