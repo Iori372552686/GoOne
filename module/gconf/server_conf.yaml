@@ -1,5 +1,6 @@
 base_cfg:
   runtime:
+    env_mode: '{{ env_mode | default("test") }}'
     register_addr: '{{ zk_address }}'
     bus_mq_addr: '{{ rabbitmq_address }}'
     admin_server:
@@ -71,6 +72,7 @@ connsvr:
     self_bus_id: '1.1.1.{{ instance_id }}'
   runtime:
     listen_port: 11000
+    game_id: '{{ game_id | default("GoOne") }}'
   debug:
     log_dir: ./logs/
     log_level: debug

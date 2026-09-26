@@ -4,6 +4,7 @@
 # 或 conf.Unmarshal("base_cfg.dependencies.db_instances", &dbs) 读取。
 base_cfg:
   runtime:
+    env_mode: dev
     register_addr: 'etcd://43.139.3.228:12379?service=online&timeout=5s&namespace=/GoOneServices'
     bus_mq_addr: 'amqp://guest:guest@43.139.3.228:15672/'
     admin_server:
@@ -93,10 +94,10 @@ connsvr:
     self_bus_id: 2.1.1.251
   runtime:
     listen_port: 11000
+    game_id: GoOne
   debug:
     log_dir: ./logs/
     log_level: debug
-  game_id: GoOne
   # 过载保护参数（可选；缺省 0 = 不限制，向后兼容）。需要限流时取消注释：
   # capacity:
   #   max_connections: 0                  # 总连接上限，0 = 不限

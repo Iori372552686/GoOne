@@ -28,6 +28,9 @@ type GatewayServer interface {
 	Kick(uid uint64, reason g1_protocol.EKickOutReason)
 	KickByRemoteAddr(uid uint64, reason g1_protocol.EKickOutReason, remoteAddr string)
 	GetClientByUid(uid uint64) *Client
+	// GetClientByConn 返回当前绑定在该连接上的 Client（未绑定为 nil），
+	// 支撑"连接优先"的会话身份查找（见 pack_proc）。
+	GetClientByConn(conn net.Conn) *Client
 	UpdateClientByUid(conn net.Conn, uid uint64, zone uint32) *Client
 }
 

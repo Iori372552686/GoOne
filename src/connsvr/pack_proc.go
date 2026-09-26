@@ -7,13 +7,22 @@ import (
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/net/net_mgr"
 	"github.com/Iori372552686/GoOne/lib/service/router"
+	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/Iori372552686/GoOne/src/connsvr/globals"
+	"github.com/Iori372552686/GoOne/src/connsvr/login"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
+	"google.golang.org/protobuf/proto"
 )
 
+// isDevMode 报告当前运行环境是否为 dev。仅影响网关接入策略：
+// dev 放行预分配 uid 模型与 GM 命令；非 dev 只接受经账号服认证的登录握手。
+func isDevMode() bool {
+	return conf.Get("base_cfg.runtime.env_mode").String() == "dev"
+}
+
 // handleClientPacket 是三种传输（TCP/WS/KCP）共用的客户端包处理逻辑：
-// 解析 CS 头 → 会话校验/重绑定 → 经 router 转发到后端服务。
+// 解析 CS 头 → 会话校验/认证绑定 → 经 router 转发到后端服务。
 // 在各自读协程/事件循环内同步调用，不得保留 data 引用。
 func handleClientPacket(gw net_mgr.GatewayServer, transport string, conn net.Conn, data []byte) {
 	headerLen := sharedstruct.ByteLenOfCSPacketHeader()
@@ -35,39 +44,77 @@ func handleClientPacket(gw net_mgr.GatewayServer, transport string, conn net.Con
 	}
 
 	if misc.IsInnerCmd(packetHeader.Cmd) {
-		logger.Debugf("Received an inner command from client: %#v", packetHeader)
+		// GM 命令（类型 0xa）默认同样被网关拒绝；dev 模式放行供 tester 联调回归。
+		if !(misc.IsGmCmd(packetHeader.Cmd) && isDevMode()) {
+			logger.Debugf("Received an inner command from client: %#v", packetHeader)
+			return
+		}
+	}
+
+	// 连接优先：已绑定会话的连接一律以会话身份路由；包头自报 UID 与会话不符时
+	// 拒绝，防止已认证连接被跨 UID 重绑冒用。
+	if client := gw.GetClientByConn(conn); client != nil {
+		if packetHeader.Uid != 0 && packetHeader.Uid != client.Uid {
+			logger.Errorf("packet uid %d mismatches bound session uid %d, rejected {cmd: %d, transport: %s}",
+				packetHeader.Uid, client.Uid, packetHeader.Cmd, transport)
+			return
+		}
+		router.SendMsgByConn(client.Uid, client.Uid, client.Zone, packetHeader.Cmd, 0, packetBody, client.Ip, client.Port)
 		return
 	}
 
-	// --- Default path: forward to backend server via router ---
-	uid := packetHeader.Uid
-	if uid == 0 {
+	// --- 未绑定连接：只有登录握手（或 dev 预分配模型）允许建立绑定 ---
+	bindUid := uint64(0)
+	if packetHeader.Cmd == uint32(g1_protocol.CMD_MAIN_LOGIN_REQ) {
+		req := &g1_protocol.LoginReq{}
+		if err := proto.Unmarshal(packetBody, req); err != nil {
+			logger.Errorf("LoginReq unmarshal failed {uid: %d, transport: %s, err: %v}", packetHeader.Uid, transport, err)
+			return
+		}
+		if req.GetAccount() == "" || req.GetChannelId() == 0 {
+			logger.Errorf("LoginReq --> account or ChannelId error, uid=%d (%s)", packetHeader.Uid, transport)
+			return
+		}
+		ret, accUid := login.OnCheckAuthByAccSvr(req.GetAccount(), req.GetToken(), req.GetChannelId(), req.GetLoginType())
+		if !ret {
+			// 认证失败：丢弃首包，不建立绑定（dev 模式不会走到这里）。
+			logger.Errorf("login auth rejected {account: %s, uid: %d, transport: %s}", req.GetAccount(), packetHeader.Uid, transport)
+			return
+		}
+		if accUid > 0 {
+			// 认证所得 uid 优先于客户端自报 uid：身份由账号服决定。
+			bindUid = accUid
+		} else {
+			// dev 回退：账号服跳过且账号非纯数字，沿用客户端自报 uid
+			//（外部预分配模型，tester/stress 依赖）。
+			bindUid = packetHeader.Uid
+		}
+	} else if isDevMode() && packetHeader.Uid != 0 {
+		// dev 预分配模型：首包即携带 uid，直接绑定。
+		bindUid = packetHeader.Uid
+	} else {
+		// 非 dev：未认证连接必须先走登录握手，业务包不得自报 uid 建立绑定。
+		logger.Errorf("unauthenticated conn must login first {cmd: %d, uid: %d, transport: %s}", packetHeader.Cmd, packetHeader.Uid, transport)
+		return
+	}
+
+	if bindUid == 0 {
 		logger.Errorf("uid==0 and no client packet handler registered for cmd %d (%s)", packetHeader.Cmd, transport)
 		return
 	}
 
-	client := gw.GetClientByUid(uid)
+	// 登录限速。admission 拒绝（enforce 模式超 login_rate）时丢弃首包，不建立绑定。
+	if a := globals.SessionHub.Admission(); a != nil && !a.TryAdmitLogin() {
+		logger.Warningf("login rejected by admission (uid: %d, transport: %s)", bindUid, transport)
+		return
+	}
+	client := gw.UpdateClientByUid(conn, bindUid, packetHeader.AppVersion)
 	if client == nil {
-		// 首次登录：该 uid 的会话尚未绑定到当前连接，先建立绑定。
-		// （GoOne 登录模型：uid 由外部预分配，客户端首包即携带 uid，
-		// connsvr 据此建立 uid↔conn 映射，后续请求才能路由与回包。）
-		// 登录限速。admission 拒绝（enforce 模式超 login_rate）时丢弃首包，
-		// 不建立绑定。
-		if a := globals.SessionHub.Admission(); a != nil && !a.TryAdmitLogin() {
-			logger.Warningf("login rejected by admission (uid: %d, transport: %s)", uid, transport)
-			return
-		}
-		client = gw.UpdateClientByUid(conn, uid, packetHeader.AppVersion)
-		if client == nil {
-			logger.Errorf("Failed to bind %s conn for uid: %v", transport, uid)
-			return
-		}
-	} else if client.Conn != conn {
-		// uid 已绑定到其它连接（重连/多地登录）：更新到当前连接。
-		gw.UpdateClientByUid(conn, uid, client.Zone)
+		logger.Errorf("Failed to bind %s conn for uid: %v", transport, bindUid)
+		return
 	}
 
-	router.SendMsgByConn(uid, uid, client.Zone, packetHeader.Cmd, 0, packetBody, client.Ip, client.Port)
+	router.SendMsgByConn(bindUid, bindUid, client.Zone, packetHeader.Cmd, 0, packetBody, client.Ip, client.Port)
 }
 
 // proc tcp packet

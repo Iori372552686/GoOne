@@ -177,3 +177,7 @@ func (t *ConnWsTcpSvr) UpdateClientByUid(conn net.Conn, uid uint64, zone uint32)
 func (t *ConnWsTcpSvr) GetClientByUid(uid uint64) *Client {
 	return t.hub.GetClientByUid(uid)
 }
+
+func (t *ConnWsTcpSvr) GetClientByConn(conn net.Conn) *Client {
+	return t.hub.GetClientByConn(conn)
+}

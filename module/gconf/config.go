@@ -34,6 +34,10 @@ type RuntimeTracingConfig struct {
 }
 
 type BaseRuntimeConfig struct {
+	// EnvMode 运行环境模式（dev/test/prod）。dev 下网关登录认证走本地回退
+	// （账号为纯数字时直接映射 uid，否则沿用客户端预分配 uid，tester 等接入方
+	// 依赖此回退）；非 dev 必须通过账号服认证后才允许建立会话绑定。
+	EnvMode string `json:"env_mode" yaml:"env_mode"`
 	// ParseConfig parses registry address strings like:
 	//   - "127.0.0.1:2181"                       (defaults to zk)
 	//   - "zk://127.0.0.1:2181?root=/&service=online&timeout=30s"
@@ -89,6 +93,8 @@ type ServiceCommonConfig struct {
 
 type ConnRuntimeConfig struct {
 	ListenPort int `json:"listen_port" yaml:"listen_port"`
+	// GameID 游戏 ID。登录认证请求账号服 profile 时作为 game_id 查询参数。
+	GameID string `json:"game_id" yaml:"game_id"`
 	// TcpImplType 选择 TCP 后端："gonet"/空 = 每连接 goroutine（默认），
 	// "gnet" = epoll/kqueue 事件驱动（万级连接场景）。
 	TcpImplType string `json:"tcp_impl_type" yaml:"tcp_impl_type"`

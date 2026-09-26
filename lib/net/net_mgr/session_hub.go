@@ -177,6 +177,19 @@ func (h *SessionHub) GetClientByUid(uid uint64) *Client {
 	return h.uidConnMap[uid]
 }
 
+// GetClientByConn 返回当前绑定在该连接上的 Client；连接未绑定任何 UID 时返回 nil。
+// 供网关做"连接优先"的会话查找：已绑定连接的包一律以会话身份路由，包头自报
+// UID 与会话不符时由调用方拒绝，防止已认证连接被跨 UID 重绑冒用。
+func (h *SessionHub) GetClientByConn(conn net.Conn) *Client {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	uid, exists := h.connUidMap[conn]
+	if !exists {
+		return nil
+	}
+	return h.uidConnMap[uid]
+}
+
 // ClientForSend 返回 UID 对应的不可变 Client 指针，供调用方在锁外写网络。若 UID 不存
 // 在返回 nil。
 func (h *SessionHub) ClientForSend(uid uint64) *Client {

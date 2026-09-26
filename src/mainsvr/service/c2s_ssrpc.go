@@ -23,9 +23,10 @@ import (
 type MainC2SServiceImpl struct{}
 
 func (s *MainC2SServiceImpl) Login(ctx *ssrpc.Context, req *g1_protocol.LoginReq) (*g1_protocol.LoginRsp, error) {
-	_ = req
-
-	ctx.Infof("---------------  Login  %d     ---------------", ctx.Uid())
+	// uid 已由 connsvr 网关认证绑定（见 src/connsvr/pack_proc.go），此处只记录
+	// 账号信息；凭证校验不在本服务重复执行。
+	ctx.Infof("---------------  Login  %d  account=%s channel=%d login_type=%s  ---------------",
+		ctx.Uid(), req.GetAccount(), req.GetChannelId(), req.GetLoginType())
 
 	rsp := &g1_protocol.LoginRsp{Ret: &g1_protocol.Ret{Code: g1_protocol.ErrorCode_ERR_OK}}
 	myRole := globals.RoleMgr.GetOrLoadOrCreateRole(ctx.Uid(), ctx)

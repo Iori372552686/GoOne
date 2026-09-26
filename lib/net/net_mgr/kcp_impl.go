@@ -183,3 +183,7 @@ func (t *ConnKcpSvr) UpdateClientByUid(conn net.Conn, uid uint64, zone uint32) *
 func (t *ConnKcpSvr) GetClientByUid(uid uint64) *Client {
 	return t.hub.GetClientByUid(uid)
 }
+
+func (t *ConnKcpSvr) GetClientByConn(conn net.Conn) *Client {
+	return t.hub.GetClientByConn(conn)
+}
