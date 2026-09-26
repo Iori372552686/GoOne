@@ -108,6 +108,12 @@ func (m *RedisMgr) Client(instanceID uint32) (goredis.UniversalClient, error) {
 	return client, nil
 }
 
+// AddClientInstance 注册一个已构造好的客户端实例，供测试注入桩客户端
+// （验证命令序列与失败传播）。生产装配应使用 AddInstance（走配置与 Ping 校验）。
+func (m *RedisMgr) AddClientInstance(instanceID uint32, client goredis.UniversalClient) {
+	m.clients.Store(instanceID, client)
+}
+
 func (m *RedisMgr) InstanceCount() int {
 	if m == nil {
 		return 0

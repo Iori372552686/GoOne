@@ -177,15 +177,17 @@ func (m *RoleMgr) removeExpiredRoles() {
 		if SelfLogoutSender != nil {
 			SelfLogoutSender(uid, zoneList[i], &g1_protocol.LogoutReq{
 				ByServer: true,
-				Reason:   "heartbeat expired",
+				Reason:   LogoutReasonHeartbeatExpired,
 			})
 			continue
 		}
 
-		// 兜底路径（未注入时）：同步保存后删除，保持旧行为但不再 fire-and-forget。
+		// 兜底路径（未注入时）：保存成功才删除；失败保留角色由下一轮 Tick 重试
+		//（F04：保存失败不再无条件丢弃内存状态）。
 		if role := m.GetRole(uid); role != nil {
 			if err := role.SaveToDBSync(); err != nil {
-				logger.Errorf("failed to save expired role {uid:%v} | %v", uid, err)
+				logger.Errorf("failed to save expired role, retained for retry {uid:%v} | %v", uid, err)
+				continue
 			}
 		}
 		m.mapUidToRole.Delete(uid)
