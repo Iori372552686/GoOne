@@ -121,6 +121,12 @@ func (r *RestApi) SignedGet(ctx context.Context, uin int64, query map[string]str
 	return r.do(ctx, "GET", uin, query, nil, nil, true)
 }
 
+// SignedGetWithHeaders 发起带签名的 GET 请求并透传自定义 headers
+// （如 Authorization、X-Account-Id）；headers 不参与签名，语义与 SignedPost 一致。
+func (r *RestApi) SignedGetWithHeaders(ctx context.Context, uin int64, query map[string]string, headers map[string]string) ([]byte, error) {
+	return r.do(ctx, "GET", uin, query, nil, headers, true)
+}
+
 // Post 发起普通 POST 请求；body 为原始字节（已是 JSON 序列化结果），headers 可为 nil。
 func (r *RestApi) Post(ctx context.Context, uin int64, body []byte, headers map[string]string) ([]byte, error) {
 	return r.do(ctx, "POST", uin, nil, body, headers, false)
