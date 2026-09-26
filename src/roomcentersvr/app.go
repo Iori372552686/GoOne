@@ -52,7 +52,16 @@ func NewApp() *runtime.App {
 
 	businessDeps := &bussvc.FuncComponent{
 		ComponentName: "business_deps",
-		OnStart: func(ctx context.Context) error {
+		OnStart: func(ctx context.Context) (err error) {
+			// F08：Start 失败的组件不会被调用 Stop，Redis 起来后任一步失败必须
+			// 自行回滚连接池。
+			redisStarted := false
+			defer func() {
+				if err != nil && redisStarted {
+					_ = rds.RedisMgr.Close()
+				}
+			}()
+
 			idGen, err := idgen.NewIDGen()
 			if err != nil {
 				return err
@@ -60,16 +69,17 @@ func NewApp() *runtime.App {
 			id.IDGen = idGen
 			// 初始化 Redis（房间快照持久化用）。OnStart 内部对空配置静默跳过，
 			// 保留 "redis 可选" 的向后兼容语义。
-			if err := rds.RedisMgr.OnStart(ctx); err != nil {
+			if err = rds.RedisMgr.OnStart(ctx); err != nil {
 				return err
 			}
+			redisStarted = true
 			var nacosConf net_conf.NacosConf
 			_ = conf.Unmarshal("base_cfg.dependencies.nacos_conf", &nacosConf)
 			if nacosConf.IPAddr != "" {
 				logger.Infof("Loading remote gameconf by Nacos group: %v ", nacosConf.GroupName)
 				// 经 lib/contrib/config/factory 构造配置中心 client，
 				// 由 gamedata.InitRemote 统一加载+热更；构造/拉取失败返回 error。
-				if err := gamedata.InitNacos(nacosConf); err != nil {
+				if err = gamedata.InitNacos(nacosConf); err != nil {
 					return err
 				}
 			}

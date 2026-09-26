@@ -43,11 +43,21 @@ func NewApp() *runtime.App {
 
 	businessDeps := &bussvc.FuncComponent{
 		ComponentName: "business_deps",
-		OnStart: func(ctx context.Context) error {
+		OnStart: func(ctx context.Context) (err error) {
+			// F08：Start 失败的组件不会被调用 Stop，Redis 起来后任一步失败必须
+			// 自行回滚连接池。
+			redisStarted := false
+			defer func() {
+				if err != nil && redisStarted {
+					_ = rds.RedisMgr.Close()
+				}
+			}()
+
 			sensitive_words.Init(conf.Get("base_cfg.dependencies.sensitive_words_file").String())
-			if err := rds.RedisMgr.OnStart(ctx); err != nil {
+			if err = rds.RedisMgr.OnStart(ctx); err != nil {
 				return err
 			}
+			redisStarted = true
 			idGen, err := idgen.NewIDGen()
 			if err != nil {
 				return err

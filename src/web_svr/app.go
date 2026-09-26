@@ -67,21 +67,43 @@ func (w *webRuntimeComponent) reportRuntimeErr(err error) {
 	}
 }
 
-// Start 实现 runtime.Component：初始化依赖 + 启动 HTTP/gRPC。Start 失败时自行清理。
-func (w *webRuntimeComponent) Start(ctx context.Context) error {
+// Start 实现 runtime.Component：初始化依赖 + 启动 HTTP/gRPC。
+// F08：App 契约约定 Start 失败的组件不会被调用 Stop，部分初始化的资源必须在
+// 此自行回收——用 started 标记 + defer 在任一失败分支逆序回滚（Redis 池、HTTP）。
+func (w *webRuntimeComponent) Start(ctx context.Context) (err error) {
 	if w.runtimeErrCh == nil {
 		w.runtimeErrCh = make(chan error, 1)
 	}
-	if err := globals.RedisMgr.OnStart(ctx); err != nil {
+
+	redisStarted := false
+	httpStarted := false
+	defer func() {
+		if err == nil {
+			return
+		}
+		if httpStarted {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = w.shutdown(shutdownCtx)
+		}
+		if redisStarted {
+			if closeErr := globals.RedisMgr.Close(); closeErr != nil {
+				logger.Errorf("rollback redis pool on failed start | %v", closeErr)
+			}
+		}
+	}()
+
+	if err = globals.RedisMgr.OnStart(ctx); err != nil {
 		return err
 	}
+	redisStarted = true
 	var signs []http_sign.Config
-	if err := conf.Unmarshal("base_cfg.dependencies.http_sign", &signs); err != nil {
+	if err = conf.Unmarshal("base_cfg.dependencies.http_sign", &signs); err != nil {
 		return err
 	}
 	globals.SignMgr.InitAndRun(signs)
 	var restConf []rest_api.Config
-	if err := conf.Unmarshal("base_cfg.dependencies.rest_api_config", &restConf); err != nil {
+	if err = conf.Unmarshal("base_cfg.dependencies.rest_api_config", &restConf); err != nil {
 		return err
 	}
 	globals.RestMgr.Init(restConf, globals.SignMgr)
@@ -91,15 +113,18 @@ func (w *webRuntimeComponent) Start(ctx context.Context) error {
 	d, srv := controller.BuildWebDispatcher()
 
 	var httpCfg web_gin.Config
-	if err := conf.Unmarshal("websvr.runtime.http_server", &httpCfg); err != nil {
+	if err = conf.Unmarshal("websvr.runtime.http_server", &httpCfg); err != nil {
 		return err
 	}
-	httpSrv, httpServeErr, err := web_gin.StartGin(httpCfg, func(router *gin.Engine) {
+	var httpSrv *http.Server
+	var httpServeErr <-chan error
+	httpSrv, httpServeErr, err = web_gin.StartGin(httpCfg, func(router *gin.Engine) {
 		controller.LoadWebRoutesWithDispatcher(router, d, srv)
 	})
 	if err != nil {
 		return err
 	}
+	httpStarted = true
 	w.setHTTPServer(httpSrv)
 	// 监督 HTTP Serve 的非预期退出，送入 RuntimeErrorSource channel，
 	// 使 HTTP listener 异常能触发 App Drain/Failed（与 gRPC 路径一致）。
@@ -109,12 +134,8 @@ func (w *webRuntimeComponent) Start(ctx context.Context) error {
 		}
 	}()
 
-	if err := w.startGRPCServer(d); err != nil {
-		// 回滚已起的 HTTP。
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = w.shutdown(ctx)
-		return err
+	if err = w.startGRPCServer(d); err != nil {
+		return err // defer 统一回滚 HTTP + Redis
 	}
 	return nil
 }
