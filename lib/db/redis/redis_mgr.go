@@ -213,6 +213,25 @@ func (m *RedisMgr) HSetBytes(ctx context.Context, instanceID uint32, key, field 
 	return client.HSet(ctx, key, field, value).Err()
 }
 
+// HSetFields 单命令写入多个 hash field（go-redis HSet map 形态 = 一条 HMSET，
+// Redis 单命令原子）。调用方先完成全部序列化再提交：任一字段损坏不会产生
+// 部分写入（对比逐字段 HSET 的"前几个字段已落库"窗口，报告 F05）。
+// values 为空 map 时是 no-op。
+func (m *RedisMgr) HSetFields(ctx context.Context, instanceID uint32, key string, values map[string][]byte) error {
+	if len(values) == 0 {
+		return nil
+	}
+	client, err := m.Client(instanceID)
+	if err != nil {
+		return err
+	}
+	fields := make(map[string]interface{}, len(values))
+	for field, value := range values {
+		fields[field] = value
+	}
+	return client.HSet(ctx, key, fields).Err()
+}
+
 func (m *RedisMgr) HGetBytes(ctx context.Context, instanceID uint32, key, field string) ([]byte, error) {
 	client, err := m.Client(instanceID)
 	if err != nil {

@@ -59,9 +59,13 @@ func roleRedisInstance() uint32 {
 	return uint32(g1_protocol.DBType_DB_TYPE_ROLE)
 }
 
-// saveRoleHash 按 persistDirtyMask 把变更模块写入 Redis hash。
+// saveRoleHash 按 persistDirtyMask 把变更模块写入 Redis hash（F05：单命令原子提交）。
 // force=true 时无视 mask，全量写所有模块（用于停机 flush、首次创建）。
 // ctx 透传至底层 Redis 调用（F07）：调用方决定取消与预算语义。
+//
+// 提交方式：先把目标模块全部 proto.Marshal 完成（任何序列化错误发生在写之前），
+// 再经一条多字段 HSET（HSetFields）提交——Redis 单命令原子，不再存在
+// "余额已写、背包未写"的中间态；失败保留 dirty mask 供重试。
 func saveRoleHash(ctx context.Context, r *Role, force bool) error {
 	instID := roleRedisInstance()
 	key := roleHashKey(r.Uid())
@@ -72,7 +76,7 @@ func saveRoleHash(ctx context.Context, r *Role, force bool) error {
 		writeMask = g1_protocol.ERoleSectionFlag_ALL
 	}
 
-	wrote := 0
+	fields := make(map[string][]byte, len(roleSectionAccessors)+1)
 	for _, acc := range roleSectionAccessors {
 		if !force && writeMask != g1_protocol.ERoleSectionFlag_ALL && !hasRoleSection(writeMask, acc.flag) {
 			continue
@@ -86,33 +90,32 @@ func saveRoleHash(ctx context.Context, r *Role, force bool) error {
 			r.Errorf("role hash marshal error {uid:%v, field:%s} | %v", r.Uid(), acc.name, err)
 			return err
 		}
-		// HSET key field value（%w 保留底层原因：ctx 取消/连接错误可被上层识别）
-		if err := rds.RedisMgr.HSetBytes(ctx, instID, key, acc.name, buf); err != nil {
-			logger.Errorf("role hash HSET error {uid:%v, field:%s} | %v", r.Uid(), acc.name, err)
-			return fmt.Errorf("role hash HSET error {uid:%v, field:%s}: %w", r.Uid(), acc.name, err)
-		}
-		wrote++
+		fields[acc.name] = buf
 	}
 
 	// GiftInfo 无 section flag：force 全量时一并写入兜底 field，避免数据丢失。
 	// ConnSvrInfo 为运行时状态，不持久化。
 	if force && r.PbRole.GiftInfo != nil {
-		if buf, err := proto.Marshal(r.PbRole.GiftInfo); err == nil {
-			if err := rds.RedisMgr.HSetBytes(ctx, instID, key, "gift", buf); err != nil {
-				logger.Errorf("role hash HSET gift error {uid:%v} | %v", r.Uid(), err)
-				return fmt.Errorf("role hash HSET gift error {uid:%v}: %w", r.Uid(), err)
-			}
-			wrote++
+		if buf, err := proto.Marshal(r.PbRole.GiftInfo); err != nil {
+			r.Errorf("role hash marshal gift error {uid:%v} | %v", r.Uid(), err)
+			return err
+		} else {
+			fields["gift"] = buf
 		}
 	}
 
-	r.Debugf("role hash save done {uid:%v, fields:%d, force:%v}", r.Uid(), wrote, force)
+	if err := rds.RedisMgr.HSetFields(ctx, instID, key, fields); err != nil {
+		logger.Errorf("role hash HSET fields error {uid:%v, fields:%d} | %v", r.Uid(), len(fields), err)
+		return fmt.Errorf("role hash HSET fields error {uid:%v}: %w", r.Uid(), err)
+	}
+
+	r.Debugf("role hash save done {uid:%v, fields:%d, force:%v}", r.Uid(), len(fields), force)
 	return nil
 }
 
 // loadRoleHash 从 Redis hash 读回角色。
-// hash 为空时回退读旧全量 string key（兼容 full 模式存量数据）。
-// 返回 (roleInfo, migratedFromFull, error)：migratedFromFull 表示数据来自旧格式。
+// hash 为空（key 不存在或无字段）返回 (nil, nil) 表示无数据；
+// 损坏字段（unmarshal 失败）作为整体失败返回错误，不以半新半旧状态发布。
 func loadRoleHash(uid uint64) (*g1_protocol.RoleInfo, error) {
 	instID := roleRedisInstance()
 	key := roleHashKey(uid)
