@@ -164,7 +164,9 @@ func (impl *TexasRoomCenterMgr) QuickStart(req *g1_protocol.QuickStartReq) *g1_p
 	impl.Unlock()
 
 	// 第二阶段：全部满员，建房（锁外执行，工厂内含总线发布）。
-	base, err := impl.createRoomFn(req.GameId, int32(req.CoinType), int32(req.Stage))
+	// 工厂签名是 (gameId, stage, coinType)：注意与请求字段对应，历史缺陷曾在此
+	// 互换 stage/coinType 导致查错配置或建错场次（F02，有回归测试守护）。
+	base, err := impl.createRoomFn(req.GameId, int32(req.Stage), int32(req.CoinType))
 	if err != nil || base == nil {
 		rsp.Ret.Code = g1_protocol.ErrorCode_ERR_TEXAS_SEAT_NOT_FOUND
 		if err != nil {

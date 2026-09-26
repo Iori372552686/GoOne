@@ -113,6 +113,47 @@ func TestQuickStartAllFullCreatesAndRegisters(t *testing.T) {
 	}
 }
 
+// TestQuickStartAllFullPassesCorrectStageCoin F02 回归：建房工厂必须收到与请求
+// 一致的 stage/coinType（原 bug 两参数互换，会查错配置或建错场次/币种的房）。
+// 用数值不同的 stage=2(MIDDLE)/coin=1(GOLD) 让互换必然暴露。
+func TestQuickStartAllFullPassesCorrectStageCoin(t *testing.T) {
+	mgr, _ := newTestMgr(1)
+	seedRoom(t, mgr, 100, 9, 9, g1_protocol.RoomStage_MIDDLE, 9999999999) // 唯一的房已满
+
+	var gotStage, gotCoin int32
+	var calls int32
+	mgr.SetCreateRoomFn(func(gameId g1_protocol.GameTypeId, stage, coinType int32) (*g1_protocol.RoomBaseInfo, error) {
+		atomic.AddInt32(&calls, 1)
+		gotStage, gotCoin = stage, coinType
+		return &g1_protocol.RoomBaseInfo{
+			RoomId:    9100,
+			GameId:    gameId,
+			Stage:     g1_protocol.RoomStage(stage),
+			CoinType:  g1_protocol.CoinType(coinType),
+			MaxPlayer: 9,
+			EndTime:   9999999999,
+		}, nil
+	})
+
+	rsp := mgr.QuickStart(&g1_protocol.QuickStartReq{
+		Stage: g1_protocol.RoomStage_MIDDLE, CoinType: g1_protocol.CoinType_COIN_GOLD, GameId: 1,
+	})
+	if rsp.Ret.Code != g1_protocol.ErrorCode_ERR_OK {
+		t.Fatalf("quick start failed: %v", rsp.Ret.Code)
+	}
+	if n := atomic.LoadInt32(&calls); n != 1 {
+		t.Fatalf("应调用建房工厂 1 次，实际 %d 次", n)
+	}
+	if gotStage != int32(g1_protocol.RoomStage_MIDDLE) || gotCoin != int32(g1_protocol.CoinType_COIN_GOLD) {
+		t.Fatalf("F02 回归：工厂收到互换参数 stage=%d coin=%d，期望 stage=%d coin=%d",
+			gotStage, gotCoin, g1_protocol.RoomStage_MIDDLE, g1_protocol.CoinType_COIN_GOLD)
+	}
+	if info := roomOf(t, mgr, g1_protocol.RoomStage_MIDDLE, rsp.RoomInfo.RoomId); info == nil ||
+		info.Base.Stage != g1_protocol.RoomStage_MIDDLE || info.Base.CoinType != g1_protocol.CoinType_COIN_GOLD {
+		t.Fatalf("登记房应与请求同 stage/coin，实际 %+v", info)
+	}
+}
+
 // TestQuickStartStageAllRejected Stage_ALL 是列表聚合值，快速开始应拒绝。
 func TestQuickStartStageAllRejected(t *testing.T) {
 	mgr, _ := newTestMgr(1)
