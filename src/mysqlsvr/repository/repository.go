@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Iori372552686/GoOne/lib/db/shard"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -21,19 +22,35 @@ type DBProvider interface {
 type Store interface {
 	UpdateRole(context.Context, uint64, string) error
 	SearchRole(context.Context, string) (uint64, error)
-	QueryRoom(context.Context, *g1_protocol.QueryRoomInfoReq) ([]*g1_protocol.MysqlTexasRoomInfo, error)
-	QueryPlayer(context.Context, *g1_protocol.QueryPlayerInfoReq) ([]*g1_protocol.MysqlTexasPlayerInfo, error)
-	GetGame(context.Context, string) (*g1_protocol.MysqlTexasGameInfo, error)
-	SaveRoom(context.Context, *g1_protocol.MysqlTexasRoomInfo) error
-	SaveGame(context.Context, *g1_protocol.MysqlTexasGameInfo) error
-	InsertPlayer(context.Context, *g1_protocol.MysqlTexasPlayerInfo) error
+	UpsertRoleData(context.Context, uint64, []byte, int64) error
+	LoadRoleData(context.Context, uint64) (*g1_protocol.MysqlRoleData, error)
 }
 
 type Repository struct {
-	db DBProvider
+	db       DBProvider
+	roleRule *shard.Rule
 }
 
-func New(db DBProvider) *Repository { return &Repository{db: db} }
+// roleDataTableBase role_data 逻辑表名（TableShards<=1 时即物理表名）。
+const roleDataTableBase = "role_data"
+
+func New(db DBProvider) *Repository {
+	return NewWithShard(db, &shard.Rule{Name: "role_data", TableBase: roleDataTableBase})
+}
+
+// NewWithShard 构造带分表规则的仓储。rule 通常来自 mysqlsvr.capacity.role_table_shards。
+func NewWithShard(db DBProvider, roleRule *shard.Rule) *Repository {
+	return &Repository{db: db, roleRule: roleRule}
+}
+
+// roleDataTable 解析 uid 对应的物理表名与 ORM 实例名。
+func (r *Repository) roleDataTable(uid uint64) (string, string, error) {
+	target, err := r.roleRule.Resolve(shard.RouteParams{Uid: uid})
+	if err != nil {
+		return "", "", fmt.Errorf("resolve role_data route: %w", err)
+	}
+	return target.Table, target.Instance, nil
+}
 
 func (r *Repository) UpdateRole(ctx context.Context, uid uint64, name string) error {
 	return r.db.Transaction(ctx, "default", func(tx *gorm.DB) error {
@@ -64,130 +81,73 @@ func (r *Repository) SearchRole(ctx context.Context, name string) (uint64, error
 	return row.Uid, err
 }
 
-func (r *Repository) QueryRoom(ctx context.Context, req *g1_protocol.QueryRoomInfoReq) ([]*g1_protocol.MysqlTexasRoomInfo, error) {
-	db, err := r.db.GetDB()
-	if err != nil {
-		return nil, err
+// UpsertRoleData 保存角色全量快照（L3 持久层）。
+// data 为 RoleInfo 整包序列化（ConnSvrInfo 由调用方清空），update_time 必须是
+// 服务器时钟 ms——不得使用带时区偏移的 Role.Now()，否则跨时区玩家会误判新旧。
+//
+// 陈旧写守卫：旧行 update_time 严格大于新值时拒绝（相等放行，允许同 ms 重写）。
+// 异步写回天然可能乱序，此守卫是兜底而非常态。
+func (r *Repository) UpsertRoleData(ctx context.Context, uid uint64, data []byte, updateTime int64) error {
+	if uid == 0 {
+		return errors.New("role data uid is required")
 	}
-	query := db.WithContext(ctx).Clauses(dbresolver.Read).Where("room_id = ?", req.GetRoomId())
-	if req.GetTableId() > 0 {
-		query = query.Where("table_id = ?", req.GetTableId())
+	if len(data) == 0 {
+		return errors.New("role data payload is empty")
 	}
-	if req.GetGameType() > 0 {
-		query = query.Where("game_type = ?", req.GetGameType())
-	}
-	if req.GetRoomStage() > 0 {
-		query = query.Where("room_stage = ?", req.GetRoomStage())
-	}
-	if req.GetBlind() != "" {
-		query = query.Where("blind = ?", req.GetBlind())
-	}
-	if req.GetBeginTime() > 0 {
-		query = query.Where("create_time >= ?", req.GetBeginTime())
-	}
-	if req.GetEndTime() > 0 {
-		query = query.Where("finish_time <= ?", req.GetEndTime())
-	}
-	items := make([]*g1_protocol.MysqlTexasRoomInfo, 0)
-	return items, query.Find(&items).Error
-}
-
-func (r *Repository) QueryPlayer(ctx context.Context, req *g1_protocol.QueryPlayerInfoReq) ([]*g1_protocol.MysqlTexasPlayerInfo, error) {
-	db, err := r.db.GetDB()
-	if err != nil {
-		return nil, err
-	}
-	query := db.WithContext(ctx).Clauses(dbresolver.Read).Where("uid = ?", req.GetUid())
-	if req.GetTableId() > 0 {
-		query = query.Where("table_id = ?", req.GetTableId())
-	}
-	if req.GetRoomId() > 0 {
-		query = query.Where("room_id = ?", req.GetRoomId())
-	}
-	if req.GetGameType() > 0 {
-		query = query.Where("game_type = ?", req.GetGameType())
-	}
-	if req.GetRoomStage() > 0 {
-		query = query.Where("room_stage = ?", req.GetRoomStage())
-	}
-	if req.GetBlind() != "" {
-		query = query.Where("blind = ?", req.GetBlind())
-	}
-	if req.GetBeginTime() > 0 {
-		query = query.Where("begin_time >= ?", req.GetBeginTime())
-	}
-	if req.GetEndTime() > 0 {
-		query = query.Where("end_time <= ?", req.GetEndTime())
-	}
-	items := make([]*g1_protocol.MysqlTexasPlayerInfo, 0)
-	return items, query.Find(&items).Error
-}
-
-func (r *Repository) GetGame(ctx context.Context, gameID string) (*g1_protocol.MysqlTexasGameInfo, error) {
-	db, err := r.db.GetDB()
-	if err != nil {
-		return nil, err
-	}
-	item := new(g1_protocol.MysqlTexasGameInfo)
-	err = db.WithContext(ctx).Clauses(dbresolver.Read).Where("game_id = ?", gameID).First(item).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	return item, err
-}
-
-func (r *Repository) SaveRoom(ctx context.Context, item *g1_protocol.MysqlTexasRoomInfo) error {
-	if item == nil {
-		return errors.New("room info is nil")
-	}
-	return r.db.Transaction(ctx, "default", func(tx *gorm.DB) error {
-		writeDB := tx.Clauses(dbresolver.Write)
-		old := new(g1_protocol.MysqlTexasRoomInfo)
-		err := writeDB.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("room_id = ? AND table_id = ?", item.RoomId, item.TableId).First(old).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return writeDB.Create(item).Error
-		}
-		if err != nil {
-			return err
-		}
-		if old.UpdateTime > item.UpdateTime {
-			return fmt.Errorf("%w: room_id=%d table_id=%d old=%d new=%d", ErrStaleUpdate, item.RoomId, item.TableId, old.UpdateTime, item.UpdateTime)
-		}
-		return writeDB.Model(old).Where("id = ?", old.Id).Select("*").Omit("id").Updates(item).Error
-	})
-}
-
-func (r *Repository) SaveGame(ctx context.Context, item *g1_protocol.MysqlTexasGameInfo) error {
-	if item == nil {
-		return errors.New("game info is nil")
-	}
-	return r.db.Transaction(ctx, "default", func(tx *gorm.DB) error {
-		writeDB := tx.Clauses(dbresolver.Write)
-		old := new(g1_protocol.MysqlTexasGameInfo)
-		err := writeDB.Clauses(clause.Locking{Strength: "UPDATE"}).Where("game_id = ?", item.GameId).First(old).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return writeDB.Create(item).Error
-		}
-		if err != nil {
-			return err
-		}
-		if old.UpdateTime > item.UpdateTime {
-			return fmt.Errorf("%w: game_id=%s old=%d new=%d", ErrStaleUpdate, item.GameId, old.UpdateTime, item.UpdateTime)
-		}
-		return writeDB.Model(old).Where("game_id = ?", old.GameId).Select("*").Omit("game_id").Updates(item).Error
-	})
-}
-
-func (r *Repository) InsertPlayer(ctx context.Context, item *g1_protocol.MysqlTexasPlayerInfo) error {
-	if item == nil {
-		return errors.New("player info is nil")
-	}
-	db, err := r.db.GetDB()
+	table, instance, err := r.roleDataTable(uid)
 	if err != nil {
 		return err
 	}
-	return db.WithContext(ctx).Clauses(dbresolver.Write).Create(item).Error
+	return r.db.Transaction(ctx, instance, func(tx *gorm.DB) error {
+		// 注意：gorm 链式方法会累积进同一 statement（clone==0 时原地修改），
+		// Take 的 WHERE/LIMIT 会泄漏进后续 UPDATE。每条语句必须经
+		// Session(NewDB) 取干净实例。
+		take := tx.Session(&gorm.Session{NewDB: true}).Clauses(dbresolver.Write)
+		old := new(g1_protocol.MysqlRoleData)
+		err := take.Table(table).Clauses(clause.Locking{Strength: "UPDATE"}).Where("uid = ?", uid).Take(old).Error
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			insert := tx.Session(&gorm.Session{NewDB: true}).Clauses(dbresolver.Write)
+			return insert.Table(table).Create(&g1_protocol.MysqlRoleData{Uid: uid, Data: data, UpdateTime: updateTime}).Error
+		case err != nil:
+			return err
+		default:
+			if old.UpdateTime > updateTime {
+				return fmt.Errorf("%w: role_data uid=%d old=%d new=%d", ErrStaleUpdate, uid, old.UpdateTime, updateTime)
+			}
+			update := tx.Session(&gorm.Session{NewDB: true}).Clauses(dbresolver.Write)
+			return update.Table(table).Where("uid = ?", uid).
+				Updates(map[string]interface{}{"data": data, "update_time": updateTime}).Error
+		}
+	})
+}
+
+// LoadRoleData 按 uid 读取角色全量快照；不存在返回 (nil, nil)。
+//
+// 刻意走主库（dbresolver.Write）而非读从库：L2 miss 后的回源读若命中滞后副本，
+// 会用旧快照重建角色造成数据回退——正确性优先于读分担。此表读频率仅为冷登录，
+// 主库压力可忽略。
+func (r *Repository) LoadRoleData(ctx context.Context, uid uint64) (*g1_protocol.MysqlRoleData, error) {
+	if uid == 0 {
+		return nil, errors.New("role data uid is required")
+	}
+	table, instance, err := r.roleDataTable(uid)
+	if err != nil {
+		return nil, err
+	}
+	db, err := r.db.GetDB(instance)
+	if err != nil {
+		return nil, err
+	}
+	item := new(g1_protocol.MysqlRoleData)
+	err = db.WithContext(ctx).Clauses(dbresolver.Write).Table(table).Where("uid = ?", uid).Take(item).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return item, nil
 }
 
 var _ Store = (*Repository)(nil)

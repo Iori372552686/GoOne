@@ -7,10 +7,10 @@ package gamedata
 // 命名约定：字段名 T{N}, T{N-1}, ..., T{1}（高位在前），与 cfgtool 生成代码中
 // 的命名字段初始化（KeyStructInit）对应：List[0] -> T{N}, List[1] -> T{N-1}, ...
 //
-// 用法（以 2 维复合键 RoomStage+CoinType 为例）：
+// 用法（以 2 维复合键为例）：
 //
-//	map[gamedata.Index2[int32, int32]]*TexasConfig
-//	key := gamedata.Index2[int32, int32]{T2: roomStage, T1: coinType}
+//	map[gamedata.Index2[int32, int32]]*SomeConfig
+//	key := gamedata.Index2[int32, int32]{T2: fieldA, T1: fieldB}
 
 // Index2 是 2 字段复合键，可作为 map key（所有字段可比较即可）。
 type Index2[T2, T1 any] struct {

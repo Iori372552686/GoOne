@@ -56,9 +56,11 @@ func (m *RoleMgr) Tick(ctx context.Context) {
 	m.removeExpiredRoles(ctx)
 }
 
-// FlushAllToDB 同步落盘内存中的全部角色数据。
+// FlushAllToDB 同步落盘内存中的全部角色数据（L2 全量 + L3 尽力投递）。
 // 用于优雅停机：必须在 TransactionMgr 排空之后调用，保证没有 handler 并发修改角色。
 // ctx 透传至 Redis 调用，遵守 Drain 的取消与时间预算（F07）。
+// L3 为 one-way 尽力投递：部署顺序上先停 mainsvr 再停 mysqlsvr，由 mysqlsvr
+// 的 Drain 排空消费；残余投递失败计入 failed（L2 已持久，重启后自愈补齐）。
 func (m *RoleMgr) FlushAllToDB(ctx context.Context) (saved int, failed int) {
 	m.mapUidToRole.Range(func(key, value interface{}) bool {
 		role, ok := value.(*Role)
@@ -66,6 +68,8 @@ func (m *RoleMgr) FlushAllToDB(ctx context.Context) (saved int, failed int) {
 			return true
 		}
 		if err := role.SaveHashSync(ctx); err != nil {
+			failed++
+		} else if err := role.MaybeFlushL3(true); err != nil {
 			failed++
 		} else {
 			saved++
@@ -83,8 +87,12 @@ func (m *RoleMgr) setRole(uid uint64, role *Role) {
 	m.mapUidToRole.Store(uid, role)
 }
 
-// loadRole 从 Redis hash 读回角色（报告 7.7：结果在前、error 在后的 Go 惯例；
+// loadRole 读穿加载角色（报告 7.7：结果在前、error 在后的 Go 惯例；
 // 旧签名为 (error, *Role) 顺序相反）。
+// L2（Redis hash）miss 时经 L3（mysqlsvr role_data）回源并回填 L2——这是
+// TTL 过期与 Redis 丢 key 后的数据安全网；L3 也 miss 才视为新角色。
+// L3 回源失败（mysqlsvr 不可用）直接报错拒绝加载：宁可不登录，不能拿
+// 空数据当新角色把存量覆盖掉。
 func loadRole(uid uint64, trans cmd_handler.IContext) (*Role, error) {
 	if uid != trans.Uid() {
 		logger.Errorf("inconsistent uid {uid:%v, transUid:%v}", uid, trans.Uid())
@@ -92,13 +100,13 @@ func loadRole(uid uint64, trans cmd_handler.IContext) (*Role, error) {
 	}
 
 	key := fmt.Sprintf("%s:%d", g1_protocol.DBType_DB_TYPE_ROLE.String(), uid)
-	info, err := loadRoleHash(uid)
+	info, found, err := roleStore.Load(context.Background(), trans, uid)
 	if err != nil {
-		logger.Errorf("get redis error {err:%v, uid:%v}", err, uid)
+		logger.Errorf("load role from storage failed {err:%v, uid:%v}", err, uid)
 		return nil, err
 	}
-	if info == nil {
-		logger.Debugf("get role redis nil {key=%v}", key)
+	if !found {
+		logger.Debugf("role not found in storage, creating new {key=%v}", key)
 		return nil, nil
 	}
 
@@ -106,6 +114,10 @@ func loadRole(uid uint64, trans cmd_handler.IContext) (*Role, error) {
 	role.PbRole = info
 	// 这里主要是老的数据添加新增的数据段，不然新数据段就是nil
 	role.RoleInitField(info.RegisterInfo.Uid)
+	// L2 命中意味着 L3 可能滞后（写回是异步防抖）：置待写标记，
+	// 由在线期间的防抖循环自愈补齐；L3 回源命中的数据是新鲜的。
+	role.needL3Flush = true
+	role.lastL3FlushAt = role.Now()
 	return &role, nil
 }
 
@@ -142,6 +154,11 @@ func (m *RoleMgr) obtainRole(uid uint64, trans cmd_handler.IContext, createIfNot
 	if createHere {
 		role.SaveHash(trans)
 		role.SaveToMysql(trans)
+		// 新角色立即落 L3 快照（force）：崩溃时 L2 若同时丢失，L3 兜底可恢复。
+		// 投递失败仅记日志——L2 已写，needL3Flush 标记保留重试。
+		if err := role.MaybeFlushL3(true); err != nil {
+			role.Errorf("role l3 initial flush failed, retained for retry | %v", err)
+		}
 	}
 
 	return role

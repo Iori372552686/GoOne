@@ -19,7 +19,7 @@ Prefer code over README or older docs when they disagree.
 ## Service Conventions
 - `connsvr` is the TCP/WebSocket gateway and owns client-facing listeners.
 - `mainsvr` holds player-facing business logic and commonly loads role state through `globals.RoleMgr`.
-- `roomcentersvr` owns room lifecycle and room tick work.
+- `roomcentersvr` is currently a minimal bus-service skeleton (old-poker room directory business removed 2026-09-27); the new game's room system lands here.
 - `mysqlsvr` is persistence-oriented and depends on ORM instances from config.
 - `infosvr` is a lighter cache/profile service.
 - `web_svr` mounts HTTP routes from `src/web_svr/controller` and may expose gRPC as well.
@@ -40,7 +40,7 @@ Prefer code over README or older docs when they disagree.
 - Treat legacy `globals.TransMgr.RegisterCmd(...)` or `cmd_handler/register.go` as compatibility paths for older code, not the default for new work.
 - When a handler needs domain state, reuse existing managers such as `globals.RoleMgr` or room managers instead of re-implementing load paths.
 - Routing behavior depends on `BusId`, `module/misc.ServerRouteRules`, and `lib/service/svrinstmgr`; avoid ad-hoc routing logic.
-- All bus services use sharded transaction processing via `bussvc.TransMgrComponent` (responses route by `DstTransID`, requests shard by RouterID/Uid serial key). Shard count is not externally tunable — it always defaults to `transaction.DefaultShardCount()` (it only partitions dispatch queues/transID space; handlers run one goroutine per transaction). Same-key queue backpressure defaults to `transaction.DefaultMaxPendingPerKey` (100); `roomcentersvr` explicitly overrides it to 200. Handlers must stay key-local; never rely on global single-thread ordering.
+- All bus services use sharded transaction processing via `bussvc.TransMgrComponent` (responses route by `DstTransID`, requests shard by RouterID/Uid serial key). Shard count is not externally tunable — it always defaults to `transaction.DefaultShardCount()` (it only partitions dispatch queues/transID space; handlers run one goroutine per transaction). Same-key queue backpressure defaults to `transaction.DefaultMaxPendingPerKey` (100). Handlers must stay key-local; never rely on global single-thread ordering.
 
 ## Generated Code Boundaries
 - Do not hand-edit `api/gen/**`.

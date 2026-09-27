@@ -14,7 +14,6 @@ import (
 //   - c2s_gm.go         GM 查询 / 设置 / 发道具
 //   - c2s_inventory.go  背包道具
 //   - c2s_mall.go       商城购买
-//   - c2s_room.go       房间与对局转发
 type MainC2SServiceImpl struct {
 	// roles 是玩家会话用例（加载 / 登出 / 过期淘汰）。经构造注入替代 handler
 	// 内的包级 globals 访问（报告 §7.1 试点）：同进程可构造多个互不污染的服务

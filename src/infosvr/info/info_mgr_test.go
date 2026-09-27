@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/db/redis"
+	"github.com/Iori372552686/GoOne/module/conf"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 	"github.com/golang/protobuf/proto"
 	goredis "github.com/redis/go-redis/v9"
@@ -20,6 +21,7 @@ type stubRedisClient struct {
 	mgetVals map[string][]byte
 	setErr   error
 	setCalls int
+	setTTLs  []time.Duration
 }
 
 func (c *stubRedisClient) MGet(ctx context.Context, keys ...string) *goredis.SliceCmd {
@@ -40,9 +42,10 @@ func (c *stubRedisClient) MGet(ctx context.Context, keys ...string) *goredis.Sli
 	return cmd
 }
 
-func (c *stubRedisClient) Set(ctx context.Context, key string, _ interface{}, _ time.Duration) *goredis.StatusCmd {
+func (c *stubRedisClient) Set(ctx context.Context, key string, _ interface{}, ttl time.Duration) *goredis.StatusCmd {
 	cmd := goredis.NewStatusCmd(ctx)
 	c.setCalls++
+	c.setTTLs = append(c.setTTLs, ttl)
 	if c.setErr != nil {
 		cmd.SetErr(c.setErr)
 		return cmd
@@ -150,5 +153,34 @@ func TestSetInfoPersistsBeforeCaching(t *testing.T) {
 	res, ret := mgr.GetInfo(context.Background(), &[]uint64{5004})
 	if ret != 0 || len(*res) != 1 || (*res)[0].Uid != 5004 {
 		t.Fatalf("成功写入后应命中缓存: ret=%d res=%v", ret, res)
+	}
+}
+
+// 简报缓存 TTL：未配置（0）时保持现状永不过期；配置后写库携带 TTL。
+func TestSetInfoBriefTTLDefaultZeroWithoutConf(t *testing.T) {
+	stub := &stubRedisClient{}
+	mgr := newTestMgr(stub)
+	ret := mgr.SetInfo(context.Background(), 1, &g1_protocol.PbRoleBriefInfo{Uid: 1})
+	if ret != 0 {
+		t.Fatalf("SetInfo ret = %d", ret)
+	}
+	if len(stub.setTTLs) != 1 || stub.setTTLs[0] != 0 {
+		t.Fatalf("未配置时 TTL 应为 0（永不过期），got %v", stub.setTTLs)
+	}
+}
+
+func TestSetInfoBriefTTLObeysConfig(t *testing.T) {
+	if err := conf.LoadBytes([]byte("infosvr:\n  capacity:\n    brief_cache_ttl_days: 7\n"), ".yaml"); err != nil {
+		t.Fatalf("load conf: %v", err)
+	}
+	stub := &stubRedisClient{}
+	mgr := newTestMgr(stub)
+	ret := mgr.SetInfo(context.Background(), 1, &g1_protocol.PbRoleBriefInfo{Uid: 1})
+	if ret != 0 {
+		t.Fatalf("SetInfo ret = %d", ret)
+	}
+	want := 7 * 24 * time.Hour
+	if len(stub.setTTLs) != 1 || stub.setTTLs[0] != want {
+		t.Fatalf("配置 7 天时 TTL = %v, want %v", stub.setTTLs, want)
 	}
 }

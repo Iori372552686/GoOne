@@ -29,7 +29,7 @@ var arrayDelimiters = []string{"|", ";", "^"}
 
 // mapFieldDelim 是 map 元素之间的分隔符。
 // 取 ';'（高于结构体成员 ',' 与 repeated 内部 '|'），保证 value 是含 repeated 字段的
-// 结构体时（如 pb.TexasGameEndInfo 的 hands/bests 用 '|'）不与元素分隔冲突。
+// 结构体时（如含 repeated 字段的结构体）不与元素分隔冲突。
 const mapFieldDelim = ";"
 
 func GenData() error {

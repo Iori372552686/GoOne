@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	g1_protocol "github.com/Iori372552686/g1_common/protocol"
+	"github.com/Iori372552686/GoOne/lib/db/shard"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
@@ -38,56 +38,122 @@ func newRepositoryTestDB(t *testing.T) (*Repository, sqlmock.Sqlmock, *sql.DB) {
 	return New(testDBProvider{db: db}), mock, pool
 }
 
-func TestSaveRoomRejectsStaleUpdate(t *testing.T) {
+func TestUpsertRoleDataInsertsWhenMissing(t *testing.T) {
 	repo, mock, pool := newRepositoryTestDB(t)
 	defer pool.Close()
 	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `mysql_texas_room_info` WHERE room_id = ? AND table_id = ? ORDER BY `mysql_texas_room_info`.`id` LIMIT ? FOR UPDATE")).
-		WithArgs(uint64(10), uint64(20), 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "room_id", "table_id", "update_time"}).AddRow(1, 10, 20, 200))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `role_data` WHERE uid = ? LIMIT ? FOR UPDATE")).
+		WithArgs(uint64(7), 1).
+		WillReturnRows(sqlmock.NewRows([]string{"uid"}))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO `role_data` (`data`,`update_time`,`uid`) VALUES (?,?,?)")).
+		WithArgs([]byte("snapshot"), int64(1000), uint64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	if err := repo.UpsertRoleData(context.Background(), 7, []byte("snapshot"), 1000); err != nil {
+		t.Fatalf("UpsertRoleData() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUpsertRoleDataRejectsStaleUpdate(t *testing.T) {
+	repo, mock, pool := newRepositoryTestDB(t)
+	defer pool.Close()
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `role_data` WHERE uid = ? LIMIT ? FOR UPDATE")).
+		WithArgs(uint64(7), 1).
+		WillReturnRows(sqlmock.NewRows([]string{"uid", "data", "update_time"}).AddRow(7, []byte("newer"), 2000))
 	mock.ExpectRollback()
 
-	err := repo.SaveRoom(context.Background(), &g1_protocol.MysqlTexasRoomInfo{
-		RoomId: 10, TableId: 20, UpdateTime: 100,
-	})
+	err := repo.UpsertRoleData(context.Background(), 7, []byte("older"), 1000)
 	if !errors.Is(err, ErrStaleUpdate) {
-		t.Fatalf("SaveRoom() error = %v, want ErrStaleUpdate", err)
+		t.Fatalf("UpsertRoleData() error = %v, want ErrStaleUpdate", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestQueryRoomAppliesOptionalFilters(t *testing.T) {
+func TestUpsertRoleDataAllowsEqualTimestamp(t *testing.T) {
+	// 相同 update_time 放行（同 ms 重写幂等）：只有严格更旧才拒绝。
 	repo, mock, pool := newRepositoryTestDB(t)
 	defer pool.Close()
-	mock.ExpectQuery("SELECT .* FROM `mysql_texas_room_info` WHERE room_id = \\? AND table_id = \\? AND game_type = \\? AND create_time >= \\? AND finish_time <= \\?").
-		WithArgs(uint64(10), uint64(20), g1_protocol.GameTypeId(1), int64(100), int64(200)).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `role_data` WHERE uid = ? LIMIT ? FOR UPDATE")).
+		WithArgs(uint64(7), 1).
+		WillReturnRows(sqlmock.NewRows([]string{"uid", "data", "update_time"}).AddRow(7, []byte("same"), 1000))
+	mock.ExpectExec("UPDATE `role_data` SET `data`=\\?,`update_time`=\\? WHERE uid = \\?").
+		WithArgs([]byte("same2"), int64(1000), uint64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
-	_, err := repo.QueryRoom(context.Background(), &g1_protocol.QueryRoomInfoReq{
-		RoomId: 10, TableId: 20, GameType: 1, BeginTime: 100, EndTime: 200,
-	})
-	if err != nil {
-		t.Fatalf("QueryRoom() error = %v", err)
+	if err := repo.UpsertRoleData(context.Background(), 7, []byte("same2"), 1000); err != nil {
+		t.Fatalf("UpsertRoleData() error = %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestGetGameMapsRecordNotFoundToNil(t *testing.T) {
+func TestUpsertRoleDataValidatesArgs(t *testing.T) {
+	repo, _, pool := newRepositoryTestDB(t)
+	defer pool.Close()
+	if err := repo.UpsertRoleData(context.Background(), 0, []byte("x"), 1); err == nil {
+		t.Error("uid=0 should be rejected")
+	}
+	if err := repo.UpsertRoleData(context.Background(), 7, nil, 1); err == nil {
+		t.Error("empty payload should be rejected")
+	}
+}
+
+func TestLoadRoleDataMapsNotFoundToNil(t *testing.T) {
 	repo, mock, pool := newRepositoryTestDB(t)
 	defer pool.Close()
-	mock.ExpectQuery("SELECT .* FROM `mysql_texas_game_info` WHERE game_id = \\? ORDER BY `mysql_texas_game_info`.`game_id` LIMIT \\?").
-		WithArgs("missing", 1).
-		WillReturnRows(sqlmock.NewRows([]string{"game_id"}))
+	mock.ExpectQuery("SELECT .* FROM `role_data` WHERE uid = \\? LIMIT \\?").
+		WithArgs(uint64(9), 1).
+		WillReturnRows(sqlmock.NewRows([]string{"uid"}))
 
-	item, err := repo.GetGame(context.Background(), "missing")
+	item, err := repo.LoadRoleData(context.Background(), 9)
 	if err != nil {
-		t.Fatalf("GetGame() error = %v", err)
+		t.Fatalf("LoadRoleData() error = %v", err)
 	}
 	if item != nil {
-		t.Fatalf("GetGame() = %#v, want nil", item)
+		t.Fatalf("LoadRoleData() = %#v, want nil", item)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLoadRoleDataReturnsRow(t *testing.T) {
+	repo, mock, pool := newRepositoryTestDB(t)
+	defer pool.Close()
+	mock.ExpectQuery("SELECT .* FROM `role_data` WHERE uid = \\? LIMIT \\?").
+		WithArgs(uint64(9), 1).
+		WillReturnRows(sqlmock.NewRows([]string{"uid", "data", "update_time"}).AddRow(9, []byte("blob"), int64(42)))
+
+	item, err := repo.LoadRoleData(context.Background(), 9)
+	if err != nil {
+		t.Fatalf("LoadRoleData() error = %v", err)
+	}
+	if item == nil || string(item.Data) != "blob" || item.UpdateTime != 42 {
+		t.Fatalf("LoadRoleData() = %#v, want uid=9 data=blob ts=42", item)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRoleDataShardedTableRouting(t *testing.T) {
+	// TableShards>1 时表名必须带后缀且同一 uid 稳定（公式契约见 lib/db/shard）。
+	repo := NewWithShard(testDBProvider{}, &shard.Rule{Name: "role_data", TableBase: "role_data", TableShards: 16})
+	table, _, err := repo.roleDataTable(9527)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if table != "role_data_1" {
+		t.Fatalf("roleDataTable(9527) = %q, want role_data_1", table)
 	}
 }

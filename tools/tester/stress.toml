@@ -84,20 +84,10 @@ think_time_ms = 200
 enabled = true
 weight = 3
 
-[modules.room]
-# 房间压测：每轮快速开始→离开房间
-enabled = true
-weight = 1
-
 [modules.inventory]
 # 背包压测：GM 加道具 + 查背包，覆盖角色 Redis 读写高频路径
 enabled = true
 weight = 1
-
-[modules.archreg]
-# 架构迭代路径压测：每轮心跳 + 快开/离房（覆盖今日改动路径）
-enabled = true
-weight = 2
 
 [collect]
 # 控制台/统计采样间隔，如 "5s", "10s"

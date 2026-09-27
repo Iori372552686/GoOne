@@ -25,7 +25,7 @@ var defaultAdminPortByServerType = map[int]int{
 }
 
 // module/misc 命名常量的本地别名，避免 conf 包为校验而引入整个 misc 包
-//（misc 含路由规则等大量无关符号）。保持数值与 misc.ServerType_* 一致。
+// （misc 含路由规则等大量无关符号）。保持数值与 misc.ServerType_* 一致。
 const (
 	serverTypeConn       = 1
 	serverTypeMain       = 2
@@ -213,6 +213,12 @@ func validateMain() error {
 	if err := mustNonNegative("mainsvr", "mainsvr.capacity.role_persist_debounce_sec"); err != nil {
 		return err
 	}
+	if err := mustNonNegative("mainsvr", "mainsvr.capacity.role_cache_ttl_days"); err != nil {
+		return err
+	}
+	if err := mustNonNegative("mainsvr", "mainsvr.capacity.role_l3_flush_debounce_sec"); err != nil {
+		return err
+	}
 	if err := mustNonEmptyList("mainsvr", "base_cfg.dependencies.db_instances"); err != nil {
 		return err
 	}
@@ -220,11 +226,17 @@ func validateMain() error {
 }
 
 func validateInfo() error {
-	return mustNonEmptyList("infosvr", "base_cfg.dependencies.db_instances")
+	if err := mustNonEmptyList("infosvr", "base_cfg.dependencies.db_instances"); err != nil {
+		return err
+	}
+	return mustNonNegative("infosvr", "infosvr.capacity.brief_cache_ttl_days")
 }
 
 func validateMysql() error {
-	return mustNonEmptyList("mysqlsvr", "base_cfg.dependencies.orm_instances")
+	if err := mustNonEmptyList("mysqlsvr", "base_cfg.dependencies.orm_instances"); err != nil {
+		return err
+	}
+	return mustNonNegative("mysqlsvr", "mysqlsvr.capacity.role_table_shards")
 }
 
 func validateWeb() error {

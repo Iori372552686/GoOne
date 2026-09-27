@@ -64,8 +64,10 @@ func roleRedisInstance() uint32 {
 // ctx 透传至底层 Redis 调用（F07）：调用方决定取消与预算语义。
 //
 // 提交方式：先把目标模块全部 proto.Marshal 完成（任何序列化错误发生在写之前），
-// 再经一条多字段 HSET（HSetFields）提交——Redis 单命令原子，不再存在
-// "余额已写、背包未写"的中间态；失败保留 dirty mask 供重试。
+// 再经一条多字段 HSET（HSetFieldsExpire）提交——TTL 配置后 HSET 与 EXPIRE 经
+// TxPipeline 一并生效，任一失败整批不提交（F05 语义的近似等价）；失败保留
+// dirty mask 供重试。L2 成功即视为数据已过持久点，同时置 needL3Flush 供
+// L3 快照防抖写回（见 store.go / sync_state.go）。
 func saveRoleHash(ctx context.Context, r *Role, force bool) error {
 	instID := roleRedisInstance()
 	key := roleHashKey(r.Uid())
@@ -104,10 +106,13 @@ func saveRoleHash(ctx context.Context, r *Role, force bool) error {
 		}
 	}
 
-	if err := rds.RedisMgr.HSetFields(ctx, instID, key, fields); err != nil {
+	if err := rds.RedisMgr.HSetFieldsExpire(ctx, instID, key, fields, roleCacheTTL()); err != nil {
 		logger.Errorf("role hash HSET fields error {uid:%v, fields:%d} | %v", r.Uid(), len(fields), err)
 		return fmt.Errorf("role hash HSET fields error {uid:%v}: %w", r.Uid(), err)
 	}
+
+	// L2 已持久：标记 L3 待写回（MaybeFlushL3 按防抖消费此标记）。
+	r.needL3Flush = true
 
 	r.Debugf("role hash save done {uid:%v, fields:%d, force:%v}", r.Uid(), len(fields), force)
 	return nil

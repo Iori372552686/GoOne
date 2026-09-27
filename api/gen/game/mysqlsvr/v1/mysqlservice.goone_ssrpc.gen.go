@@ -7,7 +7,6 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	"time"
 )
 
@@ -15,10 +14,8 @@ import (
 type MysqlServiceSS interface {
 	UpdateRoleInfo(ctx *ssrpc.Context, req *g1_protocol.MysqlInnerUpdateRoleInfoReq) (*g1_protocol.MysqlInnerUpdateRoleInfoRsp, error)
 	SearchRole(ctx *ssrpc.Context, req *g1_protocol.MysqlInnerSearchRoleReq) (*g1_protocol.MysqlInnerSearchRoleRsp, error)
-	Update(ctx *ssrpc.Context, req *g1_protocol.MysqlInnerUpdateReq) (*emptypb.Empty, error)
-	QueryRoomInfo(ctx *ssrpc.Context, req *g1_protocol.QueryRoomInfoReq) (*g1_protocol.QueryRoomInfoRsp, error)
-	QueryPlayerInfo(ctx *ssrpc.Context, req *g1_protocol.QueryPlayerInfoReq) (*g1_protocol.QueryPlayerInfoRsp, error)
-	QueryGameInfo(ctx *ssrpc.Context, req *g1_protocol.QueryGameInfoReq) (*g1_protocol.QueryGameInfoRsp, error)
+	SaveRoleData(ctx *ssrpc.Context, req *g1_protocol.MysqlInnerSaveRoleDataReq) (*g1_protocol.MysqlInnerSaveRoleDataRsp, error)
+	LoadRoleData(ctx *ssrpc.Context, req *g1_protocol.MysqlInnerLoadRoleDataReq) (*g1_protocol.MysqlInnerLoadRoleDataRsp, error)
 }
 
 // UnimplementedMysqlServiceSS can be embedded/used to have forward compatible implementations.
@@ -34,20 +31,12 @@ func (*UnimplementedMysqlServiceSS) SearchRole(ctx *ssrpc.Context, req *g1_proto
 	return nil, ssrpc.Unimplemented("MysqlService.SearchRole")
 }
 
-func (*UnimplementedMysqlServiceSS) Update(ctx *ssrpc.Context, req *g1_protocol.MysqlInnerUpdateReq) (*emptypb.Empty, error) {
-	return nil, ssrpc.Unimplemented("MysqlService.Update")
+func (*UnimplementedMysqlServiceSS) SaveRoleData(ctx *ssrpc.Context, req *g1_protocol.MysqlInnerSaveRoleDataReq) (*g1_protocol.MysqlInnerSaveRoleDataRsp, error) {
+	return nil, ssrpc.Unimplemented("MysqlService.SaveRoleData")
 }
 
-func (*UnimplementedMysqlServiceSS) QueryRoomInfo(ctx *ssrpc.Context, req *g1_protocol.QueryRoomInfoReq) (*g1_protocol.QueryRoomInfoRsp, error) {
-	return nil, ssrpc.Unimplemented("MysqlService.QueryRoomInfo")
-}
-
-func (*UnimplementedMysqlServiceSS) QueryPlayerInfo(ctx *ssrpc.Context, req *g1_protocol.QueryPlayerInfoReq) (*g1_protocol.QueryPlayerInfoRsp, error) {
-	return nil, ssrpc.Unimplemented("MysqlService.QueryPlayerInfo")
-}
-
-func (*UnimplementedMysqlServiceSS) QueryGameInfo(ctx *ssrpc.Context, req *g1_protocol.QueryGameInfoReq) (*g1_protocol.QueryGameInfoRsp, error) {
-	return nil, ssrpc.Unimplemented("MysqlService.QueryGameInfo")
+func (*UnimplementedMysqlServiceSS) LoadRoleData(ctx *ssrpc.Context, req *g1_protocol.MysqlInnerLoadRoleDataReq) (*g1_protocol.MysqlInnerLoadRoleDataRsp, error) {
+	return nil, ssrpc.Unimplemented("MysqlService.LoadRoleData")
 }
 
 // DefaultMysqlServiceSSMiddlewares returns the standard middleware chain for MysqlService.
@@ -97,56 +86,29 @@ func RegisterMysqlServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv M
 		},
 	))
 
-	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ, ssrpc.WrapUnary(
+	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd:     g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ,
-			OneWay:  true,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name:    "mysql async update",
+			Name:    "mysql save role data snapshot",
 		},
 		srv.MW,
-		func() any { return new(g1_protocol.MysqlInnerUpdateReq) },
+		func() any { return new(g1_protocol.MysqlInnerSaveRoleDataReq) },
 		func(ctx *ssrpc.Context, in any) (any, error) {
-			return srv.Impl.Update(ctx, in.(*g1_protocol.MysqlInnerUpdateReq))
+			return srv.Impl.SaveRoleData(ctx, in.(*g1_protocol.MysqlInnerSaveRoleDataReq))
 		},
 	))
 
-	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ, ssrpc.WrapUnary(
+	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_LOAD_ROLE_DATA_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_LOAD_ROLE_DATA_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name:    "mysql query room info",
+			Name:    "mysql load role data snapshot",
 		},
 		srv.MW,
-		func() any { return new(g1_protocol.QueryRoomInfoReq) },
+		func() any { return new(g1_protocol.MysqlInnerLoadRoleDataReq) },
 		func(ctx *ssrpc.Context, in any) (any, error) {
-			return srv.Impl.QueryRoomInfo(ctx, in.(*g1_protocol.QueryRoomInfoReq))
-		},
-	))
-
-	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ, ssrpc.WrapUnary(
-		ssrpc.MethodDesc{
-			Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ,
-			Timeout: 5000 * time.Millisecond,
-			Name:    "mysql query player info",
-		},
-		srv.MW,
-		func() any { return new(g1_protocol.QueryPlayerInfoReq) },
-		func(ctx *ssrpc.Context, in any) (any, error) {
-			return srv.Impl.QueryPlayerInfo(ctx, in.(*g1_protocol.QueryPlayerInfoReq))
-		},
-	))
-
-	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ, ssrpc.WrapUnary(
-		ssrpc.MethodDesc{
-			Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ,
-			Timeout: 5000 * time.Millisecond,
-			Name:    "mysql query game info",
-		},
-		srv.MW,
-		func() any { return new(g1_protocol.QueryGameInfoReq) },
-		func(ctx *ssrpc.Context, in any) (any, error) {
-			return srv.Impl.QueryGameInfo(ctx, in.(*g1_protocol.QueryGameInfoReq))
+			return srv.Impl.LoadRoleData(ctx, in.(*g1_protocol.MysqlInnerLoadRoleDataReq))
 		},
 	))
 
@@ -184,56 +146,29 @@ func RegisterMysqlServiceToDispatcher(d *ssrpc.Dispatcher, srv MysqlServiceSServ
 		},
 	))
 
-	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ, ssrpc.WrapUnary(
+	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd:     g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ,
-			OneWay:  true,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name:    "mysql async update",
+			Name:    "mysql save role data snapshot",
 		},
 		srv.MW,
-		func() any { return new(g1_protocol.MysqlInnerUpdateReq) },
+		func() any { return new(g1_protocol.MysqlInnerSaveRoleDataReq) },
 		func(ctx *ssrpc.Context, in any) (any, error) {
-			return srv.Impl.Update(ctx, in.(*g1_protocol.MysqlInnerUpdateReq))
+			return srv.Impl.SaveRoleData(ctx, in.(*g1_protocol.MysqlInnerSaveRoleDataReq))
 		},
 	))
 
-	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ, ssrpc.WrapUnary(
+	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_LOAD_ROLE_DATA_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
-			Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ,
+			Cmd:     g1_protocol.CMD_MYSQL_INNER_LOAD_ROLE_DATA_REQ,
 			Timeout: 5000 * time.Millisecond,
-			Name:    "mysql query room info",
+			Name:    "mysql load role data snapshot",
 		},
 		srv.MW,
-		func() any { return new(g1_protocol.QueryRoomInfoReq) },
+		func() any { return new(g1_protocol.MysqlInnerLoadRoleDataReq) },
 		func(ctx *ssrpc.Context, in any) (any, error) {
-			return srv.Impl.QueryRoomInfo(ctx, in.(*g1_protocol.QueryRoomInfoReq))
-		},
-	))
-
-	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ, ssrpc.WrapUnary(
-		ssrpc.MethodDesc{
-			Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ,
-			Timeout: 5000 * time.Millisecond,
-			Name:    "mysql query player info",
-		},
-		srv.MW,
-		func() any { return new(g1_protocol.QueryPlayerInfoReq) },
-		func(ctx *ssrpc.Context, in any) (any, error) {
-			return srv.Impl.QueryPlayerInfo(ctx, in.(*g1_protocol.QueryPlayerInfoReq))
-		},
-	))
-
-	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ, ssrpc.WrapUnary(
-		ssrpc.MethodDesc{
-			Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ,
-			Timeout: 5000 * time.Millisecond,
-			Name:    "mysql query game info",
-		},
-		srv.MW,
-		func() any { return new(g1_protocol.QueryGameInfoReq) },
-		func(ctx *ssrpc.Context, in any) (any, error) {
-			return srv.Impl.QueryGameInfo(ctx, in.(*g1_protocol.QueryGameInfoReq))
+			return srv.Impl.LoadRoleData(ctx, in.(*g1_protocol.MysqlInnerLoadRoleDataReq))
 		},
 	))
 
@@ -270,53 +205,28 @@ func MysqlServiceBindings(srv MysqlServiceSServer) []ssrpc.Binding {
 				return srv.Impl.SearchRole(ctx, in.(*g1_protocol.MysqlInnerSearchRoleReq))
 			},
 		)},
-		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ, CmdHandler: ssrpc.WrapUnary(
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, CmdHandler: ssrpc.WrapUnary(
 			ssrpc.MethodDesc{
-				Cmd:     g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ,
-				OneWay:  true,
+				Cmd:     g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ,
 				Timeout: 5000 * time.Millisecond,
-				Name:    "MysqlService.Update",
+				Name:    "MysqlService.SaveRoleData",
 			},
 			srv.MW,
-			func() any { return new(g1_protocol.MysqlInnerUpdateReq) },
+			func() any { return new(g1_protocol.MysqlInnerSaveRoleDataReq) },
 			func(ctx *ssrpc.Context, in any) (any, error) {
-				return srv.Impl.Update(ctx, in.(*g1_protocol.MysqlInnerUpdateReq))
+				return srv.Impl.SaveRoleData(ctx, in.(*g1_protocol.MysqlInnerSaveRoleDataReq))
 			},
 		)},
-		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
+		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_LOAD_ROLE_DATA_REQ, CmdHandler: ssrpc.WrapUnary(
 			ssrpc.MethodDesc{
-				Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ,
+				Cmd:     g1_protocol.CMD_MYSQL_INNER_LOAD_ROLE_DATA_REQ,
 				Timeout: 5000 * time.Millisecond,
-				Name:    "MysqlService.QueryRoomInfo",
+				Name:    "MysqlService.LoadRoleData",
 			},
 			srv.MW,
-			func() any { return new(g1_protocol.QueryRoomInfoReq) },
+			func() any { return new(g1_protocol.MysqlInnerLoadRoleDataReq) },
 			func(ctx *ssrpc.Context, in any) (any, error) {
-				return srv.Impl.QueryRoomInfo(ctx, in.(*g1_protocol.QueryRoomInfoReq))
-			},
-		)},
-		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
-			ssrpc.MethodDesc{
-				Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ,
-				Timeout: 5000 * time.Millisecond,
-				Name:    "MysqlService.QueryPlayerInfo",
-			},
-			srv.MW,
-			func() any { return new(g1_protocol.QueryPlayerInfoReq) },
-			func(ctx *ssrpc.Context, in any) (any, error) {
-				return srv.Impl.QueryPlayerInfo(ctx, in.(*g1_protocol.QueryPlayerInfoReq))
-			},
-		)},
-		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ, CmdHandler: ssrpc.WrapUnary(
-			ssrpc.MethodDesc{
-				Cmd:     g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ,
-				Timeout: 5000 * time.Millisecond,
-				Name:    "MysqlService.QueryGameInfo",
-			},
-			srv.MW,
-			func() any { return new(g1_protocol.QueryGameInfoReq) },
-			func(ctx *ssrpc.Context, in any) (any, error) {
-				return srv.Impl.QueryGameInfo(ctx, in.(*g1_protocol.QueryGameInfoReq))
+				return srv.Impl.LoadRoleData(ctx, in.(*g1_protocol.MysqlInnerLoadRoleDataReq))
 			},
 		)},
 	}
@@ -378,85 +288,37 @@ func (c *MysqlServiceClient) SearchRoleByRouter(ctx cmd_handler.IContext, router
 	return rsp, nil
 }
 
-// Update sends mysql async update (one-way, no response).
-func (c *MysqlServiceClient) Update(ctx cmd_handler.IContext, req *g1_protocol.MysqlInnerUpdateReq) error {
-	return ssrpc.SendByCmd(ctx, g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ, req)
-}
-
-// UpdateByRouter sends mysql async update to an explicit routerId (one-way, no response).
-func (c *MysqlServiceClient) UpdateByRouter(ctx cmd_handler.IContext, routerId uint64, req *g1_protocol.MysqlInnerUpdateReq) error {
-	return ssrpc.SendByCmdWithRouter(ctx, routerId, g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ, req)
-}
-
-// UpdateByBusId sends mysql async update to an explicit busId (one-way, no response).
-func (c *MysqlServiceClient) UpdateByBusId(ctx cmd_handler.IContext, busId uint32, req *g1_protocol.MysqlInnerUpdateReq) error {
-	return ssrpc.SendByCmdToBusId(ctx, busId, g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ, req)
-}
-
-// UpdateSimple sends mysql async update without an IContext (one-way, no response).
-func (c *MysqlServiceClient) UpdateSimple(uid uint64, zone uint32, req *g1_protocol.MysqlInnerUpdateReq) error {
-	return ssrpc.SendByCmdSimple(uid, zone, g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ, req)
-}
-
-// UpdateByBusIdSimple sends mysql async update to an explicit busId without an IContext (one-way, no response).
-func (c *MysqlServiceClient) UpdateByBusIdSimple(busId uint32, uid uint64, req *g1_protocol.MysqlInnerUpdateReq) error {
-	return ssrpc.SendByCmdToBusIdSimple(busId, uid, g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ, req)
-}
-
-// UpdateByRouterSimple sends mysql async update to an explicit routerId without an IContext (one-way, no response).
-func (c *MysqlServiceClient) UpdateByRouterSimple(routerId, uid uint64, zone uint32, req *g1_protocol.MysqlInnerUpdateReq) error {
-	return ssrpc.SendByCmdWithRouterSimple(routerId, uid, zone, g1_protocol.CMD_MYSQL_INNER_UPDATE_REQ, req)
-}
-
-// QueryRoomInfo calls mysql query room info synchronously.
-func (c *MysqlServiceClient) QueryRoomInfo(ctx cmd_handler.IContext, req *g1_protocol.QueryRoomInfoReq) (*g1_protocol.QueryRoomInfoRsp, error) {
-	rsp := &g1_protocol.QueryRoomInfoRsp{}
-	if err := ssrpc.CallByCmd(ctx, g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ, req, rsp); err != nil {
+// SaveRoleData calls mysql save role data snapshot synchronously.
+func (c *MysqlServiceClient) SaveRoleData(ctx cmd_handler.IContext, req *g1_protocol.MysqlInnerSaveRoleDataReq) (*g1_protocol.MysqlInnerSaveRoleDataRsp, error) {
+	rsp := &g1_protocol.MysqlInnerSaveRoleDataRsp{}
+	if err := ssrpc.CallByCmd(ctx, g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, req, rsp); err != nil {
 		return nil, err
 	}
 	return rsp, nil
 }
 
-// QueryRoomInfoByRouter calls mysql query room info synchronously using an explicit routerId.
-func (c *MysqlServiceClient) QueryRoomInfoByRouter(ctx cmd_handler.IContext, routerId uint64, req *g1_protocol.QueryRoomInfoReq) (*g1_protocol.QueryRoomInfoRsp, error) {
-	rsp := &g1_protocol.QueryRoomInfoRsp{}
-	if err := ssrpc.CallByCmdWithRouter(ctx, routerId, g1_protocol.CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQ, req, rsp); err != nil {
+// SaveRoleDataByRouter calls mysql save role data snapshot synchronously using an explicit routerId.
+func (c *MysqlServiceClient) SaveRoleDataByRouter(ctx cmd_handler.IContext, routerId uint64, req *g1_protocol.MysqlInnerSaveRoleDataReq) (*g1_protocol.MysqlInnerSaveRoleDataRsp, error) {
+	rsp := &g1_protocol.MysqlInnerSaveRoleDataRsp{}
+	if err := ssrpc.CallByCmdWithRouter(ctx, routerId, g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, req, rsp); err != nil {
 		return nil, err
 	}
 	return rsp, nil
 }
 
-// QueryPlayerInfo calls mysql query player info synchronously.
-func (c *MysqlServiceClient) QueryPlayerInfo(ctx cmd_handler.IContext, req *g1_protocol.QueryPlayerInfoReq) (*g1_protocol.QueryPlayerInfoRsp, error) {
-	rsp := &g1_protocol.QueryPlayerInfoRsp{}
-	if err := ssrpc.CallByCmd(ctx, g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ, req, rsp); err != nil {
+// LoadRoleData calls mysql load role data snapshot synchronously.
+func (c *MysqlServiceClient) LoadRoleData(ctx cmd_handler.IContext, req *g1_protocol.MysqlInnerLoadRoleDataReq) (*g1_protocol.MysqlInnerLoadRoleDataRsp, error) {
+	rsp := &g1_protocol.MysqlInnerLoadRoleDataRsp{}
+	if err := ssrpc.CallByCmd(ctx, g1_protocol.CMD_MYSQL_INNER_LOAD_ROLE_DATA_REQ, req, rsp); err != nil {
 		return nil, err
 	}
 	return rsp, nil
 }
 
-// QueryPlayerInfoByRouter calls mysql query player info synchronously using an explicit routerId.
-func (c *MysqlServiceClient) QueryPlayerInfoByRouter(ctx cmd_handler.IContext, routerId uint64, req *g1_protocol.QueryPlayerInfoReq) (*g1_protocol.QueryPlayerInfoRsp, error) {
-	rsp := &g1_protocol.QueryPlayerInfoRsp{}
-	if err := ssrpc.CallByCmdWithRouter(ctx, routerId, g1_protocol.CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQ, req, rsp); err != nil {
-		return nil, err
-	}
-	return rsp, nil
-}
-
-// QueryGameInfo calls mysql query game info synchronously.
-func (c *MysqlServiceClient) QueryGameInfo(ctx cmd_handler.IContext, req *g1_protocol.QueryGameInfoReq) (*g1_protocol.QueryGameInfoRsp, error) {
-	rsp := &g1_protocol.QueryGameInfoRsp{}
-	if err := ssrpc.CallByCmd(ctx, g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ, req, rsp); err != nil {
-		return nil, err
-	}
-	return rsp, nil
-}
-
-// QueryGameInfoByRouter calls mysql query game info synchronously using an explicit routerId.
-func (c *MysqlServiceClient) QueryGameInfoByRouter(ctx cmd_handler.IContext, routerId uint64, req *g1_protocol.QueryGameInfoReq) (*g1_protocol.QueryGameInfoRsp, error) {
-	rsp := &g1_protocol.QueryGameInfoRsp{}
-	if err := ssrpc.CallByCmdWithRouter(ctx, routerId, g1_protocol.CMD_MYSQL_INNER_QUERY_GAME_INFO_REQ, req, rsp); err != nil {
+// LoadRoleDataByRouter calls mysql load role data snapshot synchronously using an explicit routerId.
+func (c *MysqlServiceClient) LoadRoleDataByRouter(ctx cmd_handler.IContext, routerId uint64, req *g1_protocol.MysqlInnerLoadRoleDataReq) (*g1_protocol.MysqlInnerLoadRoleDataRsp, error) {
+	rsp := &g1_protocol.MysqlInnerLoadRoleDataRsp{}
+	if err := ssrpc.CallByCmdWithRouter(ctx, routerId, g1_protocol.CMD_MYSQL_INNER_LOAD_ROLE_DATA_REQ, req, rsp); err != nil {
 		return nil, err
 	}
 	return rsp, nil

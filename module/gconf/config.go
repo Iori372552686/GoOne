@@ -126,6 +126,12 @@ type MainCapacityConfig struct {
 	RoleSyncPatchEnabled   bool     `json:"role_sync_patch_enabled" yaml:"role_sync_patch_enabled"`
 	RoleSyncPatchAllowUids []uint64 `json:"role_sync_patch_allow_uids" yaml:"role_sync_patch_allow_uids"`
 	RolePersistDebounceSec int      `json:"role_persist_debounce_sec" yaml:"role_persist_debounce_sec"`
+	// RoleCacheTTLDays L2 角色缓存的 TTL（天）。0=不过期（现状兼容）；默认 30。
+	// 开启前提：L3（role_data 全量快照）已落库，否则过期即数据删除。
+	RoleCacheTTLDays int `json:"role_cache_ttl_days" yaml:"role_cache_ttl_days"`
+	// RoleL3FlushDebounceSec L3 全量快照写回的独立防抖（秒）。0=用默认值 60。
+	// 与 L2 的 role_persist_debounce_sec（10s）解耦，控制 MySQL 写放大。
+	RoleL3FlushDebounceSec int `json:"role_l3_flush_debounce_sec" yaml:"role_l3_flush_debounce_sec"`
 }
 
 type WebRuntimeConfig struct {
@@ -139,8 +145,17 @@ type ConnSvr struct {
 	Capacity            ConnCapacityConfig `json:"capacity" yaml:"capacity"`
 }
 
+// InfoCapacityConfig 定义 infosvr 的缓存容量参数。
+type InfoCapacityConfig struct {
+	// BriefCacheTTLDays 玩家简报（DB_TYPE_BRIEF_INFO）缓存 TTL（天）。
+	// 0=永不过期（现状兼容）。简报由 mainsvr 心跳周期重写，过期后短暂缺失、
+	// 下一次心跳即回填，因此 TTL 只影响展示不影响正确性。
+	BriefCacheTTLDays int `json:"brief_cache_ttl_days" yaml:"brief_cache_ttl_days"`
+}
+
 type InfoSvr struct {
 	ServiceCommonConfig `yaml:",inline"`
+	Capacity            InfoCapacityConfig `json:"capacity" yaml:"capacity"`
 }
 
 type MainSvr struct {
@@ -148,8 +163,16 @@ type MainSvr struct {
 	Capacity            MainCapacityConfig `json:"capacity" yaml:"capacity"`
 }
 
+// MysqlCapacityConfig 定义 mysqlsvr 的存储容量参数。
+type MysqlCapacityConfig struct {
+	// RoleTableShards role_data 分表数。<=1 = 不分表（表名 role_data 无后缀）。
+	// 公式 fnv32a(uid)%N 一经启用即为契约，扩容需数据迁移，不要随意变更。
+	RoleTableShards int `json:"role_table_shards" yaml:"role_table_shards"`
+}
+
 type MySqlSvr struct {
 	ServiceCommonConfig `yaml:",inline"`
+	Capacity            MysqlCapacityConfig `json:"capacity" yaml:"capacity"`
 }
 
 type RoomCenterSvr struct {

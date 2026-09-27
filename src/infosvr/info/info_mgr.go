@@ -3,10 +3,12 @@ package info
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/db/redis"
 	"github.com/Iori372552686/GoOne/lib/util/lru"
+	"github.com/Iori372552686/GoOne/module/conf"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 
 	"github.com/golang/protobuf/proto"
@@ -116,9 +118,19 @@ func (m *InfoMgr) saveBriefToDB(ctx context.Context, uid uint64, brief *g1_proto
 		logger.Errorf("marshal brief error {uid:%d} | %v", uid, err)
 		return int(g1_protocol.ErrorCode_ERR_MARSHAL)
 	}
-	if err := m.RedisMgr.SetBytes(ctx, dbType, key, data, 0); err != nil {
+	if err := m.RedisMgr.SetBytes(ctx, dbType, key, data, briefCacheTTL()); err != nil {
 		logger.Errorf("set db brief error {uid:%d} | %v", uid, err)
 		return int(g1_protocol.ErrorCode_ERR_DB)
 	}
 	return 0
+}
+
+// briefCacheTTL 简报缓存 TTL。未配置（0）= 永不过期（现状兼容）。
+// 简报由 mainsvr 心跳周期重写，TTL 到期仅造成短暂缺失，下次心跳回填。
+func briefCacheTTL() time.Duration {
+	days := conf.Get("infosvr.capacity.brief_cache_ttl_days").Int()
+	if days <= 0 {
+		return 0
+	}
+	return time.Duration(days) * 24 * time.Hour
 }

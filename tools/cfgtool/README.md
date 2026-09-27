@@ -178,7 +178,7 @@ pause
 
 1. **类型无关** —— 同一维度的数组分隔符固定，无论元素是标量还是结构体。如 `[]int64` 和 `[]Reward` 的元素间都用 `|`。
 2. **层级递进** —— 数组从内到外：成员 `,`（最细）→ 1维 `|` → 2维 `;` → 3维 `^`（最粗）。
-3. **map 元素用 `;`** —— 高于 value 内部的 `,`（结构体成员）与 `|`（repeated 字段内部），保证 value 是含 repeated 字段的结构体（如 `pb.TexasGameEndInfo` 的 hands/bests）时不冲突。
+3. **map 元素用 `;`** —— 高于 value 内部的 `,`（结构体成员）与 `|`（repeated 字段内部），保证 value 是含 repeated 字段的结构体（如含 repeated 字段的结构体）时不冲突。
 4. **map K:V 独占 `:`** —— 与所有层级符号正交。因结构体成员用 `,`、数组用 `|`/`;`，value 内部不含 `:`，故 map 的 K/V 切分天然无歧义（按首个 `:` 切分）。
 
 #### 示例对照
@@ -566,8 +566,8 @@ item.Range(c => { console.log(c.Name); return true; }); // 遍历
 /goone/config/dev/GlobalConst.json
 /goone/config/dev/MachineConfig.json
 /goone/config/dev/TaskConfig.json
-/goone/config/dev/TexasConfig.json
-/goone/config/dev/TexasTestConfig.json
+/goone/config/dev/DropItemConfig.json
+/goone/config/dev/TaskConfig.json
 ```
 
 > 切换环境只需改 `path` 末段：`/goone/config/prod`、`/goone/config/test`。多环境并存、互不覆盖，便于灰度与回滚。
@@ -615,8 +615,8 @@ go build -tags config_etcd -o cfgtool ./tools/cfgtool/
 ℹ️ 已上传 GlobalConst.json     (json, 1389 bytes)
 ℹ️ 已上传 MachineConfig.json   (json,  822 bytes)
 ℹ️ 已上传 TaskConfig.json      (json,  453 bytes)
-ℹ️ 已上传 TexasConfig.json     (json, 2270 bytes)
-ℹ️ 已上传 TexasTestConfig.json (json, 2570 bytes)
+ℹ️ 已上传 DropItemConfig.json  (json, 1335 bytes)
+ℹ️ 已上传 TaskConfig.json      (json, 1024 bytes)
 ✅ 配置数据上传完成，共 6 项
 ```
 
@@ -661,7 +661,7 @@ for _, kv := range resp.Kvs {
 上传只是"写"，要让业务服务真正读回这些数据，必须对齐 `module/gamedata` 读取端的契约，否则会 `InitRemote` 失败：
 
 1. **格式必须是 pb text（`.conf`）**：`gamedata` 每个 sheet 的 parser 硬编码调 `proto.UnmarshalText`，**完全忽略 `kv.Format`**。上传 JSON/bytes 给 `gamedata` 读会反序列化失败。→ **服务器侧读取请用 `-uptype=conf` 上传 `.conf`**；JSON/bytes 仅供客户端/工具链消费。
-2. **dataID 必须是 `<SheetName>.conf`**：`SheetFiles()` 返回的是 `["ItemConfig.conf", "TexasConfig.conf", ...]`，`applyKVs` 用 `kv.Key` **精确匹配**，未知名直接判缺失。
+2. **dataID 必须是 `<SheetName>.conf`**：`SheetFiles()` 返回的是 `["ItemConfig.conf", "TaskConfig.conf", ...]`，`applyKVs` 用 `kv.Key` **精确匹配**，未知名直接判缺失。
 3. **etcd 读取端需剥路径前缀**：Nacos `Load()` 返回 `kv.Key = dataID`（裸名，如 `ItemConfig.conf`），与读取端匹配；但 etcd `Load()` 返回 `kv.Key = 完整 key`（如 `/goone/config/dev/ItemConfig.conf`），而当前 `applyKVs` **不做 `filepath.Base` 剥离**。
    → **若要用 etcd 作为 `gamedata` 后端**，需二选一改一处（尚未实现）：
    - 在 `module/gamedata/gamedata.go` 的 `applyKVs` 里改用 `byKey[filepath.Base(kv.Key)]`；或

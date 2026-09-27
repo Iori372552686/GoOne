@@ -57,7 +57,7 @@ func TestAutoMigratePreservesExistingSchemaAndDataIntegration(t *testing.T) {
 		IndexName: "default", DriveName: "mysql", InitFlag: true, MaxIdle: 1, MaxOpen: 4,
 		Master: &DbInfo{IP: host, Port: port, User: parsed.User, Password: parsed.Passwd, DBName: databaseName},
 	}
-	models := []interface{}{new(g1_protocol.MysqlTexasRoomInfo), new(g1_protocol.MysqlTexasPlayerInfo), new(g1_protocol.MysqlTexasGameInfo)}
+	models := []interface{}{new(g1_protocol.MysqlRoleInfo), new(g1_protocol.MysqlRoleData)}
 	m := NewManager()
 	if err := m.InitAndRun(context.Background(), []Config{config}, models...); err != nil {
 		t.Fatalf("AutoMigrate empty database: %v", err)
@@ -71,10 +71,10 @@ func TestAutoMigratePreservesExistingSchemaAndDataIntegration(t *testing.T) {
 			t.Fatalf("AutoMigrate did not create table for %T", model)
 		}
 	}
-	if err := db.Exec("ALTER TABLE mysql_texas_room_info ADD COLUMN legacy_extra varchar(32) NULL").Error; err != nil {
+	if err := db.Exec("ALTER TABLE mysql_role_info ADD COLUMN legacy_extra varchar(32) NULL").Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Exec("INSERT INTO mysql_texas_room_info (room_id, game_type, room_stage, blind, create_time, legacy_extra) VALUES (?, ?, ?, ?, ?, ?)", 10, 1, 1, "1/2", 100, "keep-me").Error; err != nil {
+	if err := db.Exec("INSERT INTO mysql_role_info (uid, name, legacy_extra) VALUES (?, ?, ?)", 10, "role", "keep-me").Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := m.Close(); err != nil {
@@ -90,11 +90,11 @@ func TestAutoMigratePreservesExistingSchemaAndDataIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !db.Migrator().HasColumn("mysql_texas_room_info", "legacy_extra") {
+	if !db.Migrator().HasColumn("mysql_role_info", "legacy_extra") {
 		t.Fatal("AutoMigrate removed legacy_extra column")
 	}
 	var legacyValue string
-	if err := db.Raw("SELECT legacy_extra FROM mysql_texas_room_info WHERE room_id = ?", 10).Scan(&legacyValue).Error; err != nil {
+	if err := db.Raw("SELECT legacy_extra FROM mysql_role_info WHERE uid = ?", 10).Scan(&legacyValue).Error; err != nil {
 		t.Fatal(err)
 	}
 	if legacyValue != "keep-me" {

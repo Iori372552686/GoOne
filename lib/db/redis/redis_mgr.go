@@ -232,6 +232,31 @@ func (m *RedisMgr) HSetFields(ctx context.Context, instanceID uint32, key string
 	return client.HSet(ctx, key, fields).Err()
 }
 
+// HSetFieldsExpire 在 HSetFields 语义上附加 TTL：HSET 与 EXPIRE 经 TxPipeline
+// （MULTI/EXEC）一并提交——任一失败整批不生效，保住 F05"无部分写入"的近似
+// 等价。ttl<=0 时退化为 HSetFields（永不过期，现状兼容）。
+func (m *RedisMgr) HSetFieldsExpire(ctx context.Context, instanceID uint32, key string, values map[string][]byte, ttl time.Duration) error {
+	if len(values) == 0 {
+		return nil
+	}
+	if ttl <= 0 {
+		return m.HSetFields(ctx, instanceID, key, values)
+	}
+	client, err := m.Client(instanceID)
+	if err != nil {
+		return err
+	}
+	fields := make(map[string]interface{}, len(values))
+	for field, value := range values {
+		fields[field] = value
+	}
+	pipe := client.TxPipeline()
+	pipe.HSet(ctx, key, fields)
+	pipe.Expire(ctx, key, ttl)
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
 func (m *RedisMgr) HGetBytes(ctx context.Context, instanceID uint32, key, field string) ([]byte, error) {
 	client, err := m.Client(instanceID)
 	if err != nil {

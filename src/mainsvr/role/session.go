@@ -63,6 +63,11 @@ func (m *RoleMgr) Logout(uid uint64, trans cmd_handler.IContext, byServer bool, 
 		role.Errorf("logout save failed, role retained for retry | %v", err)
 		return err
 	}
+	// 登出是角色的最后一次变更机会：强制投递 L3 快照（尽力而为）。
+	// 失败不阻断登出——L2 已持久、needL3Flush 保留，重登/role_tick 自愈补齐。
+	if err := role.MaybeFlushL3(true); err != nil {
+		role.Errorf("logout l3 flush deferred for retry | %v", err)
+	}
 
 	m.DeleteRole(uid)
 	return nil

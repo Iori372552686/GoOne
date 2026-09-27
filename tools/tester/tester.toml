@@ -65,13 +65,3 @@ enabled = true
 [modules.inventory]
 enabled = true
 order = 20
-
-# 房间链路回归：RoomList/QuickStart/Join/Leave（依赖 tools/gamesim 模拟游戏服）
-[modules.room]
-enabled = true
-order = 10
-
-# 架构迭代（F01-F09）专项回归：登录/互踢/持久化/心跳/快开属性/回滚。
-[modules.archreg]
-enabled = true
-order = 30

@@ -17,30 +17,34 @@ func parseSchema(t *testing.T, model interface{}) *schema.Schema {
 	return parsed
 }
 
-func TestTexasRoomSchemaCompatibility(t *testing.T) {
-	parsed := parseSchema(t, &g1_protocol.MysqlTexasRoomInfo{})
-	if parsed.Table != "mysql_texas_room_info" {
-		t.Fatalf("table = %q, want mysql_texas_room_info", parsed.Table)
+func TestRoleInfoSchemaCompatibility(t *testing.T) {
+	parsed := parseSchema(t, &g1_protocol.MysqlRoleInfo{})
+	if parsed.Table != "mysql_role_info" {
+		t.Fatalf("table = %q, want mysql_role_info", parsed.Table)
 	}
-	assertField(t, parsed, "Id", "id", "bigint", true, false)
-	assertField(t, parsed, "RoomId", "room_id", "bigint", false, true)
+	assertField(t, parsed, "Uid", "uid", "bigint", true, false)
+	assertField(t, parsed, "Name", "name", "varchar(25)", false, false)
 
 	indexes := parsed.ParseIndexes()
 	found := false
 	for _, index := range indexes {
-		if index.Name == "IDX_mysql_texas_room_info_room_id" {
+		if index.Name == "IDX_role_info_name" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("room_id index missing: %#v", indexes)
+		t.Fatalf("name index missing: %#v", indexes)
 	}
 }
 
-func TestTexasGameSchemaCompatibility(t *testing.T) {
-	parsed := parseSchema(t, &g1_protocol.MysqlTexasGameInfo{})
-	assertField(t, parsed, "GameId", "game_id", "varchar(125)", true, false)
-	assertField(t, parsed, "GameDetail", "game_detail", "blob", false, false)
+func TestRoleDataSchemaCompatibility(t *testing.T) {
+	parsed := parseSchema(t, &g1_protocol.MysqlRoleData{})
+	if parsed.Table != "mysql_role_data" {
+		t.Fatalf("table = %q, want mysql_role_data", parsed.Table)
+	}
+	assertField(t, parsed, "Uid", "uid", "bigint", true, false)
+	assertField(t, parsed, "Data", "data", "longblob", false, false)
+	assertField(t, parsed, "UpdateTime", "update_time", "bigint", false, false)
 }
 
 func assertField(t *testing.T, parsed *schema.Schema, name, column, columnType string, primaryKey, notNull bool) {

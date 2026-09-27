@@ -3,20 +3,14 @@ package service
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/Iori372552686/GoOne/api/gen/game/mysqlsvr/v1"
 	"github.com/Iori372552686/GoOne/lib/api/gerr"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
-	"github.com/Iori372552686/GoOne/src/mysqlsvr/manager"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/repository"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
-	"github.com/golang/protobuf/proto"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
-
-const asyncWriteTimeout = 15 * time.Second
 
 type MysqlServiceImpl struct {
 	mysqlsvrv1.MysqlServiceSS
@@ -53,93 +47,53 @@ func (s *MysqlServiceImpl) SearchRole(ctx *ssrpc.Context, req *g1_protocol.Mysql
 	return rsp, nil
 }
 
-func (s *MysqlServiceImpl) Update(ctx *ssrpc.Context, req *g1_protocol.MysqlInnerUpdateReq) (*emptypb.Empty, error) {
+// SaveRoleData 保存角色全量快照（L3）。同步 UPSERT（毫秒级、幂等），不进异步池：
+// ack 语义清晰，运行期的异步性由 mainsvr 侧 one-way 投递提供。
+// 陈旧写被拒（ErrStaleUpdate）视为正常——更新的快照已落库，返回 OK。
+func (s *MysqlServiceImpl) SaveRoleData(ctx *ssrpc.Context, req *g1_protocol.MysqlInnerSaveRoleDataReq) (*g1_protocol.MysqlInnerSaveRoleDataRsp, error) {
+	rsp := &g1_protocol.MysqlInnerSaveRoleDataRsp{Ret: &g1_protocol.Ret{Code: g1_protocol.ErrorCode_ERR_OK}}
 	if s.repo == nil {
-		return &emptypb.Empty{}, gerr.New(g1_protocol.ErrorCode_ERR_INTERNAL, "biz_error", "")
+		return rsp, gerr.New(g1_protocol.ErrorCode_ERR_INTERNAL, "biz_error", "")
 	}
-	var task func(context.Context) error
-	switch req.GetDataType() {
-	case g1_protocol.DataType_DATA_TYPE_TEXAS_ROOM_INFO:
-		item := new(g1_protocol.MysqlTexasRoomInfo)
-		if err := proto.Unmarshal(req.GetData(), item); err != nil {
-			return &emptypb.Empty{}, gerr.Wrap(g1_protocol.ErrorCode_ERR_FAIL, "decode_room_info", err)
-		}
-		task = func(writeCtx context.Context) error { return s.repo.SaveRoom(writeCtx, item) }
-	case g1_protocol.DataType_DATA_TYPE_TEXAS_GAME_RECORD:
-		item := new(g1_protocol.MysqlTexasGameInfo)
-		if err := proto.Unmarshal(req.GetData(), item); err != nil {
-			return &emptypb.Empty{}, gerr.Wrap(g1_protocol.ErrorCode_ERR_FAIL, "decode_game_info", err)
-		}
-		task = func(writeCtx context.Context) error { return s.repo.SaveGame(writeCtx, item) }
-	case g1_protocol.DataType_DATA_TYPE_PLAYER_INFO:
-		item := new(g1_protocol.MysqlTexasPlayerInfo)
-		if err := proto.Unmarshal(req.GetData(), item); err != nil {
-			return &emptypb.Empty{}, gerr.Wrap(g1_protocol.ErrorCode_ERR_FAIL, "decode_player_info", err)
-		}
-		task = func(writeCtx context.Context) error { return s.repo.InsertPlayer(writeCtx, item) }
-	default:
-		return &emptypb.Empty{}, nil
+	uid := req.GetUid()
+	if uid == 0 && ctx != nil {
+		uid = ctx.Uid()
 	}
-
-	base := context.WithoutCancel(requestContext(ctx))
-	if err := manager.Push(req.GetId(), func() {
-		writeCtx, cancel := context.WithTimeout(base, asyncWriteTimeout)
-		defer cancel()
-		if err := task(writeCtx); err != nil {
-			if errors.Is(err, repository.ErrStaleUpdate) {
-				logger.Warningf("mysqlsvr rejected stale async update | %v", err)
-				return
-			}
-			logger.Errorf("mysqlsvr async update failed | %v", err)
-		}
-	}); err != nil {
-		return &emptypb.Empty{}, gerr.Wrap(g1_protocol.ErrorCode_ERR_INTERNAL, "enqueue_db_write", err)
+	if uid == 0 {
+		return rsp, gerr.New(g1_protocol.ErrorCode_ERR_MARSHAL, "save_role_data: missing uid", "")
 	}
-	return &emptypb.Empty{}, nil
+	if err := s.repo.UpsertRoleData(requestContext(ctx), uid, req.GetData(), req.GetUpdateTime()); err != nil {
+		if errors.Is(err, repository.ErrStaleUpdate) {
+			logger.Warningf("mysqlsvr rejected stale role data snapshot | %v", err)
+			return rsp, nil
+		}
+		logger.Errorf("failed to save role data {uid:%d} | %v", uid, err)
+		return rsp, gerr.Wrap(g1_protocol.ErrorCode_ERR_FAIL, "save_role_data", err)
+	}
+	return rsp, nil
 }
 
-func (s *MysqlServiceImpl) QueryRoomInfo(ctx *ssrpc.Context, req *g1_protocol.QueryRoomInfoReq) (*g1_protocol.QueryRoomInfoRsp, error) {
+// LoadRoleData 按 uid 读取角色全量快照（L2 miss 回源）。miss 时 data 为空、ret 为 OK。
+func (s *MysqlServiceImpl) LoadRoleData(ctx *ssrpc.Context, req *g1_protocol.MysqlInnerLoadRoleDataReq) (*g1_protocol.MysqlInnerLoadRoleDataRsp, error) {
 	if s.repo == nil {
 		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_INTERNAL, "database repository unavailable")
 	}
-	items, err := s.repo.QueryRoom(requestContext(ctx), req)
+	uid := req.GetUid()
+	if uid == 0 && ctx != nil {
+		uid = ctx.Uid()
+	}
+	if uid == 0 {
+		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_MARSHAL, "load_role_data: missing uid")
+	}
+	item, err := s.repo.LoadRoleData(requestContext(ctx), uid)
 	if err != nil {
-		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_DB, "query room info failed")
+		logger.Errorf("failed to load role data {uid:%d} | %v", uid, err)
+		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_DB, "load role data failed")
 	}
-	return &g1_protocol.QueryRoomInfoRsp{List: items}, nil
-}
-
-func (s *MysqlServiceImpl) QueryPlayerInfo(ctx *ssrpc.Context, req *g1_protocol.QueryPlayerInfoReq) (*g1_protocol.QueryPlayerInfoRsp, error) {
-	if s.repo == nil {
-		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_INTERNAL, "database repository unavailable")
-	}
-	items, err := s.repo.QueryPlayer(requestContext(ctx), req)
-	if err != nil {
-		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_DB, "query player info failed")
-	}
-	return &g1_protocol.QueryPlayerInfoRsp{List: items}, nil
-}
-
-func (s *MysqlServiceImpl) QueryGameInfo(ctx *ssrpc.Context, req *g1_protocol.QueryGameInfoReq) (*g1_protocol.QueryGameInfoRsp, error) {
-	if s.repo == nil {
-		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_INTERNAL, "database repository unavailable")
-	}
-	item, err := s.repo.GetGame(requestContext(ctx), req.GetGameId())
-	if err != nil {
-		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_DB, "query game info failed")
-	}
-	rsp := new(g1_protocol.QueryGameInfoRsp)
-	if item == nil {
-		return rsp, nil
-	}
-	detail := new(g1_protocol.TexasGameRecordDetail)
-	if err := proto.Unmarshal(item.GameDetail, detail); err != nil {
-		return nil, ssrpc.E(g1_protocol.ErrorCode_ERR_DB, "decode game detail failed")
-	}
-	rsp.Data = &g1_protocol.TexasGameRecord{
-		TableId: item.TableId, GameType: item.GameType, RoomStage: item.RoomStage,
-		Blind: item.Blind, BeginTime: item.BeginTime, EndTime: item.EndTime,
-		TotalPot: item.TotalPot, TotalService: item.TotalService, Detail: detail, Round: item.Round,
+	rsp := &g1_protocol.MysqlInnerLoadRoleDataRsp{Ret: &g1_protocol.Ret{Code: g1_protocol.ErrorCode_ERR_OK}}
+	if item != nil {
+		rsp.Data = item.Data
+		rsp.UpdateTime = item.UpdateTime
 	}
 	return rsp, nil
 }

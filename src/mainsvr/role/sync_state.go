@@ -327,6 +327,12 @@ func (r *Role) MaybeFlushPersist(trans cmd_handler.IContext, force bool) error {
 	r.persistDirtySince = 0
 	r.lastPersistAt = now
 	r.persistReasons = nil
+
+	// L2 已持久，顺手消费 L3 待写标记（独立防抖；force 语义透传）。
+	// L3 投递失败不影响本次持久化结果——标记保留，下次 FlushPending 重试。
+	if err := r.MaybeFlushL3(force); err != nil {
+		r.Errorf("role l3 flush deferred for retry | %v", err)
+	}
 	return nil
 }
 

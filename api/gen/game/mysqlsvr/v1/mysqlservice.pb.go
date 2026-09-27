@@ -11,7 +11,6 @@ import (
 	protocol "github.com/Iori372552686/g1_common/protocol"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	reflect "reflect"
 	unsafe "unsafe"
 )
@@ -27,48 +26,38 @@ var File_service_mysqlservice_proto protoreflect.FileDescriptor
 
 const file_service_mysqlservice_proto_rawDesc = "" +
 	"\n" +
-	"\x1aservice/mysqlservice.proto\x12\x10game.mysqlsvr.v1\x1a\x1egoone/options/v1/options.proto\x1a\x16service/mysqlsvr.proto\x1a\x11core/client.proto\x1a\x1bgoogle/protobuf/empty.proto2\x93\a\n" +
+	"\x1aservice/mysqlservice.proto\x12\x10game.mysqlsvr.v1\x1a\x1egoone/options/v1/options.proto\x1a\x16service/mysqlsvr.proto2\xab\x05\n" +
 	"\fMysqlService\x12\xa8\x01\n" +
 	"\x0eUpdateRoleInfo\x12(.g1.protocol.MysqlInnerUpdateRoleInfoReq\x1a(.g1.protocol.MysqlInnerUpdateRoleInfoRsp\"B\xca\xe4\x1d>*$CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQz\x16mysql update role info\x12\x92\x01\n" +
 	"\n" +
-	"SearchRole\x12$.g1.protocol.MysqlInnerSearchRoleReq\x1a$.g1.protocol.MysqlInnerSearchRoleRsp\"8\xca\xe4\x1d4*\x1fCMD_MYSQL_INNER_SEARCH_ROLE_REQz\x11mysql search role\x12z\n" +
-	"\x06Update\x12 .g1.protocol.MysqlInnerUpdateReq\x1a\x16.google.protobuf.Empty\"6\xca\xe4\x1d2\x18\x01*\x1aCMD_MYSQL_INNER_UPDATE_REQz\x12mysql async update\x12\x8f\x01\n" +
-	"\rQueryRoomInfo\x12\x1d.g1.protocol.QueryRoomInfoReq\x1a\x1d.g1.protocol.QueryRoomInfoRsp\"@\xca\xe4\x1d<*#CMD_MYSQL_INNER_QUERY_ROOM_INFO_REQz\x15mysql query room info\x12\x99\x01\n" +
-	"\x0fQueryPlayerInfo\x12\x1f.g1.protocol.QueryPlayerInfoReq\x1a\x1f.g1.protocol.QueryPlayerInfoRsp\"D\xca\xe4\x1d@*%CMD_MYSQL_INNER_QUERY_PLAYER_INFO_REQz\x17mysql query player info\x12\x8f\x01\n" +
-	"\rQueryGameInfo\x12\x1d.g1.protocol.QueryGameInfoReq\x1a\x1d.g1.protocol.QueryGameInfoRsp\"@\xca\xe4\x1d<*#CMD_MYSQL_INNER_QUERY_GAME_INFO_REQz\x15mysql query game info\x1a\a\xd2\xe4\x1d\x03\b\x88'BDZBgithub.com/Iori372552686/GoOne/api/gen/game/mysqlsvr/v1;mysqlsvrv1b\x06proto3"
+	"SearchRole\x12$.g1.protocol.MysqlInnerSearchRoleReq\x1a$.g1.protocol.MysqlInnerSearchRoleRsp\"8\xca\xe4\x1d4*\x1fCMD_MYSQL_INNER_SEARCH_ROLE_REQz\x11mysql search role\x12\xa7\x01\n" +
+	"\fSaveRoleData\x12&.g1.protocol.MysqlInnerSaveRoleDataReq\x1a&.g1.protocol.MysqlInnerSaveRoleDataRsp\"G\xca\xe4\x1dC*\"CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQz\x1dmysql save role data snapshot\x12\xa7\x01\n" +
+	"\fLoadRoleData\x12&.g1.protocol.MysqlInnerLoadRoleDataReq\x1a&.g1.protocol.MysqlInnerLoadRoleDataRsp\"G\xca\xe4\x1dC*\"CMD_MYSQL_INNER_LOAD_ROLE_DATA_REQz\x1dmysql load role data snapshot\x1a\a\xd2\xe4\x1d\x03\b\x88'BDZBgithub.com/Iori372552686/GoOne/api/gen/game/mysqlsvr/v1;mysqlsvrv1b\x06proto3"
 
 var file_service_mysqlservice_proto_goTypes = []any{
 	(*protocol.MysqlInnerUpdateRoleInfoReq)(nil), // 0: g1.protocol.MysqlInnerUpdateRoleInfoReq
 	(*protocol.MysqlInnerSearchRoleReq)(nil),     // 1: g1.protocol.MysqlInnerSearchRoleReq
-	(*protocol.MysqlInnerUpdateReq)(nil),         // 2: g1.protocol.MysqlInnerUpdateReq
-	(*protocol.QueryRoomInfoReq)(nil),            // 3: g1.protocol.QueryRoomInfoReq
-	(*protocol.QueryPlayerInfoReq)(nil),          // 4: g1.protocol.QueryPlayerInfoReq
-	(*protocol.QueryGameInfoReq)(nil),            // 5: g1.protocol.QueryGameInfoReq
-	(*protocol.MysqlInnerUpdateRoleInfoRsp)(nil), // 6: g1.protocol.MysqlInnerUpdateRoleInfoRsp
-	(*protocol.MysqlInnerSearchRoleRsp)(nil),     // 7: g1.protocol.MysqlInnerSearchRoleRsp
-	(*emptypb.Empty)(nil),                        // 8: google.protobuf.Empty
-	(*protocol.QueryRoomInfoRsp)(nil),            // 9: g1.protocol.QueryRoomInfoRsp
-	(*protocol.QueryPlayerInfoRsp)(nil),          // 10: g1.protocol.QueryPlayerInfoRsp
-	(*protocol.QueryGameInfoRsp)(nil),            // 11: g1.protocol.QueryGameInfoRsp
+	(*protocol.MysqlInnerSaveRoleDataReq)(nil),   // 2: g1.protocol.MysqlInnerSaveRoleDataReq
+	(*protocol.MysqlInnerLoadRoleDataReq)(nil),   // 3: g1.protocol.MysqlInnerLoadRoleDataReq
+	(*protocol.MysqlInnerUpdateRoleInfoRsp)(nil), // 4: g1.protocol.MysqlInnerUpdateRoleInfoRsp
+	(*protocol.MysqlInnerSearchRoleRsp)(nil),     // 5: g1.protocol.MysqlInnerSearchRoleRsp
+	(*protocol.MysqlInnerSaveRoleDataRsp)(nil),   // 6: g1.protocol.MysqlInnerSaveRoleDataRsp
+	(*protocol.MysqlInnerLoadRoleDataRsp)(nil),   // 7: g1.protocol.MysqlInnerLoadRoleDataRsp
 }
 var file_service_mysqlservice_proto_depIdxs = []int32{
-	0,  // 0: game.mysqlsvr.v1.MysqlService.UpdateRoleInfo:input_type -> g1.protocol.MysqlInnerUpdateRoleInfoReq
-	1,  // 1: game.mysqlsvr.v1.MysqlService.SearchRole:input_type -> g1.protocol.MysqlInnerSearchRoleReq
-	2,  // 2: game.mysqlsvr.v1.MysqlService.Update:input_type -> g1.protocol.MysqlInnerUpdateReq
-	3,  // 3: game.mysqlsvr.v1.MysqlService.QueryRoomInfo:input_type -> g1.protocol.QueryRoomInfoReq
-	4,  // 4: game.mysqlsvr.v1.MysqlService.QueryPlayerInfo:input_type -> g1.protocol.QueryPlayerInfoReq
-	5,  // 5: game.mysqlsvr.v1.MysqlService.QueryGameInfo:input_type -> g1.protocol.QueryGameInfoReq
-	6,  // 6: game.mysqlsvr.v1.MysqlService.UpdateRoleInfo:output_type -> g1.protocol.MysqlInnerUpdateRoleInfoRsp
-	7,  // 7: game.mysqlsvr.v1.MysqlService.SearchRole:output_type -> g1.protocol.MysqlInnerSearchRoleRsp
-	8,  // 8: game.mysqlsvr.v1.MysqlService.Update:output_type -> google.protobuf.Empty
-	9,  // 9: game.mysqlsvr.v1.MysqlService.QueryRoomInfo:output_type -> g1.protocol.QueryRoomInfoRsp
-	10, // 10: game.mysqlsvr.v1.MysqlService.QueryPlayerInfo:output_type -> g1.protocol.QueryPlayerInfoRsp
-	11, // 11: game.mysqlsvr.v1.MysqlService.QueryGameInfo:output_type -> g1.protocol.QueryGameInfoRsp
-	6,  // [6:12] is the sub-list for method output_type
-	0,  // [0:6] is the sub-list for method input_type
-	0,  // [0:0] is the sub-list for extension type_name
-	0,  // [0:0] is the sub-list for extension extendee
-	0,  // [0:0] is the sub-list for field type_name
+	0, // 0: game.mysqlsvr.v1.MysqlService.UpdateRoleInfo:input_type -> g1.protocol.MysqlInnerUpdateRoleInfoReq
+	1, // 1: game.mysqlsvr.v1.MysqlService.SearchRole:input_type -> g1.protocol.MysqlInnerSearchRoleReq
+	2, // 2: game.mysqlsvr.v1.MysqlService.SaveRoleData:input_type -> g1.protocol.MysqlInnerSaveRoleDataReq
+	3, // 3: game.mysqlsvr.v1.MysqlService.LoadRoleData:input_type -> g1.protocol.MysqlInnerLoadRoleDataReq
+	4, // 4: game.mysqlsvr.v1.MysqlService.UpdateRoleInfo:output_type -> g1.protocol.MysqlInnerUpdateRoleInfoRsp
+	5, // 5: game.mysqlsvr.v1.MysqlService.SearchRole:output_type -> g1.protocol.MysqlInnerSearchRoleRsp
+	6, // 6: game.mysqlsvr.v1.MysqlService.SaveRoleData:output_type -> g1.protocol.MysqlInnerSaveRoleDataRsp
+	7, // 7: game.mysqlsvr.v1.MysqlService.LoadRoleData:output_type -> g1.protocol.MysqlInnerLoadRoleDataRsp
+	4, // [4:8] is the sub-list for method output_type
+	0, // [0:4] is the sub-list for method input_type
+	0, // [0:0] is the sub-list for extension type_name
+	0, // [0:0] is the sub-list for extension extendee
+	0, // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_service_mysqlservice_proto_init() }

@@ -15,8 +15,13 @@ import (
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/util/convert"
+	"github.com/Iori372552686/GoOne/module/conf"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
+
+// defaultRoleL3FlushDebounceSec L3 快照写回默认防抖：显著大于 L2 的 10s，
+// 控制 MySQL 整包写放大（在线角色每 60s 至多一次快照落库）。
+const defaultRoleL3FlushDebounceSec = 60
 
 type Role struct {
 	sync.Mutex // Role的锁交由外部来控制
@@ -54,6 +59,12 @@ type Role struct {
 	// persistDirtyMask 记录自上次成功落盘后哪些模块变更过，供 hash 模式增量写。
 	// full 模式不读取此字段。落盘成功后清零。
 	persistDirtyMask g1_protocol.ERoleSectionFlag
+
+	// L3（role_data 全量快照）写回状态。needL3Flush 在 L2 成功后置位，
+	// MaybeFlushL3 按独立防抖消费；投递失败保留标记由 role_tick / 下次
+	// FlushPending 重试。lastL3FlushAt 用 Role 本地时钟（防抖区间自洽）。
+	needL3Flush   bool
+	lastL3FlushAt int32
 }
 
 func NewRole(uid uint64) *Role {
@@ -210,6 +221,34 @@ func (r *Role) SaveHashSync(ctx context.Context) error {
 	r.persistDirtySince = 0
 	r.persistReasons = nil
 	r.clearPersistDirtyMask()
+	return nil
+}
+
+// l3FlushDebounceSec L3 快照写回防抖（与 L2 的 10s 防抖解耦，控制 MySQL 写放大）。
+func (r *Role) l3FlushDebounceSec() int32 {
+	if v := conf.Get("mainsvr.capacity.role_l3_flush_debounce_sec").Int(); v > 0 {
+		return int32(v)
+	}
+	return defaultRoleL3FlushDebounceSec
+}
+
+// MaybeFlushL3 按防抖消费 needL3Flush，整包快照 one-way 写回 L3（mysqlsvr）。
+// force=true（logout/停机/首次创建）无视防抖立即投递。
+// 失败语义：仅投递失败返回 error 且保留标记；落库结果由持久层 update_time
+// 守卫兜底，调用方无需等待 ack。
+func (r *Role) MaybeFlushL3(force bool) error {
+	if !r.needL3Flush {
+		return nil
+	}
+	now := r.Now()
+	if !force && (r.lastL3FlushAt == 0 || now-r.lastL3FlushAt < r.l3FlushDebounceSec()) {
+		return nil
+	}
+	if err := saveRoleDataL3(r.Uid(), r.PbRole); err != nil {
+		return err
+	}
+	r.needL3Flush = false
+	r.lastL3FlushAt = now
 	return nil
 }
 

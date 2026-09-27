@@ -108,3 +108,90 @@ func TestSetBytesHonorsCanceledContext(t *testing.T) {
 		t.Fatalf("SetBytes() error = %v, want context.Canceled", err)
 	}
 }
+
+type fakePipeliner struct {
+	goredis.Pipeliner
+	hsetKey   string
+	hsetValue map[string]interface{}
+	expireKey string
+	expireTTL time.Duration
+	execErr   error
+	execDone  bool
+}
+
+func (p *fakePipeliner) HSet(_ context.Context, key string, values ...interface{}) *goredis.IntCmd {
+	p.hsetKey = key
+	if len(values) > 0 {
+		p.hsetValue, _ = values[0].(map[string]interface{})
+	}
+	return goredis.NewIntResult(1, nil)
+}
+
+func (p *fakePipeliner) Expire(_ context.Context, key string, ttl time.Duration) *goredis.BoolCmd {
+	p.expireKey = key
+	p.expireTTL = ttl
+	return goredis.NewBoolResult(true, nil)
+}
+
+func (p *fakePipeliner) Exec(context.Context) ([]goredis.Cmder, error) {
+	p.execDone = true
+	return nil, p.execErr
+}
+
+type pipelineClient struct {
+	fakeUniversalClient
+	pipe *fakePipeliner
+}
+
+func (c *pipelineClient) TxPipeline() goredis.Pipeliner { return c.pipe }
+
+func (c *pipelineClient) HSet(_ context.Context, _ string, _ ...interface{}) *goredis.IntCmd {
+	return goredis.NewIntResult(1, nil)
+}
+
+func TestHSetFieldsExpirePipelinesHSetAndExpire(t *testing.T) {
+	pipe := &fakePipeliner{}
+	mgr := NewRedisMgr()
+	mgr.AddClientInstance(1, &pipelineClient{pipe: pipe})
+
+	err := mgr.HSetFieldsExpire(context.Background(), 1, "role:7",
+		map[string][]byte{"basic": []byte("x")}, 30*24*time.Hour)
+	if err != nil {
+		t.Fatalf("HSetFieldsExpire() error = %v", err)
+	}
+	if pipe.hsetKey != "role:7" || pipe.hsetValue == nil {
+		t.Fatalf("HSet not piped: key=%q values=%v", pipe.hsetKey, pipe.hsetValue)
+	}
+	if pipe.expireKey != "role:7" || pipe.expireTTL != 30*24*time.Hour {
+		t.Fatalf("Expire not piped: key=%q ttl=%v", pipe.expireKey, pipe.expireTTL)
+	}
+	if !pipe.execDone {
+		t.Fatal("pipeline not executed")
+	}
+}
+
+func TestHSetFieldsExpireZeroTTLFallsBackToPlainHSet(t *testing.T) {
+	pipe := &fakePipeliner{}
+	mgr := NewRedisMgr()
+	mgr.AddClientInstance(1, &pipelineClient{pipe: pipe})
+
+	if err := mgr.HSetFieldsExpire(context.Background(), 1, "role:7",
+		map[string][]byte{"basic": []byte("x")}, 0); err != nil {
+		t.Fatal(err)
+	}
+	if pipe.execDone {
+		t.Fatal("ttl=0 应退化为 HSetFields，不走 pipeline")
+	}
+}
+
+func TestHSetFieldsExpireEmptyMapIsNoop(t *testing.T) {
+	pipe := &fakePipeliner{}
+	mgr := NewRedisMgr()
+	mgr.AddClientInstance(1, &pipelineClient{pipe: pipe})
+	if err := mgr.HSetFieldsExpire(context.Background(), 1, "role:7", nil, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if pipe.execDone {
+		t.Fatal("空 map 应为 no-op")
+	}
+}
