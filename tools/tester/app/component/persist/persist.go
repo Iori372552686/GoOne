@@ -55,14 +55,15 @@ type PersistComponent struct {
 
 	module ModuleCfg
 
-	mu          sync.Mutex
-	syncVersion uint64 // 每收到一次同步推送 +1（条件等待用）
-	gold        int64  // 本地缓存：金币（BasicInfo.Gold）
-	name        string // 本地缓存：角色名
-	items       map[int32]int64
-	lastFull    int32 // 最近一次同步的 full_section_mask
-	lastPatch   int32 // 最近一次同步的 patch_section_mask
-	obtainSeen  bool  // 收到过 CMD_SC_OBTAIN_NOTICE
+	mu               sync.Mutex
+	syncVersion      uint64 // 每收到一次同步推送 +1（条件等待用）
+	gold             int64  // 本地缓存：金币（BasicInfo.Gold）
+	name             string // 本地缓存：角色名
+	items            map[int32]int64
+	lastFull         int32 // 最近一次 V2 同步的 full_section_mask
+	lastPatch        int32 // 最近一次 V2 同步的 patch_section_mask
+	lastBasicTouched bool  // 最近一次同步是否触碰 BASIC 段（v1 无 mask，按字段存在性判定）
+	obtainSeen       bool  // 收到过 CMD_SC_OBTAIN_NOTICE
 }
 
 func (c *PersistComponent) Name() string { return "persist" }
@@ -81,15 +82,17 @@ func (c *PersistComponent) OnInit(ctx *component.ComponentContext) error {
 		c.module.Phase = "solo"
 	}
 	if c.module.MarkerCount == 0 {
-		c.module.MarkerCount = 12345
+		// 20101001（规则2 普通道具）MaxOwnCount=9999：标记数须在限内，
+		// 又要显著高于 solo 阶段的累计噪声（~几十）。
+		c.module.MarkerCount = 5000
 	}
 	log.Printf("[Actor %d][Persist] init phase=%s marker=%d", c.actorID, c.module.Phase, c.module.MarkerCount)
 	return nil
 }
 
-func (c *PersistComponent) OnConnected() error               { return nil }
-func (c *PersistComponent) OnAccountLogin(a string) error    { c.accountID = a; return nil }
-func (c *PersistComponent) OnRoleLogin(uid int64) error      { c.userID = uid; return nil }
+func (c *PersistComponent) OnConnected() error            { return nil }
+func (c *PersistComponent) OnAccountLogin(a string) error { c.accountID = a; return nil }
+func (c *PersistComponent) OnRoleLogin(uid int64) error   { c.userID = uid; return nil }
 
 // OnMessage 捕获服务端主动同步推送，维护本地缓存。
 // 返回 true 的语义仅为"已消费日志"，框架不据此拦截其他组件。
@@ -134,7 +137,7 @@ func (c *PersistComponent) RunTests(ctx context.Context) error {
 
 // RunStress 压测正常路径：加道具 + 查询 + 心跳（轻量组合）。
 func (c *PersistComponent) RunStress(ctx context.Context) error {
-	if err := c.gmAddItem(ctx, itemUsable, 1); err != nil {
+	if _, err := c.gmAddItem(ctx, itemUsable, 1); err != nil {
 		return err
 	}
 	_, _ = c.queryBackpack(ctx, 0, 1, 10)
@@ -151,6 +154,11 @@ func (c *PersistComponent) applyFull(info *g1_protocol.RoleInfo, fullMask, patch
 	defer c.mu.Unlock()
 	c.syncVersion++
 	c.lastFull, c.lastPatch = fullMask, patchMask
+	// v1（legacy）同步无 mask 字段：以 section 字段是否下发判定；
+	// v2 有 fullMask>0 时按位判定（fullMask==ALL 的 v1 路径会带全字段，同样成立）。
+	c.lastBasicTouched = info.GetBasicInfo() != nil ||
+		(fullMask != 0 && fullMask != int32(g1_protocol.ERoleSectionFlag_ALL) &&
+			fullMask&int32(g1_protocol.ERoleSectionFlag_BASIC_INFO) != 0)
 	if b := info.GetBasicInfo(); b != nil {
 		c.gold = b.GetGold()
 		if b.GetName() != "" {
@@ -158,6 +166,12 @@ func (c *PersistComponent) applyFull(info *g1_protocol.RoleInfo, fullMask, patch
 		}
 	}
 	if inv := info.GetInventoryInfo(); inv != nil {
+		// 全量同步含 INVENTORY 段时按服务器重建该段缓存：缺席即已删除
+		//（出售/使用归零后服务器从 ItemMap 移除；V1 无 mask、V2 有 full 位，
+		// 二者 InventoryInfo 非 nil 都代表该段被下发）。纯增量合并会漏删。
+		for id := range c.items {
+			delete(c.items, id)
+		}
 		for id, it := range inv.GetItemMap() {
 			if it.GetCount() > 0 {
 				c.items[id] = it.GetCount()

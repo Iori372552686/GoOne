@@ -112,6 +112,7 @@ func loadRole(uid uint64, trans cmd_handler.IContext) (*Role, error) {
 
 	role := Role{}
 	role.PbRole = info
+	role.initComponents()
 	// 这里主要是老的数据添加新增的数据段，不然新数据段就是nil
 	role.RoleInitField(info.RegisterInfo.Uid)
 	// L2 命中意味着 L3 可能滞后（写回是异步防抖）：置待写标记，

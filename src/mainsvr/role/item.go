@@ -7,61 +7,41 @@ import (
 	pb "github.com/Iori372552686/g1_common/protocol"
 )
 
-/// 玩家道具相关操作放在这里
+/// 玩家道具/货币相关操作放在这里。
+// 货币（1-9999）统一走 CurrencyComponent（RoleCurrencyInfo），
+// 背包道具（10000+）走 InventoryInfo——三处旧平行映射已收敛为段判定。
 
-// 获取道具数量
+// 获取道具/货币数量。
 func (r *Role) GetItemCount(itemId int32) int64 {
-	v := r.ItemGetCountRef(itemId)
-	if v == nil {
-		return 0
+	if r.Currency.IsCurrency(itemId) {
+		return r.Currency.Get(itemId)
 	}
-	return *v
-}
-
-// 获得道具数量的引用
-func (r *Role) ItemGetCountRef(itemId int32) *int64 {
-	switch itemId {
-	case int32(pb.EItemID_GOLD):
-		return &(r.PbRole.BasicInfo.Gold)
-	case int32(pb.EItemID_DIAMOND):
-		return &(r.PbRole.BasicInfo.Diamond)
-	case int32(pb.EItemID_CREDIT):
-		return &(r.PbRole.BasicInfo.Credit)
-	case int32(pb.EItemID_LIVENESS):
-		return &(r.PbRole.BasicInfo.Liveness)
-	case int32(pb.EItemID_GUILDGOLD):
-		return &(r.PbRole.BasicInfo.GuildCoin)
-	case int32(pb.EItemID_ACECOIN):
-		return &(r.PbRole.BasicInfo.AceCoin)
-	case int32(pb.EItemID_WINACECOIN):
-		return &(r.PbRole.BasicInfo.WinAceCoin)
-	default:
-		if r.PbRole.InventoryInfo.ItemMap[itemId] != nil {
-			return &r.PbRole.InventoryInfo.ItemMap[itemId].Count
-		}
+	if it := r.PbRole.InventoryInfo.ItemMap[itemId]; it != nil {
+		return it.Count
 	}
-
-	return nil
+	return 0
 }
 
 func (r *Role) ItemCheckAdd(itemId int32, itemCount int64) int {
 	if itemCount <= 0 {
 		return int(pb.ErrorCode_ERR_ARGV)
 	}
+	// 货币无拥有上限语义（入 currency_map，不占背包）
+	if r.Currency.IsCurrency(itemId) {
+		return 0
+	}
 	itemConf := itemconf.GetItemByItemId(itemId)
 	if itemConf == nil {
 		return int(pb.ErrorCode_ERR_CONF)
 	}
-	// 普通道具检查 MaxOwnCount 上限（货币走 BasicInfo，不受此限）
-	if !isBasicInfoItem(itemId) {
-		rule := r.getItemRule(itemConf)
-		if rule != nil && rule.MaxOwnCount > 0 {
-			cur := r.GetItemCount(itemId)
-			if cur+itemCount > int64(rule.MaxOwnCount) {
-				r.Errorf("ITEM|over limit {id:%d, cur:%d, add:%d, max:%d}",
-					itemId, cur, itemCount, rule.MaxOwnCount)
-				return int(pb.ErrorCode_ERR_ITEM_OVER_LIMIT)
-			}
+	// 普通道具检查 MaxOwnCount 上限
+	rule := r.getItemRule(itemConf)
+	if rule != nil && rule.MaxOwnCount > 0 {
+		cur := r.GetItemCount(itemId)
+		if cur+itemCount > int64(rule.MaxOwnCount) {
+			r.Errorf("ITEM|over limit {id:%d, cur:%d, add:%d, max:%d}",
+				itemId, cur, itemCount, rule.MaxOwnCount)
+			return int(pb.ErrorCode_ERR_ITEM_OVER_LIMIT)
 		}
 	}
 	return 0
@@ -101,21 +81,21 @@ func (r *Role) ItemsSee(in *[]*pb.PbItem) *[]*pb.PbItem {
 	return &out
 }
 
-// 生成掉落（如果输入列表里面有drop类型的道具，则展开drop）
+// ItemSee 输入道具的"视图展开"：
+//   - 货币直通（不依赖 ItemConfig）；
+//   - 未配置道具丢弃（与历史行为一致，防幽灵道具入包）；
+//   - 其余原样返回。掉落产出统一走 DropExecute（drop_group.go 双层解析），
+//     不再在此做单层展开。
 func (r *Role) ItemSee(item *pb.PbItem) *[]*pb.PbItem {
 	out := make([]*pb.PbItem, 0)
-
-	conf := itemconf.GetItemByItemId(item.Id)
-	if conf == nil {
+	if r.Currency.IsCurrency(item.Id) {
+		out = append(out, item)
 		return &out
 	}
-	if conf.Type == int32(pb.EItemType_DROP) {
-		drop := r.DropGetItemByDropID(item.Id)
-		out = append(out, *drop...)
-	} else {
-		out = append(out, item)
+	if itemconf.GetItemByItemId(item.Id) == nil {
+		return &out
 	}
-
+	out = append(out, item)
 	return &out
 }
 
@@ -175,21 +155,28 @@ func (r *Role) ItemReduce(itemId int32, itemCount int64, reason *Reason) (*[]*pb
 		return nil, ret
 	}
 
-	ref := r.ItemGetCountRef(itemId)
-	*ref -= itemCount
-
-	if *ref == 0 {
-		if isBasicInfoItem(itemId) {
-			r.TouchBasicInfo("basic_info")
-		} else {
-			r.ItemRemove(itemId)
+	if r.Currency.IsCurrency(itemId) {
+		// 货币扣减（含余额校验与脏标记，CurrencyComponent 内完成）
+		if ret := r.Currency.Deduct(itemId, itemCount, reason); ret != pb.ErrorCode_ERR_OK {
+			return nil, ret
 		}
+		return out, pb.ErrorCode_ERR_OK
+	}
+
+	it := r.PbRole.InventoryInfo.ItemMap[itemId]
+	if it == nil {
+		r.Errorf("reduce nil item {id: %v}", itemId)
+		return nil, pb.ErrorCode_ERR_ITEM_NOT_ENOUGH
+	}
+	it.Count -= itemCount
+	if it.Count == 0 {
+		r.ItemRemove(itemId)
 	} else {
 		r.trackItemMutation(itemId, false, reason)
 	}
 
 	r.Debugf("reduce item {id: %v, cnt: %v, after: %v, reason:[%d|%d]}",
-		itemId, itemCount, *ref, reason.Reason, reason.Scene)
+		itemId, itemCount, it.Count, reason.Reason, reason.Scene)
 
 	return out, pb.ErrorCode_ERR_OK
 }
@@ -208,23 +195,25 @@ func (r *Role) ItemsReduce(items *[]*pb.PbItem, reason *Reason) (*[]*pb.PbItem, 
 		if v.Count == 0 {
 			continue
 		}
-		ref := r.ItemGetCountRef(v.Id)
-		if ref == nil {
-			r.Errorf("get ref nul {id: %v}", v.Id)
-			return nil, -1
-		}
-		*ref -= v.Count
-		if *ref == 0 {
-			if isBasicInfoItem(v.Id) {
-				r.TouchBasicInfo("basic_info")
-			} else {
-				r.ItemRemove(v.Id)
+		if r.Currency.IsCurrency(v.Id) {
+			if ret := r.Currency.Deduct(v.Id, v.Count, reason); ret != pb.ErrorCode_ERR_OK {
+				return nil, ret
 			}
+			continue
+		}
+		it := r.PbRole.InventoryInfo.ItemMap[v.Id]
+		if it == nil {
+			r.Errorf("reduce nil item {id: %v}", v.Id)
+			return nil, pb.ErrorCode_ERR_ITEM_NOT_ENOUGH
+		}
+		it.Count -= v.Count
+		if it.Count == 0 {
+			r.ItemRemove(v.Id)
 		} else {
 			r.trackItemMutation(v.Id, false, reason)
 		}
 		r.Debugf("reduce item {id: %v, cnt: %v, after: %v, reason:[%d|%d]}",
-			v.Id, v.Count, *ref, reason.Reason, reason.Scene)
+			v.Id, v.Count, it.Count, reason.Reason, reason.Scene)
 	}
 	return out, pb.ErrorCode_ERR_OK
 }
@@ -244,11 +233,16 @@ func (r *Role) ItemAdd(itemId int32, itemCount int64, reason *Reason) pb.ErrorCo
 	}
 
 	items := r.ItemSee(&pb.PbItem{Id: itemId, Count: itemCount})
+	ret := pb.ErrorCode_ERR_OK
 	for _, v := range *items {
-		r.itemDoAdd(v.Id, v.Count, reason)
+		// itemDoAdd 的错误码必须透传（MaxOwnCount 超限、配置缺失等）：
+		// 丢弃会让调用方拿到假成功（模拟测试 T13 发现）。
+		if code := r.itemDoAdd(v.Id, v.Count, reason); code != 0 {
+			ret = pb.ErrorCode(code)
+		}
 	}
 
-	return pb.ErrorCode_ERR_OK
+	return ret
 }
 
 // 添加多个道具
@@ -262,15 +256,24 @@ func (r *Role) ItemsAdd(items *[]*pb.PbItem, reason *Reason) pb.ErrorCode {
 	}
 
 	realItems := r.ItemsSee(items)
+	ret := pb.ErrorCode_ERR_OK
 	for _, v := range *realItems {
-		r.itemDoAdd(v.Id, v.Count, reason)
+		if code := r.itemDoAdd(v.Id, v.Count, reason); code != 0 {
+			ret = pb.ErrorCode(code)
+		}
 	}
-	return pb.ErrorCode_ERR_OK
+	return ret
 }
 
 func (r *Role) itemDoAdd(itemId int32, itemCount int64, reason *Reason) int {
 	if itemCount == 0 {
 		return 0
+	}
+
+	// 货币（含经验/体力等资源）：统一入 currency_map，CurrencyComponent 内
+	// 完成溢出保护、脏标记与回调。
+	if r.Currency.IsCurrency(itemId) {
+		return int(r.Currency.Add(itemId, itemCount, reason))
 	}
 
 	itemConf := itemconf.GetItemByItemId(itemId)
@@ -292,44 +295,24 @@ func (r *Role) itemDoAdd(itemId int32, itemCount int64, reason *Reason) int {
 		}
 	}
 
-	ref := r.ItemGetCountRef(itemId)
-	switch pb.EItemID(itemId) {
-	case pb.EItemID_GOLD,
-		pb.EItemID_DIAMOND,
-		pb.EItemID_LIVENESS,
-		pb.EItemID_GUILDGOLD:
-		*ref += itemCount
+	// 按MainType分层处理
+	switch itemConf.MainType {
+	case int32(pb.EItemMainType_ICON):
+		switch itemConf.SubType {
+		case int32(pb.EItemSubType_ICON_ICON):
+			r.IconAdd(itemId, reason)
+		case int32(pb.EItemSubType_ICON_FRAME):
+			r.FrameAdd(itemId, reason)
+		}
+
+	default: // 通用背包物品处理
+		it := r.PbRole.InventoryInfo.ItemMap[itemId]
+		if it == nil {
+			it = &pb.PbItem{Id: itemId}
+			r.PbRole.InventoryInfo.ItemMap[itemId] = it
+		}
+		it.Count += itemCount
 		r.trackItemMutation(itemId, false, reason)
-
-	case pb.EItemID_EXP: // 经验单独处理
-		r.ExpAdd(itemCount)
-		if shouldTrackMutation(reason) {
-			r.TouchBasicInfo("basic_info")
-		}
-
-	default:
-		// 按MainType分层处理
-		switch itemConf.MainType {
-		case int32(pb.EItemMainType_ICON):
-			switch itemConf.SubType {
-			case int32(pb.EItemSubType_ICON_ICON):
-				r.IconAdd(itemId, reason)
-			case int32(pb.EItemSubType_ICON_FRAME):
-				r.FrameAdd(itemId, reason)
-			}
-
-		default: // 通用背包物品处理
-			if ref == nil {
-				r.PbRole.InventoryInfo.ItemMap[itemId] = &pb.PbItem{Id: itemId, Count: 0}
-				ref = &r.PbRole.InventoryInfo.ItemMap[itemId].Count
-			}
-			*ref += itemCount
-			r.trackItemMutation(itemId, false, reason)
-		}
-	}
-
-	if ref != nil {
-		//r.ActTaskReport(int32(pb.TaskName_TASK_GET_FIXED_ITEM), itemId, 0, 0, itemCount)
 	}
 
 	r.Debugf("ITEM| add item {id: %v, count: %v, reason:[%v|%v]}", itemId, itemCount, reason.Reason, reason.Scene)
@@ -489,17 +472,10 @@ func (r *Role) applyItemUse(useConf *pb.ItemUseConfig, count int32, reason *Reas
 		}
 		return r.ItemAdd(useConf.UseId, prodCnt, reason)
 	case itemUseTypeDropGroup:
-		// 掉落组：UseId 是掉落组ID，count 是次数；产出走 ItemAdd
-		var produced []*pb.PbItem
-		for i := int32(0); i < count; i++ {
-			got := r.DropGetItemByDropID(useConf.UseId)
-			if got != nil {
-				produced = append(produced, *got...)
-			}
-		}
-		for _, it := range produced {
-			r.ItemAdd(it.Id, it.Count, reason)
-		}
+		// 掉落组：UseId 是掉落组ID，count 是次数。
+		// DropExecute 内部完成"组→包"两层解析与 ItemAdd 落账；
+		// UseId 不在组表时降级为按掉落包直接产出（drop_group.go executeDropOnce）。
+		r.DropExecute(useConf.UseId, count, reason)
 		return pb.ErrorCode_ERR_OK
 	default:
 		r.Errorf("ITEM|use unknown type {item:%d, type:%d}", useConf.Id, useConf.UseType)
@@ -512,7 +488,7 @@ func (r *Role) ItemSell(itemId int32, count int32, reason *Reason) pb.ErrorCode 
 	if count <= 0 {
 		return pb.ErrorCode_ERR_ARGV
 	}
-	if isBasicInfoItem(itemId) {
+	if r.Currency.IsCurrency(itemId) {
 		return pb.ErrorCode_ERR_ITEM_CAN_NOT_SELL
 	}
 	itemConf := itemconf.GetItemByItemId(itemId)
@@ -532,7 +508,7 @@ func (r *Role) ItemDecompose(itemId int32, count int32, reason *Reason) (*[]*pb.
 	if count <= 0 {
 		return nil, pb.ErrorCode_ERR_ARGV
 	}
-	if isBasicInfoItem(itemId) {
+	if r.Currency.IsCurrency(itemId) {
 		return nil, pb.ErrorCode_ERR_ITEM_CAN_NOT_DECOMPOSE
 	}
 	outputs := itemconf.GroupItemDecomposeByItemId(itemId)
@@ -631,4 +607,79 @@ func itemQuality(itemId int32) int32 {
 		return c.Quality
 	}
 	return 0
+}
+
+// ============================================================
+// 背包段组件（增量档）
+// ============================================================
+
+type ItemComponent struct {
+	sectionBase
+
+	inventoryUpserts int32Set
+	inventoryDeletes int32Set
+}
+
+func NewItemComponent() *ItemComponent { return &ItemComponent{} }
+
+func (c *ItemComponent) Name() string { return "inventory" }
+
+func (c *ItemComponent) Flag() pb.ERoleSectionFlag {
+	return pb.ERoleSectionFlag_INVENTORY_INFO
+}
+
+func (c *ItemComponent) OnInit(r *Role) error { c.bind(r); return nil }
+func (c *ItemComponent) OnDestroy()            {}
+
+func (c *ItemComponent) InitField(uid uint64) {
+	if c.role.PbRole.InventoryInfo == nil {
+		c.role.PbRole.InventoryInfo = &pb.RoleInventoryInfo{}
+		c.role.PbRole.InventoryInfo.ItemMap = make(map[int32]*pb.PbItem)
+	}
+}
+
+func (c *ItemComponent) Touch(reason string) {
+	c.touch(pb.ERoleSectionFlag_INVENTORY_INFO, reason)
+}
+
+func (c *ItemComponent) MarkDirty(itemID int32, deleted bool) {
+	c.role.markPatchSection(pb.ERoleSectionFlag_INVENTORY_INFO)
+	if deleted {
+		delInt32Value(&c.inventoryUpserts, itemID)
+		setInt32Value(&c.inventoryDeletes, itemID)
+	} else {
+		delInt32Value(&c.inventoryDeletes, itemID)
+		setInt32Value(&c.inventoryUpserts, itemID)
+	}
+	c.role.markPersistSectionDirty(pb.ERoleSectionFlag_INVENTORY_INFO, "inventory")
+}
+
+func (c *ItemComponent) BuildPatch(dst *pb.ScSyncUserDataV2) bool {
+	patch := &pb.RoleInventoryPatch{}
+	for _, itemID := range sortedInt32Values(c.inventoryUpserts) {
+		if c.role.PbRole.InventoryInfo == nil || c.role.PbRole.InventoryInfo.ItemMap == nil {
+			continue
+		}
+		if item := c.role.PbRole.InventoryInfo.ItemMap[itemID]; item != nil {
+			patch.UpsertItems = append(patch.UpsertItems, item)
+		}
+	}
+	patch.DeleteItemIds = sortedInt32Values(c.inventoryDeletes)
+	if len(patch.UpsertItems) == 0 && len(patch.DeleteItemIds) == 0 {
+		return false
+	}
+	dst.InventoryPatch = patch
+	return true
+}
+
+func (c *ItemComponent) ClearDirty() {
+	c.inventoryUpserts = nil
+	c.inventoryDeletes = nil
+}
+
+func inventorySection() roleSection {
+	return messageSection(pb.ERoleSectionFlag_INVENTORY_INFO, "inventory",
+		func(i *pb.RoleInfo) *pb.RoleInventoryInfo { return i.InventoryInfo },
+		func(i *pb.RoleInfo, m *pb.RoleInventoryInfo) { i.InventoryInfo = m },
+		func() *pb.RoleInventoryInfo { return new(pb.RoleInventoryInfo) })
 }

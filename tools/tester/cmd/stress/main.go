@@ -29,6 +29,7 @@ import (
 	// 注册全部业务测试组件
 	_ "github.com/Iori372552686/GoOne/tools/tester/app/component/inventory"
 	_ "github.com/Iori372552686/GoOne/tools/tester/app/component/login"
+	_ "github.com/Iori372552686/GoOne/tools/tester/app/component/persist"
 )
 
 func main() {

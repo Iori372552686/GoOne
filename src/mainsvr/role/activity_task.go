@@ -331,3 +331,76 @@ func (r *Role) SendActvityTaskSingleUpdateToSelf(c cmd_handler.IContext, info *g
 	router.SendPbMsgByBusIdSimple(c.OriSrcBusId(), c.Uid(), uint32(g1_protocol.CMD_MAIN_ACTIVITY_TASK_SINGLE_UPDATE_NOTIFY), rsp)
 }
 */
+
+// ============================================================
+// 活动任务段组件（增量档）
+// ============================================================
+
+type ActivityTaskComponent struct {
+	sectionBase
+
+	actTaskUpserts int32Set
+	actTaskDeletes int32Set
+}
+
+func NewActivityTaskComponent() *ActivityTaskComponent { return &ActivityTaskComponent{} }
+
+func (c *ActivityTaskComponent) Name() string { return "activity_task" }
+
+func (c *ActivityTaskComponent) Flag() g1_protocol.ERoleSectionFlag {
+	return g1_protocol.ERoleSectionFlag_ACTVITY_TASK_INFO
+}
+
+func (c *ActivityTaskComponent) OnInit(r *Role) error { c.bind(r); return nil }
+func (c *ActivityTaskComponent) OnDestroy()            {}
+
+// InitField 保持原 RoleInitField 语义：活动任务段不做 nil 兜底。
+func (c *ActivityTaskComponent) InitField(uid uint64) {}
+
+// Touch 活动任务段走增量档：标记 patch + 持久化脏（与原 TouchActvityTaskInfo 一致）。
+func (c *ActivityTaskComponent) Touch(reason string) {
+	c.role.markPatchSection(g1_protocol.ERoleSectionFlag_ACTVITY_TASK_INFO)
+	c.role.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_ACTVITY_TASK_INFO, reason)
+}
+
+func (c *ActivityTaskComponent) MarkDirty(taskID int32, deleted bool) {
+	c.role.markPatchSection(g1_protocol.ERoleSectionFlag_ACTVITY_TASK_INFO)
+	if deleted {
+		delInt32Value(&c.actTaskUpserts, taskID)
+		setInt32Value(&c.actTaskDeletes, taskID)
+	} else {
+		delInt32Value(&c.actTaskDeletes, taskID)
+		setInt32Value(&c.actTaskUpserts, taskID)
+	}
+	c.role.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_ACTVITY_TASK_INFO, "activity_task")
+}
+
+func (c *ActivityTaskComponent) BuildPatch(dst *g1_protocol.ScSyncUserDataV2) bool {
+	patch := &g1_protocol.RoleActvityTaskPatch{}
+	for _, taskID := range sortedInt32Values(c.actTaskUpserts) {
+		if c.role.PbRole.Actvity_Info == nil || c.role.PbRole.Actvity_Info.TaskMap == nil {
+			continue
+		}
+		if task := c.role.PbRole.Actvity_Info.TaskMap[taskID]; task != nil {
+			patch.UpsertTasks = append(patch.UpsertTasks, task)
+		}
+	}
+	patch.DeleteTaskIds = sortedInt32Values(c.actTaskDeletes)
+	if len(patch.UpsertTasks) == 0 && len(patch.DeleteTaskIds) == 0 {
+		return false
+	}
+	dst.ActvityTaskPatch = patch
+	return true
+}
+
+func (c *ActivityTaskComponent) ClearDirty() {
+	c.actTaskUpserts = nil
+	c.actTaskDeletes = nil
+}
+
+func activityTaskSection() roleSection {
+	return messageSection(g1_protocol.ERoleSectionFlag_ACTVITY_TASK_INFO, "activity_task",
+		func(i *g1_protocol.RoleInfo) *g1_protocol.RoleActvityTaskInfo { return i.Actvity_Info },
+		func(i *g1_protocol.RoleInfo, m *g1_protocol.RoleActvityTaskInfo) { i.Actvity_Info = m },
+		func() *g1_protocol.RoleActvityTaskInfo { return new(g1_protocol.RoleActvityTaskInfo) })
+}

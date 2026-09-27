@@ -59,7 +59,7 @@ func (c *InventoryComponent) OnMessage(cmd uint32, data []byte) bool {
 
 // RunStress 压测正常路径：加道具 + 查背包（高频轻量组合）。
 func (c *InventoryComponent) RunStress(ctx context.Context) error {
-	if err := c.gmAddItem(ctx, 30100001, 1); err != nil {
+	if err := c.gmAddItem(ctx, 20001, 1); err != nil {
 		return err
 	}
 	_, _ = c.queryBackpack(ctx, 0, 1, 10)
@@ -99,7 +99,7 @@ func (c *InventoryComponent) RunTests(ctx context.Context) error {
 
 // T01: GM 加道具后能查到数量。
 func (c *InventoryComponent) testGmAddItem(ctx context.Context) error {
-	return c.gmAddItem(ctx, 30100001, 10)
+	return c.gmAddItem(ctx, 20001, 10)
 }
 
 // T02: 查背包返回非负 total。
@@ -116,15 +116,15 @@ func (c *InventoryComponent) testQueryBackpack(ctx context.Context) error {
 }
 
 // T03: 使用道具链路。
-//   a) getuse 宝箱（90101001，规则3 Getuse=1）：添加即自动开启——背包中不存在该道具，
+//   a) getuse 宝箱（30001，规则3 Getuse=1）：添加即自动开启——背包中不存在该道具，
 //      后续显式使用应返回 ERR_ITEM_NOT_ENOUGH（获得即使用是有意的配置驱动行为）；
-//   b) 普通道具（20101001，规则2 可使用无 Getuse）：添加后显式使用应成功。
+//   b) 普通道具（10001，规则2 可使用无 Getuse）：添加后显式使用应成功。
 func (c *InventoryComponent) testUseItem(ctx context.Context) error {
 	// a) getuse 边界：添加成功 + 显式使用不足。
-	if err := c.gmAddItem(ctx, 90101001, 1); err != nil {
+	if err := c.gmAddItem(ctx, 30001, 1); err != nil {
 		return fmt.Errorf("gm add getuse item: %w", err)
 	}
-	reqA := &g1_protocol.UseItemReq{ItemId: 90101001, Count: 1}
+	reqA := &g1_protocol.UseItemReq{ItemId: 30001, Count: 1}
 	rspA := &g1_protocol.UseItemRsp{Ret: &g1_protocol.Ret{}}
 	if err := c.requester.RequestProto(ctx, uint32(g1_protocol.CMD_MAIN_ITEM_USE_REQ), reqA, rspA, 10*time.Second); err != nil {
 		return err
@@ -134,10 +134,10 @@ func (c *InventoryComponent) testUseItem(ctx context.Context) error {
 	}
 
 	// b) 普通道具：添加 → 显式使用成功。
-	if err := c.gmAddItem(ctx, 20101001, 2); err != nil {
+	if err := c.gmAddItem(ctx, 10001, 2); err != nil {
 		return fmt.Errorf("gm add normal item: %w", err)
 	}
-	req := &g1_protocol.UseItemReq{ItemId: 20101001, Count: 1}
+	req := &g1_protocol.UseItemReq{ItemId: 10001, Count: 1}
 	rsp := &g1_protocol.UseItemRsp{Ret: &g1_protocol.Ret{}}
 	if err := c.requester.RequestProto(ctx, uint32(g1_protocol.CMD_MAIN_ITEM_USE_REQ), req, rsp, 10*time.Second); err != nil {
 		return err
@@ -150,8 +150,8 @@ func (c *InventoryComponent) testUseItem(ctx context.Context) error {
 
 // T04: 出售可售道具应成功并加金币。
 func (c *InventoryComponent) testSellItem(ctx context.Context) error {
-	_ = c.gmAddItem(ctx, 30100001, 1) // 金币兑换物1，Sale=100
-	req := &g1_protocol.SellItemReq{ItemId: 30100001, Count: 1}
+	_ = c.gmAddItem(ctx, 20001, 1) // 金币兑换物1，Sale=100
+	req := &g1_protocol.SellItemReq{ItemId: 20001, Count: 1}
 	rsp := &g1_protocol.SellItemRsp{Ret: &g1_protocol.Ret{}}
 	if err := c.requester.RequestProto(ctx, uint32(g1_protocol.CMD_MAIN_ITEM_SELL_REQ), req, rsp, 10*time.Second); err != nil {
 		return err
@@ -164,8 +164,8 @@ func (c *InventoryComponent) testSellItem(ctx context.Context) error {
 
 // T05: 分解可分解道具应返回产出。
 func (c *InventoryComponent) testDecompose(ctx context.Context) error {
-	_ = c.gmAddItem(ctx, 30100001, 1) // DecomposeConfig: 30100001 → 10101002×100
-	req := &g1_protocol.DecomposeItemReq{ItemId: 30100001, Count: 1}
+	_ = c.gmAddItem(ctx, 20001, 1) // DecomposeConfig: 20001 → GOLD(1)×100
+	req := &g1_protocol.DecomposeItemReq{ItemId: 20001, Count: 1}
 	rsp := &g1_protocol.DecomposeItemRsp{Ret: &g1_protocol.Ret{}}
 	if err := c.requester.RequestProto(ctx, uint32(g1_protocol.CMD_MAIN_ITEM_DECOMPOSE_REQ), req, rsp, 10*time.Second); err != nil {
 		return err
@@ -181,8 +181,8 @@ func (c *InventoryComponent) testDecompose(ctx context.Context) error {
 func (c *InventoryComponent) testBatchAdd(ctx context.Context) error {
 	req := &g1_protocol.BatchAddItemReq{
 		Items: []*g1_protocol.PbItem{
-			{Id: 30100001, Count: 5},
-			{Id: 30100002, Count: 3},
+			{Id: 20001, Count: 5},
+			{Id: 20002, Count: 3},
 		},
 	}
 	rsp := &g1_protocol.BatchAddItemRsp{Ret: &g1_protocol.Ret{}}
@@ -199,8 +199,8 @@ func (c *InventoryComponent) testBatchAdd(ctx context.Context) error {
 // 若策略表 source=decompose 未配置或冷却，推送可能缺席，用例降级为"不强制"。
 func (c *InventoryComponent) testObtainNotice(ctx context.Context) error {
 	c.obtainNotice = false
-	_ = c.gmAddItem(ctx, 30100001, 1)
-	dreq := &g1_protocol.DecomposeItemReq{ItemId: 30100001, Count: 1}
+	_ = c.gmAddItem(ctx, 20001, 1)
+	dreq := &g1_protocol.DecomposeItemReq{ItemId: 20001, Count: 1}
 	drsp := &g1_protocol.DecomposeItemRsp{Ret: &g1_protocol.Ret{}}
 	if err := c.requester.RequestProto(ctx, uint32(g1_protocol.CMD_MAIN_ITEM_DECOMPOSE_REQ), dreq, drsp, 10*time.Second); err != nil {
 		return err

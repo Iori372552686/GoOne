@@ -6,7 +6,6 @@ package role
 
 import (
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/service/router"
@@ -29,16 +28,33 @@ const (
 	obtainMergeModeQuality int32 = 2 // 按品质保留
 )
 
-// obtainState 每个玩家的获得展示运行时状态（source 冷却）。
+// ObtainComponent 获得展示组件（逻辑型）：持有每玩家 source 冷却状态，
+// 随 Role 生命周期生灭，替代旧的 uid 索引包级 map（无淘汰泄漏）。
+type ObtainComponent struct {
+	role *Role
+
+	sourceCooldown map[string]int64 // source -> 上次推送的 unix nano
+}
+
+func NewObtainComponent() *ObtainComponent { return &ObtainComponent{} }
+
+func (c *ObtainComponent) Name() string    { return "obtain" }
+func (c *ObtainComponent) OnInit(r *Role) error {
+	c.role = r
+	return nil
+}
+func (c *ObtainComponent) OnDestroy() {}
+
+// obtainState 返回本玩家冷却状态（懒初始化），供既有冷却函数复用。
 type obtainState struct {
 	sourceCooldown map[string]int64 // source -> 上次推送的 unix nano
 }
 
-var obtainStates sync.Map // uid(uint64) -> *obtainState
-
-func getObtainState(uid uint64) *obtainState {
-	v, _ := obtainStates.LoadOrStore(uid, &obtainState{sourceCooldown: make(map[string]int64)})
-	return v.(*obtainState)
+func (c *ObtainComponent) state() *obtainState {
+	if c.sourceCooldown == nil {
+		c.sourceCooldown = make(map[string]int64)
+	}
+	return &obtainState{sourceCooldown: c.sourceCooldown}
 }
 
 // ObtainNotifyParam 获得展示通知参数。
@@ -63,7 +79,7 @@ func (r *Role) ObtainNotify(param *ObtainNotifyParam) pb.ErrorCode {
 	}
 
 	// source 冷却：冷却期内不推送（防刷屏）
-	st := getObtainState(r.Uid())
+	st := r.Obtain.state()
 	if isSourceCoolingDown(st, param.Source, policy) {
 		return pb.ErrorCode_ERR_OK
 	}
@@ -208,7 +224,7 @@ func buildObtainRewardItems(param *ObtainNotifyParam, policy obtainPolicy) ([]*p
 			return
 		}
 		rewardType := int32(obtainRewardTypeItem)
-		if isBasicInfoItem(it.Id) {
+		if isCurrencyID(it.Id) {
 			if !policy.includeCurrency {
 				return
 			}

@@ -37,6 +37,7 @@ func InitNacos(conf net_conf.NacosConf) error {
 		NacosCacheDir:    conf.CacheDir,
 		NacosLogLevel:    conf.LogLevel,
 	})
+
 	if err != nil {
 		return err
 	}
@@ -44,5 +45,6 @@ func InitNacos(conf net_conf.NacosConf) error {
 		_ = cli.Close()
 		return err
 	}
+
 	return nil
 }

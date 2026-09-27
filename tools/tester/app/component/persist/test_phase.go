@@ -14,9 +14,15 @@ func (c *PersistComponent) runPhaseWrite(ctx context.Context) error {
 		return fmt.Errorf("write 阶段登录: %w", err)
 	}
 
-	// 标记 1：道具数量（inventory section）。
-	if _, err := c.gmAddItem(ctx, itemUsable, c.module.MarkerCount); err != nil {
+	// 标记 1：道具数量（inventory section）。检查返回码——超 MaxOwnCount 等
+	// 业务拒绝会立即失败，避免误判为同步丢失。
+	rsp, err := c.gmAddItem(ctx, itemUsable, c.module.MarkerCount)
+	if err != nil {
 		return fmt.Errorf("写入标记道具: %w", err)
+	}
+	if c.isErr(rsp.GetRet().GetCode()) {
+		return fmt.Errorf("写入标记道具被拒绝: code=%d（标记数 %d 是否超出道具 MaxOwnCount？）",
+			rsp.GetRet().GetCode(), c.module.MarkerCount)
 	}
 	if err := c.waitSyncCond(ctx, "标记道具同步", func() bool {
 		return c.itemCount(itemUsable) >= c.module.MarkerCount

@@ -65,3 +65,15 @@ enabled = true
 [modules.inventory]
 enabled = true
 order = 20
+
+# 角色持久化（DAL 三层）回归：
+#   phase = "solo"（默认）单进程全链路用例
+#   phase = "write" / "verify" 配合 tools/cmd/dalprobe wipe-l2 验证 L3 权威恢复：
+#     1) phase=write 跑一轮（登录→写标记→登出）
+#     2) go run ./tools/cmd/dalprobe -op wipe-l2 -uid <start_uid> ...
+#     3) phase=verify 跑一轮（登录必须从 L3 恢复标记数据）
+[modules.persist]
+enabled = true
+order = 30
+# phase = "solo"
+# marker_count = 12345

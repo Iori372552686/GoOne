@@ -57,14 +57,15 @@ func NewApp() *runtime.App {
 			if err = rds.RedisMgr.OnStart(ctx); err != nil {
 				return err
 			}
+
 			redisStarted = true
-			idGen, err := idgen.NewIDGen()
+			globals.IDGen, err = idgen.NewIDGen()
 			if err != nil {
 				return err
 			}
-			globals.IDGen = idGen
+
 			var nacosConf net_conf.NacosConf
-			_ = conf.Unmarshal("base_cfg.dependencies.nacos_conf", &nacosConf)
+			conf.Unmarshal("base_cfg.dependencies.nacos_conf", &nacosConf)
 			if nacosConf.IPAddr != "" {
 				logger.Infof("Loading remote gameconf by Nacos group: %v ", nacosConf.GroupName)
 				if err = gamedata.InitNacos(nacosConf); err != nil {

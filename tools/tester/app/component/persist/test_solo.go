@@ -170,15 +170,19 @@ func (c *PersistComponent) testSellItemCrossSystem(ctx context.Context) error {
 	if c.isErr(rsp.GetRet().GetCode()) {
 		return fmt.Errorf("出售失败: code=%d", rsp.GetRet().GetCode())
 	}
-	// 预期：道具 -1，金币 +100（Sale 配置）。
-	if err := c.waitSyncCond(ctx, "出售跨系统联动", func() bool {
+	// 预期：道具 -1，金币 +100（Sale 配置）。金币走 BASIC full 同步、道具删除走
+	// inventory patch，两条推送可能有先后——各自等待。
+	if err := c.waitSyncCond(ctx, "出售金币入账", func() bool {
 		return c.goldNow() == goldBefore+100
 	}); err != nil {
 		return fmt.Errorf("金币未按配表入账: got=%d want=%d（BUG：出售联动丢失或数额错误）",
 			c.goldNow(), goldBefore+100)
 	}
-	if got := c.itemCount(itemSellable); got != itemBefore-1 {
-		return fmt.Errorf("出售后道具计数错误: got=%d want=%d", got, itemBefore-1)
+	if err := c.waitSyncCond(ctx, "出售道具扣减", func() bool {
+		return c.itemCount(itemSellable) == itemBefore-1
+	}); err != nil {
+		return fmt.Errorf("出售后道具计数错误: got=%d want=%d（BUG：出售未扣减道具）",
+			c.itemCount(itemSellable), itemBefore-1)
 	}
 	return nil
 }
@@ -391,27 +395,34 @@ func (c *PersistComponent) testGmGetRoleRoundTrip(ctx context.Context) error {
 func (c *PersistComponent) testSyncPatchMaskNoSpill(ctx context.Context) error {
 	c.mu.Lock()
 	c.syncVersion = 0
-	c.lastPatch = 0
 	c.mu.Unlock()
 
 	if _, err := c.gmAddItem(ctx, itemUsable, 2); err != nil {
 		return err
 	}
-	_ = c.waitSyncCond(ctx, "等待一次同步", func() bool { return true })
+	// 等待本次操作触发的下一次同步到达（版本号从 0 递增）。
+	if err := c.waitSyncCond(ctx, "等待加道具后的同步推送", func() bool {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		return c.syncVersion >= 1
+	}); err != nil {
+		return err
+	}
 
 	c.mu.Lock()
-	full, patch := c.lastFull, c.lastPatch
+	full, patch, basicTouched := c.lastFull, c.lastPatch, c.lastBasicTouched
 	c.mu.Unlock()
-	// 加道具只应触碰 INVENTORY（full 或 patch 二选一），不应把 BASIC/GAME 等
-	// 无关 section 卷进 full 同步（否则是同步扩散 BUG）。
-	if full != 0 {
-		if full != int32(g1_protocol.ERoleSectionFlag_INVENTORY_INFO) {
-			return fmt.Errorf("full mask 扩散: 0x%X（只应含 INVENTORY 0x%X）",
-				full, int32(g1_protocol.ERoleSectionFlag_INVENTORY_INFO))
-		}
-		return nil
+	// 加道具只应触碰 INVENTORY，不应把 BASIC 等无关 section 卷进同步
+	// （否则是同步扩散，客户端全量重刷、流量放大）。
+	if basicTouched {
+		return fmt.Errorf("加道具的同步触碰了 BASIC 段（同步扩散）")
 	}
-	if patch != int32(g1_protocol.ERoleSectionFlag_INVENTORY_INFO) {
+	if full != 0 && full != int32(g1_protocol.ERoleSectionFlag_ALL) &&
+		full != int32(g1_protocol.ERoleSectionFlag_INVENTORY_INFO) {
+		return fmt.Errorf("full mask 扩散: 0x%X（只应含 INVENTORY 0x%X）",
+			full, int32(g1_protocol.ERoleSectionFlag_INVENTORY_INFO))
+	}
+	if patch != 0 && patch != int32(g1_protocol.ERoleSectionFlag_INVENTORY_INFO) {
 		return fmt.Errorf("patch mask 扩散: 0x%X（只应含 INVENTORY 0x%X）",
 			patch, int32(g1_protocol.ERoleSectionFlag_INVENTORY_INFO))
 	}

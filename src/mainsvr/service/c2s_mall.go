@@ -33,15 +33,10 @@ func (s *MainC2SServiceImpl) MallBuyPackage(ctx *ssrpc.Context, req *g1_protocol
 		return rsp, gerr.New(code, "item_check_reduce", "")
 	}
 
-	// 如果是充值购买的礼包就走充值（暂未实现，保持旧逻辑）
-	if int32(g1_protocol.EItemID_ACECOIN) == conf.CostItemID {
-		// ret = RechargeAdd(conf.Rmb, myRole)
-	} else {
-		code = myRole.ItemExchange(conf.CostItemID, int64(conf.CostItemCnt), conf.PackageID,
-			1, &role.Reason{Reason: g1_protocol.Reason_REASON_MALL_PACKAGE, Scene: req.GetConfId()})
-		if code != g1_protocol.ErrorCode_ERR_OK {
-			return rsp, gerr.New(code, "item_exchange", "")
-		}
+	code = myRole.ItemExchange(conf.CostItemID, int64(conf.CostItemCnt), conf.PackageID,
+		1, &role.Reason{Reason: g1_protocol.Reason_REASON_MALL_PACKAGE, Scene: req.GetConfId()})
+	if code != g1_protocol.ErrorCode_ERR_OK {
+		return rsp, gerr.New(code, "item_exchange", "")
 	}
 
 	myRole.MallAddBuyCount(req.GetConfId())

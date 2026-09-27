@@ -49,8 +49,9 @@ func (roleCodec) UnmarshalL3(data []byte) (*g1_protocol.RoleInfo, error) {
 	return info, nil
 }
 
-// MarshalL2Fields sections 为 section 名列表；nil = 全量（含 gift 兜底 field，
-// 与 saveRoleHash 的 force 语义一致）。
+// MarshalL2Fields sections 为 section 名列表；nil = 全量。
+// 段集合来自 roleSectionRegistry（component.go，与 saveRoleHash/同步链路同源）；
+// 未设置的段（真 nil）跳过，不写空 field。
 func (roleCodec) MarshalL2Fields(info *g1_protocol.RoleInfo, sections []string) (map[string][]byte, error) {
 	if info == nil {
 		return nil, fmt.Errorf("marshal role l2: nil RoleInfo")
@@ -61,50 +62,37 @@ func (roleCodec) MarshalL2Fields(info *g1_protocol.RoleInfo, sections []string) 
 		wanted[s] = true
 	}
 
-	fields := make(map[string][]byte, len(roleSectionAccessors)+1)
-	for _, acc := range roleSectionAccessors {
-		if !full && !wanted[acc.name] {
+	fields := make(map[string][]byte, len(roleSectionRegistry))
+	for i := range roleSectionRegistry {
+		sec := &roleSectionRegistry[i]
+		if !full && !wanted[sec.name] {
 			continue
 		}
-		msg := acc.get(info)
+		msg := sec.getMsg(info)
 		if msg == nil {
 			continue
 		}
 		buf, err := proto.Marshal(msg)
 		if err != nil {
-			return nil, fmt.Errorf("marshal role l2 field %s: %w", acc.name, err)
+			return nil, fmt.Errorf("marshal role l2 field %s: %w", sec.name, err)
 		}
-		fields[acc.name] = buf
-	}
-	// GiftInfo 无 section flag：全量写时兜底（与 persist_hash.go 的 force 分支一致）。
-	if full && info.GiftInfo != nil {
-		buf, err := proto.Marshal(info.GiftInfo)
-		if err != nil {
-			return nil, fmt.Errorf("marshal role l2 field gift: %w", err)
-		}
-		fields["gift"] = buf
+		fields[sec.name] = buf
 	}
 	return fields, nil
 }
 
-// UnmarshalL2Fields 复用 persist_hash.go 的 unmarshalSection（缺段零值补）。
+// UnmarshalL2Fields 按注册表把 hash field 集合反序列化（缺段零值补）。
 func (roleCodec) UnmarshalL2Fields(fields map[string][]byte) (*g1_protocol.RoleInfo, error) {
 	info := new(g1_protocol.RoleInfo)
-	for _, acc := range roleSectionAccessors {
-		buf, ok := fields[acc.name]
+	for i := range roleSectionRegistry {
+		sec := &roleSectionRegistry[i]
+		buf, ok := fields[sec.name]
 		if !ok || len(buf) == 0 {
 			continue
 		}
-		if err := unmarshalSection(info, acc.flag, buf); err != nil {
-			return nil, fmt.Errorf("unmarshal role l2 field %s: %w", acc.name, err)
+		if err := sec.unmarshal(info, buf); err != nil {
+			return nil, fmt.Errorf("unmarshal role l2 field %s: %w", sec.name, err)
 		}
-	}
-	if buf, ok := fields["gift"]; ok && len(buf) > 0 {
-		gift := new(g1_protocol.RoleGiftExchangeInfo)
-		if err := proto.Unmarshal(buf, gift); err != nil {
-			return nil, fmt.Errorf("unmarshal role l2 field gift: %w", err)
-		}
-		info.GiftInfo = gift
 	}
 	return info, nil
 }
@@ -194,6 +182,12 @@ func (s *RoleStore) tiered(trans cmd_handler.IContext) *dal.TieredStore[*g1_prot
 // Load 读穿：L2 → L3（需 trans）→ 回填 L2。found=false 表示全新角色。
 func (s *RoleStore) Load(ctx context.Context, trans cmd_handler.IContext, uid uint64) (*g1_protocol.RoleInfo, bool, error) {
 	return s.tiered(trans).Load(ctx, uid)
+}
+
+// SaveL2 写穿 L2：sections=nil 全量段，否则仅写指定段（saveRoleHash 的
+// 唯一 L2 写入口，DAL 与运行期共用一条写路径）。
+func (s *RoleStore) SaveL2(ctx context.Context, uid uint64, info *g1_protocol.RoleInfo, sections []string) error {
+	return s.tiered(nil).SaveL2(ctx, uid, info, sections)
 }
 
 // SaveL3 整包快照 one-way 写回（尽力投递）。

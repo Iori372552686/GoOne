@@ -14,7 +14,6 @@ import (
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/lib/util/convert"
 	"github.com/Iori372552686/GoOne/module/conf"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
@@ -37,20 +36,24 @@ type Role struct {
 	// 于 UID 串行域完成。
 	lastHeartbeatUnix atomic.Int64
 
+	// 组件体系：注册顺序即初始化顺序（依赖底层先行）。
+	comps        []RoleComponent
+	sectionComps []SectionComponent
+	patchComps   []PatchComponent
+	// patchableMask 全部增量档组件的段位并集（原 patchableRoleSectionMask）。
+	patchableMask g1_protocol.ERoleSectionFlag
+
+	// 核心组件 O(1) 访问器（initComponents 装配时填充）。
+	Basic    *BasicComponent
+	Currency *CurrencyComponent
+	Item     *ItemComponent
+	Icon     *IconComponent
+	Mall     *MallComponent
+	Drop     *DropComponent
+	Obtain   *ObtainComponent
+
 	pendingFullSyncMask g1_protocol.ERoleSectionFlag
 	pendingPatchMask    g1_protocol.ERoleSectionFlag
-
-	inventoryUpserts int32Set
-	inventoryDeletes int32Set
-	mallUpserts      int32Set
-	mallDeletes      int32Set
-	iconUpserts      int32Set
-	iconDeletes      int32Set
-	frameUpserts     int32Set
-	frameDeletes     int32Set
-	actTaskUpserts   int32Set
-	actTaskDeletes   int32Set
-	iconEquipDirty   bool
 
 	needPersist       bool
 	persistDirtySince int32
@@ -71,62 +74,74 @@ func NewRole(uid uint64) *Role {
 	role := new(Role)
 
 	role.PbRole = new(g1_protocol.RoleInfo)
+	role.initComponents()
 	role.RoleInitField(uid)
 	role.OnRoleCreate()
 	return role
 }
 
-// Role的初始化函数 新增成员以后记得加上去
+// initComponents 装配全部功能组件。顺序即 OnInit/InitField 顺序：
+// 数据段组件依赖底层先行（基础 → 背包 → 外观/商城 → 任务 → 逻辑型）。
+func (r *Role) initComponents() {
+	r.comps = []RoleComponent{
+		NewRegisterComponent(),
+		NewLoginComponent(),
+		NewGameComponent(),
+		NewBasicComponent(),
+		NewCurrencyComponent(),
+		NewItemComponent(),
+		NewIconComponent(),
+		NewMallComponent(),
+		NewMainTaskComponent(),
+		NewGuildComponent(),
+		NewGuideComponent(),
+		NewOpenFuncComponent(),
+		NewGiftComponent(),
+		NewActivityTaskComponent(),
+		NewDropComponent(),
+		NewObtainComponent(),
+		NewItemUseComponent(),
+	}
+	for _, c := range r.comps {
+		if err := c.OnInit(r); err != nil {
+			r.Errorf("component %s init failed: %v", c.Name(), err)
+			continue
+		}
+		if sc, ok := c.(SectionComponent); ok {
+			r.sectionComps = append(r.sectionComps, sc)
+		}
+		if pc, ok := c.(PatchComponent); ok {
+			r.patchComps = append(r.patchComps, pc)
+			r.patchableMask |= pc.Flag()
+		}
+		switch comp := c.(type) {
+		case *BasicComponent:
+			r.Basic = comp
+		case *CurrencyComponent:
+			r.Currency = comp
+		case *ItemComponent:
+			r.Item = comp
+		case *IconComponent:
+			r.Icon = comp
+		case *MallComponent:
+			r.Mall = comp
+		case *DropComponent:
+			r.Drop = comp
+		case *ObtainComponent:
+			r.Obtain = comp
+		}
+	}
+}
+
+// RoleInitField 数据段 nil 兜底（ConnSvrInfo 为运行时态单独处理）。
+// 各段的具体默认值由所属组件的 InitField 提供。
 func (r *Role) RoleInitField(uid uint64) {
-	now := datetime.Now()
 	if r.PbRole.ConnSvrInfo == nil {
 		r.PbRole.ConnSvrInfo = &g1_protocol.ConnSvrInfo{}
 	}
-	if r.PbRole.RegisterInfo == nil {
-		r.PbRole.RegisterInfo = &g1_protocol.RoleRegisterInfo{}
-		r.PbRole.RegisterInfo.Uid = uid
-		r.PbRole.RegisterInfo.RegisterTime = now
+	for _, sc := range r.sectionComps {
+		sc.InitField(uid)
 	}
-	if r.PbRole.LoginInfo == nil {
-		r.PbRole.LoginInfo = &g1_protocol.RoleLoginInfo{}
-	}
-	if r.PbRole.GameInfo == nil {
-		r.PbRole.GameInfo = &g1_protocol.RoleGameInfo{}
-		r.PbRole.GameInfo.PlayRoomIds = make([]uint64, 0)
-	}
-	if r.PbRole.BasicInfo == nil {
-		r.PbRole.BasicInfo = &g1_protocol.RoleBasicInfo{}
-		r.PbRole.BasicInfo.Level = 1
-		r.PbRole.BasicInfo.Name = "Player" + convert.Int64ToString(int64(uid))
-		//r.PbRole.DescInfo.FrameId = gamedata.Const.DefaultFrame()
-		//r.PbRole.DescInfo.ImageId = gamedata.Const.DefaultImage()
-		r.PbRole.BasicInfo.Gold = 1000000
-		r.PbRole.BasicInfo.Diamond = 10000
-		r.PbRole.BasicInfo.AceCoin = 100000
-		r.PbRole.BasicInfo.WinAceCoin = 20000
-		r.PbRole.BasicInfo.Credit = 10000
-		r.PbRole.BasicInfo.FreeCnt = 1
-	}
-	if r.PbRole.IconInfo == nil {
-		r.PbRole.IconInfo = &g1_protocol.RoleIconInfo{}
-		//r.PbRole.IconInfo.FrameId = ConstConfig.MGetByName("DefaultFrame").Value //gamedata.Const.DefaultFrame()
-		r.PbRole.IconInfo.IconUrl = "headicon_" + convert.Int64ToString(int64(uid)%31)
-	}
-	if r.PbRole.MallInfo == nil {
-		r.PbRole.MallInfo = &g1_protocol.RoleMallInfo{}
-	}
-	if r.PbRole.MainTaskInfo == nil {
-		r.PbRole.MainTaskInfo = &g1_protocol.RoleMainTaskInfo{}
-	}
-	if r.PbRole.OpenFunInfo == nil {
-		r.PbRole.OpenFunInfo = &g1_protocol.RoleOpenFunction{}
-		r.PbRole.OpenFunInfo.IsAllOpen = true
-	}
-	if r.PbRole.InventoryInfo == nil {
-		r.PbRole.InventoryInfo = &g1_protocol.RoleInventoryInfo{}
-		r.PbRole.InventoryInfo.ItemMap = make(map[int32]*g1_protocol.PbItem)
-	}
-
 }
 
 func (r *Role) Now() int32 {
@@ -233,15 +248,23 @@ func (r *Role) l3FlushDebounceSec() int32 {
 }
 
 // MaybeFlushL3 按防抖消费 needL3Flush，整包快照 one-way 写回 L3（mysqlsvr）。
-// force=true（logout/停机/首次创建）无视防抖立即投递。
+// force=true（logout/停机/首次创建）或任一 L3Critical 组件有待写变更时无视
+// 防抖立即投递（货币等价值敏感段不落在防抖窗口后面）。
 // 失败语义：仅投递失败返回 error 且保留标记；落库结果由持久层 update_time
 // 守卫兜底，调用方无需等待 ack。
 func (r *Role) MaybeFlushL3(force bool) error {
 	if !r.needL3Flush {
 		return nil
 	}
+	critical := false
+	for _, c := range r.comps {
+		if lc, ok := c.(L3Critical); ok && lc.RequireImmediateL3() {
+			critical = true
+			break
+		}
+	}
 	now := r.Now()
-	if !force && (r.lastL3FlushAt == 0 || now-r.lastL3FlushAt < r.l3FlushDebounceSec()) {
+	if !force && !critical && (r.lastL3FlushAt == 0 || now-r.lastL3FlushAt < r.l3FlushDebounceSec()) {
 		return nil
 	}
 	if err := saveRoleDataL3(r.Uid(), r.PbRole); err != nil {
@@ -249,6 +272,11 @@ func (r *Role) MaybeFlushL3(force bool) error {
 	}
 	r.needL3Flush = false
 	r.lastL3FlushAt = now
+	for _, c := range r.comps {
+		if ob, ok := c.(L3FlushObserver); ok {
+			ob.OnL3Flushed()
+		}
+	}
 	return nil
 }
 
@@ -269,7 +297,6 @@ func (r *Role) SyncDataToClient(dataFlag g1_protocol.ERoleSectionFlag) error {
 }
 
 func (r *Role) OnLogin(now int32) {
-	r.ExpAdd(0)
 	r.SyncOpenFuncData()
 }
 
@@ -346,7 +373,7 @@ func (r *Role) everyDayCheck(now int32) g1_protocol.ERoleSectionFlag {
 	//day := datetime.GetDayOfMonth(now)
 	//hour,_:= datetime.GetHourMinuteForTime(now)
 
-	r.MallDailyRefresh()
+	//r.MallDailyRefresh()
 
 	return g1_protocol.ERoleSectionFlag_MALL_INFO |
 		g1_protocol.ERoleSectionFlag_ACTVITY_TASK_INFO
@@ -363,7 +390,7 @@ func (r *Role) GetBriefInfo() *g1_protocol.PbRoleBriefInfo {
 	info.Uid = r.Uid()
 	info.Name = r.PbRole.BasicInfo.Name
 	info.Level = r.PbRole.BasicInfo.Level
-	info.Exp = int32(r.PbRole.BasicInfo.Exp)
+	info.Exp = int32(r.Currency.Get(int32(g1_protocol.EItemID_EXP)))
 	info.IconUrl = r.PbRole.IconInfo.IconUrl
 	info.Frame = r.PbRole.IconInfo.FrameId
 	info.RegisterTime = r.PbRole.RegisterInfo.RegisterTime
@@ -381,9 +408,6 @@ func (r *Role) UpdateBriefInfo() error {
 	req.IgnoreRsp = true
 
 	return infosvrv1.NewInfoServiceClient().SetBriefInfoSimple(r.Uid(), r.Zone(), &req)
-}
-
-func (r *Role) ExpAdd(exp int64) {
 }
 
 func (r *Role) IsOnline() bool {

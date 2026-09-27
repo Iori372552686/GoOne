@@ -25,3 +25,4 @@ deploy/hosts/host_dev.txt
 /.GoOne
 /lib/contrib/protoc/include
 /.artifacts
+/docs
