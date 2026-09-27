@@ -36,7 +36,7 @@ func (c *CurrencyComponent) Flag() pb.ERoleSectionFlag {
 }
 
 func (c *CurrencyComponent) OnInit(r *Role) error { c.bind(r); return nil }
-func (c *CurrencyComponent) OnDestroy()            {}
+func (c *CurrencyComponent) OnDestroy()           {}
 
 // InitField 货币段兜底与初始资源（原 RoleBasicInfo 标量初值迁移至此）。
 func (c *CurrencyComponent) InitField(uid uint64) {
@@ -51,8 +51,6 @@ func (c *CurrencyComponent) InitField(uid uint64) {
 	if len(info.CurrencyMap) == 0 {
 		info.CurrencyMap[int32(pb.EItemID_GOLD)] = 1000000
 		info.CurrencyMap[int32(pb.EItemID_DIAMOND)] = 10000
-		info.CurrencyMap[int32(pb.EItemID_ACECOIN)] = 100000
-		info.CurrencyMap[int32(pb.EItemID_WINACECOIN)] = 20000
 		info.CurrencyMap[int32(pb.EItemID_CREDIT)] = 10000
 	}
 }

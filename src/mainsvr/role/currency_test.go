@@ -1,11 +1,28 @@
 package role
 
 import (
+	"context"
 	"math"
 	"testing"
 
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
+
+// fakeRoleL3 L3 桩：只统计 Save 投递次数，Load/Delete 供接口完备。
+type fakeRoleL3 struct {
+	saveCalls int
+}
+
+func (f *fakeRoleL3) Load(ctx context.Context, key uint64) (data []byte, updateTime int64, err error) {
+	return nil, 0, nil
+}
+
+func (f *fakeRoleL3) Save(ctx context.Context, key uint64, data []byte, updateTime int64) error {
+	f.saveCalls++
+	return nil
+}
+
+func (f *fakeRoleL3) Delete(ctx context.Context, key uint64) error { return nil }
 
 func newCurrencyTestRole(t *testing.T, uid uint64) *Role {
 	t.Helper()
@@ -112,14 +129,11 @@ func TestCurrencyInitFieldDefaults(t *testing.T) {
 	if got := r.Currency.Get(int32(g1_protocol.EItemID_DIAMOND)); got != 510000 {
 		t.Fatalf("diamond = %d, want 510000 (10000 默认 + 500000 首发礼包)", got)
 	}
-	if got := r.Currency.Get(int32(g1_protocol.EItemID_ACECOIN)); got != 100000 {
-		t.Fatalf("default acecoin = %d, want 100000", got)
-	}
-	if got := r.Currency.Get(int32(g1_protocol.EItemID_WINACECOIN)); got != 20000 {
-		t.Fatalf("default winAce = %d, want 20000", got)
-	}
 	if got := r.Currency.Get(int32(g1_protocol.EItemID_CREDIT)); got != 510000 {
 		t.Fatalf("credit = %d, want 510000 (10000 默认 + 500000 首发礼包)", got)
+	}
+	if got := r.Currency.Get(int32(g1_protocol.EItemID_STAMINA)); got != 0 {
+		t.Fatalf("stamina = %d, want 0（未配置默认值的货币不注入）", got)
 	}
 
 	// 已有数据不重置

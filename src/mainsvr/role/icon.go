@@ -151,7 +151,7 @@ func (c *IconComponent) Flag() g1_protocol.ERoleSectionFlag {
 }
 
 func (c *IconComponent) OnInit(r *Role) error { c.bind(r); return nil }
-func (c *IconComponent) OnDestroy()            {}
+func (c *IconComponent) OnDestroy()           {}
 
 func (c *IconComponent) InitField(uid uint64) {
 	if c.role.PbRole.IconInfo == nil {

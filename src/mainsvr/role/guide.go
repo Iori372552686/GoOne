@@ -37,7 +37,7 @@ func (c *GuideComponent) Flag() g1_protocol.ERoleSectionFlag {
 }
 
 func (c *GuideComponent) OnInit(r *Role) error { c.bind(r); return nil }
-func (c *GuideComponent) OnDestroy()            {}
+func (c *GuideComponent) OnDestroy()           {}
 
 // InitField 保持原 RoleInitField 语义：引导段不做 nil 兜底（按需懒建）。
 func (c *GuideComponent) InitField(uid uint64) {}

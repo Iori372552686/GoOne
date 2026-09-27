@@ -352,7 +352,7 @@ func (c *ActivityTaskComponent) Flag() g1_protocol.ERoleSectionFlag {
 }
 
 func (c *ActivityTaskComponent) OnInit(r *Role) error { c.bind(r); return nil }
-func (c *ActivityTaskComponent) OnDestroy()            {}
+func (c *ActivityTaskComponent) OnDestroy()           {}
 
 // InitField 保持原 RoleInitField 语义：活动任务段不做 nil 兜底。
 func (c *ActivityTaskComponent) InitField(uid uint64) {}

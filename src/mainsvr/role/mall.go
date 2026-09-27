@@ -77,7 +77,7 @@ func (c *MallComponent) Flag() g1_protocol.ERoleSectionFlag {
 }
 
 func (c *MallComponent) OnInit(r *Role) error { c.bind(r); return nil }
-func (c *MallComponent) OnDestroy()            {}
+func (c *MallComponent) OnDestroy()           {}
 
 func (c *MallComponent) InitField(uid uint64) {
 	if c.role.PbRole.MallInfo == nil {

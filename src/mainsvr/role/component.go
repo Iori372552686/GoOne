@@ -29,7 +29,7 @@ type RoleComponent interface {
 // SectionComponent 数据型组件：绑定 RoleInfo 的一个数据段。
 type SectionComponent interface {
 	RoleComponent
-	// Flag 段位。无 ERoleSectionFlag 的段（如 gift）返回 0——只参与持久化，
+	// Flag 段位。0 表示无对应 ERoleSectionFlag——只参与持久化，
 	// 不参与 mask 驱动的同步（mask&0 恒为 0，天然排除，含 ALL=-1）。
 	Flag() g1_protocol.ERoleSectionFlag
 	// InitField 对应数据段的 nil 兜底初始化（原 RoleInitField 的逐段拆分）。
@@ -160,7 +160,6 @@ func buildRoleSections() []roleSection {
 		guideSection(),
 		openFuncSection(),
 		activityTaskSection(),
-		giftSection(),
 	}
 }
 

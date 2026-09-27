@@ -38,7 +38,7 @@ type ObtainComponent struct {
 
 func NewObtainComponent() *ObtainComponent { return &ObtainComponent{} }
 
-func (c *ObtainComponent) Name() string    { return "obtain" }
+func (c *ObtainComponent) Name() string { return "obtain" }
 func (c *ObtainComponent) OnInit(r *Role) error {
 	c.role = r
 	return nil

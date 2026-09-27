@@ -60,7 +60,7 @@ func (c *GameComponent) Flag() pb.ERoleSectionFlag {
 }
 
 func (c *GameComponent) OnInit(r *Role) error { c.bind(r); return nil }
-func (c *GameComponent) OnDestroy()            {}
+func (c *GameComponent) OnDestroy()           {}
 
 func (c *GameComponent) InitField(uid uint64) {
 	if c.role.PbRole.GameInfo == nil {

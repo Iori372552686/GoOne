@@ -365,54 +365,6 @@ func (r *Role) GoldAdd(count int64, reason *Reason) pb.ErrorCode {
 	return r.ItemAdd(int32(pb.EItemID_GOLD), count, reason)
 }
 
-// ace coin
-func (r *Role) AceCoinAdd(count int64, reason *Reason) pb.ErrorCode {
-	return r.ItemAdd(int32(pb.EItemID_ACECOIN), count, reason)
-}
-
-func (r *Role) WinAceCoinAdd(count int64, reason *Reason) pb.ErrorCode {
-	return r.ItemAdd(int32(pb.EItemID_WINACECOIN), count, reason)
-}
-
-func (r *Role) AceCoinCheckEnough(count int64) pb.ErrorCode {
-	aceCnt := r.GetItemCount(int32(pb.EItemID_ACECOIN))
-	winAceCnt := r.GetItemCount(int32(pb.EItemID_WINACECOIN))
-
-	if aceCnt+winAceCnt < count {
-		return pb.ErrorCode_ERR_ACE_COIN_NOT_ENOUGH
-	}
-
-	return pb.ErrorCode_ERR_OK
-}
-
-func (r *Role) AceCoinReduce(count int64, reason *Reason) pb.ErrorCode {
-	aceCnt := r.GetItemCount(int32(pb.EItemID_ACECOIN))
-
-	ret := pb.ErrorCode_ERR_ACE_COIN_NOT_ENOUGH
-	if aceCnt >= count {
-		_, ret = r.ItemReduce(int32(pb.EItemID_ACECOIN), count, reason)
-	} else {
-		_, ret = r.ItemReduce(int32(pb.EItemID_ACECOIN), aceCnt, reason)
-		_, ret = r.ItemReduce(int32(pb.EItemID_WINACECOIN), count-aceCnt, reason)
-	}
-
-	return ret
-}
-
-func (r *Role) WinAceCoinReduce(count int64, reason *Reason) pb.ErrorCode {
-	winAceCnt := r.GetItemCount(int32(pb.EItemID_WINACECOIN))
-
-	ret := pb.ErrorCode_ERR_ACE_COIN_NOT_ENOUGH
-	if winAceCnt >= count {
-		_, ret = r.ItemReduce(int32(pb.EItemID_WINACECOIN), count, reason)
-	} else {
-		_, ret = r.ItemReduce(int32(pb.EItemID_WINACECOIN), winAceCnt, reason)
-		_, ret = r.ItemReduce(int32(pb.EItemID_ACECOIN), count-winAceCnt, reason)
-	}
-
-	return ret
-}
-
 // 将相同的id聚合在一起
 func (r *Role) itemAggregate(items *[]*pb.PbItem) *[]*pb.PbItem {
 	m := make(map[int32]*pb.PbItem)
@@ -629,7 +581,7 @@ func (c *ItemComponent) Flag() pb.ERoleSectionFlag {
 }
 
 func (c *ItemComponent) OnInit(r *Role) error { c.bind(r); return nil }
-func (c *ItemComponent) OnDestroy()            {}
+func (c *ItemComponent) OnDestroy()           {}
 
 func (c *ItemComponent) InitField(uid uint64) {
 	if c.role.PbRole.InventoryInfo == nil {

@@ -96,7 +96,6 @@ func (r *Role) initComponents() {
 		NewGuildComponent(),
 		NewGuideComponent(),
 		NewOpenFuncComponent(),
-		NewGiftComponent(),
 		NewActivityTaskComponent(),
 		NewDropComponent(),
 		NewObtainComponent(),

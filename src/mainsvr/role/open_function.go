@@ -37,7 +37,7 @@ func (c *OpenFuncComponent) Flag() g1_protocol.ERoleSectionFlag {
 }
 
 func (c *OpenFuncComponent) OnInit(r *Role) error { c.bind(r); return nil }
-func (c *OpenFuncComponent) OnDestroy()            {}
+func (c *OpenFuncComponent) OnDestroy()           {}
 
 func (c *OpenFuncComponent) InitField(uid uint64) {
 	if c.role.PbRole.OpenFunInfo == nil {

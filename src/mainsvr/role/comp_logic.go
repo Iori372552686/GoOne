@@ -11,9 +11,9 @@ type DropComponent struct {
 
 func NewDropComponent() *DropComponent { return &DropComponent{} }
 
-func (c *DropComponent) Name() string              { return "drop" }
-func (c *DropComponent) OnInit(r *Role) error      { c.role = r; return nil }
-func (c *DropComponent) OnDestroy()                {}
+func (c *DropComponent) Name() string         { return "drop" }
+func (c *DropComponent) OnInit(r *Role) error { c.role = r; return nil }
+func (c *DropComponent) OnDestroy()           {}
 
 // ItemUseComponent 道具使用分发组件（UseType 分发见 item.go）。
 type ItemUseComponent struct {

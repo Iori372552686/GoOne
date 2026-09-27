@@ -19,8 +19,7 @@ import (
 // 首次创建）时写全部模块。段 marshal/unmarshal 全部经 roleSectionRegistry，
 // 与 DAL codec（store.go）同源。
 //
-// 注：GiftInfo 无对应 ERoleSectionFlag（注册表内 flag=0），仅在全量写时落盘；
-// ConnSvrInfo 为运行时状态不落盘。
+// 注：ConnSvrInfo 为运行时状态不落盘。
 
 // roleHashKey 返回角色在 Redis 的 key（full 与 hash 模式共用）。
 func roleHashKey(uid uint64) string {

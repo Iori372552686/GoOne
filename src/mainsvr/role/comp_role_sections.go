@@ -1,9 +1,9 @@
 package role
 
 import (
-	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 	"github.com/Iori372552686/GoOne/lib/api/datetime"
 	"github.com/Iori372552686/GoOne/lib/util/convert"
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 // 注册段组件。InitField 语义与原 RoleInitField 的对应分支保持一致。
@@ -19,7 +19,7 @@ func (c *RegisterComponent) Flag() g1_protocol.ERoleSectionFlag {
 }
 
 func (c *RegisterComponent) OnInit(r *Role) error { c.bind(r); return nil }
-func (c *RegisterComponent) OnDestroy()            {}
+func (c *RegisterComponent) OnDestroy()           {}
 
 func (c *RegisterComponent) InitField(uid uint64) {
 	if c.role.PbRole.RegisterInfo != nil {
@@ -54,7 +54,7 @@ func (c *LoginComponent) Flag() g1_protocol.ERoleSectionFlag {
 }
 
 func (c *LoginComponent) OnInit(r *Role) error { c.bind(r); return nil }
-func (c *LoginComponent) OnDestroy()            {}
+func (c *LoginComponent) OnDestroy()           {}
 
 func (c *LoginComponent) InitField(uid uint64) {
 	if c.role.PbRole.LoginInfo == nil {
@@ -86,7 +86,7 @@ func (c *BasicComponent) Flag() g1_protocol.ERoleSectionFlag {
 }
 
 func (c *BasicComponent) OnInit(r *Role) error { c.bind(r); return nil }
-func (c *BasicComponent) OnDestroy()            {}
+func (c *BasicComponent) OnDestroy()           {}
 
 func (c *BasicComponent) InitField(uid uint64) {
 	if c.role.PbRole.BasicInfo != nil {
@@ -123,7 +123,7 @@ func (c *MainTaskComponent) Flag() g1_protocol.ERoleSectionFlag {
 }
 
 func (c *MainTaskComponent) OnInit(r *Role) error { c.bind(r); return nil }
-func (c *MainTaskComponent) OnDestroy()            {}
+func (c *MainTaskComponent) OnDestroy()           {}
 
 func (c *MainTaskComponent) InitField(uid uint64) {
 	if c.role.PbRole.MainTaskInfo == nil {
@@ -155,7 +155,7 @@ func (c *GuildComponent) Flag() g1_protocol.ERoleSectionFlag {
 }
 
 func (c *GuildComponent) OnInit(r *Role) error { c.bind(r); return nil }
-func (c *GuildComponent) OnDestroy()            {}
+func (c *GuildComponent) OnDestroy()           {}
 
 func (c *GuildComponent) InitField(uid uint64) {}
 
@@ -168,32 +168,4 @@ func guildSection() roleSection {
 		func(i *g1_protocol.RoleInfo) *g1_protocol.RoleGuildInfo { return i.GuildInfo },
 		func(i *g1_protocol.RoleInfo, m *g1_protocol.RoleGuildInfo) { i.GuildInfo = m },
 		func() *g1_protocol.RoleGuildInfo { return new(g1_protocol.RoleGuildInfo) })
-}
-
-// 礼包兑换段：无 ERoleSectionFlag（flag=0），仅参与持久化与显式全量同步，
-// 不进入 mask 驱动的增量链路（mask&0 恒为 0）。
-
-type GiftComponent struct{ sectionBase }
-
-func NewGiftComponent() *GiftComponent { return &GiftComponent{} }
-
-func (c *GiftComponent) Name() string { return "gift" }
-
-func (c *GiftComponent) Flag() g1_protocol.ERoleSectionFlag { return 0 }
-
-func (c *GiftComponent) OnInit(r *Role) error { c.bind(r); return nil }
-func (c *GiftComponent) OnDestroy()            {}
-
-func (c *GiftComponent) InitField(uid uint64) {}
-
-func (c *GiftComponent) Touch(reason string) {
-	// 无段位：仅标记持久化全量写（force 路径覆盖 gift field）。
-	c.role.markPersistSectionDirty(g1_protocol.ERoleSectionFlag_ALL, reason)
-}
-
-func giftSection() roleSection {
-	return messageSection(0, "gift",
-		func(i *g1_protocol.RoleInfo) *g1_protocol.RoleGiftExchangeInfo { return i.GiftInfo },
-		func(i *g1_protocol.RoleInfo, m *g1_protocol.RoleGiftExchangeInfo) { i.GiftInfo = m },
-		func() *g1_protocol.RoleGiftExchangeInfo { return new(g1_protocol.RoleGiftExchangeInfo) })
 }
