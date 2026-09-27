@@ -14,7 +14,9 @@ cd "$ROOT"
 MW_HOST="${MW_HOST:-43.139.3.228}"
 REDIS_PASS="${REDIS_PASS:-go123456}"
 MYSQL_DSN="${MYSQL_DSN:-g1_game:go123456@tcp(${MW_HOST}:3306)/g1_game}"
-CONF="$ROOT/etc/config/server_conf_ide.yaml"
+# 隔离配置：独立 etcd 命名空间 + 错开 busId，避免与并行开发栈互抢路由/队列。
+# 需要复用 ide 配置时可 DAL_CONF=... 覆盖。
+CONF="${DAL_CONF:-$ROOT/etc/config/server_conf_daltest.yaml}"
 OUT="$ROOT/build/dalsim"
 UID_PROBE=100001
 

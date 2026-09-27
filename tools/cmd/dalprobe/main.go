@@ -44,6 +44,17 @@ func main() {
 	switch *op {
 	case "wipe-l2", "check-l2":
 		err = redisOp(ctx, *op, key, *redisIP, *redisPort, *redisPass)
+	case "reset":
+		// 清态：DEL L2 key + DELETE L3 行（消除跨轮数据污染，全新角色起步）。
+		if e := redisOp(ctx, "wipe-l2", key, *redisIP, *redisPort, *redisPass); e != nil {
+			err = e
+			break
+		}
+		if *mysqlDSN == "" {
+			fmt.Fprintln(os.Stderr, "reset 需要 -mysql.dsn")
+			os.Exit(1)
+		}
+		err = resetL3(ctx, *uid, *mysqlDSN)
 	case "check-l3":
 		if *mysqlDSN == "" {
 			fmt.Fprintln(os.Stderr, "check-l3 需要 -mysql.dsn")
@@ -137,5 +148,20 @@ func mysqlOp(ctx context.Context, uid uint64, dsn string) error {
 	if dataLen < 100 {
 		return fmt.Errorf("快照过小 data=%dB（不完整的 RoleInfo？）", dataLen)
 	}
+	return nil
+}
+
+func resetL3(ctx context.Context, uid uint64, dsn string) error {
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	res, err := db.ExecContext(ctx, "DELETE FROM role_data WHERE uid = ?", uid)
+	if err != nil {
+		return fmt.Errorf("delete role_data: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	fmt.Printf("[dalprobe] reset: L3 row deleted {uid:%d, rows:%d}\n", uid, n)
 	return nil
 }
