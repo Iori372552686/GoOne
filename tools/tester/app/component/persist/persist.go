@@ -29,10 +29,12 @@ func init() {
 	})
 }
 
-// 真实配置表道具 ID（与 inventory 组件用例一致，勿凭空编造）。
+// 真实配置表道具 ID（ItemConfig.conf 2026-09 新 ID 体系）。
 const (
-	itemUsable   = int32(20101001) // 普通道具：可添加、可显式使用
-	itemSellable = int32(30100001) // 金币兑换物：Sale=100
+	itemUsable   = int32(10002) // 经验药水：CanUse=1、无 Getuse、MaxOwnCount=9999
+	itemSellable = int32(20001) // 金币兑换物1：Sale=100
+	// itemGone 旧 ID 体系道具（20101001 等）已被配置清理移除——
+	// T14 用不存在 ID、T15 用未持有 ID 的断言依赖此事实。
 )
 
 // ModuleCfg [modules.persist] 私有参数。
@@ -160,9 +162,15 @@ func (c *PersistComponent) applyFull(info *g1_protocol.RoleInfo, fullMask, patch
 		(fullMask != 0 && fullMask != int32(g1_protocol.ERoleSectionFlag_ALL) &&
 			fullMask&int32(g1_protocol.ERoleSectionFlag_BASIC_INFO) != 0)
 	if b := info.GetBasicInfo(); b != nil {
-		c.gold = b.GetGold()
 		if b.GetName() != "" {
 			c.name = b.GetName()
+		}
+	}
+	// 金币已迁至 RoleCurrencyInfo.currency_map（BasicInfo.Gold deprecated，
+	// 货币组件化 2026-09）：full 同步携带 currency 段时权威覆盖。
+	if cur := info.GetCurrencyInfo(); cur != nil {
+		if g, ok := cur.GetCurrencyMap()[int32(g1_protocol.EItemID_GOLD)]; ok {
+			c.gold = g
 		}
 	}
 	if inv := info.GetInventoryInfo(); inv != nil {

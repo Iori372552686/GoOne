@@ -12,7 +12,8 @@ base_cfg:
     register_addr: 'etcd://43.139.3.228:12379?service=online&timeout=5s&namespace=/GoOneDALTest'
     bus_mq_addr: 'amqp://guest:guest@43.139.3.228:15672/'
     admin_server:
-      enabled: true
+      # 隔离栈关闭 admin（回退端口 8101-8104 与并行开发本地栈冲突会启动失败）。
+      enabled: false
       ip: ""
       port: 0
     tracing:
@@ -91,7 +92,8 @@ connsvr:
   identity:
     self_bus_id: 2.1.1.252
   runtime:
-    listen_port: 11000
+    # 隔离栈独立网关段（TCP=21001 / WS=21000），避开并行栈 11000/11001。
+    listen_port: 21000
     game_id: GoOne
   debug:
     log_dir: ./logs/

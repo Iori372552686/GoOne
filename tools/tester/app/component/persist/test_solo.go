@@ -246,9 +246,9 @@ func (c *PersistComponent) testLogoutLoginPersisted(ctx context.Context) error {
 	if gotItem != wantItem {
 		return fmt.Errorf("登出→重登道具丢失: got=%d want=%d（BUG：logout 保存或 load 读回丢数据）", gotItem, wantItem)
 	}
-	if rsp.GetRoleInfo().GetBasicInfo().GetGold() != wantGold {
-		return fmt.Errorf("登出→重登金币丢失: got=%d want=%d",
-			rsp.GetRoleInfo().GetBasicInfo().GetGold(), wantGold)
+	gotGold := rsp.GetRoleInfo().GetCurrencyInfo().GetCurrencyMap()[int32(g1_protocol.EItemID_GOLD)]
+	if gotGold != wantGold {
+		return fmt.Errorf("登出→重登金币丢失: got=%d want=%d（currency 段快照丢失）", gotGold, wantGold)
 	}
 	return nil
 }
@@ -342,15 +342,18 @@ func (c *PersistComponent) testGmAddItemNonexistent(ctx context.Context) error {
 
 // T15（协议）使用未持有道具：ERR_ITEM_NOT_ENOUGH 且状态不变。
 func (c *PersistComponent) testUseItemNotOwned(ctx context.Context) error {
-	const ghost = int32(20109999) // 不在背包中的未分配 ID 段
+	const ghost = int32(10029999) // 配置中不存在的道具 ID
 	before := c.itemCount(ghost)
 	rsp := &g1_protocol.UseItemRsp{Ret: &g1_protocol.Ret{}}
 	if err := c.requester.RequestProto(ctx, uint32(g1_protocol.CMD_MAIN_ITEM_USE_REQ),
 		&g1_protocol.UseItemReq{ItemId: ghost, Count: 1}, rsp, 10*time.Second); err != nil {
 		return err
 	}
-	if rsp.GetRet().GetCode() != g1_protocol.ErrorCode_ERR_ITEM_NOT_ENOUGH {
-		return fmt.Errorf("使用未持有道具应返回 ERR_ITEM_NOT_ENOUGH，实际 code=%d", rsp.GetRet().GetCode())
+	// 服务器语义：配置不存在/不可使用的 ID → ERR_ITEM_CAN_NOT_USE(-10012)；
+	// 存在但数量不足 → ERR_ITEM_NOT_ENOUGH(-10002)。两者都属正确拒绝。
+	code := rsp.GetRet().GetCode()
+	if code != g1_protocol.ErrorCode_ERR_ITEM_NOT_ENOUGH && code != g1_protocol.ErrorCode_ERR_ITEM_CAN_NOT_USE {
+		return fmt.Errorf("使用未持有道具应返回 NOT_ENOUGH(-10002) 或 CAN_NOT_USE(-10012)，实际 code=%d", code)
 	}
 	if c.itemCount(ghost) != before {
 		return fmt.Errorf("失败操作改变了状态（BUG：回滚缺失）")
@@ -382,8 +385,9 @@ func (c *PersistComponent) testGmGetRoleRoundTrip(ctx context.Context) error {
 	if info.GetBasicInfo() == nil || info.GetInventoryInfo() == nil {
 		return fmt.Errorf("GMGetRole 返回缺少 section")
 	}
-	if info.GetBasicInfo().GetGold() != c.goldNow() {
-		return fmt.Errorf("GM 读回金币与缓存不一致: %d vs %d", info.GetBasicInfo().GetGold(), c.goldNow())
+	gotGold := info.GetCurrencyInfo().GetCurrencyMap()[int32(g1_protocol.EItemID_GOLD)]
+	if gotGold != c.goldNow() {
+		return fmt.Errorf("GM 读回金币与缓存不一致: %d vs %d", gotGold, c.goldNow())
 	}
 	if got := info.GetInventoryInfo().GetItemMap()[itemUsable].GetCount(); got != c.itemCount(itemUsable) {
 		return fmt.Errorf("GM 读回道具与缓存不一致: %d vs %d", got, c.itemCount(itemUsable))

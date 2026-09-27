@@ -89,8 +89,9 @@ func RegisterMysqlServiceToTransactionMgr(mgr transaction.ITransactionMgr, srv M
 	mgr.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd:     g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ,
+			OneWay:  true,
 			Timeout: 5000 * time.Millisecond,
-			Name:    "mysql save role data snapshot",
+			Name:    "mysql save role data snapshot (best-effort one-way)",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.MysqlInnerSaveRoleDataReq) },
@@ -149,8 +150,9 @@ func RegisterMysqlServiceToDispatcher(d *ssrpc.Dispatcher, srv MysqlServiceSServ
 	d.RegisterCmd(g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, ssrpc.WrapUnary(
 		ssrpc.MethodDesc{
 			Cmd:     g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ,
+			OneWay:  true,
 			Timeout: 5000 * time.Millisecond,
-			Name:    "mysql save role data snapshot",
+			Name:    "mysql save role data snapshot (best-effort one-way)",
 		},
 		srv.MW,
 		func() any { return new(g1_protocol.MysqlInnerSaveRoleDataReq) },
@@ -208,6 +210,7 @@ func MysqlServiceBindings(srv MysqlServiceSServer) []ssrpc.Binding {
 		{Kind: ssrpc.BindingCMD, CMD: g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, CmdHandler: ssrpc.WrapUnary(
 			ssrpc.MethodDesc{
 				Cmd:     g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ,
+				OneWay:  true,
 				Timeout: 5000 * time.Millisecond,
 				Name:    "MysqlService.SaveRoleData",
 			},
@@ -288,22 +291,34 @@ func (c *MysqlServiceClient) SearchRoleByRouter(ctx cmd_handler.IContext, router
 	return rsp, nil
 }
 
-// SaveRoleData calls mysql save role data snapshot synchronously.
-func (c *MysqlServiceClient) SaveRoleData(ctx cmd_handler.IContext, req *g1_protocol.MysqlInnerSaveRoleDataReq) (*g1_protocol.MysqlInnerSaveRoleDataRsp, error) {
-	rsp := &g1_protocol.MysqlInnerSaveRoleDataRsp{}
-	if err := ssrpc.CallByCmd(ctx, g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, req, rsp); err != nil {
-		return nil, err
-	}
-	return rsp, nil
+// SaveRoleData sends mysql save role data snapshot (best-effort one-way) (one-way, no response).
+func (c *MysqlServiceClient) SaveRoleData(ctx cmd_handler.IContext, req *g1_protocol.MysqlInnerSaveRoleDataReq) error {
+	return ssrpc.SendByCmd(ctx, g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, req)
 }
 
-// SaveRoleDataByRouter calls mysql save role data snapshot synchronously using an explicit routerId.
-func (c *MysqlServiceClient) SaveRoleDataByRouter(ctx cmd_handler.IContext, routerId uint64, req *g1_protocol.MysqlInnerSaveRoleDataReq) (*g1_protocol.MysqlInnerSaveRoleDataRsp, error) {
-	rsp := &g1_protocol.MysqlInnerSaveRoleDataRsp{}
-	if err := ssrpc.CallByCmdWithRouter(ctx, routerId, g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, req, rsp); err != nil {
-		return nil, err
-	}
-	return rsp, nil
+// SaveRoleDataByRouter sends mysql save role data snapshot (best-effort one-way) to an explicit routerId (one-way, no response).
+func (c *MysqlServiceClient) SaveRoleDataByRouter(ctx cmd_handler.IContext, routerId uint64, req *g1_protocol.MysqlInnerSaveRoleDataReq) error {
+	return ssrpc.SendByCmdWithRouter(ctx, routerId, g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, req)
+}
+
+// SaveRoleDataByBusId sends mysql save role data snapshot (best-effort one-way) to an explicit busId (one-way, no response).
+func (c *MysqlServiceClient) SaveRoleDataByBusId(ctx cmd_handler.IContext, busId uint32, req *g1_protocol.MysqlInnerSaveRoleDataReq) error {
+	return ssrpc.SendByCmdToBusId(ctx, busId, g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, req)
+}
+
+// SaveRoleDataSimple sends mysql save role data snapshot (best-effort one-way) without an IContext (one-way, no response).
+func (c *MysqlServiceClient) SaveRoleDataSimple(uid uint64, zone uint32, req *g1_protocol.MysqlInnerSaveRoleDataReq) error {
+	return ssrpc.SendByCmdSimple(uid, zone, g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, req)
+}
+
+// SaveRoleDataByBusIdSimple sends mysql save role data snapshot (best-effort one-way) to an explicit busId without an IContext (one-way, no response).
+func (c *MysqlServiceClient) SaveRoleDataByBusIdSimple(busId uint32, uid uint64, req *g1_protocol.MysqlInnerSaveRoleDataReq) error {
+	return ssrpc.SendByCmdToBusIdSimple(busId, uid, g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, req)
+}
+
+// SaveRoleDataByRouterSimple sends mysql save role data snapshot (best-effort one-way) to an explicit routerId without an IContext (one-way, no response).
+func (c *MysqlServiceClient) SaveRoleDataByRouterSimple(routerId, uid uint64, zone uint32, req *g1_protocol.MysqlInnerSaveRoleDataReq) error {
+	return ssrpc.SendByCmdWithRouterSimple(routerId, uid, zone, g1_protocol.CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQ, req)
 }
 
 // LoadRoleData calls mysql load role data snapshot synchronously.

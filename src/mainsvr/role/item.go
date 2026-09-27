@@ -232,6 +232,12 @@ func (r *Role) ItemAdd(itemId int32, itemCount int64, reason *Reason) pb.ErrorCo
 		return pb.ErrorCode_ERR_OK
 	}
 
+	// 配置不存在的道具必须拒绝：ItemSee 对未知 ID 返回空列表，
+	// 若不在此拦截会静默假成功（模拟测试 T14 发现）。
+	if !r.Currency.IsCurrency(itemId) && itemconf.GetItemByItemId(itemId) == nil {
+		return pb.ErrorCode_ERR_CONF
+	}
+
 	items := r.ItemSee(&pb.PbItem{Id: itemId, Count: itemCount})
 	ret := pb.ErrorCode_ERR_OK
 	for _, v := range *items {
@@ -295,13 +301,16 @@ func (r *Role) itemDoAdd(itemId int32, itemCount int64, reason *Reason) int {
 		}
 	}
 
-	// 按MainType分层处理
+	// 按MainType分层处理。
+	// 图像道具（头像 701/70101、头像框 70102）的 EItemMainType_ICON 系枚举已随
+	// 道具清理从 proto 移除，但存量角色数据仍可能携带 MainType=701，分支以
+	// 历史字面量保留（IconAdd/FrameAdd 落 IconMap，不入背包 ItemMap）。
 	switch itemConf.MainType {
-	case int32(pb.EItemMainType_ICON):
+	case 701:
 		switch itemConf.SubType {
-		case int32(pb.EItemSubType_ICON_ICON):
+		case 70101:
 			r.IconAdd(itemId, reason)
-		case int32(pb.EItemSubType_ICON_FRAME):
+		case 70102:
 			r.FrameAdd(itemId, reason)
 		}
 

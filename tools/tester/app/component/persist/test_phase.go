@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 // runPhaseWrite L3 权威验证·写阶段：登录 → 写入标记数据 → 登出（强制 L2+L3 flush）。
@@ -74,7 +76,7 @@ func (c *PersistComponent) runPhaseVerify(ctx context.Context) error {
 			return nil
 		}},
 		{"V2_GoldRecoveredFromL3", func() error {
-			got := info.GetBasicInfo().GetGold()
+			got := info.GetCurrencyInfo().GetCurrencyMap()[int32(g1_protocol.EItemID_GOLD)]
 			if got <= 0 {
 				return fmt.Errorf("金币未从 L3 恢复: got=%d（BUG：重登变成新角色或快照过旧）", got)
 			}
@@ -96,7 +98,8 @@ func (c *PersistComponent) runPhaseVerify(ctx context.Context) error {
 		}},
 	}
 	log.Printf("[Actor %d][Persist] VERIFY: name=%q gold=%d item(%d)=%d",
-		c.actorID, info.GetBasicInfo().GetName(), info.GetBasicInfo().GetGold(),
+		c.actorID, info.GetBasicInfo().GetName(),
+		info.GetCurrencyInfo().GetCurrencyMap()[int32(g1_protocol.EItemID_GOLD)],
 		itemUsable, info.GetInventoryInfo().GetItemMap()[itemUsable].GetCount())
 
 	for _, t := range tests {

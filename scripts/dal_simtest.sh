@@ -63,11 +63,11 @@ start_svc connsvr
 
 # 等 connsvr 监听（TCP 网关在 11001；11000 是 WS）
 for i in $(seq 1 20); do
-  if (timeout 2 bash -c "echo > /dev/tcp/127.0.0.1/11001" 2>/dev/null); then break; fi
+  if (timeout 2 bash -c "echo > /dev/tcp/127.0.0.1/21001" 2>/dev/null); then break; fi
   sleep 1
 done
-if ! (timeout 2 bash -c "echo > /dev/tcp/127.0.0.1/11001" 2>/dev/null); then
-  fail "connsvr 未监听 11001（查看 $OUT/*.log）"
+if ! (timeout 2 bash -c "echo > /dev/tcp/127.0.0.1/21001" 2>/dev/null); then
+  fail "connsvr 未监听 21001（查看 $OUT/*.log）"
   note "=== connsvr.log tail ==="; tail -20 "$OUT/connsvr.log" || true
   note "=== mainsvr.log tail ===";  tail -20 "$OUT/mainsvr.log"  || true
   exit 1
@@ -79,7 +79,7 @@ note "servers up (connsvr:11000)"
 # 端口保持原样：tcp_port=11001（connsvr 的 TCP 监听；11000 是 WS，勿改），
 # 再追加本编排需要的模块。
 gen_toml() { # phase outfile
-  awk '/^\[modules\./{exit} {print}' "$ROOT/tools/tester/tester.toml" > "$2"
+  awk '/^\[modules\./{exit} {print}' "$ROOT/tools/tester/tester.toml"     | sed -e 's/^tcp_port = .*/tcp_port = 21001/' > "$2"
   cat >> "$2" <<EOF
 
 [modules.login]
@@ -108,13 +108,35 @@ run_tester() { # toml tag
 run_tester "$OUT/tester_solo.toml" solo
 
 # ---------- 3. L3 权威验证（write → wipe → verify）----------
+L3_BASELINE=$("$OUT/dalprobe" -op check-l3 -uid $UID_PROBE -mysql.dsn "$MYSQL_DSN" 2>/dev/null | grep -oE "update_time=[0-9]+" | cut -d= -f2)
+echo "L3_BASELINE=$L3_BASELINE" >> "$OUT/failures.log" 2>/dev/null || true
+note "L3 baseline update_time=$L3_BASELINE"
 run_tester "$OUT/tester_write.toml" write
 
-note "dalprobe check-l3（快照应已落库）"
-if "$OUT/dalprobe" -op check-l3 -uid $UID_PROBE -mysql.dsn "$MYSQL_DSN" > "$OUT/probe_l3.log" 2>&1; then
-  note "L3 snapshot OK"; cat "$OUT/probe_l3.log"; pass
+# write 登出后 L3 快照经 one-way 异步到达（观察过 ~2s 延迟）：
+# 轮询等待 update_time 越过 write 开始时刻，最多 15s。
+WAIT_L3="${WAIT_L3:-1}"
+if [ "$WAIT_L3" = "1" ]; then
+  note "polling L3 snapshot update (max 15s) ..."
+  ok3=0
+  for i in $(seq 1 15); do
+    sleep 1
+    ts=$("$OUT/dalprobe" -op check-l3 -uid $UID_PROBE -mysql.dsn "$MYSQL_DSN" 2>/dev/null | grep -oE "update_time=[0-9]+" | cut -d= -f2)
+    if [ -n "$ts" ] && [ "$ts" -gt "$L3_BASELINE" ] 2>/dev/null; then ok3=1; break; fi
+  done
+  if [ "$ok3" = "1" ]; then
+    note "L3 snapshot updated (ts=$ts)"; pass
+  else
+    fail "L3 快照未在 15s 内更新（write 登出快照丢失？）"
+    "$OUT/dalprobe" -op check-l3 -uid $UID_PROBE -mysql.dsn "$MYSQL_DSN" || true
+  fi
 else
-  fail "L3 快照缺失"; cat "$OUT/probe_l3.log" || true
+  note "dalprobe check-l3（快照应已落库）"
+  if "$OUT/dalprobe" -op check-l3 -uid $UID_PROBE -mysql.dsn "$MYSQL_DSN" > "$OUT/probe_l3.log" 2>&1; then
+    note "L3 snapshot OK"; cat "$OUT/probe_l3.log"; pass
+  else
+    fail "L3 快照缺失"; cat "$OUT/probe_l3.log" || true
+  fi
 fi
 
 note "dalprobe wipe-l2（模拟 TTL 过期/Redis 丢 key）"

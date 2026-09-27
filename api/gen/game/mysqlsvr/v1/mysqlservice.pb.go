@@ -26,12 +26,12 @@ var File_service_mysqlservice_proto protoreflect.FileDescriptor
 
 const file_service_mysqlservice_proto_rawDesc = "" +
 	"\n" +
-	"\x1aservice/mysqlservice.proto\x12\x10game.mysqlsvr.v1\x1a\x1egoone/options/v1/options.proto\x1a\x16service/mysqlsvr.proto2\xab\x05\n" +
+	"\x1aservice/mysqlservice.proto\x12\x10game.mysqlsvr.v1\x1a\x1egoone/options/v1/options.proto\x1a\x16service/mysqlsvr.proto2\xc3\x05\n" +
 	"\fMysqlService\x12\xa8\x01\n" +
 	"\x0eUpdateRoleInfo\x12(.g1.protocol.MysqlInnerUpdateRoleInfoReq\x1a(.g1.protocol.MysqlInnerUpdateRoleInfoRsp\"B\xca\xe4\x1d>*$CMD_MYSQL_INNER_UPDATE_ROLE_INFO_REQz\x16mysql update role info\x12\x92\x01\n" +
 	"\n" +
-	"SearchRole\x12$.g1.protocol.MysqlInnerSearchRoleReq\x1a$.g1.protocol.MysqlInnerSearchRoleRsp\"8\xca\xe4\x1d4*\x1fCMD_MYSQL_INNER_SEARCH_ROLE_REQz\x11mysql search role\x12\xa7\x01\n" +
-	"\fSaveRoleData\x12&.g1.protocol.MysqlInnerSaveRoleDataReq\x1a&.g1.protocol.MysqlInnerSaveRoleDataRsp\"G\xca\xe4\x1dC*\"CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQz\x1dmysql save role data snapshot\x12\xa7\x01\n" +
+	"SearchRole\x12$.g1.protocol.MysqlInnerSearchRoleReq\x1a$.g1.protocol.MysqlInnerSearchRoleRsp\"8\xca\xe4\x1d4*\x1fCMD_MYSQL_INNER_SEARCH_ROLE_REQz\x11mysql search role\x12\xbf\x01\n" +
+	"\fSaveRoleData\x12&.g1.protocol.MysqlInnerSaveRoleDataReq\x1a&.g1.protocol.MysqlInnerSaveRoleDataRsp\"_\xca\xe4\x1d[\x18\x01*\"CMD_MYSQL_INNER_SAVE_ROLE_DATA_REQz3mysql save role data snapshot (best-effort one-way)\x12\xa7\x01\n" +
 	"\fLoadRoleData\x12&.g1.protocol.MysqlInnerLoadRoleDataReq\x1a&.g1.protocol.MysqlInnerLoadRoleDataRsp\"G\xca\xe4\x1dC*\"CMD_MYSQL_INNER_LOAD_ROLE_DATA_REQz\x1dmysql load role data snapshot\x1a\a\xd2\xe4\x1d\x03\b\x88'BDZBgithub.com/Iori372552686/GoOne/api/gen/game/mysqlsvr/v1;mysqlsvrv1b\x06proto3"
 
 var file_service_mysqlservice_proto_goTypes = []any{
