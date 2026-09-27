@@ -64,7 +64,7 @@ base_cfg:
     rest_api_config:
       - service_name: default
         urls:
-          - 'http://43.139.3.228:8000/mg/api/sdk/getGameRole?'
+          - 'http://43.139.3.228:10001/api/v1/account/profile?'
         sign_name: default
 
     nacos_conf:

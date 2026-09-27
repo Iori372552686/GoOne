@@ -353,15 +353,14 @@ func (r *Router) onRecvBusMsg(srcBusId uint32, data []byte) error {
 	packet := new(sharedstruct.SSPacket)
 	packet.Header.From(data)
 	packet.Body = data[sharedstruct.ByteLenOfSSPacketHeader():]
-	if logger.DebugEnabled() {
-		logger.CmdDebugf(packet.Header.Cmd, "[uid: %d] Received bus message: %+v", packet.Header.Uid, packet.Header)
-	}
+	logger.CmdDebugf(packet.Header.Cmd, "[uid: %d] Received bus message: %v", packet.Header.Uid, packet.Header)
+
 	finish := beginRouterObserve("receive", "bus", packet.Header.Cmd)
 	if r.cbOnRecvSSPacket != nil {
 		r.cbOnRecvSSPacket(packet)
 	}
-	finish(len(packet.Body), nil)
 
+	finish(len(packet.Body), nil)
 	return nil
 }
 
@@ -439,7 +438,7 @@ func SendMsgByConn(uid, routerId uint64, zone, cmd uint32, srcTransId uint32, da
 }
 
 // busRuntimeErrorSource 是 bus driver 可选实现的运行期错误源接口
-//（BusImplRabbitMQ 已实现）。Router 侧局部声明，避免反向依赖具体 driver。
+// （BusImplRabbitMQ 已实现）。Router 侧局部声明，避免反向依赖具体 driver。
 type busRuntimeErrorSource interface {
 	RuntimeErrors() <-chan error
 }

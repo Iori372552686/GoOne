@@ -13,6 +13,6 @@ mysql_user: g1_game
 mysql_password: gg123456
 mysql_schema: poker
 gm_open : "true"
-LoginSdkAddr : http://192.168.50.250:8000/mg/api/sdk/getGameRole?
+LoginSdkAddr : http://43.139.3.228:10001/api/v1/account/profile?
 ListenPort : 11000
 
