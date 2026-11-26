@@ -5,8 +5,7 @@
 #   - *.env.example 中的 change-me-* 占位值；
 #   - server_conf.yaml 等 GoOne 部署模板里的 {{ var }} 占位符。
 #
-# gitleaks-action 默认加载内置规则；本文件通过 extend 引入内置规则，再用 allowRules 与
-# [allowlist] 做项目特定的豁免。
+# 通过 extend 引入内置规则，再用 [[allowlists]] 定义项目特定的豁免。
 
 title = "GoOne gitleaks 配置"
 
@@ -15,7 +14,7 @@ title = "GoOne gitleaks 配置"
 useDefault = true
 
 # 全局允许路径：样例与文档不参与扫描。
-[allowlist]
+[[allowlists]]
 description = "允许示例/模板/文档文件"
 paths = [
   '''\.env\.example$''',
@@ -26,7 +25,7 @@ paths = [
 ]
 
 # 放行明确的占位值，避免误报。
-[[allowlist]]
+[[allowlists]]
 description = "放行 change-me 占位与 {{ }} 模板变量"
 regexes = [
   '''change-me-[a-z-]+''',
@@ -34,8 +33,9 @@ regexes = [
 ]
 
 # 放行以无权限示例值出现的弱口令（仅出现在 .env.example 中）。
-[[allowlist]]
+[[allowlists]]
 description = "放行示例弱口令值"
+condition = "AND"
 paths = ['''\.env\.example$''']
 regexes = [
   '''123456''',

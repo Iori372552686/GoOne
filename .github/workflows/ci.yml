@@ -44,7 +44,7 @@ jobs:
 
       - name: Vet
         # composites disabled: generated gamedata repositories use unkeyed
-        # Index2 literals (tracked in docs/optimization_roadmap.md 3.6).
+        # Index2 literals.
         run: go vet -composites=false ./...
 
       - name: Test root packages
@@ -234,12 +234,11 @@ jobs:
 
       - name: gitleaks
         # 扫描全部历史与工作区，禁止 Token、完整 DSN、Authorization、私钥进入仓库。
-        # 配置见仓库根 .gitleaks.toml（allowRules 仅放行 .env.example 中的 change-me 占位）。
+        # 配置见仓库根 .gitleaks.toml。
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          version: v8.30.1
+          GITLEAKS_VERSION: "8.30.1"
 
   lint:
     name: golangci-lint + static gates
@@ -256,12 +255,32 @@ jobs:
           cache: true
           cache-dependency-path: "**/go.sum"
 
+      - name: Resolve lint baseline
+        id: lint-base
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          # PR 只检查相对目标分支的改动；push 只检查本次推送。
+          # 新建分支或不可达的旧提交回退到与 dev 的共同历史。
+          candidate="${PR_BASE:-${PUSH_BEFORE:-}}"
+          base=
+          if [ -n "$candidate" ] && git cat-file -e "$candidate^{commit}" 2>/dev/null; then
+            base=$(git merge-base HEAD "$candidate" || true)
+          fi
+          if [ -z "$base" ]; then
+            base=$(git merge-base HEAD origin/dev || true)
+            if [ -z "$base" ] || [ "$base" = "$(git rev-parse HEAD)" ]; then
+              base=$(git rev-parse HEAD^)
+            fi
+          fi
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
+
       - uses: golangci/golangci-lint-action@v8
         with:
           # 固定版本，避免浮动 latest 导致门禁不可复现。
           version: v2.14.0
-          # 只对本次改动引入的新问题失败；存量债务冻结在 origin/dev 基线。
-          args: --new-from-rev=origin/${{ github.base_ref || 'dev' }}
+          args: --new-from-rev=${{ steps.lint-base.outputs.sha }}
 
       - name: Legacy lifecycle static scan
         # 已删除旧生命周期；此扫描阻止 application/bootstrap/busapp 旧 API
@@ -271,7 +290,7 @@ jobs:
           hits=$(grep -rnE "application\.(Init|Run)|NewServiceApp|bootstrap\.ServiceApp" \
             cmd src lib tools 2>/dev/null \
             | grep -v "_test.go" \
-            | grep -vE "^\s*//|^\s*\*" \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|/\*|\*([[:space:]]|/|$))' \
             | grep -v "api/gen/" \
             || true)
           if [ -n "$hits" ]; then
@@ -289,7 +308,7 @@ jobs:
           hits=$(grep -rnE "Register[A-Za-z]+ToDispatcher|Register[A-Za-z]+ToTransactionMgr|TransMgr\.RegisterCmd" \
             cmd src 2>/dev/null \
             | grep -v "_test.go" \
-            | grep -vE "^\s*//|^\s*\*" \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|/\*|\*([[:space:]]|/|$))' \
             | grep -v "api/gen/" \
             || true)
           if [ -n "$hits" ]; then
@@ -307,7 +326,7 @@ jobs:
           hits=$(grep -rnE '"[^"]*bus/driver/all"' \
             cmd src lib/service/runtime 2>/dev/null \
             | grep -v "_test.go" \
-            | grep -vE "^\s*//|^\s*\*" \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|/\*|\*([[:space:]]|/|$))' \
             || true)
           if [ -n "$hits" ]; then
             echo "Found driver/all blank import in production (cmd/src/lib/service/runtime):"

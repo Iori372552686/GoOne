@@ -19,7 +19,7 @@ golangci-lint run --new-from-rev=origin/dev
 ```
 
 - 代码风格遵循 `[docs/STYLE.md](docs/STYLE.md)`（新代码强制，CI lint 只检查增量）。
-- 性能相关改动必须附 benchmark 前后对比，流程见 `[docs/benchmarks/baseline.md](docs/benchmarks/baseline.md)`。
+- 性能相关改动必须附 benchmark 前后对比，流程见 [性能与门禁](docs/STYLE.md#117-性能与门禁)。
 - 修 bug 请先补一个能复现的测试。
 - 集成测试必须带可达性预检查并 `t.Skip`，不得依赖外部环境才能通过 CI。
 

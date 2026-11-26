@@ -1,6 +1,9 @@
 package error_sentry
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -8,24 +11,38 @@ import (
 )
 
 func Test_ErrorCapture(t *testing.T) {
-	str := "测试"
-	userId := "0526_90001"
-	userName := "Name_0526_90001"
-	id := 052601
-	errMsg := "cs"
+	type request struct{ method, path string }
+	received := make(chan request, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case received <- request{r.Method, r.URL.Path}:
+		default:
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
 
-	// InitBugsnag(BUGSNAG_VERSION_READY, "game_ready", "3")
-	// Error(userId, userName, str, id, errMsg)
+	previousConfig, previousClient := sentryCnf, sentry.CurrentHub().Client()
+	t.Cleanup(func() {
+		sentryCnf = previousConfig
+		sentry.CurrentHub().BindClient(previousClient)
+	})
 
-	InitSentry(
-		"https://1fb15babfd3b4705b371b2819db269c7:9aaef6b1d5bd4cf5ac02e45b461c8184@sentry.io/1859718",
-
-		"test_version_0526",
-		"test_0526",
-		"test_release_0526",
-		userId,
-	)
-
-	CaptureErrorToSentry(sentry.LevelError, userId, userName, str, id, errMsg)
-	time.Sleep(5 * time.Second)
+	// Only the loopback server receives the event; CI must not send telemetry.
+	dsn := "http://test-key@" + strings.TrimPrefix(server.URL, "http://") + "/1"
+	if err := InitSentry(dsn, "test-version", "test-service", "test-release", "test-player"); err != nil {
+		t.Fatal(err)
+	}
+	CaptureErrorToSentry(sentry.LevelError, "test-player", "test-user", "test error: %s", "example")
+	if !sentry.Flush(5 * time.Second) {
+		t.Fatal("timed out waiting for Sentry test event")
+	}
+	select {
+	case got := <-received:
+		if got.method != http.MethodPost || got.path != "/api/1/envelope/" {
+			t.Fatalf("unexpected Sentry request: %+v", got)
+		}
+	default:
+		t.Fatal("loopback server did not receive a Sentry event")
+	}
 }

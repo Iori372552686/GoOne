@@ -1,6 +1,6 @@
 # GoOne 代码风格规范
 
-> 适用范围：整个仓库的新增与修改代码。存量代码按 [`optimization_roadmap.md`](optimization_roadmap.md) 4.2 分批清理，
+> 适用范围：整个仓库的新增与修改代码。存量代码可分批清理，
 > 不要求一次性重写，但**新代码必须遵守本规范**，CI 的 golangci-lint（`--new-from-rev`）只对增量生效。
 
 ## 1. 命名
@@ -69,7 +69,7 @@
   - 日志必须 Debug 级 + `logger.DebugEnabled()` 前置判断，避免参数装箱；
   - 禁止每消息 `make`——使用 `lib/util/bufpool` 或栈上数组（参考 SS 头编码）；
   - 禁止每消息 goroutine——串行执行或常驻 worker。
-- 性能改动必须附 benchmark 前后对比（见 `docs/benchmarks/baseline.md` 流程），无数据不合并。
+- 性能改动必须附 benchmark 前后对比（见 [11.7 性能与门禁](#117-性能与门禁)），无数据不合并。
 
 ## 6. 日志
 
@@ -111,9 +111,7 @@
 
 ## 11. 生命周期与运行时（P0 核心现代化规范）
 
-> 本节由 [`docs/architecture_review_2026-07-v2.md`](architecture_review_2026-07-v2.md)
-> 与 [`docs/optimization_roadmap.md`](optimization_roadmap.md) P0 迭代落地，新代码
-> 必须遵守。落地实现在 `lib/service/runtime`、`lib/service/ssrpc`、
+> 新代码必须遵守本节规定。落地实现在 `lib/service/runtime`、`lib/service/ssrpc`、
 > `lib/service/appconfig`、`lib/service/bus`。
 
 ### 11.1 Component 生命周期
@@ -193,7 +191,7 @@ RabbitMQ 是当前通信传输，不是可靠业务任务队列（非持久队�
 
 ### 11.7 性能与门禁
 
-- 每项性能修改必须附 benchmark 前后对比（见 [`benchmarks/baseline.md`](benchmarks/baseline.md)），
+- 每项性能修改必须附 benchmark 前后对比，
   同机、同 Go 版本、同参数至少 10 次；核心吞吐中位数不得回退超过 5%，0-alloc 热路
   径不得引入新分配。
 - 不把所有 goroutine 当性能问题：`TransactionMgr` 的在途事务 goroutine 模型以

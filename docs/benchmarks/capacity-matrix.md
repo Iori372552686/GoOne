@@ -49,8 +49,8 @@
 - 30 秒 drain timeout 内完成排空。
 - Drain 后 goroutine、FD 回到基线 ±2%。
 
-> CPU/RSS/GC/readiness/drain 指标由服务端 Prometheus 采集，判定标准见
-> [`observability_slo.md`](../observability_slo.md)。
+> CPU/RSS/GC/readiness/drain 指标由服务端 Prometheus 采集。采集与告警说明见
+> [可观测性指南](../observability/README.md)。
 
 ## 排水（Drain）记录
 
