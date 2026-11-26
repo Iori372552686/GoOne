@@ -122,44 +122,65 @@ func TestTaskStopWaitsForRun(t *testing.T) {
 
 func TestTaskPanicDoesNotKillLoop(t *testing.T) {
 	var calls atomic.Int64
+	recovered := make(chan struct{})
 	task := New("panicky", 15*time.Millisecond, func(context.Context) error {
-		calls.Add(1)
-		if calls.Load() == 1 {
+		switch calls.Add(1) {
+		case 1:
 			panic("boom")
+		case 2:
+			close(recovered)
 		}
 		return nil
 	})
+	task.RunOnStart = true
 	if err := task.Start(context.Background()); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	time.Sleep(60 * time.Millisecond)
-	if err := task.Stop(context.Background()); err != nil {
-		t.Fatalf("Stop: %v", err)
-	}
-	// 第一次 panic 后 loop 应继续，后续周期仍执行。
-	if got := calls.Load(); got < 2 {
-		t.Fatalf("expected loop to survive panic and run >=2 times, got %d", got)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := task.Stop(ctx); err != nil {
+			t.Errorf("Stop: %v", err)
+		}
+	})
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-recovered:
+	case <-timer.C:
+		t.Fatalf("scheduler did not continue after panic; calls = %d", calls.Load())
 	}
 }
 
 func TestTaskRunErrorLoggedNotFatal(t *testing.T) {
 	var calls atomic.Int64
+	recovered := make(chan struct{})
 	task := New("err", 15*time.Millisecond, func(context.Context) error {
-		n := calls.Add(1)
-		if n == 1 {
+		switch calls.Add(1) {
+		case 1:
 			return errors.New("transient")
+		case 2:
+			close(recovered)
 		}
 		return nil
 	})
+	task.RunOnStart = true
 	if err := task.Start(context.Background()); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	time.Sleep(50 * time.Millisecond)
-	if err := task.Stop(context.Background()); err != nil {
-		t.Fatalf("Stop: %v", err)
-	}
-	if got := calls.Load(); got < 2 {
-		t.Fatalf("expected >=2 calls after a returned error, got %d", got)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := task.Stop(ctx); err != nil {
+			t.Errorf("Stop: %v", err)
+		}
+	})
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-recovered:
+	case <-timer.C:
+		t.Fatalf("scheduler did not continue after a returned error; calls = %d", calls.Load())
 	}
 }
 
