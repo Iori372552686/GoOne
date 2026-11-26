@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Iori372552686/GoOne/lib/contrib/registry"
-	"github.com/Iori372552686/GoOne/lib/internal/itest"
+	"github.com/Iori372552686/GoOne/lib/testsupport"
 	"net"
 	"reflect"
 	"strconv"
@@ -26,7 +26,7 @@ func tcpServer(t *testing.T, lis net.Listener) {
 }
 
 func TestRegister(t *testing.T) {
-	itest.Require(t, "127.0.0.1:8500")
+	testsupport.Require(t, "127.0.0.1:8500")
 	addr := fmt.Sprintf("%s:9091", getIntranetIP())
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {

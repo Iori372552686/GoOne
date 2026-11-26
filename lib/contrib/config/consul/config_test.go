@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/Iori372552686/GoOne/lib/internal/itest"
+	"github.com/Iori372552686/GoOne/lib/testsupport"
 	"github.com/hashicorp/consul/api"
 )
 
@@ -29,7 +29,7 @@ func newTestClient(t *testing.T) *api.Client {
 }
 
 func TestConfig(t *testing.T) {
-	itest.Require(t, "127.0.0.1:8500")
+	testsupport.Require(t, "127.0.0.1:8500")
 	client := newTestClient(t)
 
 	if _, err := client.KV().Put(&api.KVPair{Key: testKey, Value: []byte("test config")}, nil); err != nil {
@@ -76,7 +76,7 @@ func TestConfig(t *testing.T) {
 }
 
 func TestExtToFormat(t *testing.T) {
-	itest.Require(t, "127.0.0.1:8500")
+	testsupport.Require(t, "127.0.0.1:8500")
 	client := newTestClient(t)
 	tp := "kratos/test/ext"
 	tn := "a.bird.json"

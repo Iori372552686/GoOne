@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/module/conf"
 	goredis "github.com/redis/go-redis/v9"
 )
 
@@ -22,17 +21,29 @@ var ErrInstanceNotFound = errors.New("redis instance not found")
 type redisClientFactory func(normalizedConfig, *tls.Config) (goredis.UniversalClient, error)
 
 type RedisMgr struct {
-	clients   sync.Map // map[uint32]goredis.UniversalClient
-	newClient redisClientFactory
+	clients    sync.Map // map[uint32]goredis.UniversalClient
+	newClient  redisClientFactory
+	loadConfig func(key string, out any) error
 }
 
 func NewRedisMgr() *RedisMgr {
 	return &RedisMgr{newClient: newUniversalClient}
 }
 
+// NewRedisMgrWithConfigLoader enables OnStart with an application-supplied configuration reader.
+func NewRedisMgrWithConfigLoader(load func(key string, out any) error) *RedisMgr {
+	mgr := NewRedisMgr()
+	mgr.loadConfig = load
+	return mgr
+}
+
+// OnStart loads configured instances and starts their connection pools.
 func (m *RedisMgr) OnStart(ctx context.Context) error {
+	if m.loadConfig == nil {
+		return errors.New("redis: OnStart requires a configuration loader")
+	}
 	var dbs []Config
-	if err := conf.Unmarshal(DefaultConfKey, &dbs); err != nil {
+	if err := m.loadConfig(DefaultConfKey, &dbs); err != nil {
 		return err
 	}
 	if len(dbs) == 0 {

@@ -5,12 +5,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Iori372552686/GoOne/lib/internal/itest"
+	"github.com/Iori372552686/GoOne/lib/testsupport"
 	"k8s.io/client-go/util/homedir"
 )
 
 func TestSource(t *testing.T) {
-	if !itest.Enabled() {
+	if !testsupport.Enabled() {
 		t.Skip("set GOONE_INTEGRATION=1 to run integration tests")
 	}
 	home := homedir.HomeDir()

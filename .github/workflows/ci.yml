@@ -9,6 +9,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GOWORK: "off"
+
 jobs:
   # 每个 job 的失败含义可区分：
   #   build-unit  — 编译 + vet + 全量单元测试（无中间件时集成测试自 Skip）
@@ -21,60 +24,74 @@ jobs:
 
   build-unit:
     name: Build & Unit Test
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.12'
+          go-version-file: go.mod
           cache: true
+          cache-dependency-path: "**/go.sum"
 
       - name: Build
-        run: go build ./...
+        run: go build -mod=readonly ./...
 
       - name: Vet
         # composites disabled: generated gamedata repositories use unkeyed
         # Index2 literals (tracked in docs/optimization_roadmap.md 3.6).
         run: go vet -composites=false ./...
 
-      - name: Test
-        # V4 P0-09：运行完整 ./...，不再维护容易遗漏的手工 package 清单。
-        # 集成测试在无中间件时由 itest.Require 自 Skip，不会外部超时。
-        run: go test -count=1 -timeout 600s ./...
+      - name: Test root packages
+        run: go test -mod=readonly -count=1 -timeout 600s ./...
+
+      - name: Build, vet and test library modules
+        run: go run -mod=readonly ./tools/cmd/checkmodules check
+
+      - name: Test optional etcd configuration
+        env:
+          GOFLAGS: -tags=config_etcd
+        run: go run -mod=readonly ./tools/cmd/checkmodules test ./lib/contrib/config/factory
 
   race:
     name: Race Detector
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.12'
+          go-version-file: go.mod
           cache: true
+          cache-dependency-path: "**/go.sum"
 
-      - name: Race (core packages)
-        # race 覆盖 net、runtime、router、svrinstmgr、bus、ssrpc、
-        # transaction、scheduler、async、gamedata 等并发敏感包，
-        # 以及有真实状态的业务包（报告 §8：role 的心跳/过期/保存并发）。
-        # 注：lib/service 下不存在 appconfig 子包；bus/... 含 nsq 手动联调用例，
-        # 这里只跑其并发核心，driver 的真实联调由 integration job 覆盖。
-        # 旧德州项目的 ./src/roomcentersvr/room_mgr/... 已于 2026-09-27 移除。
+      - name: Race (root packages)
         run: >
           go test -race -count=1 -timeout 600s
-          ./lib/net/...
-          ./lib/service/runtime/...
-          ./lib/service/router/...
-          ./lib/service/svrinstmgr/...
-          ./lib/service/bus/...
-          ./lib/service/ssrpc/...
-          ./lib/service/transaction/...
-          ./lib/service/scheduler/...
-          ./lib/service/async/...
           ./module/gamedata/...
           ./src/mainsvr/role/...
           ./src/connsvr/...
+          ./src/serviceconfig/...
+
+      - name: Race (library modules)
+        run: >
+          go run ./tools/cmd/checkmodules race
+          ./lib/net
+          ./lib/service/runtime
+          ./lib/service/router
+          ./lib/service/svrinstmgr
+          ./lib/service/bus
+          ./lib/service/ssrpc
+          ./lib/service/transaction
+          ./lib/service/scheduler
+          ./lib/service/async
 
   integration:
     # V4 P0-09：真实中间件集成。GOONE_INTEGRATION=1 时依赖不可达必须失败
@@ -119,14 +136,17 @@ jobs:
       GOONE_REDIS_ADDR: 127.0.0.1:6379
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.12'
+          go-version-file: go.mod
           cache: true
+          cache-dependency-path: "**/go.sum"
 
       - name: Init MySQL testdb
-        # xorm 集成测试 DSN 指向 testdb；CI mysql 镜像默认无该库，需先建。
+        # GORM 集成测试 DSN 指向 testdb；CI mysql 镜像默认无该库，需先建。
         run: |
           for i in $(seq 1 30); do
             if mysqladmin -h127.0.0.1 -uroot -p"ci-root-${{ github.run_id }}" ping >/dev/null 2>&1; then
@@ -137,24 +157,16 @@ jobs:
           mysql -h127.0.0.1 -uroot -p"ci-root-${{ github.run_id }}" -e "CREATE DATABASE IF NOT EXISTS testdb;"
 
       - name: Integration tests
-        # 测试范围严格对齐已启动的中间件（mysql/redis/zookeeper/rabbitmq）：
-        #   - bus/driver/rabbitmq   → rabbitmq（精确到 driver 子包，避免递归进 nsq
-        #                              的手动联调用例，后者用 select{} 永久阻塞）
-        #   - router / svrinstmgr   → 纯内存单测，无中间件
-        #   - db/redis / db/xorm    → redis / mysql（经 env 覆盖默认 DSN）
-        #   - registry/zookeeper    → zookeeper（精确到子包，避免递归进
-        #                              etcd/consul/nacos——CI 未启动且 itest.Require
-        #                              在 GOONE_INTEGRATION=1 下为 t.Fatal）
-        # 用 -v 输出实际执行用例；下方 step 校验用例数 > 0。
-        run: >
-          go test -count=1 -timeout 600s -v
-          ./lib/service/bus/driver/rabbitmq/...
-          ./lib/service/router/...
-          ./lib/service/svrinstmgr/...
-          ./lib/db/redis/...
-          ./lib/db/xorm/...
-          ./lib/contrib/registry/zookeeper/...
-          2>&1 | tee integration.log
+        run: |
+          set -o pipefail
+          go run ./tools/cmd/checkmodules integration \
+            ./lib/service/bus/driver/rabbitmq \
+            ./lib/service/router \
+            ./lib/service/svrinstmgr \
+            ./lib/db/redis \
+            ./lib/db/gorm \
+            ./lib/contrib/registry/zookeeper \
+            2>&1 | tee integration.log
 
       - name: Verify non-zero executed tests
         # V4 P0-09：用例数为 0 视为失败（避免依赖全 Skip 的虚假绿灯）。
@@ -178,47 +190,47 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.12'
+          go-version-file: go.mod
           cache: true
-
-      - name: Install protoc
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
-          protoc --version
+          cache-dependency-path: "**/go.sum"
 
       - name: Generate twice, expect no diff
         run: |
           set -e
-          ./main.sh check-genproto --full
-          # 第二次生成后工作树必须无 diff（首次已校验格式与生成一致性）。
-          if ! git diff --quiet; then
-            echo "generated code differs after re-run — generation is non-idempotent"
-            git diff --stat
-            exit 1
-          fi
+          cp -R lib/contrib/protoc/protoc-33.2-linux-x86_64 "$RUNNER_TEMP/goone-protoc"
+          chmod +x "$RUNNER_TEMP/goone-protoc/bin/protoc"
+          export PROTOC_BIN_DIR="$RUNNER_TEMP/goone-protoc"
+          export PATH="$PROTOC_BIN_DIR/bin:$PATH"
+          for pass in 1 2; do
+            bash ./main.sh check-genproto --full
+            git diff --exit-code -- api/gen
+            git -C common diff --exit-code -- protocol
+          done
 
   security:
     # 供应链与凭据门禁。govulncheck 可达漏洞为 0；gitleaks 阻止真实凭据进入 diff。
-    # 工具版本固定以保证可复现：govulncheck v1.6.0、gitleaks v8.30.1。
+    # 工具版本固定以保证可复现：govulncheck v1.10.0、gitleaks v8.30.1。
     name: Security (govulncheck + gitleaks)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: recursive
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.12'
+          go-version-file: go.mod
           cache: true
+          cache-dependency-path: "**/go.sum"
 
       - name: govulncheck
         # 可达漏洞必须为 0；任一可达漏洞阻断合并。
         run: |
           set -e
-          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          go install golang.org/x/vuln/cmd/govulncheck@v1.10.0
           govulncheck ./...
+          go run ./tools/cmd/checkmodules security
 
       - name: gitleaks
         # 扫描全部历史与工作区，禁止 Token、完整 DSN、Authorization、私钥进入仓库。
@@ -236,16 +248,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: recursive
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.12'
+          go-version-file: go.mod
           cache: true
+          cache-dependency-path: "**/go.sum"
 
-      - uses: golangci/golangci-lint-action@v6
+      - uses: golangci/golangci-lint-action@v8
         with:
           # 固定版本，避免浮动 latest 导致门禁不可复现。
-          version: v2.12.2
+          version: v2.14.0
           # 只对本次改动引入的新问题失败；存量债务冻结在 origin/dev 基线。
           args: --new-from-rev=origin/${{ github.base_ref || 'dev' }}
 
@@ -307,13 +321,16 @@ jobs:
         # 不得出现在模块图。
         run: |
           set -e
-          if go list -deps ./cmd/web_svr 2>/dev/null | grep -Eq 'rocketmq|nats.go|go-nsq|kafka-go'; then
+          web_deps=$(go list -deps ./cmd/web_svr)
+          gateway_deps=$(go list -deps ./cmd/connsvr)
+          all_modules=$(go list -m all)
+          if grep -Eq 'amqp091-go|rocketmq|nats.go|go-nsq|kafka-go' <<< "$web_deps"; then
             echo "websvr unexpectedly links MQ SDK"; exit 1
           fi
-          if go list -deps ./cmd/connsvr 2>/dev/null | grep -Eq 'rocketmq|nats.go|go-nsq|kafka-go'; then
+          if grep -Eq 'rocketmq|nats.go|go-nsq|kafka-go' <<< "$gateway_deps"; then
             echo "connsvr links unselected MQ SDK"; exit 1
           fi
-          if go list -m all 2>/dev/null | grep -q 'streadway/amqp'; then
+          if grep -q 'streadway/amqp' <<< "$all_modules"; then
             echo "streadway/amqp still in module graph"; exit 1
           fi
 
@@ -323,11 +340,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.12'
+          go-version-file: go.mod
           cache: true
+          cache-dependency-path: "**/go.sum"
 
       - name: Check docs links
         run: go run ./tools/cmd/checkdocs ./docs

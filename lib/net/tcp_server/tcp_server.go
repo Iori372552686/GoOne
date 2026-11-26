@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/util/bufpool"
-	"github.com/Iori372552686/GoOne/module/misc"
 )
 
 const (
@@ -38,15 +38,15 @@ type TcpSvr struct {
 
 	// listener 字段化：Quiesce 关闭 listener 停止接新连接但保留
 	// 既有连接；Stop 关闭 listener 与全部连接。StopCloseOnce 保证幂等。
-	listener       net.Listener
-	stopCloseOnce  sync.Once
+	listener      net.Listener
+	stopCloseOnce sync.Once
 }
 
 func (s *TcpSvr) InitAndRun(ip string, port int, handler ITcpSvrEventHandler) error {
 	// 仅在调用方未预设（零值）时填默认。TcpReadTimeout/WriteTimeout 在 Start 后被读
 	// goroutine 热路径读取，InitAndRun 后不得再修改（避免数据竞争）。
 	if s.TcpReadTimeout == 0 {
-		s.TcpReadTimeout = 2 * misc.ClientExpiryThreshold
+		s.TcpReadTimeout = 2 * sharedstruct.ClientExpiryThreshold
 	}
 	if s.TcpWriteTimeout == 0 {
 		s.TcpWriteTimeout = 10 * time.Second
@@ -224,7 +224,7 @@ func (s *TcpSvr) runConnRead(conn net.Conn) {
 }
 
 // destroyConn 拆除一个连接。锁内置 closed=true 并删除；不调用 close(chanWrite)
-//（直接 close channel 会与并发 WriteData 的 send 产生 send-on-closed-channel 竞态）。
+// （直接 close channel 会与并发 WriteData 的 send 产生 send-on-closed-channel 竞态）。
 // 改为向 chanWrite 投递一个 nil（关闭信号）：写协程收到 nil 即退出循环并 Close 底层
 // conn。chan 本身随 entry 一起被 GC。
 //
@@ -265,7 +265,7 @@ func (s *TcpSvr) runConnWrite(conn net.Conn, chanWrite <-chan *bufpool.Buffer) {
 		_ = conn.SetWriteDeadline(time.Now().Add(s.TcpWriteTimeout))
 		sentLen, err := conn.Write(buf.Bytes)
 		dataLen := len(buf.Bytes)
-		bufpool.Release(buf) // writer 完成（含出错）后释放 Lease，只释放一次。
+		bufpool.Release(buf)                 // writer 完成（含出错）后释放 Lease，只释放一次。
 		if sentLen < dataLen || err != nil { //todo: retry?
 			logger.Errorf("Failed to write tcp data {err:%v, dataLen: %v, sentLen: %v}", err, dataLen, sentLen)
 			_ = conn.Close()

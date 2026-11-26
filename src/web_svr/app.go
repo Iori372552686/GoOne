@@ -12,7 +12,6 @@ import (
 	"github.com/Iori372552686/GoOne/lib/api/logger"
 	"github.com/Iori372552686/GoOne/lib/api/net_conf"
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
-	"github.com/Iori372552686/GoOne/lib/service/runtime/bussvc"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/util/sensitive_words"
 	"github.com/Iori372552686/GoOne/lib/web/http_sign"
@@ -21,6 +20,7 @@ import (
 	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/module/gamedata"
 	"github.com/Iori372552686/GoOne/module/gconf"
+	"github.com/Iori372552686/GoOne/src/serviceconfig"
 	"github.com/Iori372552686/GoOne/src/web_svr/controller"
 	"github.com/Iori372552686/GoOne/src/web_svr/globals"
 	"github.com/gin-gonic/gin"
@@ -298,7 +298,8 @@ func (w *webRuntimeComponent) getGRPCServer() *grpc.Server {
 func NewApp() *runtime.App {
 	// gamedata 加载作为 LoadConfig 的追加钩子：配置中心（nacos）优先，
 	// 未配置时回退本地目录。
-	app := bussvc.MustNew("websvr", nil, bussvc.WithConfLoader(func(_ context.Context) error {
+	assembly := serviceconfig.ForGoOne()
+	app := assembly.MustNew("websvr", nil, assembly.WithConfLoader(func(_ context.Context) error {
 		var nacosConf net_conf.NacosConf
 		_ = conf.Unmarshal("base_cfg.dependencies.nacos_conf", &nacosConf)
 		gameDataDir := conf.Get("base_cfg.dependencies.game_data_dir").String()

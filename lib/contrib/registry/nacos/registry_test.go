@@ -3,7 +3,7 @@ package nacos
 import (
 	"context"
 	"github.com/Iori372552686/GoOne/lib/contrib/registry"
-	"github.com/Iori372552686/GoOne/lib/internal/itest"
+	"github.com/Iori372552686/GoOne/lib/testsupport"
 	"log"
 	"net"
 	"testing"
@@ -33,7 +33,7 @@ func getIntranetIP() string {
 
 func TestRegistry(t *testing.T) {
 	ip := getIntranetIP()
-	itest.Require(t, net.JoinHostPort(ip, "8848"))
+	testsupport.Require(t, net.JoinHostPort(ip, "8848"))
 	serviceName := "golang-sms@grpc"
 	ctx := context.Background()
 
@@ -125,7 +125,7 @@ func TestRegistry(t *testing.T) {
 
 func TestRegistryMany(t *testing.T) {
 	ip := getIntranetIP()
-	itest.Require(t, net.JoinHostPort(ip, "8848"))
+	testsupport.Require(t, net.JoinHostPort(ip, "8848"))
 	serviceName := "golang-sms@grpc"
 	// ctx := context.Background()
 

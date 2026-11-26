@@ -193,10 +193,8 @@ import (
 func NewApp() *runtime.App {
 	app := runtime.MustNew("{{.Name}}")
 	// TODO: 增加组件后在此 MustRegister，例如：
-	// app := runtime.MustNew("{{.Name}}", bussvc.WithConfLoader())
-	// app.MustRegister(scheduler.DefaultDateTimeTick(),
-	//     bussvc.NewLoggerComponent(app), bussvc.NewAdminComponent(app, router.ReadyCheck),
-	//     bussvc.NewTracingComponent(app), ...)
+	// assembly := serviceconfig.ForGoOne()
+	// app := assembly.MustNew("{{.Name}}", router.ReadyCheck, assembly.WithConfLoader())
 	return app
 }
 `

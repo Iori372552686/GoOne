@@ -122,7 +122,7 @@ check_genproto() {
   if [[ "${mode}" == "--full" || "${mode}" == "full" ]]; then
     require_file "${ROOT_DIR}/scripts/proto_goone.sh"
     log_info "Running full proto generation: ./scripts/proto_goone.sh"
-    (cd "$ROOT_DIR" && ./scripts/proto_goone.sh)
+    (cd "$ROOT_DIR" && bash ./scripts/proto_goone.sh)
 
     log_info "Checking working tree: api/gen and common/protocol must match generator output"
     if ! (cd "$ROOT_DIR" && git diff --quiet -- api/gen common/protocol); then

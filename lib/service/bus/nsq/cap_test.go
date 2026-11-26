@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
-	"github.com/Iori372552686/GoOne/lib/internal/itest"
+	"github.com/Iori372552686/GoOne/lib/testsupport"
 )
 
 // TestConsumer is a manual integration test: it requires an external nsq
 // lookupd and never terminates by itself, so it is skipped by default.
 func TestConsumer(t *testing.T) {
-	itest.Require(t, "127.0.0.1:4150")
+	testsupport.Require(t, "127.0.0.1:4150")
 
 	_, err := NewConsumer("test", "ch1", "nacos.miniworldplus.com:4161", []string{}, 3, nil)
 	if err != nil {
@@ -29,7 +29,7 @@ func TestConsumer(t *testing.T) {
 // TestProducer is a manual integration test: it requires an external nsqd,
 // so it is skipped by default.
 func TestProducer(t *testing.T) {
-	itest.Require(t, "127.0.0.1:4150")
+	testsupport.Require(t, "127.0.0.1:4150")
 
 	producer, err := NewProducer("nacos.miniworldplus.com:4150")
 	if err != nil {

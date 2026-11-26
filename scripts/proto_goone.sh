@@ -16,6 +16,10 @@ if [[ -f "$ROOT_DIR/common/game_proto/gen_code.sh" ]]; then
   echo "[proto_goone] step 1/2: generate common/protocol (g1_common)"
   (
     cd "$ROOT_DIR/common/game_proto"
+    # protoc-gen-go uses Go's formatter. Match the toolchain used by common/protocol.
+    export GOTOOLCHAIN=go1.25.12
+    common_go_root="$(go env GOROOT)"
+    export PATH="$common_go_root/bin:$PATH"
     bash ./gen_code.sh
   )
 fi

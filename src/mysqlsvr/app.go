@@ -17,13 +17,15 @@ import (
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/globals"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/repository"
 	"github.com/Iori372552686/GoOne/src/mysqlsvr/service"
+	"github.com/Iori372552686/GoOne/src/serviceconfig"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 // NewApp 用 runtime.App + Component 装配 mysqlsvr。服务名只在 MustNew 出现一次；
 // 标准组件（logger/admin/tracing/router）由 bussvc 构造器自读 conf 装配。
 func NewApp() *runtime.App {
-	app := bussvc.MustNew("mysqlsvr", router.ReadyCheck, bussvc.WithConfLoader())
+	assembly := serviceconfig.ForGoOne()
+	app := assembly.MustNew("mysqlsvr", router.ReadyCheck, assembly.WithConfLoader())
 
 	// 标准组件（datetime/logger/admin/tracing）由 bussvc.MustNew 集中注册。
 
@@ -87,7 +89,7 @@ func NewApp() *runtime.App {
 	}
 
 	// DriverRegistry 只注册 rabbitmq。
-	routerComp := bussvc.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry())
+	routerComp := assembly.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry())
 
 	// 注册顺序即 Start 顺序：datetime 周期刷新（WithConfLoader 自动注册，隐含在最前）
 	// → logger → admin → tracing → orm 依赖（DB pool）→ SSRPC 注册（必须在

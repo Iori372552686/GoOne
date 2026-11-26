@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Iori372552686/GoOne/lib/internal/itest"
+	"github.com/Iori372552686/GoOne/lib/testsupport"
 	goredis "github.com/redis/go-redis/v9"
 )
 
 func TestRedisV9DataCompatibilityIntegration(t *testing.T) {
 	host, port, addr, pass := redisTestAddr()
-	itest.Require(t, addr)
+	testsupport.Require(t, addr)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	m := NewRedisMgr()

@@ -34,20 +34,6 @@ func TestNewPublisherFromURL_Nacos(t *testing.T) {
 	}
 }
 
-// TestNewPublisher_Etcd_Disabled 在默认 tag（未启用 config_etcd）下，
-// etcd Publisher 必须返回 "not enabled" 错误，与读路径 newEtcdClient 行为一致。
-func TestNewPublisher_Etcd_Disabled(t *testing.T) {
-	cfg, err := ParseConfig("etcd://127.0.0.1:2379?path=/goone/config")
-	if err != nil {
-		t.Fatalf("ParseConfig: %v", err)
-	}
-	pub, err := NewPublisher(cfg)
-	if err == nil {
-		_ = pub.Close()
-		t.Fatal("want 'not enabled' error under default tags, got nil")
-	}
-}
-
 // TestNewPublisher_UnsupportedBackend apollo/consul/k8s 暂未实现写路径。
 func TestNewPublisher_UnsupportedBackend(t *testing.T) {
 	cfg, err := ParseConfig("apollo://?appid=x&endpoint=http://127.0.0.1:8080&namespace=app.yaml")

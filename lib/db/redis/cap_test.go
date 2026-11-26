@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Iori372552686/GoOne/lib/internal/itest"
+	"github.com/Iori372552686/GoOne/lib/testsupport"
 )
 
 // redisTestAddr/redisTestPass 取自环境变量（默认本地无密码实例），
@@ -47,7 +47,7 @@ func capKey(i int) string { return fmt.Sprintf("%s0x%08x", capKeyPrefix, i) }
 
 func TestCap(t *testing.T) {
 	host, port, addr, pass := redisTestAddr()
-	itest.Require(t, addr)
+	testsupport.Require(t, addr)
 
 	const (
 		c      = 1 * 1024
@@ -83,7 +83,7 @@ func TestCap(t *testing.T) {
 
 func TestIncBy(t *testing.T) {
 	host, port, addr, pass := redisTestAddr()
-	itest.Require(t, addr)
+	testsupport.Require(t, addr)
 
 	redisMgr := NewRedisMgr()
 	err := redisMgr.AddInstance(context.Background(), Config{InstanceID: 1, IP: host, Port: port, Password: pass})

@@ -60,13 +60,24 @@ if (-not $goExe) {
 if (Test-Path (Join-Path $repoRoot "common/game_proto/gen_code.bat")) {
   Write-Host "[proto_goone] step 1/2: generate common/protocol"
   Push-Location (Join-Path $repoRoot "common\game_proto")
+  $savedToolchain = $env:GOTOOLCHAIN
+  $savedPath = $env:PATH
   try {
+    # protoc-gen-go uses Go's formatter. Match the toolchain used by common/protocol.
+    $env:GOTOOLCHAIN = "go1.25.12"
+    $commonGoRoot = & $goExe env GOROOT
+    if ($LASTEXITCODE -ne 0) {
+      throw "Failed to resolve the common protocol toolchain"
+    }
+    $env:PATH = "$(Join-Path $commonGoRoot 'bin');$savedPath"
     cmd /c gen_code.bat
     if ($LASTEXITCODE -ne 0) {
       throw "common/game_proto/gen_code.bat failed with exit code $LASTEXITCODE"
     }
   }
   finally {
+    $env:GOTOOLCHAIN = $savedToolchain
+    $env:PATH = $savedPath
     Pop-Location
   }
 }

@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/util/bufpool"
-	"github.com/Iori372552686/GoOne/module/misc"
 	"github.com/gorilla/websocket"
 )
 
@@ -60,7 +60,7 @@ type WsTcpSvr struct {
 }
 
 func (s *WsTcpSvr) InitAndRun(implType, mod string, port int, handler IWsTcpSvrEventHandler) error {
-	s.wsReadTimeout = misc.ClientExpiryThreshold
+	s.wsReadTimeout = sharedstruct.ClientExpiryThreshold
 	s.wsWriteTimeout = 5 * time.Second
 
 	s.handler = handler

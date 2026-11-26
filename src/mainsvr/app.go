@@ -22,13 +22,15 @@ import (
 	"github.com/Iori372552686/GoOne/src/mainsvr/globals/rds"
 	"github.com/Iori372552686/GoOne/src/mainsvr/role"
 	"github.com/Iori372552686/GoOne/src/mainsvr/service"
+	"github.com/Iori372552686/GoOne/src/serviceconfig"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 )
 
 // NewApp 用 runtime.App + Component 装配 mainsvr。服务名只在 MustNew 出现一次；
 func NewApp() *runtime.App {
 	// gamedata 本地目录加载作为 LoadConfig 的追加钩子，在校验通过后执行。
-	app := bussvc.MustNew("mainsvr", router.ReadyCheck, bussvc.WithConfLoader(func(_ context.Context) error {
+	assembly := serviceconfig.ForGoOne()
+	app := assembly.MustNew("mainsvr", router.ReadyCheck, assembly.WithConfLoader(func(_ context.Context) error {
 		if gameDataDir := conf.Get("base_cfg.dependencies.game_data_dir").String(); gameDataDir != "" {
 			logger.Infof("Loading local file by gameconf_dir: %v ", gameDataDir)
 			if err := gamedata.InitLocal(gameDataDir); err != nil {
@@ -95,7 +97,7 @@ func NewApp() *runtime.App {
 	)
 
 	// DriverRegistry 只注册 rabbitmq。
-	routerComp := bussvc.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry())
+	routerComp := assembly.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry())
 
 	// SelfLogoutSender 注入：心跳过期淘汰改经事务串行执行，落盘与删除在 Logout
 	// handler 内按 uid 串行键执行，消除 Tick 与业务 handler 对同一 *Role 的并发读写。

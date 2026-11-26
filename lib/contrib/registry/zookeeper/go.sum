@@ -1,0 +1,6 @@
+github.com/Iori372552686/GoOne/lib/contrib/registry v0.1.0 h1:AeUPZaWLcWJ3Avq1D900PcXYCcbP7zG4aWB65OE3asQ=
+github.com/Iori372552686/GoOne/lib/contrib/registry v0.1.0/go.mod h1:/FuSZRFtiOaiqtTGVAc7b3HZxHeBlSTVQcETggP17HY=
+github.com/Iori372552686/GoOne/lib/testsupport v0.1.0 h1:g/aPRBqzOpItZYgpZIqgxK3zYDVEH6O2pLwCe3XocSY=
+github.com/Iori372552686/GoOne/lib/testsupport v0.1.0/go.mod h1:qJ16H36LnotD8dLH4BqYUI3u1ZtGsimTRGoIFlXypT4=
+github.com/go-zookeeper/zk v1.0.4 h1:DPzxraQx7OrPyXq2phlGlNSIyWEsAox0RJmjTseMV6I=
+github.com/go-zookeeper/zk v1.0.4/go.mod h1:nOB03cncLtlp4t+UAkGSV+9beXP/akpekBwL+UX1Qcw=

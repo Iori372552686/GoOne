@@ -4,7 +4,7 @@ import "runtime"
 
 type TransactionMgrConfig struct {
 	// MaxTrans 全局在途事务数上限（超限拒绝新请求）。<=0 回退为 1；
-	// 生产装配由 bussvc.TransMgrComponent 再回退到 misc.MaxTransNumber。
+	// 生产装配由 bussvc.TransMgrComponent 回退到 10000。
 	MaxTrans int32
 	// ShardCount 派发分片数（队列/transID 空间划分；handler 执行始终是每事务独立
 	// goroutine，故它不是并发旋钮）。<=0 回退 DefaultShardCount()。

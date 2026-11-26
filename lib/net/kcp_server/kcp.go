@@ -16,8 +16,8 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/api/logger"
+	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/util/bufpool"
-	"github.com/Iori372552686/GoOne/module/misc"
 	kcp "github.com/xtaci/kcp-go/v5"
 )
 
@@ -47,7 +47,7 @@ type KcpSvr struct {
 }
 
 func (s *KcpSvr) InitAndRun(ip string, port int, handler IKcpSvrEventHandler) error {
-	s.KcpReadTimeout = 2 * misc.ClientExpiryThreshold
+	s.KcpReadTimeout = 2 * sharedstruct.ClientExpiryThreshold
 	s.KcpWriteTimeout = 10 * time.Second
 
 	s.handler = handler
@@ -210,7 +210,7 @@ func (s *KcpSvr) runConnRead(conn net.Conn) {
 }
 
 // destroyConn 拆除一个连接。锁内置 closed=true 并删除；不调用 close(chanWrite)
-//（直接 close channel 会与并发 WriteData 的 send 产生 send-on-closed-channel 竞态）。
+// （直接 close channel 会与并发 WriteData 的 send 产生 send-on-closed-channel 竞态）。
 // 改为向 chanWrite 投递一个 nil（关闭信号）：写协程收到 nil 即退出循环并 Close 底层
 // conn。chan 本身随 entry 一起被 GC。
 func (s *KcpSvr) destroyConn(conn net.Conn) {

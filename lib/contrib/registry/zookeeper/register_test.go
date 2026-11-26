@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/Iori372552686/GoOne/lib/contrib/registry"
-	"github.com/Iori372552686/GoOne/lib/internal/itest"
+	"github.com/Iori372552686/GoOne/lib/testsupport"
 )
 
 func TestRegistry(t *testing.T) {
-	itest.Require(t, "127.0.0.1:2181")
+	testsupport.Require(t, "127.0.0.1:2181")
 
 	ctx := context.Background()
 	s := &registry.ServiceInstance{

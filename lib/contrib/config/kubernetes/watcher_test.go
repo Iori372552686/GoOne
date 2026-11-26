@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Iori372552686/GoOne/lib/internal/itest"
+	"github.com/Iori372552686/GoOne/lib/testsupport"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -14,7 +14,7 @@ import (
 )
 
 func TestKube(t *testing.T) {
-	if !itest.Enabled() {
+	if !testsupport.Enabled() {
 		t.Skip("set GOONE_INTEGRATION=1 to run integration tests")
 	}
 	home := homedir.HomeDir()

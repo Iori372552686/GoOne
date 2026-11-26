@@ -17,12 +17,14 @@ import (
 	"github.com/Iori372552686/GoOne/module/gconf"
 	"github.com/Iori372552686/GoOne/src/connsvr/globals"
 	"github.com/Iori372552686/GoOne/src/connsvr/service"
+	"github.com/Iori372552686/GoOne/src/serviceconfig"
 )
 
 // NewApp 用 runtime.App + Component 装配 connsvr。服务名只在 MustNew 出现一次；
 // 标准组件（logger/admin/tracing/router）由 bussvc 构造器自读 conf 装配。
 func NewApp() *runtime.App {
-	app := bussvc.MustNew("connsvr", router.ReadyCheck, bussvc.WithConfLoader())
+	assembly := serviceconfig.ForGoOne()
+	app := assembly.MustNew("connsvr", router.ReadyCheck, assembly.WithConfLoader())
 
 	// 标准组件（datetime/logger/admin/tracing）由 bussvc.MustNew 集中注册。
 
@@ -59,7 +61,7 @@ func NewApp() *runtime.App {
 	// connsvr 特有：客户端下行包在 onRecvSSPacket 中短路回客户端，覆盖默认的
 	// TransMgr.ProcessSSPacket。DriverRegistry 只注册 rabbitmq（bus 服务不再隐式
 	// 链接全部 5 类 MQ SDK；websvr 不链接任何 driver）。
-	routerComp := bussvc.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry(), onRecvSSPacket)
+	routerComp := assembly.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry(), onRecvSSPacket)
 
 	// 网关监听器：在 router/bus 起来之后启动 TCP/WS/KCP。实现 Quiescer（停止接新连接）
 	// 与 runtime.Component（Stop 强制关闭全部连接），满足网关排空。

@@ -12,6 +12,7 @@ import (
 	"github.com/Iori372552686/GoOne/module/conf"
 	"github.com/Iori372552686/GoOne/module/gamedata"
 	"github.com/Iori372552686/GoOne/src/roomcentersvr/globals"
+	"github.com/Iori372552686/GoOne/src/serviceconfig"
 )
 
 // NewApp 用 runtime.App + Component 装配 roomcentersvr。服务名只在 MustNew 出现一次；
@@ -21,7 +22,8 @@ import (
 // 已于 2026-09-27 移除；当前仅保留总线服务骨架，待新游戏的房间系统在此落位。
 func NewApp() *runtime.App {
 	// gamedata 本地目录加载作为 LoadConfig 的追加钩子，在校验通过后执行。
-	app := bussvc.MustNew("roomcentersvr", router.ReadyCheck, bussvc.WithConfLoader(func(_ context.Context) error {
+	assembly := serviceconfig.ForGoOne()
+	app := assembly.MustNew("roomcentersvr", router.ReadyCheck, assembly.WithConfLoader(func(_ context.Context) error {
 		if gameDataDir := conf.Get("base_cfg.dependencies.game_data_dir").String(); gameDataDir != "" {
 			logger.Infof("Loading local file by gameconf_dir: %v ", gameDataDir)
 			if err := gamedata.InitLocal(gameDataDir); err != nil {
@@ -56,7 +58,7 @@ func NewApp() *runtime.App {
 		},
 	}
 
-	routerComp := bussvc.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry())
+	routerComp := assembly.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry())
 
 	app.MustRegister(
 		businessDeps, transMgr, routerComp,

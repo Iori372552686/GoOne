@@ -19,7 +19,6 @@ import (
 	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 	"github.com/Iori372552686/GoOne/lib/service/svrinstmgr"
-	"github.com/Iori372552686/GoOne/module/misc"
 
 	"github.com/golang/protobuf/proto"
 )
@@ -264,7 +263,7 @@ func (r *Router) SendMsgBySvrType(svrType uint32, routerId, uid uint64, zone uin
 }
 
 func (r *Router) SendMsgByConn(uid, routerId uint64, zone, cmd uint32, srcTransId uint32, data []byte, ip, port uint32) error {
-	svrType := misc.ServerTypeInCmd(cmd)
+	svrType := sharedstruct.ServerTypeInCmd(cmd)
 	dstBusId, routerKey := r.instanceMgr.GetSvrInsBySvrType(svrType, zone, uid, routerId)
 	if dstBusId == 0 {
 		logger.Errorf("cannot get a server instance to send {svrType: %v, uid: %v, cmd: %v}", svrType, uid, cmd)

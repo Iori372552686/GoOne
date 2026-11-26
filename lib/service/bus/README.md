@@ -1,3 +1,41 @@
+# lib/service/bus
+
+[功能] 定义服务间总线接口 `IBus`、地址解析和显式驱动注册表。只需抽象或自定义驱动时可独立使用。各消息队列驱动单独发布。
+
+## 安装
+
+[版本] 需要 Go 1.25.4 或更新版本。以下命令在模块的首发标签发布后可执行。
+
+```sh
+go get github.com/Iori372552686/GoOne/lib/service/bus@v0.1.0
+```
+
+## 示例
+
+[运行条件] 解析地址不建立连接。实际使用时向 `NewDriverRegistry` 注册驱动，再调用 `CreateBus`、`Start` 和 `Close`。
+
+[用法] 将示例保存为消费者模块中的 `main.go`，执行 `go run .`。
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/Iori372552686/GoOne/lib/service/bus"
+	"log"
+)
+
+func main() {
+	kind, _, err := bus.ParseAddr("nats://127.0.0.1:4222")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(kind, bus.IpStringToInt("1.2.3.4"))
+}
+```
+
+---
+
 # Bus 中间件抽象层
 
 `bus` 是服务器之间消息收发的中间件抽象层，统一屏蔽不同 MQ 中间件（RabbitMQ / NSQ / NATS / Kafka / RocketMQ）的差异，对业务只暴露一套简单 API：
@@ -218,6 +256,6 @@ onRecv(srcBusId uint32, payload []byte) error
 
 ## 5. 调试与测试建议
 
-- 推荐在本地起对应中间件（RabbitMQ / NSQ / NATS / Kafka / RocketMQ），配合 `go test ./lib/service/bus` 进行联调；
+- 推荐在本地起对应中间件（RabbitMQ / NSQ / NATS / Kafka / RocketMQ），配合 `go run ./tools/cmd/checkmodules test ./lib/service/bus` 进行联调；
 - 如在 CI 环境无外部 MQ，可使用 `-run` / `-short` 或在测试中 `t.Skip`（当前测试已按不可用时自动跳过）；
 - 建议统一通过 `CreateBusE` + addr 的方式管理配置，便于在配置中心统一下发/修改。

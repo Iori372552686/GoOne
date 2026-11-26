@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Iori372552686/GoOne/lib/internal/itest"
+	"github.com/Iori372552686/GoOne/lib/testsupport"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 	mysqldriver "github.com/go-sql-driver/mysql"
 )
 
 func TestAutoMigratePreservesExistingSchemaAndDataIntegration(t *testing.T) {
-	if !itest.Enabled() {
+	if !testsupport.Enabled() {
 		t.Skip("set GOONE_INTEGRATION=1 to run integration tests")
 	}
 	dsn := os.Getenv("GOONE_MYSQL_DSN")
@@ -30,7 +30,7 @@ func TestAutoMigratePreservesExistingSchemaAndDataIntegration(t *testing.T) {
 	if parsed.Net != "tcp" {
 		t.Fatalf("GOONE_MYSQL_DSN network = %q, want tcp", parsed.Net)
 	}
-	itest.Require(t, parsed.Addr)
+	testsupport.Require(t, parsed.Addr)
 	host, portText, err := net.SplitHostPort(parsed.Addr)
 	if err != nil {
 		t.Fatalf("split MySQL address: %v", err)

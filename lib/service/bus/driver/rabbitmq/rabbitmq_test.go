@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Iori372552686/GoOne/lib/internal/itest"
+	"github.com/Iori372552686/GoOne/lib/testsupport"
 	"github.com/Iori372552686/GoOne/lib/service/bus"
 )
 
@@ -106,7 +106,7 @@ func amqpTestAddr() string {
 func TestRabbitMQRealIntegration(t *testing.T) {
 	addr := amqpTestAddr()
 	// 快速探测可达性（含 env 门控），避免无中间件时长时间挂起。
-	itest.Require(t, parseAMQPHostPort(addr))
+	testsupport.Require(t, parseAMQPHostPort(addr))
 
 	const sender = 0x01010101
 	const receiver = 0x02020202

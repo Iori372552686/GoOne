@@ -1,0 +1,6 @@
+github.com/Iori372552686/g1_common v0.0.0-20260927184256-1e5a092d86ec h1:y84pETLFRrmMKWTukAsnUfj8P6R+RtRB3sQEP/5Y8l4=
+github.com/Iori372552686/g1_common v0.0.0-20260927184256-1e5a092d86ec/go.mod h1:ysaoeDDIIpscOBbO06MVoyciKBo+IQrvBS1jFWnUGLk=
+github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
+github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
+google.golang.org/protobuf v1.36.11 h1:fV6ZwhNocDyBLK0dj+fg8ektcVegBBuEolpbTQyBNVE=
+google.golang.org/protobuf v1.36.11/go.mod h1:HTf+CrKn2C3g5S8VImy6tdcUvCska2kB7j23XfzDpco=

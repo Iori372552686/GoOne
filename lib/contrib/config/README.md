@@ -1,3 +1,52 @@
+# lib/contrib/config
+
+[功能] 定义配置源 `Source`、订阅 `Watcher` 和发布 `Publisher` 的公共接口。自定义来源可用 `Wrap` 附上资源关闭逻辑。
+
+## 安装
+
+[版本] 需要 Go 1.25.4 或更新版本。以下命令在模块的首发标签发布后可执行。
+
+```sh
+go get github.com/Iori372552686/GoOne/lib/contrib/config@v0.1.0
+```
+
+## 示例
+
+[用法] 将示例保存为消费者模块中的 `main.go`，执行 `go run .`。
+
+```go
+package main
+
+import (
+	"errors"
+	"fmt"
+	"github.com/Iori372552686/GoOne/lib/contrib/config"
+	"log"
+)
+
+type memorySource struct{}
+
+func (memorySource) Load() ([]*config.KeyValue, error) {
+	return []*config.KeyValue{{Key: "app.yaml", Value: []byte("enabled: true"), Format: "yaml"}}, nil
+}
+
+func (memorySource) Watch() (config.Watcher, error) {
+	return nil, errors.New("static source")
+}
+
+func main() {
+	client := config.Wrap(memorySource{}, nil)
+	defer client.Close()
+	items, err := client.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(items[0].Key, string(items[0].Value))
+}
+```
+
+---
+
 # Config中间件 抽象层（本地 Source/Watcher/KeyValue + Publisher）
 
 本目录提供一套**本地**的 `Source/Watcher/KeyValue` 配置中间件抽象，并在其上实现多种配置中心 Source；另提供与之对称的 **`Publisher`** 写抽象，用于把配置数据发布到配置中心：
@@ -114,5 +163,3 @@ if err := pub.Publish(ctx, "ItemConfig.json", content, "json"); err != nil { ret
 - 工厂只负责：**解析字符串 + 组装选项 + 创建 Source**
 - `Normalize()` 会补齐默认超时与必填项校验，避免在运行时隐式失败
 - Apollo 原 `NewSource` 会 panic；已新增 `NewSourceE`（返回 error），工厂使用 `NewSourceE`
-
-

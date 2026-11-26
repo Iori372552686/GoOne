@@ -2,17 +2,15 @@ package ssrpc
 
 import (
 	"github.com/Iori372552686/GoOne/lib/api/cmd_handler"
+	"github.com/Iori372552686/GoOne/lib/api/sharedstruct"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 	"github.com/golang/protobuf/proto"
 )
 
 // SvrTypeFromCmd extracts the server type from a CMD value (bits [23:16]).
-//
-// This matches the convention in module/misc.ServerTypeInCmd but lives in
-// the ssrpc package so that generated client stubs do not depend on module/misc.
 func SvrTypeFromCmd(cmd g1_protocol.CMD) uint32 {
-	return uint32(cmd) >> 16 & 0xff
+	return sharedstruct.ServerTypeInCmd(uint32(cmd))
 }
 
 // CallByCmd performs a synchronous RPC call, automatically deriving the target

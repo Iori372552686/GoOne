@@ -1,3 +1,50 @@
+# lib/contrib/config/consul
+
+[功能] 从 Consul KV 路径读配置并监听变化。入口为 `New`、`WithPath`、`Load` 和 `Watch`。
+
+## 安装
+
+[版本] 需要 Go 1.25.4 或更新版本。以下命令在模块的首发标签发布后可执行。
+
+```sh
+go get github.com/Iori372552686/GoOne/lib/contrib/config/consul@v0.1.0
+```
+
+## 示例
+
+[运行条件] 运行前准备可访问的 Consul agent、读取 KV 的凭据和 `apps/demo` 前缀数据。用 `Watcher.Stop` 停止订阅。
+
+[用法] 将示例保存为消费者模块中的 `main.go`，执行 `go run .`。
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/Iori372552686/GoOne/lib/contrib/config/consul"
+	"github.com/hashicorp/consul/api"
+	"log"
+)
+
+func main() {
+	client, err := api.NewClient(api.DefaultConfig())
+	if err != nil {
+		log.Fatal(err)
+	}
+	source, err := consul.New(client, consul.WithPath("apps/demo"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	items, err := source.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(len(items))
+}
+```
+
+---
+
 # Consul Config
 
 ```go

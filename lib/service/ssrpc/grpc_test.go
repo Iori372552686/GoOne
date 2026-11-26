@@ -6,13 +6,13 @@ import (
 	"net"
 	"testing"
 
-	optionsv1 "github.com/Iori372552686/GoOne/api/gen/goone/options/v1"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 // ---------------------------------------------------------------------------
@@ -217,10 +217,10 @@ func TestDispatcher_MountGRPC_UnaryRoundTrip(t *testing.T) {
 	lis := bufconn.Listen(1024 * 1024)
 	srv := grpc.NewServer()
 	d := NewDispatcher()
-	d.RegisterGRPCUnary("test.grpc.v1.Svc", "Ping", func() any { return new(optionsv1.SsRpc) },
+	d.RegisterGRPCUnary("test.grpc.v1.Svc", "Ping", func() any { return new(descriptorpb.FieldDescriptorProto) },
 		WrapGRPCUnary(MethodDesc{Name: "test ping"}, nil, func(ctx *Context, req any) (any, error) {
-			in := req.(*optionsv1.SsRpc)
-			return &optionsv1.SsRpc{Comment: "pong", Cmd: in.GetCmd() + 1}, nil
+			in := req.(*descriptorpb.FieldDescriptorProto)
+			return &descriptorpb.FieldDescriptorProto{Name: proto.String("pong"), Number: proto.Int32(in.GetNumber() + 1)}, nil
 		}))
 	d.MountGRPC(srv)
 
@@ -239,13 +239,13 @@ func TestDispatcher_MountGRPC_UnaryRoundTrip(t *testing.T) {
 	}
 	defer conn.Close()
 
-	var rsp optionsv1.SsRpc
-	err = conn.Invoke(ctx, "/test.grpc.v1.Svc/Ping", &optionsv1.SsRpc{Cmd: 7}, &rsp)
+	var rsp descriptorpb.FieldDescriptorProto
+	err = conn.Invoke(ctx, "/test.grpc.v1.Svc/Ping", &descriptorpb.FieldDescriptorProto{Number: proto.Int32(7)}, &rsp)
 	if err != nil {
 		t.Fatalf("Invoke err: %v", err)
 	}
-	if rsp.GetComment() != "pong" || rsp.GetCmd() != 8 {
-		t.Fatalf("unexpected unary response: comment=%q cmd=%d", rsp.GetComment(), rsp.GetCmd())
+	if rsp.GetName() != "pong" || rsp.GetNumber() != 8 {
+		t.Fatalf("unexpected unary response: comment=%q cmd=%d", rsp.GetName(), rsp.GetNumber())
 	}
 }
 
@@ -253,16 +253,16 @@ func TestDispatcher_MountGRPC_ServerStreamRoundTrip(t *testing.T) {
 	lis := bufconn.Listen(1024 * 1024)
 	srv := grpc.NewServer()
 	d := NewDispatcher()
-	d.RegisterGRPCStream("test.grpc.v1.Svc", "Watch", WrapGRPCServerStreamTyped[*optionsv1.SsRpc](
+	d.RegisterGRPCStream("test.grpc.v1.Svc", "Watch", WrapGRPCServerStreamTyped[*descriptorpb.FieldDescriptorProto](
 		MethodDesc{Name: "test watch"},
 		nil,
-		func() any { return new(optionsv1.SsRpc) },
-		func(ctx *Context, req any, stream *ServerStream[*optionsv1.SsRpc]) error {
-			in := req.(*optionsv1.SsRpc)
-			if err := stream.Send(&optionsv1.SsRpc{Comment: "first", Cmd: in.GetCmd() + 1}); err != nil {
+		func() any { return new(descriptorpb.FieldDescriptorProto) },
+		func(ctx *Context, req any, stream *ServerStream[*descriptorpb.FieldDescriptorProto]) error {
+			in := req.(*descriptorpb.FieldDescriptorProto)
+			if err := stream.Send(&descriptorpb.FieldDescriptorProto{Name: proto.String("first"), Number: proto.Int32(in.GetNumber() + 1)}); err != nil {
 				return err
 			}
-			return stream.Send(&optionsv1.SsRpc{Comment: "second", Cmd: in.GetCmd() + 2})
+			return stream.Send(&descriptorpb.FieldDescriptorProto{Name: proto.String("second"), Number: proto.Int32(in.GetNumber() + 2)})
 		},
 	))
 	d.MountGRPC(srv)
@@ -287,25 +287,25 @@ func TestDispatcher_MountGRPC_ServerStreamRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStream err: %v", err)
 	}
-	if err := stream.SendMsg(&optionsv1.SsRpc{Cmd: 7}); err != nil {
+	if err := stream.SendMsg(&descriptorpb.FieldDescriptorProto{Number: proto.Int32(7)}); err != nil {
 		t.Fatalf("SendMsg err: %v", err)
 	}
 	if err := stream.CloseSend(); err != nil {
 		t.Fatalf("CloseSend err: %v", err)
 	}
 
-	var rsp1, rsp2 optionsv1.SsRpc
+	var rsp1, rsp2 descriptorpb.FieldDescriptorProto
 	if err := stream.RecvMsg(&rsp1); err != nil {
 		t.Fatalf("RecvMsg #1 err: %v", err)
 	}
 	if err := stream.RecvMsg(&rsp2); err != nil {
 		t.Fatalf("RecvMsg #2 err: %v", err)
 	}
-	if rsp1.GetComment() != "first" || rsp1.GetCmd() != 8 || rsp2.GetComment() != "second" || rsp2.GetCmd() != 9 {
+	if rsp1.GetName() != "first" || rsp1.GetNumber() != 8 || rsp2.GetName() != "second" || rsp2.GetNumber() != 9 {
 		t.Fatalf("unexpected stream responses: %#v / %#v", &rsp1, &rsp2)
 	}
 
-	var rsp3 optionsv1.SsRpc
+	var rsp3 descriptorpb.FieldDescriptorProto
 	if err := stream.RecvMsg(&rsp3); err != io.EOF {
 		t.Fatalf("expected EOF after server stream, got %v", err)
 	}

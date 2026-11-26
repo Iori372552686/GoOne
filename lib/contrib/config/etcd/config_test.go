@@ -10,7 +10,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
 
-	"github.com/Iori372552686/GoOne/lib/internal/itest"
+	"github.com/Iori372552686/GoOne/lib/testsupport"
 )
 
 const testKey = "/kratos/test/config"
@@ -23,7 +23,7 @@ func etcdAddr() string {
 	return "127.0.0.1:2379"
 }
 
-// newTestClient 构造连接 etcd 的客户端。调用方需先通过 itest.Require 门控。
+// newTestClient 构造连接 etcd 的客户端。调用方需先通过 testsupport.Require 门控。
 func newTestClient(t *testing.T) *clientv3.Client {
 	t.Helper()
 	client, err := clientv3.New(clientv3.Config{
@@ -38,7 +38,7 @@ func newTestClient(t *testing.T) *clientv3.Client {
 
 func TestConfig(t *testing.T) {
 	// 集成测试统一门控，未开启或 etcd 不可达时 t.Skip。
-	itest.Require(t, etcdAddr())
+	testsupport.Require(t, etcdAddr())
 	client := newTestClient(t)
 	defer func() { _ = client.Close() }()
 
@@ -87,7 +87,7 @@ func TestConfig(t *testing.T) {
 
 func TestExtToFormat(t *testing.T) {
 	// 集成测试统一门控。
-	itest.Require(t, etcdAddr())
+	testsupport.Require(t, etcdAddr())
 	client := newTestClient(t)
 	defer func() { _ = client.Close() }()
 

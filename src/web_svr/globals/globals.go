@@ -6,10 +6,11 @@ import (
 	"github.com/Iori372552686/GoOne/lib/db/redis"
 	"github.com/Iori372552686/GoOne/lib/web/http_sign"
 	"github.com/Iori372552686/GoOne/lib/web/rest_api"
+	"github.com/Iori372552686/GoOne/module/conf"
 )
 
 var (
 	SignMgr  = http_sign.NewSignMgr()
 	RestMgr  = rest_api.NewRestApiMgr()
-	RedisMgr = redis.NewRedisMgr()
+	RedisMgr = redis.NewRedisMgrWithConfigLoader(conf.Unmarshal)
 )

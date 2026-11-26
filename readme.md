@@ -9,6 +9,58 @@ GoOne 是一套基于 Go 实现的微服务分布式游戏服务器框架，核�
 ---
 
 
+## 独立 Go 模块
+
+[接入] 每个模块可单独选择版本，Go 会下载它所需的依赖。现有 package import 路径保持可用。以下示例需要 Go 1.25.4 或更新版本，并在对应模块标签发布后执行。
+
+```sh
+go mod init example.com/demo
+go get github.com/Iori372552686/GoOne/lib/db/redis@v0.1.0
+```
+
+[模块索引] 各 README 说明用途、依赖条件并提供 Go 示例。
+
+| 分类 | 模块 |
+| --- | --- |
+| 框架 API | [cmd_handler](lib/api/cmd_handler/README.md)、[datetime](lib/api/datetime/README.md)、[error_sentry](lib/api/error_sentry/README.md)、[gerr](lib/api/gerr/README.md)、[http_client](lib/api/http_client/README.md)、[logger](lib/api/logger/README.md)、[logo](lib/api/logo/README.md)、[net_conf](lib/api/net_conf/README.md)、[sharedstruct](lib/api/sharedstruct/README.md)、[uerror](lib/api/uerror/README.md) |
+| 远程配置 | [配置接口](lib/contrib/config/README.md)、[apollo](lib/contrib/config/apollo/README.md)、[consul](lib/contrib/config/consul/README.md)、[etcd](lib/contrib/config/etcd/README.md)、[地址工厂](lib/contrib/config/factory/README.md)、[kubernetes](lib/contrib/config/kubernetes/README.md)、[nacos](lib/contrib/config/nacos/README.md) |
+| 服务注册发现 | [注册发现接口](lib/contrib/registry/README.md)、[consul](lib/contrib/registry/consul/README.md)、[etcd](lib/contrib/registry/etcd/README.md)、[地址工厂](lib/contrib/registry/factory/README.md)、[kubernetes](lib/contrib/registry/kubernetes/README.md)、[nacos](lib/contrib/registry/nacos/README.md)、[zookeeper](lib/contrib/registry/zookeeper/README.md) |
+| 数据访问 | [dal](lib/db/dal/README.md)、[gorm](lib/db/gorm/README.md)、[mysql](lib/db/mysql/README.md)、[redis](lib/db/redis/README.md)、[shard](lib/db/shard/README.md)、[ssdb](lib/db/ssdb/README.md) |
+| 网络 | [gnet_server](lib/net/gnet_server/README.md)、[kcp_server](lib/net/kcp_server/README.md)、[net_mgr](lib/net/net_mgr/README.md)、[tcp_server](lib/net/tcp_server/README.md)、[ws_server](lib/net/ws_server/README.md) |
+| 消息总线与驱动 | [总线核心](lib/service/bus/README.md)、[kafka](lib/service/bus/driver/kafka/README.md)、[nats](lib/service/bus/driver/nats/README.md)、[NSQ 驱动](lib/service/bus/driver/nsq/README.md)、[rabbitmq](lib/service/bus/driver/rabbitmq/README.md)、[rocketmq](lib/service/bus/driver/rocketmq/README.md)、[NSQ 原生客户端](lib/service/bus/nsq/README.md) |
+| 服务运行与 RPC | [async](lib/service/async/README.md)、[router](lib/service/router/README.md)、[runtime](lib/service/runtime/README.md)、[bussvc](lib/service/runtime/bussvc/README.md)、[scheduler](lib/service/scheduler/README.md)、[ssrpc](lib/service/ssrpc/README.md)、[svrinstmgr](lib/service/svrinstmgr/README.md)、[transaction](lib/service/transaction/README.md) |
+| 工具 | [bufpool](lib/util/bufpool/README.md)、[convert](lib/util/convert/README.md)、[crypto](lib/util/crypto/README.md)、[encoding](lib/util/encoding/README.md)、[file](lib/util/file/README.md)、[generic](lib/util/generic/README.md)、[idgen](lib/util/idgen/README.md)、[lru](lib/util/lru/README.md)、[marshal](lib/util/marshal/README.md)、[mutex](lib/util/mutex/README.md)、[random](lib/util/random/README.md)、[safego](lib/util/safego/README.md)、[sensitive_words](lib/util/sensitive_words/README.md)、[slices](lib/util/slices/README.md)、[timer](lib/util/timer/README.md)、[tos](lib/util/tos/README.md)、[version](lib/util/version/README.md)、[zip](lib/util/zip/README.md) |
+| Web | [http_client](lib/web/http_client/README.md)、[http_sign](lib/web/http_sign/README.md)、[rest_api](lib/web/rest_api/README.md)、[web_gin](lib/web/web_gin/README.md) |
+| 集成测试 | [testsupport](lib/testsupport/README.md) |
+
+### 构建完整 GoOne
+
+[构建] 主工程需要 Go 1.27.4 或更新版本。初始化 `common` 子模块后，根 `go.mod` 会通过相对路径读取本次 checkout 中的库。以下命令在 Bash 中执行，`checkmodules` 会遍历所有库及支持模块。
+
+```sh
+git submodule update --init --recursive
+GOWORK=off go build -mod=readonly ./...
+GOWORK=off go test -mod=readonly ./...
+GOWORK=off go run ./tools/cmd/checkmodules check
+```
+
+[Windows] 在 PowerShell 中先执行 `$env:GOWORK = 'off'`，再运行相同的 `go` 命令。可用 `./build.ps1 tester stress` 生成工具二进制。
+
+### 从旧版迁移
+
+[迁移] 已有项目如果保留对拆分前 GoOne 根模块的依赖，在首发标签可用后，同时更新根版本和所选子模块。这样同一个 package 只有一个模块提供。
+
+```sh
+go get github.com/Iori372552686/GoOne@v1.4.0 github.com/Iori372552686/GoOne/lib/db/redis@v0.1.0
+go mod tidy
+```
+
+[配置接线] `module/conf` 和 `module/misc` 继续由根模块提供。独立使用 `bussvc` 时通过 `Assembly` 注入配置与路由。Redis 的 `OnStart` 由 `NewRedisMgrWithConfigLoader` 注入配置读取函数，应用也可通过 `InitAndRun` 传入配置。
+
+[版本] 子模块标签使用 `<模块目录>/v0.1.0`，例如 `lib/db/redis/v0.1.0`。根模块的首发配套标签是 `v1.4.0`。发布时把这些标签指向同一通过验收的提交。
+
+---
+
 ## 1. 架构概览
 
 ![image](https://github.com/user-attachments/assets/991e2091-dbd9-4f8f-9e0b-5c24ed98bf3b)

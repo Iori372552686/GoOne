@@ -9,12 +9,14 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/src/infosvr/globals"
 	"github.com/Iori372552686/GoOne/src/infosvr/service"
+	"github.com/Iori372552686/GoOne/src/serviceconfig"
 )
 
 // NewApp 用 runtime.App + Component 装配 infosvr。服务名只在 MustNew 出现一次；
 // 标准组件（logger/admin/tracing/router）由 bussvc 构造器自读 conf 装配。
 func NewApp() *runtime.App {
-	app := bussvc.MustNew("infosvr", router.ReadyCheck, bussvc.WithConfLoader())
+	assembly := serviceconfig.ForGoOne()
+	app := assembly.MustNew("infosvr", router.ReadyCheck, assembly.WithConfLoader())
 
 	// 标准组件（datetime/logger/admin/tracing）由 bussvc.MustNew 集中注册。
 	transMgr := &bussvc.TransMgrComponent{Mgr: globals.TransMgr}
@@ -36,7 +38,7 @@ func NewApp() *runtime.App {
 	)
 
 	// DriverRegistry 只注册 rabbitmq。
-	routerComp := bussvc.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry())
+	routerComp := assembly.NewRouterComponent(app, globals.TransMgr, rabbitmq.NewRegistry())
 
 	// Start 顺序：datetime_tick（WithConfLoader 自动注册，隐含在最前）→ logger →
 	// admin → tracing → dependencies → ssrpc_registry → transaction_mgr → router。

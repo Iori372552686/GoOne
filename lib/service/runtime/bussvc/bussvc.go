@@ -20,8 +20,6 @@ import (
 	"github.com/Iori372552686/GoOne/lib/service/runtime"
 	"github.com/Iori372552686/GoOne/lib/service/ssrpc"
 	"github.com/Iori372552686/GoOne/lib/service/transaction"
-	"github.com/Iori372552686/GoOne/module/conf"
-	"github.com/Iori372552686/GoOne/module/misc"
 )
 
 // ErrDriversNotConfigured 在 RouterComponent.Drivers 为 nil 时由 Start 返回。
@@ -45,41 +43,6 @@ type Common struct {
 	Pprof        bool
 
 	Tracing ssrpc.TracingConfig
-}
-
-// CommonFromConf 从 conf 按 key 读取并组装 Common，一处实现取代历史上散落在各
-// 服务 app.go 的 5 份近全同 xxxCommon()。svc 是服务段名（如 "connsvr"）。
-//
-// 读取的 key 路径与 yaml 结构一致：
-//   - <svc>.debug.log_dir / log_level
-//   - <svc>.identity.self_bus_id
-//   - base_cfg.runtime.bus_mq_addr / register_addr / admin_server.* / tracing.*
-//   - base_cfg.debug.pprof
-//
-// admin 端口为 0 时按服务类型回退（conf.ResolveAdminPort）。
-func CommonFromConf(svc string) Common {
-	admPrefix := "base_cfg.runtime.admin_server."
-	admPort := conf.ResolveAdminPort(conf.Get(admPrefix+"port").Int(), svc)
-	trPrefix := "base_cfg.runtime.tracing."
-	return Common{
-		LogDir:       conf.Get(svc + ".debug.log_dir").String(),
-		LogLevel:     conf.Get(svc + ".debug.log_level").String(),
-		SelfBusId:    conf.Get(svc + ".identity.self_bus_id").String(),
-		BusMQAddr:    conf.Get("base_cfg.runtime.bus_mq_addr").String(),
-		RegisterAddr: conf.Get("base_cfg.runtime.register_addr").String(),
-		AdminEnabled: conf.Get(admPrefix + "enabled").Bool(),
-		AdminIP:      conf.Get(admPrefix + "ip").String(),
-		AdminPort:    admPort,
-		Pprof:        conf.Get("base_cfg.debug.pprof").Bool(),
-		Tracing: ssrpc.TracingConfig{
-			Enabled:      conf.Get(trPrefix + "enabled").Bool(),
-			Exporter:     conf.Get(trPrefix + "exporter").String(),
-			Endpoint:     conf.Get(trPrefix + "endpoint").String(),
-			Insecure:     conf.Get(trPrefix + "insecure").Bool(),
-			SamplerRatio: conf.Get(trPrefix + "sampler_ratio").Float64(),
-			Headers:      conf.Get(trPrefix + "headers").StringsMap(),
-		},
-	}
 }
 
 // TracingComponent 把 ssrpc trace 的初始化与关闭包成 Component（早启动、晚停止）。
@@ -150,12 +113,14 @@ func (l *LoggerComponent) Stop(_ context.Context) error {
 	return nil
 }
 
+const defaultMaxTrans = 10_000
+
 // TransMgrComponent 把 TransactionMgr 的启动与排空关闭包成 Component。它实现
 // Drainer：Close 排空在途事务（受 ctx 超时约束）。
 //
 // 配置为值语义（无 func 包装、无 conf key 声明）：全零配置即推荐默认形态——
 // ShardCount=DefaultShardCount() 多分片（按 routerid_or_uid 串行键分片）、
-// MaxTrans=misc.MaxTransNumber、MaxPendingPerKey=DefaultMaxPendingPerKey。
+// MaxTrans=10000、MaxPendingPerKey=DefaultMaxPendingPerKey。
 // 分片数刻意不开放外部调优：它只划分派发队列与 transID 空间（handler 执行始终是
 // 每事务独立 goroutine），GOMAXPROCS 默认值恒正确；服务只需在确实不同时显式给
 // MaxPendingPerKey（如 roomcentersvr 的 200）。
@@ -174,7 +139,7 @@ func (c *TransMgrComponent) Name() string { return "transaction_mgr" }
 func (c *TransMgrComponent) Start(_ context.Context) error {
 	cfg := c.Cfg
 	if cfg.MaxTrans <= 0 {
-		cfg.MaxTrans = misc.MaxTransNumber
+		cfg.MaxTrans = defaultMaxTrans
 	}
 	if cfg.ShardCount <= 0 {
 		cfg.ShardCount = transaction.DefaultShardCount()
@@ -206,6 +171,7 @@ func (c *TransMgrComponent) Stop(_ context.Context) error {
 // Quiescer：BeginShutdown 注销实例并拒绝新请求；仍接收 DstTransID 非零的事务响应。
 type RouterComponent struct {
 	Common         func() Common
+	RouteRules     func() map[uint32]uint32     // Optional service routing policy, read at Start.
 	OnRecvSSPacket func(*sharedstruct.SSPacket) // 可选；为 nil 时默认投到 TransMgr。
 	TransMgr       transaction.ITransactionMgr
 	// Drivers 是显式 Driver 注册表（必填）。bus 服务在装配期创建
@@ -318,7 +284,11 @@ func (r *RouterComponent) Start(_ context.Context) error {
 	busCtor := func(onRecvMsg bus.MsgHandler) (bus.IBus, error) {
 		return drivers.CreateBus(selfBusInt, onRecvMsg, addr)
 	}
-	if err := router.InitAndRunWithBusCtor(c.SelfBusId, onRecv, busCtor, misc.ServerRouteRules, c.RegisterAddr); err != nil {
+	var rules map[uint32]uint32
+	if r.RouteRules != nil {
+		rules = r.RouteRules()
+	}
+	if err := router.InitAndRunWithBusCtor(c.SelfBusId, onRecv, busCtor, rules, c.RegisterAddr); err != nil {
 		return err
 	}
 	r.watchBusRuntimeErrors()

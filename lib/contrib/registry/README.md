@@ -1,3 +1,40 @@
+# lib/contrib/registry
+
+[功能] 定义服务实例、注册、注销、发现与订阅接口。业务代码可接收 `Discovery`，装配层传入选定后端。
+
+## 安装
+
+[版本] 需要 Go 1.25.4 或更新版本。以下命令在模块的首发标签发布后可执行。
+
+```sh
+go get github.com/Iori372552686/GoOne/lib/contrib/registry@v0.1.0
+```
+
+## 示例
+
+[运行条件] 持有 `Client` 的一方负责调用 `Close`，订阅结束时调用 `Watcher.Stop`。
+
+[用法] 将示例保存为消费者模块中的 `main.go`，执行 `go run .`。
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/Iori372552686/GoOne/lib/contrib/registry"
+)
+
+func main() {
+	instance := registry.ServiceInstance{
+		ID: "inventory-1", Name: "inventory",
+		Endpoints: []string{"grpc://127.0.0.1:9000"},
+	}
+	fmt.Println(instance.ID, instance.Endpoints[0])
+}
+```
+
+---
+
 # Registry 抽象层（Kratos 风格裁剪版）
 
 本目录提供一套**服务注册 / 服务发现**的通用抽象，参考 Kratos registry 的接口形态，并在本项目里做了轻量封装与工程化落地。

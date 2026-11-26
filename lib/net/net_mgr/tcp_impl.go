@@ -10,7 +10,6 @@ import (
 	"github.com/Iori372552686/GoOne/lib/net/tcp_server"
 	"github.com/Iori372552686/GoOne/lib/service/router"
 	"github.com/Iori372552686/GoOne/lib/util/safego"
-	"github.com/Iori372552686/GoOne/module/misc"
 	g1_protocol "github.com/Iori372552686/g1_common/protocol"
 
 	"github.com/golang/protobuf/proto"
@@ -99,7 +98,7 @@ func (t *ConnTcpSvr) OnClose(conn net.Conn) {
 	req := g1_protocol.LogoutReq{}
 	req.ByServer = true
 	req.Reason = "disconnect"
-	err := router.SendPbMsgBySvrTypeSimple(uint32(misc.ServerType_MainSvr), uid, 0, g1_protocol.CMD_MAIN_LOGOUT_REQ, &req)
+	err := router.SendPbMsgBySvrTypeSimple(sharedstruct.ServerTypeInCmd(uint32(g1_protocol.CMD_MAIN_LOGOUT_REQ)), uid, 0, g1_protocol.CMD_MAIN_LOGOUT_REQ, &req)
 	if err != nil {
 		logger.Error(err)
 	}
