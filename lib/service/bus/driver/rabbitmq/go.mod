@@ -6,7 +6,7 @@ require (
 	github.com/Iori372552686/GoOne/lib/api/logger v0.1.0
 	github.com/Iori372552686/GoOne/lib/service/bus v0.1.0
 	github.com/Iori372552686/GoOne/lib/testsupport v0.1.0
-	github.com/rabbitmq/amqp091-go v1.13.0
+	github.com/rabbitmq/amqp091-go v1.14.0
 )
 
 require (

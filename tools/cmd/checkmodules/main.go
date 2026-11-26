@@ -45,7 +45,11 @@ func run() error {
 	case "integration":
 		checks = [][]string{{"go", "test", "-v", "-count=1", "-timeout=600s", "./..."}}
 	case "security":
-		checks = [][]string{{"govulncheck", "./..."}}
+		command := []string{"govulncheck"}
+		if db := os.Getenv("GOONE_GOVULN_DB"); db != "" {
+			command = append(command, "-db", db)
+		}
+		checks = [][]string{append(command, "./...")}
 	default:
 		return fmt.Errorf("unknown check %q", os.Args[1])
 	}

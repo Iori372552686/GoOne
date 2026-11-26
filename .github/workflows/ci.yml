@@ -229,7 +229,14 @@ jobs:
         run: |
           set -e
           go install golang.org/x/vuln/cmd/govulncheck@v1.10.0
-          govulncheck ./...
+          # 同一批扫描共用当次下载的官方库，避免逐模块请求触发限流。
+          db_dir="$(mktemp -d "$RUNNER_TEMP/goone-vulndb.XXXXXX")"
+          curl --fail --silent --show-error --location --retry 3 --max-time 120 \
+            https://vuln.go.dev/vulndb.zip --output "$db_dir/vulndb.zip"
+          unzip -q "$db_dir/vulndb.zip" -d "$db_dir"
+          test -s "$db_dir/index/db.json"
+          export GOONE_GOVULN_DB="file://$db_dir"
+          govulncheck -db "$GOONE_GOVULN_DB" ./...
           go run ./tools/cmd/checkmodules security
 
       - name: gitleaks
